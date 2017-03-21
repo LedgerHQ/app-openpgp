@@ -22,7 +22,7 @@ This release is in beta stage with known missing parts (see also Add-on) :
 ## Add-on
 
 The GnuPG application implements the following addon:
-  - serial moddification
+  - serial modification
   - on screen reset
   - 3 independent key slots
   - seeded key generation
