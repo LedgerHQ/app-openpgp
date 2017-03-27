@@ -219,12 +219,8 @@ void gpg_init() {
 }
 
 void gpg_init_ux() {
-  snprintf(G_gpg_vstate.menu_cur_slot,  16, ">>SLOT: %d<<", G_gpg_vstate.slot+1);
-  snprintf(G_gpg_vstate.menu_seed_mode, 16, ">>%s<<", G_gpg_vstate.seed_mode?"ON":"OFF");
-  snprintf(G_gpg_vstate.menu_template_key, 16, "choose key...");
-  snprintf(G_gpg_vstate.menu_template_type, 16, "choose type...");
-  G_gpg_vstate.ux_type = 0;
-  G_gpg_vstate.ux_key = 0;
+  G_gpg_vstate.ux_type = -1;
+  G_gpg_vstate.ux_key = -1;
 }
 
 /* ----------------------------------------------------------------------- */

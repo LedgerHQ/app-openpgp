@@ -156,7 +156,8 @@ void gpg_check_access_write_DO() {
   switch(ref) {
   //PW1
   case 0x0101:
-  case 0x0103:
+  case 0x0103:  
+  case 0x01F2:
     if (gpg_is_verified(ID_PW1)) {
       return;
     }
@@ -167,6 +168,7 @@ void gpg_check_access_write_DO() {
   case 0x4f:
   case 0x0102:
   case 0x0104:
+  case 0x01F1:
   case 0x005E:
   case 0x005B:
   case 0x5F2D:
@@ -265,7 +267,6 @@ int gpg_dispatch() {
 #endif
     /* --- CHALLENGE --- */
   case INS_GET_CHALLENGE:
-
     sw = gpg_apdu_get_challenge();
     break;
 

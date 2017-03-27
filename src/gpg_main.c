@@ -29,7 +29,7 @@
 
 
 /* ----------------------------------------------------------------------- */
-/* ---                            UI layout                            --- */
+/* ---                        Blue  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
 /* screeen size: 
   blue; 320x480 
@@ -153,50 +153,53 @@ unsigned int ui_idle_blue_button(unsigned int button_mask,
 }
 
 #endif
+/* ----------------------------------------------------------------------- */
+/* ---                        NanoS  UI layout                         --- */
+/* ----------------------------------------------------------------------- */
+
+
+const ux_menu_entry_t ui_idle_sub_template[];
+void ui_idle_sub_template_display(unsigned int value);
+const bagl_element_t*  ui_idle_sub_template_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element);
+void ui_idle_sub_tmpl_set_action(unsigned int value) ;
+const ux_menu_entry_t ui_idle_sub_tmpl_key[];
+void ui_idle_sub_tmpl_key_action(unsigned int value);
+const ux_menu_entry_t ui_idle_sub_tmpl_type[];
+void ui_idle_sub_tmpl_type_action(unsigned int value);
+
+const ux_menu_entry_t ui_idle_sub_seed[];
+void ui_idle_sub_seed_display(unsigned int value);
+const bagl_element_t*  ui_idle_sub_seed_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) ;
+void ui_idle_sub_seed_action(unsigned int value) ;
+
+const ux_menu_entry_t ui_idle_sub_reset[] ;
+void ui_idle_sub_reset_action(unsigned int value);
+
+const ux_menu_entry_t ui_idle_sub_slot[];
+void ui_idle_sub_slot_display(unsigned int value);
+const bagl_element_t*  ui_idle_sub_slot_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element);
+void ui_idle_sub_slot_action(unsigned int value);
+
+const ux_menu_entry_t ui_idle_settings[] ;
 
 const ux_menu_entry_t ui_idle_mainmenu[];
+void ui_idle_main_display(unsigned int value) ;
+const bagl_element_t* ui_idle_main_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element);
 
-/* ----- Helpers  UX ----- */
-void ui_info(const ux_menu_entry_t *back, const char* msg1, const char* msg2) {
-  ux_menu_entry_t ui_invalid[2] = {
-   {back, NULL,  0, NULL, msg1, msg2, 0, 0},
+
+/* ------------------------------- Helpers  UX ------------------------------- */
+
+void ui_info(const char* msg1, const char* msg2, const void *menu_display, unsigned int entry) {
+  ux_menu_entry_t ui_dogsays[2] = {
+   {NULL, menu_display,  0, NULL, msg1, msg2, 0, 0},
    UX_MENU_END
  };
- UX_MENU_DISPLAY(0, ui_invalid, NULL);
+ UX_MENU_DISPLAY(entry, ui_dogsays, NULL);
 };
 
-/* ----- SLOT UX ----- */
-void ui_idle_sub_slot_action(unsigned int value) {
-  unsigned char s;
 
-  if (value == 0) {
-    s = G_gpg_vstate.slot;
-    gpg_nvm_write(&N_gpg_pstate->config_slot[1], &s,1);  
-  }
-  else {
-     s = (unsigned char)(value-1);
-     G_gpg_vstate.slot = s;
-     G_gpg_vstate.kslot   = &N_gpg_pstate->keys[G_gpg_vstate.slot];
-     
-  }
-  // redisplay first entry of the idle menu
-  gpg_init_ux();
-  UX_MENU_DISPLAY(0, ui_idle_mainmenu, NULL);
-}
+/* ------------------------------- template UX ------------------------------- */
 
-const ux_menu_entry_t ui_idle_sub_slot[] = {
-  #if GPG_KEYS_SLOTS != 3
-  #error menu definition not correct for current value of GPG_KEYS_SLOTS
-  #endif
-  {NULL,             ui_idle_sub_slot_action,   1, NULL,          "Select slot 1",  NULL, 0, 0},
-  {NULL,             ui_idle_sub_slot_action,   2, NULL,          "Select slot 2",  NULL, 0, 0},
-  {NULL,             ui_idle_sub_slot_action,   3, NULL,          "Select slot 3",  NULL, 0, 0},
-  {NULL,             ui_idle_sub_slot_action,   0, NULL,          "Set as default", NULL, 0, 0},
-  {ui_idle_mainmenu, NULL,                     1, &C_badge_back, "Back",            NULL, 61, 40},
-  UX_MENU_END
-};
-
-/* ----- template UX ----- */
 #define LABEL_SIG      "Signature"
 #define LABEL_AUT      "Authentication"
 #define LABEL_DEC      "Decryption"
@@ -208,84 +211,66 @@ const ux_menu_entry_t ui_idle_sub_slot[] = {
 #define LABEL_BPOOLR1  "Brainpool R1"
 #define LABEL_Ed25519  "Ed25519"
 
-const ux_menu_entry_t ui_idle_sub_template[];
-const ux_menu_entry_t ui_idle_sub_tmpl_key[];
-const ux_menu_entry_t ui_idle_sub_tmpl_type[];
+const ux_menu_entry_t ui_idle_sub_template[] = {
+  {ui_idle_sub_tmpl_key,           NULL,  -1, NULL,          "Choose key...",   NULL, 0, 0},
+  {ui_idle_sub_tmpl_type,          NULL,  -1, NULL,          "Choose type...",  NULL, 0, 0},
+  {NULL,    ui_idle_sub_tmpl_set_action,  -1, NULL,          "Set template",    NULL, 0, 0},
+  {ui_idle_settings,               NULL,   0, &C_badge_back, "Back",            NULL, 61, 40},
+  UX_MENU_END
+};
 
-/*
-const bagl_element_t* ui_idle_sub_tmpl_key_prepocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
-  if (entry == &ui_idle_sub_tmpl_key[2]) {
-    if(element->component.userid==0x20) {
-      element->component.stroke = 10; // 1 second stop in each way
-      element->component.icon_id = 26; // roundtrip speed in pixel/s
-      UX_CALLBACK_SET_INTERVAL(MAX(3000, 2*(1000+bagl_label_roundtrip_duration_ms(element, 7))));
+void ui_idle_sub_template_display(unsigned int value) {
+   UX_MENU_DISPLAY(value, ui_idle_sub_template, ui_idle_sub_template_preprocessor);
+}
+
+const bagl_element_t* ui_idle_sub_template_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
+  if(element->component.userid==0x20) {
+    if (entry == &ui_idle_sub_template[0]) {
+      switch(G_gpg_vstate.ux_key) {
+      case 1: 
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s", LABEL_SIG);
+        break;
+      case 2: 
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s", LABEL_DEC);
+        break;
+      case 3: 
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s", LABEL_AUT);
+        break;
+      default:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Choose key...");
+        break;
+      }
+      element->text = G_gpg_vstate.menu;    
+    }
+    if (entry == &ui_idle_sub_template[1]) {
+      switch(G_gpg_vstate.ux_type) {
+      case 2048:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_RSA2048);
+        break;
+      case 3072:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_RSA3072);
+        break;
+      case 4096:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_RSA4096);
+        break;
+      case CX_CURVE_SECP256R1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_NISTP256);
+        break;
+      case CX_CURVE_BrainPoolP256R1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOLR1);
+        break;
+      case CX_CURVE_Ed25519:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_Ed25519);
+        break;
+      default:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Choose type...");
+        break;
+      } 
+      element->text = G_gpg_vstate.menu;
     }
   }
-  return element;
+  return element;      
 }
-*/
-
-void ui_idle_sub_tmpl_key_action(unsigned int value) {
-
-  switch(value) {
-  case 1:
-    snprintf(G_gpg_vstate.menu_template_key, 16, "%s", LABEL_SIG);
-    G_gpg_vstate.ux_key = 1;
-    break;
-  case 2:
-    snprintf(G_gpg_vstate.menu_template_key, 16, "%s", LABEL_AUT);
-    G_gpg_vstate.ux_key = 2;
-    break;
-  case 3:
-    snprintf(G_gpg_vstate.menu_template_key, 16," %s", LABEL_DEC);
-    G_gpg_vstate.ux_key = 3;
-    break;
-  }
-  UX_MENU_DISPLAY(0, ui_idle_sub_template, NULL);
-}
-const ux_menu_entry_t ui_idle_sub_tmpl_key[] = {
-  {NULL,                 ui_idle_sub_tmpl_key_action,   1, NULL,          LABEL_SIG, NULL, 0, 0},
-  {NULL,                 ui_idle_sub_tmpl_key_action,   2, NULL,          LABEL_DEC, NULL, 0, 0},
-  {NULL,                 ui_idle_sub_tmpl_key_action,   3, NULL,          LABEL_AUT, NULL, 0, 0},
-  {ui_idle_sub_template, NULL,                          0, &C_badge_back, "Back",    NULL, 61, 40},
-  UX_MENU_END
-};
-
-void ui_idle_sub_tmpl_type_action(unsigned int value) {
-  switch(value) {
-  case 2048:
-    snprintf(G_gpg_vstate.menu_template_type, 16," %s", LABEL_RSA2048);
-    break;
-  case 3072:
-    snprintf(G_gpg_vstate.menu_template_type, 16," %s", LABEL_RSA3072);
-    break;
-  case 4096:
-    snprintf(G_gpg_vstate.menu_template_type, 16," %s", LABEL_RSA4096);
-    break;
-  case CX_CURVE_SECP256R1:
-    snprintf(G_gpg_vstate.menu_template_type, 16," %s", LABEL_NISTP256);
-    break;
-  case CX_CURVE_BrainPoolP256R1:
-    snprintf(G_gpg_vstate.menu_template_type, 16," %s", LABEL_BPOOLR1);
-    break;
-  case CX_CURVE_Ed25519:
-    snprintf(G_gpg_vstate.menu_template_type, 16," %s", LABEL_Ed25519);
-    break;
-  } 
-  G_gpg_vstate.ux_type = value;
-  UX_MENU_DISPLAY(1, ui_idle_sub_template, NULL);
-}
-const ux_menu_entry_t ui_idle_sub_tmpl_type[] = {
-  {NULL,             ui_idle_sub_tmpl_type_action,   2048,                     NULL,   LABEL_RSA2048,   NULL,  0,  0},
-  {NULL,             ui_idle_sub_tmpl_type_action,   3072,                     NULL,   LABEL_RSA3072,   NULL,  0,  0},
-  {NULL,             ui_idle_sub_tmpl_type_action,   4096,                     NULL,   LABEL_RSA4096,   NULL,  0,  0},
-  {NULL,             ui_idle_sub_tmpl_type_action,   CX_CURVE_SECP256R1,       NULL,   LABEL_NISTP256,  NULL,  0,  0},
-  {NULL,             ui_idle_sub_tmpl_type_action,   CX_CURVE_BrainPoolP256R1, NULL,   LABEL_BPOOLR1,   NULL,  0,  0},  
-  {NULL,             ui_idle_sub_tmpl_type_action,   CX_CURVE_Ed25519,         NULL,   LABEL_Ed25519,   NULL,  0,  0},
-  {ui_idle_sub_template,                    NULL,    1,               &C_badge_back,   "Back",          NULL, 61, 40},
-  UX_MENU_END
-};
-
 
 void  ui_idle_sub_tmpl_set_action(unsigned int value) {
   LV(attributes,GPG_KEY_ATTRIBUTES_LENGTH);
@@ -293,15 +278,7 @@ void  ui_idle_sub_tmpl_set_action(unsigned int value) {
   char* err;
 
   err = NULL;
-  if (!G_gpg_vstate.ux_key) {
-    err = "key";
-    goto ERROR;
-  }
-  if (!G_gpg_vstate.ux_type){ 
-    err = "type ";
-    goto ERROR;
-  }
-
+  
   os_memset(&attributes, 0, sizeof(attributes));
   switch (G_gpg_vstate.ux_type) {
   case 2048:
@@ -349,7 +326,7 @@ void  ui_idle_sub_tmpl_set_action(unsigned int value) {
     break;
 
     default:
-    err = "not supported";
+    err = "type";
     goto ERROR;
   }
 
@@ -365,96 +342,235 @@ void  ui_idle_sub_tmpl_set_action(unsigned int value) {
     dest = &G_gpg_vstate.kslot->aut;
     break;
   default:
-    err = "key not found";
+    err = "key";
     goto ERROR;
   }
  
   gpg_nvm_write(dest, NULL, sizeof(gpg_key_t));
   gpg_nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-  ui_info(ui_idle_sub_template, "Template set!", NULL);
+  ui_info("Template set!", NULL, ui_idle_sub_template_display, 0);
   return;
 
 ERROR:
-  ui_info(ui_idle_sub_template, "Invalid selection:", err);
+  ui_info("Invalid selection:", err, ui_idle_sub_template_display, 0);
 
 }
-/*
-void ui_idle_sub_tmpl_key_display(unsigned int value) {
-  UX_MENU_DISPLAY(0,ui_idle_sub_tmpl_key,ui_idle_sub_tmpl_key_prepocessor);
-}
-*/
-const ux_menu_entry_t ui_idle_sub_template[] = {
-  {ui_idle_sub_tmpl_key,           NULL,  0, NULL,          G_gpg_vstate.menu_template_key,   NULL, 0, 0},
-  {ui_idle_sub_tmpl_type,          NULL,  0, NULL,          G_gpg_vstate.menu_template_type,  NULL, 0, 0},
-  {NULL,    ui_idle_sub_tmpl_set_action,  0, NULL,          "Set template",                   NULL, 0, 0},
-  {ui_idle_mainmenu, NULL,                2, &C_badge_back, "Back",                           NULL, 61, 40},
+
+
+const ux_menu_entry_t ui_idle_sub_tmpl_key[] = {
+  {NULL,                 ui_idle_sub_tmpl_key_action,   1,          NULL, LABEL_SIG, NULL, 0, 0},
+  {NULL,                 ui_idle_sub_tmpl_key_action,   2,          NULL, LABEL_DEC, NULL, 0, 0},
+  {NULL,                 ui_idle_sub_tmpl_key_action,   3,          NULL, LABEL_AUT, NULL, 0, 0},
+  {ui_idle_sub_template, NULL,                          0, &C_badge_back,    "Back", NULL, 61, 40},
   UX_MENU_END
 };
 
-
-/* ----- SEED UX ----- */
-const ux_menu_entry_t ui_idle_sub_seed[];
-void ui_idle_sub_seed_action(unsigned int value) {
-  G_gpg_vstate.seed_mode = value;
-  gpg_init_ux();
-  UX_MENU_DISPLAY(0, ui_idle_sub_seed, NULL);
+void ui_idle_sub_tmpl_key_action(unsigned int value) {
+  G_gpg_vstate.ux_key = value;
+  ui_idle_sub_template_display(0);
 }
+
+
+const ux_menu_entry_t ui_idle_sub_tmpl_type[] = {
+  {NULL,             ui_idle_sub_tmpl_type_action,   2048,                     NULL,   LABEL_RSA2048,   NULL,  0,  0},
+  {NULL,             ui_idle_sub_tmpl_type_action,   3072,                     NULL,   LABEL_RSA3072,   NULL,  0,  0},
+  {NULL,             ui_idle_sub_tmpl_type_action,   4096,                     NULL,   LABEL_RSA4096,   NULL,  0,  0},
+  {NULL,             ui_idle_sub_tmpl_type_action,   CX_CURVE_SECP256R1,       NULL,   LABEL_NISTP256,  NULL,  0,  0},
+  {NULL,             ui_idle_sub_tmpl_type_action,   CX_CURVE_BrainPoolP256R1, NULL,   LABEL_BPOOLR1,   NULL,  0,  0},  
+  {NULL,             ui_idle_sub_tmpl_type_action,   CX_CURVE_Ed25519,         NULL,   LABEL_Ed25519,   NULL,  0,  0},
+  {ui_idle_sub_template,                    NULL,    1,              &C_badge_back,   "Back",          NULL, 61, 40},
+  UX_MENU_END
+};
+
+void ui_idle_sub_tmpl_type_action(unsigned int value) {
+  G_gpg_vstate.ux_type = value;
+   ui_idle_sub_template_display(1);
+}
+
+/* --------------------------------- SEED UX --------------------------------- */
+
 const ux_menu_entry_t ui_idle_sub_seed[] = {
   #if GPG_KEYS_SLOTS != 3
   #error menu definition not correct for current value of GPG_KEYS_SLOTS
   #endif
-  {NULL,             NULL,                     0,    NULL,          G_gpg_vstate.menu_seed_mode, NULL, 0, 0},
-  {NULL,             ui_idle_sub_seed_action,  1,    NULL,          "Set on",                    NULL, 0, 0},
-  {NULL,             ui_idle_sub_seed_action,  0,    NULL,          "Set off",                   NULL, 0, 0},
-  {ui_idle_mainmenu, NULL,                     2,    &C_badge_back, "Back",                      NULL, 61, 40},
+  {NULL,                    NULL, 0, NULL,          "",        NULL, 0, 0},
+  {NULL, ui_idle_sub_seed_action, 1, NULL,          "Set on",  NULL, 0, 0},
+  {NULL, ui_idle_sub_seed_action, 0, NULL,          "Set off", NULL, 0, 0},
+  {ui_idle_settings,        NULL, 1, &C_badge_back, "Back",    NULL, 61, 40},
   UX_MENU_END
 };
 
-/* ----- RESET UX ----- */
+void ui_idle_sub_seed_display(unsigned int value) {
+  UX_MENU_DISPLAY(value, ui_idle_sub_seed, ui_idle_sub_seed_preprocessor);
+}
+
+const bagl_element_t* ui_idle_sub_seed_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
+  if(element->component.userid==0x20) {
+     if (entry == &ui_idle_sub_seed[0]) {
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "< %s >", G_gpg_vstate.seed_mode?"ON":"OFF");
+      element->text = G_gpg_vstate.menu;
+     }
+  }
+  return element;
+}
+
+void ui_idle_sub_seed_action(unsigned int value) {
+  G_gpg_vstate.seed_mode = value;
+  ui_idle_sub_seed_display(0);
+}
+
+/* -------------------------------- RESET UX --------------------------------- */
+
+const ux_menu_entry_t ui_idle_sub_reset[] = {
+  #if GPG_KEYS_SLOTS != 3
+  #error menu definition not correct for current value of GPG_KEYS_SLOTS
+  #endif
+  {NULL,   NULL,                     0, NULL,          "Really Reset ?", NULL, 0, 0},
+  {NULL,   ui_idle_main_display,     0, &C_badge_back, "Oh No!",         NULL, 61, 40},
+  {NULL,   ui_idle_sub_reset_action, 0, NULL,          "Yes!",           NULL, 0, 0},
+  UX_MENU_END
+};
+
 void ui_idle_sub_reset_action(unsigned int value) {
   unsigned char magic[4];
   magic[0] = 0; magic[1] = 0; magic[2] = 0; magic[3] = 0;
   gpg_nvm_write(N_gpg_pstate->magic, magic, 4);
   gpg_init();
-  UX_MENU_DISPLAY(0, ui_idle_mainmenu, NULL);
+  ui_idle_main_display(0);
 }
-const ux_menu_entry_t ui_idle_sub_reset[] = {
-  #if GPG_KEYS_SLOTS != 3
-  #error menu definition not correct for current value of GPG_KEYS_SLOTS
-  #endif
-  {NULL,             NULL,                      0,    NULL,          "Really Reset ?",  NULL, 0, 0},
-  {NULL,             ui_idle_sub_reset_action,  0,    NULL,          "Yes!",            NULL, 0, 0},
-  {ui_idle_mainmenu, NULL,                      0,    &C_badge_back, "Oh No!",          NULL, 61, 40},
-  UX_MENU_END
-};
 
-/* ----- SETTINGS UX ----- */
+/* ------------------------------- SETTINGS UX ------------------------------- */
+
 const ux_menu_entry_t ui_idle_settings[] = {
-  {NULL,                  NULL,          0, NULL,           G_gpg_vstate.menu_cur_slot, NULL, 0, 0},
-  {ui_idle_sub_template,  NULL,          0, NULL,           "Key template",             NULL, 0, 0},
-  {ui_idle_sub_seed,      NULL,          0, NULL,           "Seed mode",                NULL, 0, 0},
-  {ui_idle_sub_reset,     NULL,          0, NULL,           "Reset",                    NULL, 0, 0},
-  {ui_idle_mainmenu,      NULL,          2, &C_badge_back,  "Back",                     NULL, 61, 40},
+  {NULL,   ui_idle_sub_template_display,  0, NULL,          "Key template", NULL, 0, 0},
+  {NULL,       ui_idle_sub_seed_display,  0, NULL,          "Seed mode",    NULL, 0, 0},
+  {ui_idle_sub_reset,              NULL,  0, NULL,          "Reset",        NULL, 0, 0},
+  {NULL,           ui_idle_main_display,  2, &C_badge_back, "Back",         NULL, 61, 40},
+  UX_MENU_END
+};
+/* --------------------------------- SLOT UX --------------------------------- */
+
+#if GPG_KEYS_SLOTS != 3
+#error menu definition not correct for current value of GPG_KEYS_SLOTS
+#endif
+
+const ux_menu_entry_t ui_idle_sub_slot[] = {
+  {NULL,             NULL,                     -1, NULL,          "Choose:",     NULL, 0, 0},
+  {NULL,             ui_idle_sub_slot_action,   1, NULL,          "",            NULL, 0, 0},
+  {NULL,             ui_idle_sub_slot_action,   2, NULL,          "",            NULL, 0, 0},
+  {NULL,             ui_idle_sub_slot_action,   3, NULL,          "",            NULL, 0, 0},
+  {NULL,             ui_idle_sub_slot_action, 128, NULL,          "Set Default", NULL, 0, 0},
+  {NULL,                ui_idle_main_display,  1, &C_badge_back, "Back",        NULL, 61, 40},
+  UX_MENU_END
+};
+void ui_idle_sub_slot_display(unsigned int value) {
+   UX_MENU_DISPLAY(value, ui_idle_sub_slot, ui_idle_sub_slot_preprocessor);
+}
+
+
+const bagl_element_t*  ui_idle_sub_slot_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
+  unsigned int slot;
+  if(element->component.userid==0x20) {
+    for (slot = 1; slot <= 3; slot ++) {
+      if (entry == &ui_idle_sub_slot[slot]) {
+        break;
+      }
+    }
+    if (slot != 4) {
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Slot %d  %s  %s", 
+              slot, 
+              slot == N_gpg_pstate->config_slot[1]+1?"#":" ", /* default */ 
+              slot == G_gpg_vstate.slot+1?"+":" "            /* selected*/);
+      element->text = G_gpg_vstate.menu;
+    }
+  }
+  return element;
+}
+void ui_idle_sub_slot_action(unsigned int value) {
+  unsigned char s;
+
+  if (value == 128) {
+    s = G_gpg_vstate.slot;
+    gpg_nvm_write(&N_gpg_pstate->config_slot[1], &s,1);
+    value = s+1;  
+  }
+  else {
+     s = (unsigned char)(value-1);
+     G_gpg_vstate.slot = s;
+     G_gpg_vstate.kslot   = &N_gpg_pstate->keys[G_gpg_vstate.slot];
+     
+  }
+  // redisplay first entry of the idle menu
+  ui_idle_sub_slot_display(value);
+}
+/* --------------------------------- INFO UX --------------------------------- */
+
+#if GPG_KEYS_SLOTS != 3
+#error menu definition not correct for current value of GPG_KEYS_SLOTS
+#endif
+
+#define STR(x)  #x
+#define XSTR(x) STR(x)
+
+const ux_menu_entry_t ui_idle_info[] = {
+  {NULL,  NULL,                 -1, NULL,          "OpenPGP Card",             NULL, 0, 0},
+  {NULL,  NULL,                 -1, NULL,          "(c) Ledger SAS",           NULL, 0, 0},
+  {NULL,  NULL,                 -1, NULL,          "Spec  3.0",                NULL, 0, 0},
+  {NULL,  NULL,                 -1, NULL,          "App  " XSTR(GPG_VERSION),  NULL, 0, 0},
+  {NULL,  ui_idle_main_display,  3, &C_badge_back, "Back",                     NULL, 61, 40},
   UX_MENU_END
 };
 
-/* ----- MAIN UX ----- */
+#undef STR
+#undef XSTR
+
+/* --------------------------------- MAIN UX --------------------------------- */
+
 const ux_menu_entry_t ui_idle_mainmenu[] = {
-  {NULL,               NULL,          0, NULL,              G_gpg_vstate.menu_cur_slot, NULL, 0, 0},
-  {ui_idle_sub_slot,   NULL,          0, NULL,              "Select slot",              NULL, 0, 0},
-  {ui_idle_settings,   NULL,          0, NULL,              "Settings",                 NULL, 0, 0},
-  {NULL,               os_sched_exit, 0, &C_icon_dashboard, "Quit app" ,                NULL, 50, 29},
+  {NULL,                       NULL,  0, NULL,              "",            NULL, 0, 0},
+  {NULL,   ui_idle_sub_slot_display,  0, NULL,              "Select slot", NULL, 0, 0},
+  {ui_idle_settings,           NULL,  0, NULL,              "Settings",    NULL, 0, 0},
+  {ui_idle_info,               NULL,  0, NULL,              "About",    NULL, 0, 0},
+  {NULL,              os_sched_exit,  0, &C_icon_dashboard, "Quit app" ,   NULL, 50, 29},
   UX_MENU_END
 };
 
+const bagl_element_t* ui_idle_main_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
+  if (entry == &ui_idle_mainmenu[0]) {
+    if(element->component.userid==0x20) {      
+      unsigned int serial;
+      char name[20];
+      
+      serial = MIN(N_gpg_pstate->name.length,19);
+      os_memset(name, 0, 20);
+      os_memmove(name, N_gpg_pstate->name.value, serial);
+      serial = (N_gpg_pstate->AID[10] << 24) |
+               (N_gpg_pstate->AID[11] << 16) |
+               (N_gpg_pstate->AID[12] <<  8) |
+               (N_gpg_pstate->AID[13]);
+      os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+      snprintf(G_gpg_vstate.menu,  sizeof(G_gpg_vstate.menu), "< User: %s / SLOT: %d / Serial: %x >", 
+               name, G_gpg_vstate.slot+1, serial);
+      element->component.stroke = 10; // 1 second stop in each way
+      element->component.icon_id = 26; // roundtrip speed in pixel/s
+      element->text = G_gpg_vstate.menu;
+      UX_CALLBACK_SET_INTERVAL(bagl_label_roundtrip_duration_ms(element, 7));
+    }
+  }
+  return element;
+}
+void ui_idle_main_display(unsigned int value) {
+   UX_MENU_DISPLAY(value, ui_idle_mainmenu, ui_idle_main_preprocessor);
+}
+
+void ui_idle_init(void) {
+ ui_idle_main_display(0);
+ // setup the first screen changing
+  UX_CALLBACK_SET_INTERVAL(1000);
+}
 
 void io_seproxyhal_display(const bagl_element_t *element) {
   io_seproxyhal_display_default((bagl_element_t *)element);
-}
-void ui_idle_init(void) {
-  UX_MENU_DISPLAY(0, ui_idle_mainmenu, NULL);
-  // setup the first screen changing
-  UX_CALLBACK_SET_INTERVAL(1000);
 }
 
 /* ----------------------------------------------------------------------- */

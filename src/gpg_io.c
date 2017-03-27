@@ -283,11 +283,15 @@ int gpg_io_do() {
   switch (G_gpg_vstate.io_ins) {
   case INS_GET_DATA:
   case INS_GET_RESPONSE:
-  case INS_GET_CHALLENGE:
   case INS_TERMINATE_DF:
   case INS_ACTIVATE_FILE:
     G_gpg_vstate.io_le  = G_io_apdu_buffer[4];
     break;
+  
+  case INS_GET_CHALLENGE:
+    if (G_gpg_vstate.io_p1 == 0) {
+      break;
+    }
   default:
     G_gpg_vstate.io_lc  = G_io_apdu_buffer[4];
     os_memmove(G_gpg_vstate.work.io_buffer, G_io_apdu_buffer+5, G_gpg_vstate.io_lc);

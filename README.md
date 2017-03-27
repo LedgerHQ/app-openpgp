@@ -2,8 +2,7 @@
 
 GnuPG application for Ledger Blue and Nano S
 
-This application implements "The OpenPGP card" specification revision 3.0. This specification is available in *doc* directory and at:
-ttps://g10code.com/p-card.html
+This application implements "The OpenPGP card" specification revision 3.0. This specification is available in *doc* directory and at https://g10code.com/p-card.html .
 
 The application supports:
   - RSA with key up to 4096 bits 
@@ -45,6 +44,8 @@ When installed the default slot is "1". You can change it in settings.
 
 A seeded mode is implemented in order to restore private keys on a new token.
 In this mode key material is generated from the global token seeded.
+
+Please consider SEED mode as experimental.
 
 More details to come... 
 

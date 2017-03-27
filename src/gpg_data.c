@@ -244,10 +244,11 @@ int gpg_apdu_put_data(unsigned int ref) {
     break;
   
   case 0x01F2:
-    if (G_gpg_vstate.io_length != 1) {
-      THROW(SW_WRONG_LENGTH);
-    }
-    if (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] >= GPG_KEYS_SLOTS)  {
+    if ((N_gpg_pstate->config_slot[2] & 2) == 0) {
+      THROW(SW_CONDITIONS_NOT_SATISFIED);
+    }  
+    if ((G_gpg_vstate.io_length != 1) || 
+        (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] >= GPG_KEYS_SLOTS))  {
        THROW(SW_WRONG_DATA);
     }
     G_gpg_vstate.slot = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];

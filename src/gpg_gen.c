@@ -39,17 +39,19 @@ static void gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
  * @in  Ski_len    sub-seed length
  */
 static void gpg_pso_derive_key_seed(unsigned char *Sn, unsigned char* key_name, unsigned int idx,
-                                    unsigned char *Ski,  unsigned int Ski_len,
-                                    cx_sha3_t *xof) {
+                                    unsigned char *Ski,  unsigned int Ski_len) {
  
-  unsigned char idx16[2];
-  idx16[0] = idx >>8;
-  idx16[1] = idx;
-  
-  cx_sha3_xof_init(xof, 256, Ski_len);
-  cx_hash((cx_hash_t *)xof, 0,       Sn,      32, NULL);
-  cx_hash((cx_hash_t *)xof, 0,       (unsigned char *)key_name, 4, NULL);
-  cx_hash((cx_hash_t *)xof, CX_LAST, idx16   , 2, Ski);
+  unsigned char h[32];
+  h[0] = idx >>8;
+  h[1] = idx;
+
+  cx_sha256_init(&G_gpg_vstate.work.md.sha256);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, 0,       Sn,      32, NULL);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, 0,       (unsigned char *)key_name, 4, NULL);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, CX_LAST, h   , 2, h);
+
+  cx_sha3_xof_init(&G_gpg_vstate.work.md.sha3, 256, Ski_len);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski);
 }
 
 
@@ -140,8 +142,8 @@ int gpg_apdu_gen() {
         unsigned int size;
         size = ksz>>1;
         gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
-        gpg_pso_derive_key_seed(seed, name, 1, pq,      size, (cx_sha3_t*)((unsigned int)&G_gpg_vstate.work.io_buffer[1024] & (~3)));
-        gpg_pso_derive_key_seed(seed, name, 2, pq+size, size, (cx_sha3_t*)((unsigned int)&G_gpg_vstate.work.io_buffer[1024] & (~3)));
+        gpg_pso_derive_key_seed(seed, name, 1, pq,      size);
+        gpg_pso_derive_key_seed(seed, name, 2, pq+size, size);
         *pq        |= 0x80;
         *(pq+size) |= 0x80;
         cx_math_next_prime(pq,size);
@@ -172,7 +174,7 @@ int gpg_apdu_gen() {
       curve = gpg_oid2curve(keygpg->attributes.value+1, keygpg->attributes.length-1);
       if ((G_gpg_vstate.io_p2 == 0x01) | (G_gpg_vstate.seed_mode)) {
         gpg_pso_derive_slot_seed(G_gpg_vstate.slot,   seed);
-        gpg_pso_derive_key_seed(seed, name, 1, seed, 32, (cx_sha3_t*)&G_gpg_vstate.work.io_buffer[1024]);
+        gpg_pso_derive_key_seed(seed, name, 1, seed, 32);
         cx_ecfp_init_private_key(curve,seed, 32, &G_gpg_vstate.work.ecfp256.private);
         keepprivate = 1;
       }

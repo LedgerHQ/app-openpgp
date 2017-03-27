@@ -94,7 +94,7 @@ Sn = BIP32_derive (/0x80475047/n)
 
 Then specific seeds are derived with the SHA3-XOF function for each of the four key :
 
- Sk[i] = SHA3-XOF(Sn \| <key_name> \| int16(i), length)
+ Sk[i] = SHA3-XOF(SHA256(Sn \| <key_name> \| int16(i)), length)
 
 Sn is the dedicated slot seed from step 1.
 key_name is one of 'sig ','dec ', 'aut ', 'sym0', each four characters.
@@ -142,7 +142,7 @@ Deterministic random number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The deterministic random number generation relies on the BIP32 scheme.
-The master install path of GPG-ledger is set to /0x80/'G'/'P'/'G', aka /0x80/0x47/0x50/0x47
+The master install path of GPG-ledger is set to /0x80'GPG', aka /80475047
 
 **Random prime number generation** :
 
@@ -156,8 +156,8 @@ The master install path of GPG-ledger is set to /0x80/'G'/'P'/'G', aka /0x80/0x4
 
 For a given length *L* and seed *S*:
 
-  - generate Sr = BIP32_derive (/0x80/'G'/'P'/'G'/0)
-  - generate r = SHA3-XOF(Sr \| 'rnd' \| S, L)
+  - generate Sr = BIP32_derive(/0x80475047/0x0F0F0F0F)
+  - generate r = SHA3-XOF(SHA256(Sr \| 'rnd' \| S), L)
   - return r
 
 **Seeded prime number generation** :
@@ -178,10 +178,10 @@ Key Slot management
 Key slots are managed by data object 01F1 and 01F2 witch are 
 manageable by PUT/GET DATA command as for others DO and organized as follow.
 
-On application reset the *01F2* content is set to *Default Slot* value
+On application reset, the *01F2* content is set to *Default Slot* value
 of *01F1*.
 
-*01F1*
+*01F1:*
 
   +------+--------------------------------------------------+--------+
   |bytes |    description                                   |  R/W   |
@@ -190,15 +190,23 @@ of *01F1*.
   +------+--------------------------------------------------+--------+
   |   2  |  Default slot                                    |  R/W   |
   +------+--------------------------------------------------+--------+
-  |   3  |  Allowed slot selection method:                  |  R/W   |
-  |      |     0: selection not allowed (locked to default) |        |
-  |      |     1: selection by APDU                         |        |
-  |      |     2: selection by screen                       |        |
-  |      |     3: selection by APDU and screen              |        |
+  |   3  |  Allowed slot selection method                   |  R/W   |
   +------+--------------------------------------------------+--------+
 
+Byte 3 is endoced as follow:
 
-*01F2*
+  +----+----+----+----+----+----+----+----+-------------------------+
+  | b8 | b7 | b6 | b5 | b4 | b3 | b2 | b1 | Meaning                 |
+  +----+----+----+----+----+----+----+----+-------------------------+
+  | \- | \- | \- | \- | \- | \- | \- | x  | selection by APDU       |
+  +----+----+----+----+----+----+----+----+-------------------------+
+  | \- | \- | \- | \- | \- | \- | x  | \- | selection by screen     |
+  +----+----+----+----+----+----+----+----+-------------------------+
+
+ 
+  
+
+*01F2:*
 
   +------+--------------------------------------------------+--------+
   |bytes |  Description                                     |  R/W   |
@@ -206,7 +214,7 @@ of *01F1*.
   |   1  |  Current slot                                    |  R/W   |
   +------+--------------------------------------------------+--------+
 
-*01F0*
+*01F0:*
 
   +------+--------------------------------------------------+--------+
   |bytes |  Description                                     |  R/W   |
@@ -217,17 +225,17 @@ of *01F1*.
   +------+--------------------------------------------------+--------+
 
 
-*Access Conditions*
+*Access Conditions:*
 
- +------+--------------+-------------+
+  +-------+------------+-------------+
   |   DO  |    Read    |    Write    |
-  +======+=============+=============+
+  +=======+============+=============+
   |  01F0 |  Always    |    Never    |
-  +------+-------------+-------------+
+  +-------+------------+-------------+
   |  01F1 |  Always    |  Verify PW3 |
-  +------+-------------+-------------+
+  +-------+------------+-------------+
   |  01F2 |  Always    |  Verify PW1 |
-  +------+-------------+-------------+
+  +-------+------------+-------------+
 
 
 
@@ -242,13 +250,19 @@ P2 parameter of GENERATE ASYMMETRIC KEY PAIR is set to (hex value):
 Deterministic random number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-P1 parameter of GET CHALLENGE is set to (hex value):
-  - 00 for true random
-  - 81 for prime true random
-  - 82 for seeded random
-  - 83 for prime seeded random
+P1 parameter of GET CHALLENGE is a bits field encoded as follow:
 
-When P1 is set to 82 or 83, Data field contains the seed
+  +----+-----+----+----+----+----+----+----+-------------------------+
+  | b8 |  b7 | b6 | b5 | b4 | b3 | b2 | b1 | Meaning                 |
+  +----+-----+----+----+----+----+----+----+-------------------------+
+  | \- | \-  | \- | \- | \- | \- | \- | x  | prime random            |
+  +----+-----+----+----+----+----+----+----+-------------------------+
+  | \- | \-  | \- | \- | \- | \- |  x | \- | seeded random           |
+  +----+-----+----+----+----+----+----+----+-------------------------+
+
+
+When bit b2 is set, data field contains the seed and P2 contains
+the length of random bytes to generate.
 
 
 Other minor add-on

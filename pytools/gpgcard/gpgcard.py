@@ -113,7 +113,7 @@ class GPGCard() :
             allreaders = readers()
             for r in allreaders:
                 rname = str(r)
-                print('try: %s : %s'%(rname,device[5:]))
+                #print('try: %s : %s'%(rname,device[5:]))
                 if rname.startswith(device[5:]):
                     r.createConnection()
                     self.token = r
@@ -121,7 +121,8 @@ class GPGCard() :
                     self.connection.connect()
                     self.exchange = self._exchange_pcsc
                 else:
-                    print("No")
+                    #print("No")
+                    pass
         if not self.token:
             print("No token")
 
@@ -146,7 +147,7 @@ class GPGCard() :
         return resp,sw
 
     def _exchange_pcsc(self,apdu,sw=0x9000):
-        print("xch S cmd : %s"%(binascii.hexlify(apdu)))
+        #print("xch S cmd : %s"%(binascii.hexlify(apdu)))
         apdu = [x for x in apdu]
         resp, sw1, sw2 = self.connection.transmit(apdu)
         while sw1==0x61:
@@ -156,7 +157,7 @@ class GPGCard() :
             resp = resp + resp2
         resp = bytes(resp)
         sw = (sw1<<8)|sw2
-        print("xch S resp: %s %.04x"%(binascii.hexlify(resp),sw))
+        #print("xch S resp: %s %.04x"%(binascii.hexlify(resp),sw))
         return resp,sw
 
     def select(self):
@@ -730,5 +731,3 @@ class GPGCard() :
             'd': tags[0x98],
             }
 
-    def dump():
-        pass

@@ -14,15 +14,15 @@
 #
 
 #extract TARGET_ID from the SDK to allow for makefile choices
-APPNAME = "GNUPG3"
-APPVERSION = "0.9"
+APPNAME = "OpenPGP"
+APPVERSION = "1.0RC1"
 TARGET_ID = 0x31100002
 $(info TARGET_ID=$(TARGET_ID))
 
-APP_LOAD_PARAMS=--appFlags 0
+APP_LOAD_PARAMS=--appFlags 0 --path "2152157255" --curve secp256k1
 LOADFLAGS = --params --appVersion $(APPVERSION)
 
-ICONNAME=icon.gif
+ICONNAME=icon_pgp.gif
 
 
 ################
@@ -60,10 +60,8 @@ DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=128
 DEFINES   += HAVE_BAGL HAVE_PRINTF HAVE_SPRINTF
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=7 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
 DEFINES   += HAVE_USB_CLASS_CCID
-#DEFINES   += PRINTF=screen_printf
-DEFINES   += PRINTF\(...\)=
 
-DEFINES   += $(GPG_CONFIG)
+DEFINES   += $(GPG_CONFIG) GPG_VERSION=$(APPVERSION) GPG_NAME=$(APPNAME)
 
 ##############
 # Compiler #
@@ -75,8 +73,8 @@ CC        := $(CLANGPATH)/clang
 CFLAGS   :=
 CFLAGS   += -gdwarf-2  -gstrict-dwarf
 #CFLAGS   += -O0
-CFLAGS   += -O0 -g3
-#CFLAGS   += -O3 -Os
+#CFLAGS   += -O0 -g3
+CFLAGS   += -O3 -Os
 CFLAGS   += -mcpu=cortex-m0 -mthumb
 CFLAGS   += -fno-common -mtune=cortex-m0 -mlittle-endian
 CFLAGS   += -std=gnu99 -Werror=int-to-pointer-cast -Wall -Wextra -Wno-unused-variable #-save-temps

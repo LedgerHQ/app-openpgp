@@ -23,13 +23,13 @@
 
 
 /* big private DO */
-#define GPG_EXT_PRIVATE_DO_LENGTH             1024
+#define GPG_EXT_PRIVATE_DO_LENGTH             512
 /* will be fixed..1024 is not enougth */
-#define GPG_EXT_CARD_HOLDER_CERT_LENTH        4096
+#define GPG_EXT_CARD_HOLDER_CERT_LENTH        2560
 /* random choice */
 #define GPG_EXT_CHALLENGE_LENTH               254
 /* accpet long PW, but less than one sha256 block */
-#define GPG_MAX_PW_LENGTH                     48
+#define GPG_MAX_PW_LENGTH                     12
 
 #define GPG_KEYS_SLOTS                        3
 
@@ -201,6 +201,13 @@ struct gpg_v_state_s {
       cx_ecfp_public_key_t public;
       cx_ecfp_private_key_t private;
     }ecfp256;
+    struct {
+      unsigned char md_buffer[GPG_IO_BUFFER_LENGTH-MAX(sizeof(cx_sha3_t),sizeof(cx_sha256_t))];
+      union {
+        cx_sha3_t sha3;
+        cx_sha256_t sha256;
+      };
+    } md ;
   } work;
 
   /* data state */
@@ -213,10 +220,7 @@ struct gpg_v_state_s {
 
 
   /* ux menus */
-  char          menu_cur_slot[16];
-  char          menu_seed_mode[16];
-  char          menu_template_key[16];
-  char          menu_template_type[16];
+  char          menu[64];
   unsigned int  ux_key;
   unsigned int  ux_type;
 
