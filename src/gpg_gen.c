@@ -169,7 +169,6 @@ int gpg_apdu_gen() {
         (keygpg->attributes.value[0] == 19) ||
         (keygpg->attributes.value[0] == 22) ){
       unsigned int   curve,keepprivate;
-      unsigned char  *d;
       keepprivate = 0;
       curve = gpg_oid2curve(keygpg->attributes.value+1, keygpg->attributes.length-1);
       if ((G_gpg_vstate.io_p2 == 0x01) | (G_gpg_vstate.seed_mode)) {

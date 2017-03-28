@@ -188,6 +188,9 @@ const bagl_element_t* ui_idle_main_preprocessor(const ux_menu_entry_t* entry, ba
 
 
 /* ------------------------------- Helpers  UX ------------------------------- */
+void ui_CCID_reset(void) {
+  //INSERT CODE HERE TO REMOVE/INSERT THE TOKEN
+}
 
 void ui_info(const char* msg1, const char* msg2, const void *menu_display, unsigned int entry) {
   ux_menu_entry_t ui_dogsays[2] = {
@@ -436,6 +439,7 @@ void ui_idle_sub_reset_action(unsigned int value) {
   magic[0] = 0; magic[1] = 0; magic[2] = 0; magic[3] = 0;
   gpg_nvm_write(N_gpg_pstate->magic, magic, 4);
   gpg_init();
+  ui_CCID_reset();
   ui_idle_main_display(0);
 }
 
@@ -460,7 +464,7 @@ const ux_menu_entry_t ui_idle_sub_slot[] = {
   {NULL,             ui_idle_sub_slot_action,   2, NULL,          "",            NULL, 0, 0},
   {NULL,             ui_idle_sub_slot_action,   3, NULL,          "",            NULL, 0, 0},
   {NULL,             ui_idle_sub_slot_action, 128, NULL,          "Set Default", NULL, 0, 0},
-  {NULL,                ui_idle_main_display,  1, &C_badge_back, "Back",        NULL, 61, 40},
+  {NULL,                ui_idle_main_display,   1, &C_badge_back, "Back",        NULL, 61, 40},
   UX_MENU_END
 };
 void ui_idle_sub_slot_display(unsigned int value) {
@@ -496,9 +500,11 @@ void ui_idle_sub_slot_action(unsigned int value) {
   }
   else {
      s = (unsigned char)(value-1);
-     G_gpg_vstate.slot = s;
-     G_gpg_vstate.kslot   = &N_gpg_pstate->keys[G_gpg_vstate.slot];
-     
+     if (s!= G_gpg_vstate.slot) {
+       G_gpg_vstate.slot = s;
+       G_gpg_vstate.kslot   = &N_gpg_pstate->keys[G_gpg_vstate.slot];
+       ui_CCID_reset();
+     }
   }
   // redisplay first entry of the idle menu
   ui_idle_sub_slot_display(value);
@@ -547,7 +553,7 @@ const bagl_element_t* ui_idle_main_preprocessor(const ux_menu_entry_t* entry, ba
       serial = (N_gpg_pstate->AID[10] << 24) |
                (N_gpg_pstate->AID[11] << 16) |
                (N_gpg_pstate->AID[12] <<  8) |
-               (N_gpg_pstate->AID[13]);
+               (N_gpg_pstate->AID[13] |(G_gpg_vstate.slot+1));
       os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
       snprintf(G_gpg_vstate.menu,  sizeof(G_gpg_vstate.menu), "< User: %s / SLOT: %d / Serial: %x >", 
                name, G_gpg_vstate.slot+1, serial);
@@ -693,38 +699,44 @@ __attribute__((section(".boot"))) int main(void) {
 
   // ensure exception will work as planned
   os_boot();
-  UX_INIT();
+  for(;;) {
+    UX_INIT();
 
-  BEGIN_TRY {
-    TRY {
+    BEGIN_TRY {
+      TRY {
       
-      //start communication with MCU
-      io_seproxyhal_init();
+        //start communication with MCU
+        io_seproxyhal_init();
 
-      USB_CCID_power(1);
-   
-      //set up
-      gpg_init();
+        USB_CCID_power(1);
 
-      //set up initial screen
-      ui_idle_init();
-      
-   
+        //set up
+        gpg_init();
+  
+        //set up initial screen
+        ui_idle_init();
 
-      //start the application
-      //the first exchange will:
-      // - display the  initial screen
-      // - send the ATR
-      // - receive the first command
-      gpg_main();
+
+
+        //start the application
+        //the first exchange will:
+        // - display the  initial screen
+        // - send the ATR
+        // - receive the first command
+        gpg_main();
+      }
+      CATCH(EXCEPTION_IO_RESET) {
+                // reset IO and UX
+        continue;
+      }
+      CATCH_ALL {
+        break;
+      }
+      FINALLY {
+      }
     }
-    CATCH_OTHER(e) {
-    }
-    FINALLY {
-    }
+    END_TRY;
   }
-  END_TRY;
-
   app_exit();
 }
 

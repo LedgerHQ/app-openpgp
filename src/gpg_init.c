@@ -239,10 +239,10 @@ int gpg_install(unsigned char app_state) {
   G_gpg_vstate.work.io_buffer[7] = app_state;
   gpg_nvm_write(N_gpg_pstate->histo, G_gpg_vstate.work.io_buffer, sizeof(C_default_Histo));
 
-  //AID (TODO:  set serial)
+  //AID
   os_memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));
   cx_rng(G_gpg_vstate.work.io_buffer+10, 4);
-  G_gpg_vstate.work.io_buffer[13] &= 0x07;
+  G_gpg_vstate.work.io_buffer[13] &= ~0x07;
   gpg_nvm_write(N_gpg_pstate->AID, &G_gpg_vstate.work.io_buffer, sizeof(C_default_AID));
 
   if (app_state == STATE_ACTIVATE) {

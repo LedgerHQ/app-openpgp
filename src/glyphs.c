@@ -14,20 +14,6 @@ unsigned char const C_badge_back_bitmap[] = {
 const bagl_icon_details_t C_badge_back = { GLYPH_badge_back_WIDTH, GLYPH_badge_back_HEIGHT, 1, C_badge_back_colors, C_badge_back_bitmap };
 #endif // OS_IO_SEPROXYHAL
 #include "glyphs.h"
-unsigned int const C_fish_left_colors[]
- = {
-  0x00000000, 
-  0x00ffffff, 
-};
-	
-unsigned char const C_fish_left_bitmap[] = {
-0x00, 0x00, 0x18, 0x84, 0x9f, 0xb1, 0x7f, 0xfe, 0x1f, 0x7f, 0x06, 0x07, 0x01, 0x00, };
-
-#ifdef OS_IO_SEPROXYHAL
-#include "os_io_seproxyhal.h"
-const bagl_icon_details_t C_fish_left = { GLYPH_fish_left_WIDTH, GLYPH_fish_left_HEIGHT, 1, C_fish_left_colors, C_fish_left_bitmap };
-#endif // OS_IO_SEPROXYHAL
-#include "glyphs.h"
 unsigned int const C_icon_dashboard_colors[]
  = {
   0x00000000, 

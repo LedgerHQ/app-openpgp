@@ -76,7 +76,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
     if ((sigkey->attributes.value[0] == 19) ||
         (sigkey->attributes.value[0] == 22)) {
       cx_ecfp_private_key_t *key;
-      unsigned int sz,i,j,rs_len;
+      unsigned int sz,i,rs_len;
       unsigned char *rs;
 
       key = &sigkey->key.ecfp256;
@@ -128,7 +128,6 @@ static int gpg_sign(gpg_key_t *sigkey) {
 
 int gpg_apdu_pso(unsigned int pso) {
   unsigned int t,l,ksz;
-  unsigned int hid,oidlen;
   switch(pso) {
   // --- PSO:CDS ---
   case 0x9e9a: {

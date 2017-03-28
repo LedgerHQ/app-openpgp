@@ -25,6 +25,9 @@ int gpg_is_verified(id) {
 }
 
 void gpg_check_access_ins() {
+  unsigned int ref;
+  ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
+
   switch (G_gpg_vstate.io_ins) {
   case INS_SELECT:
     return;
@@ -35,11 +38,8 @@ void gpg_check_access_ins() {
   case INS_VERIFY:
     return;
 
-  case INS_CHANGE_REFERENCE_DATA:
-  if (gpg_is_verified(ID_PW1) || gpg_is_verified(ID_RC)) {
-      return;
-    }
-    break;
+  case INS_CHANGE_REFERENCE_DATA:  
+    return;
 
   case INS_RESET_RETRY_COUNTER:
     if (gpg_is_verified(ID_PW3) || gpg_is_verified(ID_RC)) {
@@ -60,7 +60,15 @@ void gpg_check_access_ins() {
     break;
     
   case INS_PSO:
-    if (gpg_is_verified(ID_PW1) || gpg_is_verified(ID_PW2)) {
+    if ((ref == 0x9e9a) && gpg_is_verified(ID_PW1)) {
+      //pso:sign
+      if (N_gpg_pstate->PW_status[0] == 0) {
+        gpg_set_pin_verified(ID_PW1,0);
+      }
+      return;
+    }
+    if ((ref == 0x8086 ) && gpg_is_verified(ID_PW2)) {
+      //pso:dec
       return;
     }
     break;
@@ -132,7 +140,7 @@ void gpg_check_access_read_DO() {
 
     //PW1
   case 0x0103:
-    if (gpg_is_verified(ID_PW1)) {
+    if (gpg_is_verified(ID_PW2)) {
       return;
     }
     break;
@@ -158,7 +166,7 @@ void gpg_check_access_write_DO() {
   case 0x0101:
   case 0x0103:  
   case 0x01F2:
-    if (gpg_is_verified(ID_PW1)) {
+    if (gpg_is_verified(ID_PW2)) {
       return;
     }
     break;

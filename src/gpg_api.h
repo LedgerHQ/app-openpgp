@@ -42,6 +42,7 @@ int  gpg_apdu_reset_retry_counter(void) ;
 int gpg_oid2curve(unsigned char* oid, unsigned int len);
 int gpg_is_pin_verified(int id);
 int gpg_is_pin_blocked(int id);
+void gpg_set_pin_verified(int id, int verified);
 
 /* ----------------------------------------------------------------------- */
 /* ---                                  IO                            ---- */

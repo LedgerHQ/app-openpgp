@@ -164,17 +164,17 @@ typedef struct gpg_nv_state_s gpg_nv_state_t;
 struct gpg_v_state_s {
   /* app state */
   unsigned char   selected;
-  unsigned char      slot; /* DO 01F2 */
-  gpg_key_slot_t   *kslot;
-  unsigned char    seed_mode;
+  unsigned char   slot; /* DO 01F2 */
+  gpg_key_slot_t *kslot;
+  unsigned char   seed_mode;
 
   /* io state*/
-  unsigned char io_cla;
-  unsigned char io_ins;
-  unsigned char io_p1;
-  unsigned char io_p2;
-  unsigned char io_lc;
-  unsigned char io_le;
+  unsigned char   io_cla;
+  unsigned char   io_ins;
+  unsigned char   io_p1;
+  unsigned char   io_p2;
+  unsigned char   io_lc;
+  unsigned char   io_le;
   unsigned short  io_length;
   unsigned short  io_offset;
   unsigned short  io_mark;
@@ -207,7 +207,7 @@ struct gpg_v_state_s {
         cx_sha3_t sha3;
         cx_sha256_t sha256;
       };
-    } md ;
+    } md;
   } work;
 
   /* data state */
@@ -311,6 +311,7 @@ typedef struct  gpg_v_state_s gpg_v_state_t;
 
 #define SW_SECURITY_STATUS_NOT_SATISFIED    0x6982
 #define SW_FILE_INVALID                     0x6983
+#define SW_PIN_BLOCKED                      0x6983
 #define SW_DATA_INVALID                     0x6984
 #define SW_CONDITIONS_NOT_SATISFIED         0x6985
 #define SW_COMMAND_NOT_ALLOWED              0x6986

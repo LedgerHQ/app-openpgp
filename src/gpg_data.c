@@ -69,6 +69,7 @@ int gpg_apdu_get_data(unsigned int ref)  {
     /*  Full Application identifier  */
   case 0x004F:
     gpg_io_insert(N_gpg_pstate->AID, 16);
+    G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset-3] |= G_gpg_vstate.slot+1;
     break;
     /* Historical bytes, */
   case 0x5F52:
@@ -261,13 +262,13 @@ int gpg_apdu_put_data(unsigned int ref) {
     if (G_gpg_vstate.io_length != 4) {
       THROW(SW_WRONG_LENGTH);
     }
+    G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] &= ~0x07;
     nvm_write(&N_gpg_pstate->AID[10], &G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset], 4);
     sw = SW_OK;
     break;
 
     /* ----------------- Extended Header list -----------------*/
   case 0x3FFF: {
-    void          *pkey,*vkey;
     unsigned int  len_e,len_p,len_q;
     unsigned int  endof,ksz,reset_cnt;
     gpg_key_t     *keygpg;
