@@ -28,10 +28,10 @@ int gpg_apdu_select() {
     G_gpg_vstate.DO_reccord = 0;
     G_gpg_vstate.DO_offset  = 0;
     if ( G_gpg_vstate.selected == 0) {
-      G_gpg_vstate.verified_pin[ID_PW1] = 0;
-      G_gpg_vstate.verified_pin[ID_PW2] = 0;
-      G_gpg_vstate.verified_pin[ID_PW3] = 0;
-      G_gpg_vstate.verified_pin[ID_RC]  = 0;
+      G_gpg_vstate.verified_pin[PIN_ID_PW1] = 0;
+      G_gpg_vstate.verified_pin[PIN_ID_PW2] = 0;
+      G_gpg_vstate.verified_pin[PIN_ID_PW3] = 0;
+      G_gpg_vstate.verified_pin[PIN_ID_RC]  = 0;
     }
     gpg_io_discard(0);
     sw = SW_OK;

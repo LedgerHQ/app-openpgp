@@ -619,7 +619,7 @@ int gpg_apdu_put_data(unsigned int ref) {
 
     /* ----------------- RC ----------------- */
   case 0xD3:
-    sw = gpg_apdu_change_ref_data(ID_RC);
+    sw = gpg_apdu_change_ref_data(PIN_ID_RC);
     break;
 
     /* ----------------- UIF ----------------- */

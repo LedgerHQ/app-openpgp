@@ -160,7 +160,8 @@ static const uint8_t const USBD_DeviceDesc[]= {
 
 /* USB Mass storage device Configuration Descriptor */
 /*   All Descriptors (Configuration, Interface, Endpoint, Class, Vendor */
-static const uint8_t USBD_CfgDesc[] =
+#define USBD_OFFSET_CfgDesc_bPINSupport 70
+static const  uint8_t N_USBD_CfgDesc[] =
 {
   
   0x09,   /* bLength: Configuration Descriptor size */
@@ -252,9 +253,10 @@ static const uint8_t USBD_CfgDesc[] =
   0x00,     /* bClassGetResponse*/
   0x00,     /* bClassEnvelope */
   0x00,0x00,    /* wLcdLayout : 0000h no LCD. */
-  0x01,     /* bPINSupport : no PIN verif and modif  */
+  0x03,     /* bPINSupport : no PIN verif and modif  */                  //<= offset: 70
   0x01,     /* bMaxCCIDBusySlots  */
 
+  //72
   /********************  CCID   Endpoints ********************/
   0x07,   /*Endpoint descriptor length = 7*/
   0x05,   /*Endpoint descriptor type */
@@ -283,10 +285,11 @@ static const uint8_t USBD_CfgDesc[] =
 };
 
 
+
 static uint8_t  *USBD_GetCfgDesc_impl (uint16_t *length)
 {
-  *length = sizeof (USBD_CfgDesc);
-  return (uint8_t*)USBD_CfgDesc;
+  *length = sizeof (N_USBD_CfgDesc);
+  return (uint8_t*)(N_USBD_CfgDesc);
 }
 
 /**
@@ -431,6 +434,12 @@ static const USBD_ClassTypeDef USBD_CCID =
   USBD_GetDeviceQualifierDesc_impl,
 };
 
+
+void USBD_CCID_activate_pinpad(int enabled) {
+  unsigned char e;
+  e = enabled?3:0;
+  nvm_write(USBD_GetCfgDesc_impl+USBD_OFFSET_CfgDesc_bPINSupport, &e,1);
+}
 
 void USB_CCID_power(unsigned char enabled) {
   os_memset(&USBD_Device, 0, sizeof(USBD_Device));

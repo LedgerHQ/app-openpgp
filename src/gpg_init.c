@@ -214,6 +214,8 @@ void gpg_init() {
   //key conf
   G_gpg_vstate.slot  = N_gpg_pstate->config_slot[1];
   G_gpg_vstate.kslot = &N_gpg_pstate->keys[G_gpg_vstate.slot];
+  //pin conf
+  G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
   //ux conf
   gpg_init_ux();
 }
@@ -229,7 +231,6 @@ void gpg_init_ux() {
 int gpg_install(unsigned char app_state) {
   gpg_pin_t pin;
   unsigned int l;
-  unsigned char config[4];
 
   //full reset data
   gpg_nvm_write(N_gpg_pstate, NULL, sizeof(gpg_nv_state_t));
@@ -268,12 +269,17 @@ int gpg_install(unsigned char app_state) {
     G_gpg_vstate.work.io_buffer[1] = GPG_MAX_PW_LENGTH;
     G_gpg_vstate.work.io_buffer[2] = GPG_MAX_PW_LENGTH;
     G_gpg_vstate.work.io_buffer[3] = GPG_MAX_PW_LENGTH;
-    gpg_nvm_write(&N_gpg_pstate->PW_status, G_gpg_vstate.work.io_buffer, 4);
+    gpg_nvm_write(&N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer, 4);
 
     //config slot
-    config[0] = GPG_KEYS_SLOTS;
-    config[1] = 0;
-    config[2] = 3; // 3: selection by APDU and screen 
+    G_gpg_vstate.work.io_buffer[0] = GPG_KEYS_SLOTS;
+    G_gpg_vstate.work.io_buffer[1] = 0;
+    G_gpg_vstate.work.io_buffer[2] = 3; // 3: selection by APDU and screen 
+    gpg_nvm_write(&N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer, 3);
+
+    //config pin
+    G_gpg_vstate.work.io_buffer[0] = PIN_MODE_SCREEN;
+    gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
 
     //default key template: RSA 2048)
     

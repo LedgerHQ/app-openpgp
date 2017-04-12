@@ -16,6 +16,7 @@
 #ifndef GPG_TYPES_H
 #define GPG_TYPES_H
 
+#include "os_io_seproxyhal.h"
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
  */
@@ -107,6 +108,9 @@ struct gpg_nv_state_s {
   /* magic */
   unsigned char magic[8];
 
+  /* pin mode */
+  unsigned char config_pin[1];
+
   /* 01F1 (01F2 is volatile)*/
   unsigned char config_slot[3];
 
@@ -178,7 +182,6 @@ struct gpg_v_state_s {
   unsigned short  io_length;
   unsigned short  io_offset;
   unsigned short  io_mark;
-  unsigned short  io_flags;
   union {
     unsigned char io_buffer[GPG_IO_BUFFER_LENGTH];
     struct {
@@ -217,13 +220,14 @@ struct gpg_v_state_s {
 
   /* PINs state */
   unsigned char verified_pin[5];
-
+  unsigned char pinmode;
 
   /* ux menus */
   char          menu[64];
+  unsigned char ux_pinentry[12];
   unsigned int  ux_key;
   unsigned int  ux_type;
-
+  ux_menu_entry_t ui_dogsays[2] ;
 
 #ifdef GPG_DEBUG
   unsigned char print;
@@ -240,10 +244,6 @@ typedef struct  gpg_v_state_s gpg_v_state_t;
 
 /* ---  IDentifiers  --- */
 
-#define ID_PW1                              1
-#define ID_PW2                              2
-#define ID_PW3                              3
-#define ID_RC                               4
 
 #define ID_AUTH                             1
 #define ID_DEC                              2
@@ -255,6 +255,17 @@ typedef struct  gpg_v_state_s gpg_v_state_t;
 
 #define IO_OFFSET_END                       (unsigned int)-1
 #define IO_OFFSET_MARK                      (unsigned int)-2
+
+#define PIN_ID_PW1                          1
+#define PIN_ID_PW2                          2
+#define PIN_ID_PW3                          3
+#define PIN_ID_RC                           4
+
+#define PIN_MODE_HOST                       1
+#define PIN_MODE_SCREEN                     2
+#define PIN_MODE_CONFIRM                    3
+#define PIN_MODE_TRUST                      4
+
 
 
 /* ---  INS  --- */

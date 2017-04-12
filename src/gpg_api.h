@@ -39,10 +39,12 @@ int  gpg_apdu_change_ref_data(int id) ;
 int  gpg_apdu_reset_retry_counter(void) ;
 
 
-int gpg_oid2curve(unsigned char* oid, unsigned int len);
-int gpg_is_pin_verified(int id);
-int gpg_is_pin_blocked(int id);
-void gpg_set_pin_verified(int id, int verified);
+int  gpg_oid2curve(unsigned char* oid, unsigned int len);
+int  gpg_is_pin_verified(int id);
+int  gpg_is_pin_blocked(int id);
+int  gpg_set_pin_verified(int id, int verified);
+int  gpg_check_pin(int id, unsigned char *pin_val, unsigned int pin_len);
+void gpg_change_pin(int id, unsigned char *pin_val, unsigned int pin_len);
 
 /* ----------------------------------------------------------------------- */
 /* ---                                  IO                            ---- */
@@ -73,7 +75,7 @@ int gpg_io_fetch_tl(unsigned int *T, unsigned int *L) ;
 int gpg_io_fetch_nv(unsigned char* buffer, int len) ;
 int gpg_io_fetch(unsigned char* buffer, int len) ;
 
-int gpg_io_do(void) ;
+int gpg_io_do(unsigned int io_flags) ;
 
 
 /* ----------------------------------------------------------------------- */

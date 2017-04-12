@@ -17,6 +17,8 @@
 #define CCID_INTR_EPIN_SIZE 16
 
 #define CCID_EP0_BUFF_SIZ            64
-
+ 
+void USB_CCID_power(unsigned char enabled);
+void USBD_CCID_activate_pinpad(int enabled);
 
 #endif // USBD_CCID_IMPL_H

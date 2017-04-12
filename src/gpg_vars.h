@@ -18,6 +18,7 @@
 
 #include "os.h"
 #include "cx.h"
+#include "os_io_seproxyhal.h"
 #include "gpg_types.h"
 #include "gpg_api.h"
 
@@ -39,5 +40,5 @@ extern gpg_nv_state_t N_state_pic;
 extern int apdu_n;
 #endif
 
-
+extern ux_state_t ux;
 #endif

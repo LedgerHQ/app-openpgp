@@ -1,3 +1,4 @@
+
 /* Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,23 +14,12 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
-#include "gpg_vars.h"
 
-#include "os_io_seproxyhal.h"
+#ifndef GPG_UX_NANOS_H
+#define GPG_UX_NANOS_H
 
-#ifndef GPG_DEBUG_MAIN
-unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-ux_state_t ux;
-#else
-extern unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-int apdu_n;
-
+void ui_init(void);
+void ui_main_display(unsigned int value);
+void ui_menu_pinconfirm_display(unsigned int value);
+void ui_menu_pinentry_display(unsigned int value);
 #endif
-
-
-gpg_v_state_t  G_gpg_vstate;
-
