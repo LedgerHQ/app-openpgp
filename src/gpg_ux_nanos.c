@@ -237,7 +237,24 @@ void ui_menu_pinentry_display(unsigned int value) {
 
 unsigned int ui_pinentry_prepro(const  bagl_element_t* element) {
   if (element->component.userid == 1) {
-    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s PIN",  (G_gpg_vstate.io_p2 == 0x83)?"Admin":"User");
+    if (G_gpg_vstate.io_ins == 0x24) { 
+      switch  (G_gpg_vstate.io_p1) {
+      case 0:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Current %s PIN",  (G_gpg_vstate.io_p2 == 0x83)?"Admin":"User");
+        break;
+      case 1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "New %s PIN",  (G_gpg_vstate.io_p2 == 0x83)?"Admin":"User");
+        break;
+      case 2:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Confirm %s PIN",  (G_gpg_vstate.io_p2 == 0x83)?"Admin":"User");
+        break;
+        default:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "WAT %s PIN",  (G_gpg_vstate.io_p2 == 0x83)?"Admin":"User");
+        break;
+      }
+    } else {
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s PIN",  (G_gpg_vstate.io_p2 == 0x83)?"Admin":"User");
+    }
   }
   else if (element->component.userid == 2) {
     unsigned int i;
@@ -256,8 +273,10 @@ unsigned int ui_pinentry_prepro(const  bagl_element_t* element) {
 
 unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int button_mask_counter) {
   unsigned int offset = G_gpg_vstate.ux_pinentry[0];
-  
+  unsigned m_pinentry;
   char digit ;
+
+  m_pinentry = 1;
 
   switch(button_mask) {
   case BUTTON_EVT_RELEASED|BUTTON_LEFT: // Down
@@ -266,6 +285,7 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
   } else {
     G_gpg_vstate.ux_pinentry[offset] = sizeof(C_pin_digit)-1;
   }
+  ui_menu_pinentry_display(1);
   break;
   
   case BUTTON_EVT_RELEASED|BUTTON_RIGHT:  //up
@@ -273,6 +293,7 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
     if (G_gpg_vstate.ux_pinentry[offset] == sizeof(C_pin_digit)) {
       G_gpg_vstate.ux_pinentry[offset] = 0;
     }
+    ui_menu_pinentry_display(1);
     break;
   
   case BUTTON_EVT_RELEASED|BUTTON_LEFT|BUTTON_RIGHT: 
@@ -282,10 +303,11 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
       offset ++;
       G_gpg_vstate.ux_pinentry[0] = offset;
       if (offset == GPG_MAX_PW_LENGTH+1) {
-        return validate_pin() ;
-        
+          validate_pin();         
+      } else {
+        G_gpg_vstate.ux_pinentry[offset] = 5;
+        ui_menu_pinentry_display(1);
       }
-      G_gpg_vstate.ux_pinentry[offset] = 5;
     } 
     //cancel digit
     else if (digit == 'C') {
@@ -293,11 +315,12 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
         offset--;
         G_gpg_vstate.ux_pinentry[0] = offset;
       }
+      ui_menu_pinentry_display(1);
     } 
     //validate pin
     else if (digit == 'V') {
       G_gpg_vstate.ux_pinentry[0] = offset-1;
-      return validate_pin() ;
+      validate_pin();
     }
     //cancel input without check
     else { //(digit == 'A') 
@@ -305,13 +328,11 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
       gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
       gpg_io_do(IO_RETURN_AFTER_TX);
       ui_menu_main_display(0);
-      return 0;
     } 
   }
-  ui_menu_pinentry_display(1);
   return 0; 
 }
-
+// >= 0
 static unsigned int validate_pin() {
   unsigned int offset, len, sw;
 
@@ -337,12 +358,12 @@ static unsigned int validate_pin() {
   }
 
   if (G_gpg_vstate.io_ins == 0x24) {
-    if (G_gpg_vstate.work.io_buffer[0] <= 2) {
+    if (G_gpg_vstate.io_p1 <= 2) {
       gpg_io_insert_u8(G_gpg_vstate.ux_pinentry[0]);
       gpg_io_insert((unsigned char*)(G_gpg_vstate.menu+1), G_gpg_vstate.ux_pinentry[0]);
-      G_gpg_vstate.work.io_buffer[0]++;
+      G_gpg_vstate.io_p1++;
     }
-    if (G_gpg_vstate.work.io_buffer[0] == 3) {
+    if (G_gpg_vstate.io_p1 == 3) {
       if (!gpg_check_pin(G_gpg_vstate.io_p2&0x0F, G_gpg_vstate.work.io_buffer+1, G_gpg_vstate.work.io_buffer[0])) {
         gpg_io_discard(1);
         gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
@@ -358,13 +379,16 @@ static unsigned int validate_pin() {
         gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
         gpg_io_do(IO_RETURN_AFTER_TX);
         ui_info(PIN_DIFFERS, NULL, ui_menu_main_display, 0);
+      } else {
+        gpg_change_pin(G_gpg_vstate.io_p2&0x0F, G_gpg_vstate.work.io_buffer+offset+ 1, len);
+        gpg_io_discard(1);
+        gpg_io_insert_u16(SW_OK);      
+        gpg_io_do(IO_RETURN_AFTER_TX);
+        ui_info(PIN_CHANGED, NULL, ui_menu_main_display, 0);
       }
-      gpg_change_pin(G_gpg_vstate.io_p2&0x0F, G_gpg_vstate.work.io_buffer+offset+ 1, len);
-      gpg_io_discard(1);
-      gpg_io_insert_u16(SW_OK);      
-      gpg_io_do(IO_RETURN_AFTER_TX);
-      ui_info(PIN_CHANGED, NULL, ui_menu_main_display, 0);
       return 0;
+    } else {
+      ui_menu_pinentry_display(0);
     }
   }
   return 0;
@@ -797,7 +821,7 @@ const ux_menu_entry_t ui_menu_main[] = {
   {NULL,              os_sched_exit,  0, &C_icon_dashboard, "Quit app" ,   NULL, 50, 29},
   UX_MENU_END
 };
-
+extern const  uint8_t N_USBD_CfgDesc[];
 const bagl_element_t* ui_menu_main_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
   if (entry == &ui_menu_main[0]) {
     if(element->component.userid==0x20) {      
@@ -814,6 +838,7 @@ const bagl_element_t* ui_menu_main_preprocessor(const ux_menu_entry_t* entry, ba
       os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
       snprintf(G_gpg_vstate.menu,  sizeof(G_gpg_vstate.menu), "< User: %s / SLOT: %d / Serial: %x >", 
                name, G_gpg_vstate.slot+1, serial);
+      
       element->component.stroke = 10; // 1 second stop in each way
       element->component.icon_id = 26; // roundtrip speed in pixel/s
       element->text = G_gpg_vstate.menu;

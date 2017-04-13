@@ -10,7 +10,10 @@ The application supports:
   - EDDSA with Ed25519 curve 
   - ECDH with  secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and curve25519 curves
 
-To compile it, use at least the Nano S SDK 1.3.1.4 on firmware 1.3.1
+
+To compile it
+  -  use at least the Nano S SDK 1.3.1.4 on firmware 1.3.1
+  - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c by the one provided in sdk/ directory
 
 This release is in beta stage with known missing parts (see also Add-on) :
 

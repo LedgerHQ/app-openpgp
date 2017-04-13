@@ -210,6 +210,15 @@ int gpg_apdu_change_ref_data(int id) {
     return 0;
   }
   //avoid any-overflow whitout giving info
+  if (G_gpg_vstate.io_length == 0) {
+    if (G_gpg_vstate.pinmode != PIN_MODE_HOST) {
+      //Delegate pin change to ui 
+      gpg_io_discard(1);
+      ui_menu_pinentry_display(0);
+      return 0;
+    }   
+  }
+
   if (pin->length > G_gpg_vstate.io_length) {
     len =  G_gpg_vstate.io_length;
   } else {

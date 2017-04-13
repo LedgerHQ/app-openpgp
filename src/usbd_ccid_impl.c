@@ -161,7 +161,7 @@ static const uint8_t const USBD_DeviceDesc[]= {
 /* USB Mass storage device Configuration Descriptor */
 /*   All Descriptors (Configuration, Interface, Endpoint, Class, Vendor */
 #define USBD_OFFSET_CfgDesc_bPINSupport 70
-static const  uint8_t N_USBD_CfgDesc[] =
+const  uint8_t N_USBD_CfgDesc[] =
 {
   
   0x09,   /* bLength: Configuration Descriptor size */
@@ -438,7 +438,7 @@ static const USBD_ClassTypeDef USBD_CCID =
 void USBD_CCID_activate_pinpad(int enabled) {
   unsigned char e;
   e = enabled?3:0;
-  nvm_write(USBD_GetCfgDesc_impl+USBD_OFFSET_CfgDesc_bPINSupport, &e,1);
+  nvm_write(((char*)PIC(N_USBD_CfgDesc))+USBD_OFFSET_CfgDesc_bPINSupport, &e,1);
 }
 
 void USB_CCID_power(unsigned char enabled) {
