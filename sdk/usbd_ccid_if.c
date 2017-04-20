@@ -35,6 +35,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 uint8_t Ccid_BulkState;
+uint8_t ccid_card_inserted;
 uint8_t UsbIntMessageBuffer[INTR_MAX_PACKET_SIZE];  /* data buffer*/
 __IO uint8_t PrevXferComplete_IntrIn;
 usb_ccid_param_t usb_ccid_param;
@@ -68,7 +69,7 @@ void CCID_Init (USBD_HandleTypeDef  *pdev)
   memset(&Ccid_SlotStatus, 0, sizeof(Ccid_SlotStatus));
   memset(&Protocol0_DataStructure, 0, sizeof(Protocol0_DataStructure));
   memset(&Ccid_bulk_data, 0, sizeof(Ccid_bulk_data));
-
+  ccid_card_inserted = 0;
   /* CCID Related Initialization */
   CCID_SetIntrTransferStatus(1);  /* Transfer Complete Status */
   CCID_UpdSlotChange(1);
@@ -77,6 +78,9 @@ void CCID_Init (USBD_HandleTypeDef  *pdev)
   /* Prepare Out endpoint to receive 1st packet */ 
   Ccid_BulkState = CCID_STATE_IDLE;
   USBD_LL_PrepareReceive(pdev, CCID_BULK_OUT_EP, CCID_BULK_EPOUT_SIZE);
+
+  // send the smartcard as inserted state at boot time
+  io_usb_ccid_set_card_inserted(1);
 }
 
 /**
@@ -463,7 +467,7 @@ void CCID_SetIntrTransferStatus (uint8_t xfer_Status)
 
 
 uint8_t SC_Detect(void) {
-  return 1;
+   return ccid_card_inserted;
 }
 
 void SC_Poweroff(void) {
@@ -569,13 +573,12 @@ void io_usb_ccid_reply(unsigned char* buffer, unsigned short length) {
   // start sending rpely
   CCID_Send_Reply(&USBD_Device);
 }
-
 // ask for power on
-void io_usb_ccid_poweron(void) {
+void io_usb_ccid_set_card_inserted(unsigned int inserted) {
+  ccid_card_inserted = inserted;
   CCID_UpdSlotChange(1);
   CCID_IntMessage(&USBD_Device);
 }
-
 
 
 

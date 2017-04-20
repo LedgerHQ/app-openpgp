@@ -165,6 +165,8 @@ __attribute__((section(".boot"))) int main(void) {
         io_seproxyhal_init();
 
         USB_CCID_power(1);
+        io_usb_ccid_set_card_inserted(1);
+  
 
         //set up
         gpg_init();

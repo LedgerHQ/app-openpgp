@@ -96,7 +96,8 @@ static unsigned int validate_pin();
 
 /* ------------------------------- Helpers  UX ------------------------------- */
 void ui_CCID_reset(void) {
-  //INSERT CODE HERE TO REMOVE/INSERT THE TOKEN
+  io_usb_ccid_set_card_inserted(0);
+  io_usb_ccid_set_card_inserted(1);
 }
 
 void ui_info(const char* msg1, const char* msg2, const void *menu_display, unsigned int value) {
