@@ -11,14 +11,46 @@ The application supports:
   - ECDH with  secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and curve25519 curves
 
 
-To compile it
-  -  use at least the Nano S SDK 1.3.1.4 on firmware 1.3.1
-  - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c by the one provided in sdk/ directory
-
 This release is in beta stage with known missing parts (see also Add-on) :
 
    * Ledger Blue support
    * Seed mode ON/OFF via apdu
+
+
+## Installation
+
+### NanoS
+
+#### From source
+
+  - use at least the Nano S SDK 1.3.1.4 on firmware 1.3.1
+  - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c by the one provided in sdk/ directory
+
+#### From Binary
+
+Use the Chrome App "Ledger Manager". See https://www.ledgerwallet.com/apps/manager for details.
+
+As "OpenPGP card" application is not fully released, click on "Show delevoppers items" on the bottom right corner. 
+
+### Host
+
+#### Linux
+
+You have to have to add the NanoS to /etc/libccid_Info.plist
+
+    In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
+    In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
+    In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token<</string>
+  
+This 3 entries must be added at the end of each list.
+
+#### MAC
+
+TODO
+
+#### Windows
+
+TODO
 
 
 ## Add-on
