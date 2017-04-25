@@ -348,24 +348,28 @@ int gpg_apdu_put_data(unsigned int ref) {
         rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa1024.private; 
         pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa1024;
         pkey_size = sizeof(cx_rsa_1024_private_key_t);
+        pq = G_gpg_vstate.work.rsa1024.public.n;
         break;
       case 2048/8:
         rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa2048.public;
         rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa2048.private;
         pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa2048;
         pkey_size = sizeof(cx_rsa_2048_private_key_t);
+        pq = G_gpg_vstate.work.rsa2048.public.n;
         break;
       case 3072/8:
         rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa3072.public;
         rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa3072.private;
         pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa3072;
         pkey_size = sizeof(cx_rsa_3072_private_key_t);
+        pq = G_gpg_vstate.work.rsa3072.public.n;
         break;
       case 4096/8:
         rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa4096.public;
         rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa4096.private;
         pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa4096;
         pkey_size = sizeof(cx_rsa_4096_private_key_t);
+        pq = G_gpg_vstate.work.rsa4096.public.n;
         break;
       }
       ksz = ksz>>1;
@@ -391,7 +395,6 @@ int gpg_apdu_put_data(unsigned int ref) {
       //move p,q over pub key, this only work because adr<rsa_pub> < adr<p>
       p = G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset;
       q = p + len_p;
-      pq = (unsigned char*)rsa_pub;
 
       os_memmove(pq+ksz-len_p,   p, len_p);
       os_memmove(pq+2*ksz-len_q, q, len_q);
