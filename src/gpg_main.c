@@ -131,6 +131,7 @@ unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
 
   default:
     THROW(INVALID_PARAMETER);
+    return 0;
   }
   return 0;
 }

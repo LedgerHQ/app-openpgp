@@ -36,6 +36,7 @@
 
 #define  GPG_KEY_ATTRIBUTES_LENGTH            12
 
+#define GPG_RSA_DEFAULT_PUB 0x010001U
 
 struct gpg_pin_s {
   //initial pin length, 0 means not set
@@ -113,6 +114,8 @@ struct gpg_nv_state_s {
 
   /* 01F1 (01F2 is volatile)*/
   unsigned char config_slot[3];
+  /* RSA exponent */
+  unsigned int default_RSA_exponent;
 
   /*  0101 0102 0103 0104 */
   LV(private_DO1, GPG_EXT_PRIVATE_DO_LENGTH);

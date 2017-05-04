@@ -83,6 +83,15 @@ Deterministic key derivation
 
 The deterministic key derivation process relies on the BIP32 scheme.
 The master install path of GPG-ledger is set to /0x80'GPG', aka /80475047
+Deterministic key derivation maybe activated in:
+     Settings->Seed Mode->Set on
+
+This activation remains effective until *set off* is selected or the application
+ends.
+
+The key management remains the same if seed mode is on or off, i.e. key are stored in memory key containers. So their is no perfomance inpact when using seeded keys.
+
+Seeded keys are generated as follow:
 
 **Step1**:
 
@@ -269,6 +278,6 @@ Other minor add-on
 ------------------
 
 GnuPG use both fingerprints and serial number to identfy key on card.
-So, the put data command accept to modify the AID file with '4F' tag.
+So, the put data command is able to modify the AID file with '4F' tag.
 In that case the data field shall be four bytes length and shall contain 
 the new serial number. '4F' is protected by PW3 (admin) PIN.

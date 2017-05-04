@@ -276,9 +276,13 @@ int gpg_install(unsigned char app_state) {
     G_gpg_vstate.work.io_buffer[1] = 0;
     G_gpg_vstate.work.io_buffer[2] = 3; // 3: selection by APDU and screen 
     gpg_nvm_write(&N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer, 3);
-
+    
+    //config rsa pub
+    l = GPG_RSA_DEFAULT_PUB;
+    nvm_write(&N_gpg_pstate->default_RSA_exponent, &l, sizeof(unsigned int));
+    
     //config pin
-    G_gpg_vstate.work.io_buffer[0] = PIN_MODE_SCREEN;
+    G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
     gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
 
     //default key template: RSA 2048)

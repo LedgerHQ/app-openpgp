@@ -37,6 +37,7 @@ int gpg_apdu_select() {
     sw = SW_OK;
   } else {
     THROW(SW_FILE_NOT_FOUND);
+    return 0;
   }
   return sw;
 }

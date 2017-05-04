@@ -50,6 +50,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
       }
       if (key->size != ksz) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
+        return 0;
       }
 
       //sign
@@ -82,6 +83,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
       key = &sigkey->key.ecfp256;
       if (key->d_len != 32) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
+        return 0;
       }
       //sign
       if (sigkey->attributes.value[0] == 19) {
@@ -122,7 +124,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
     }
     // --- PSO:CDS NOT SUPPORTED
     THROW(SW_REFERENCED_DATA_NOT_FOUND);
-
+    return 0;
 }
 
 
@@ -133,6 +135,7 @@ int gpg_apdu_pso(unsigned int pso) {
   case 0x9e9a: {
     return gpg_sign(&G_gpg_vstate.kslot->sig);
   }
+
   // --- PSO:DEC ---
   case 0x8086: {
     unsigned int msg_len;
@@ -141,11 +144,12 @@ int gpg_apdu_pso(unsigned int pso) {
     pad_byte = gpg_io_fetch_u8();
 
     switch(pad_byte) {
-    // --- RSA
+    // --- PSO:DEC:RSA
     case 0x00: {
       cx_rsa_private_key_t *key;
       if (G_gpg_vstate.kslot->dec.attributes.value[0] != 0x01) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
+      return 0;
       }
       ksz = (G_gpg_vstate.kslot->dec.attributes.value[1]<<8) | G_gpg_vstate.kslot->dec.attributes.value[2];
       ksz = ksz>>3;
@@ -167,6 +171,7 @@ int gpg_apdu_pso(unsigned int pso) {
      
       if ((key == NULL) || (key->size != ksz)) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
+      return 0;
       }
       msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
       sz = cx_rsa_decrypt(key,
@@ -179,13 +184,15 @@ int gpg_apdu_pso(unsigned int pso) {
       gpg_io_inserted(sz);
       return SW_OK;
     }
-    // --- AES
+
+    // --- PSO:DEC:AES
     case 0x02: {
       cx_aes_key_t *key;
       unsigned int sz;
       key = &G_gpg_vstate.kslot->AES_dec;
       if (!(key->size != 16)) {
         THROW(SW_CONDITIONS_NOT_SATISFIED+5);
+      return 0;
       }
       msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
       sz = cx_aes(key,
@@ -197,26 +204,31 @@ int gpg_apdu_pso(unsigned int pso) {
       gpg_io_inserted(sz);
       return SW_OK;
     }
-    // --- ECDH
+
+    // --- PSO:DEC:ECDH
     case 0xA6: {
       cx_ecfp_private_key_t *key;
       unsigned int sz;
       unsigned int curve;
       if (G_gpg_vstate.kslot->dec.attributes.value[0] != 18) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
+        return 0;
       }
       key = &G_gpg_vstate.kslot->dec.key.ecfp256;
       if (key->d_len != 32) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
+        return 0; 
       }
       gpg_io_fetch_l(&l);
       gpg_io_fetch_tl(&t, &l);
       if (t != 0x7f49) {
         THROW(SW_WRONG_DATA);
+        return 0;
       }
       gpg_io_fetch_tl(&t, &l);
       if (t != 0x86) {
         THROW(SW_WRONG_DATA);
+        return 0;
       }
             
       curve = gpg_oid2curve(G_gpg_vstate.kslot->dec.attributes.value+1, G_gpg_vstate.kslot->dec.attributes.length-1);
@@ -246,18 +258,23 @@ int gpg_apdu_pso(unsigned int pso) {
       gpg_io_insert( G_gpg_vstate.work.io_buffer+128,sz);
       return SW_OK;
     }
-    // --- PSO:DEC NOT SUPPORTDED
-    default:
-      THROW(SW_REFERENCED_DATA_NOT_FOUND);
-    }
 
-  //--- PSO NOT SUPPPORTED ---
-  default:
-    THROW(SW_REFERENCED_DATA_NOT_FOUND);
+    // --- PSO:DEC:xx NOT SUPPORTDED
+    default: 
+      THROW(SW_REFERENCED_DATA_NOT_FOUND);
+      return 0;
+    } 
 
   }
-  THROW(SW_WRONG_DATA);
-  }}
+  
+  //--- PSO:yy NOT SUPPPORTED ---
+  default:
+    THROW(SW_REFERENCED_DATA_NOT_FOUND);
+    return 0;
+  }
+  THROW(SW_REFERENCED_DATA_NOT_FOUND);
+  return 0;
+}
 
 
 int gpg_apdu_internal_authenticate() {
@@ -267,6 +284,7 @@ int gpg_apdu_internal_authenticate() {
   if (G_gpg_vstate.kslot->aut.attributes.value[0] == 1) {
     if ( G_gpg_vstate.io_length > ((G_gpg_vstate.kslot->aut.attributes.value[1]<<8)|G_gpg_vstate.kslot->aut.attributes.value[2])*40/100) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     } 
   }  
   return gpg_sign(&G_gpg_vstate.kslot->aut);

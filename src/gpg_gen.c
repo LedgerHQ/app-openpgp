@@ -69,10 +69,12 @@ int gpg_apdu_gen() {
     break;
   default:
     THROW(SW_INCORRECT_P1P2);
+    return 0;
   }
 
   if (G_gpg_vstate.io_lc != 2){
     THROW(SW_WRONG_LENGTH);
+    return 0;
   }
 
   gpg_io_fetch_tl(&t,&l);
@@ -94,6 +96,7 @@ int gpg_apdu_gen() {
     break;
   default:
     THROW(SW_WRONG_DATA);
+    return 0;
   }
 
   switch ((G_gpg_vstate.io_p1<<8)|G_gpg_vstate.io_p2) {
@@ -102,7 +105,7 @@ int gpg_apdu_gen() {
   case 0x8001:
     // RSA
     if (keygpg->attributes.value[0] == 0x01) {
-#define GPG_RSA_DEFAULT_PUB 0x010001U
+
       unsigned char      *pq;
       cx_rsa_public_key_t *rsa_pub;
       cx_rsa_private_key_t *rsa_priv, *pkey;
@@ -151,7 +154,7 @@ int gpg_apdu_gen() {
       }
 
 
-      cx_rsa_generate_pair(ksz, rsa_pub, rsa_priv, GPG_RSA_DEFAULT_PUB, pq);
+      cx_rsa_generate_pair(ksz, rsa_pub, rsa_priv, N_gpg_pstate->default_RSA_exponent, pq);
 
       nvm_write(pkey, rsa_priv, pkey_size);
       nvm_write(&keygpg->pub_key.rsa[0], rsa_pub->e, 4);
@@ -162,7 +165,7 @@ int gpg_apdu_gen() {
       gpg_io_clear();
 
       goto send_rsa_pub;
-#undef GPG_RSA_DEFAULT_PUB
+
     }
     // ECC
     if ((keygpg->attributes.value[0] == 18) || 
@@ -207,24 +210,28 @@ int gpg_apdu_gen() {
       case 1024/8:
       if (keygpg->key.rsa1024.size == 0) {
         THROW (SW_REFERENCED_DATA_NOT_FOUND);
+      return 0;
       }
       gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa1024.n);
       break;
       case 2048/8:
         if (keygpg->key.rsa2048.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
+          return 0;
         }
         gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa2048.n);
         break;
       case 3072/8:
         if (keygpg->key.rsa3072.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
+          return 0;
         }
         gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa3072.n);
         break;
       case 4096/8:
         if (keygpg->key.rsa4096.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
+          return 0;
         }
         gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa4096.n);
         break;
@@ -248,6 +255,7 @@ int gpg_apdu_gen() {
       
       if (keygpg->pub_key.ecfp256.W_len == 0) {
         THROW (SW_REFERENCED_DATA_NOT_FOUND);
+        return 0;
       }
       gpg_io_discard(1);
       gpg_io_mark();
@@ -277,4 +285,5 @@ int gpg_apdu_gen() {
   }
   
   THROW(SW_WRONG_DATA);
+  return 0;
 }

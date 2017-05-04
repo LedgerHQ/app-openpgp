@@ -23,8 +23,13 @@ This release is in beta stage with known missing parts (see also Add-on) :
 
 #### From source
 
-  - use at least the Nano S SDK 1.3.1.4 on firmware 1.3.1
-  - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c by the one provided in sdk/ directory
+Building from sources requires the the Nano S SDK 1.3.1.4 on firmware 1.3.1. See
+https://github.com/LedgerHQ/nanos-secure-sdk
+
+The SDK must be slightly modified:
+
+  - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c and - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/inc/usbd_ccid_if.h by the one provided in sdk/ directory
+  - edit script.ld and modify the stack size : STACK_SIZE = 832;
 
 #### From Binary
 

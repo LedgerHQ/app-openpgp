@@ -102,6 +102,10 @@ void gpg_check_access_read_DO() {
     //ALWAYS
   case 0x0101:
   case 0x0102:
+  case 0x01F0:
+  case 0x01F1:
+  case 0x01F2:
+  case 0x01F8:
   case 0x006E:
   case 0x0065:
   case 0x0073:
@@ -179,6 +183,7 @@ void gpg_check_access_write_DO() {
   case 0x0102:
   case 0x0104:
   case 0x01F1:
+  case 0x01F8:
   case 0x005E:
   case 0x005B:
   case 0x5F2D:

@@ -30,6 +30,7 @@ int gpg_apdu_get_data(unsigned int ref)  {
   int sw;
 
 
+
   if (G_gpg_vstate.DO_current != ref) {
     G_gpg_vstate.DO_current = ref;
     G_gpg_vstate.DO_reccord = 0;
@@ -63,6 +64,10 @@ int gpg_apdu_get_data(unsigned int ref)  {
     break;
   case 0x01F2:
     gpg_io_insert_u8(G_gpg_vstate.slot);
+    break;
+    /* ----------------- Config RSA exponent ----------------- */
+  case 0x01F8:
+    gpg_io_insert_u32(N_gpg_pstate->default_RSA_exponent);
     break;
 
    /* ----------------- Application ----------------- */
@@ -176,8 +181,8 @@ int gpg_apdu_get_data(unsigned int ref)  {
 
     /* WAT */
   default:
-    sw = SW_REFERENCED_DATA_NOT_FOUND;
-    break;
+    THROW(SW_REFERENCED_DATA_NOT_FOUND);
+    return 0;
   }
 
   return sw;
@@ -225,6 +230,7 @@ int gpg_apdu_put_data(unsigned int ref) {
   WRITE_PRIVATE_DO:
     if (G_gpg_vstate.io_length > GPG_EXT_PRIVATE_DO_LENGTH) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, G_gpg_vstate.io_length);
     gpg_nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
@@ -234,28 +240,42 @@ int gpg_apdu_put_data(unsigned int ref) {
   case 0x01F1:
     if (G_gpg_vstate.io_length != 3) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     if ((G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset +0] != GPG_KEYS_SLOTS) ||
         (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset +1] >= GPG_KEYS_SLOTS) ||
         (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset +2] >  3)) {
        THROW(SW_WRONG_DATA);
+      return 0;
     }
     gpg_nvm_write(N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,3);
-    sw = SW_OK;
     break;
   
   case 0x01F2:
     if ((N_gpg_pstate->config_slot[2] & 2) == 0) {
       THROW(SW_CONDITIONS_NOT_SATISFIED);
+      return 0;
     }  
     if ((G_gpg_vstate.io_length != 1) || 
         (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] >= GPG_KEYS_SLOTS))  {
        THROW(SW_WRONG_DATA);
+      return 0;
     }
     G_gpg_vstate.slot = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
-
-    sw = SW_OK;
     break;
+
+  /* ----------------- Config RSA exponent ----------------- */
+  case 0x01F8: {
+    unsigned int e;
+    if (G_gpg_vstate.io_length != 4) {
+      THROW(SW_WRONG_LENGTH);
+      return 0;
+    }    
+    e =  gpg_io_fetch_u32();
+    nvm_write(&N_gpg_pstate->default_RSA_exponent, &e, sizeof(unsigned int));
+    break;
+  }
+    
 
     /* ----------------- Serial -----------------*/
   case 0x4f:
@@ -264,7 +284,6 @@ int gpg_apdu_put_data(unsigned int ref) {
     }
     G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] &= ~0x07;
     nvm_write(&N_gpg_pstate->AID[10], &G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset], 4);
-    sw = SW_OK;
     break;
 
     /* ----------------- Extended Header list -----------------*/
@@ -277,6 +296,7 @@ int gpg_apdu_put_data(unsigned int ref) {
     gpg_io_fetch_tl(&t,&l);
     if (t!=0x4D) {
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
+      return 0;
     }
     //fecth B8/B6/A4
     gpg_io_fetch_tl(&t,&l);
@@ -296,11 +316,13 @@ int gpg_apdu_put_data(unsigned int ref) {
       break;
     default:
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
+      break;
     }
     //fecth 7f78
     gpg_io_fetch_tl(&t,&l);
     if (t!=0x7f48) {
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
+      return 0;
     }
     len_e = 0; len_p = 0; len_q = 0;
     endof = G_gpg_vstate.io_offset+l;
@@ -324,12 +346,14 @@ int gpg_apdu_put_data(unsigned int ref) {
         break;
       default:
         THROW(SW_REFERENCED_DATA_NOT_FOUND);
+        return 0;
       }
     }
     //fecth 5f78
     gpg_io_fetch_tl(&t,&l);
     if (t!=0x5f48) {
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
+      return 0;
     }
 
     // --- RSA KEY ---
@@ -373,33 +397,40 @@ int gpg_apdu_put_data(unsigned int ref) {
         break;
       }
       ksz = ksz>>1;
-      if ( (len_e>4)||(len_e==0)      ||
-           (len_p > ksz )||
-           (len_q > ksz)) {
-        THROW(SW_WRONG_DATA);
-      }
+      
              
       //fetch e
       e = 0;
       switch(len_e) {
       case 4:
-        e = (e<<8) | gpg_io_fetch_u8();
+        e = gpg_io_fetch_u32();
+        break;
       case 3:
-        e = (e<<8) | gpg_io_fetch_u8();
+        e = gpg_io_fetch_u24();
+        break;
       case 2:
-        e = (e<<8) | gpg_io_fetch_u8();
+        e = gpg_io_fetch_u16();
+        break;
        case 1:
-        e = (e<<8) | gpg_io_fetch_u8();
+        e = gpg_io_fetch_u8();
+        break;
+      default:
+        THROW(SW_WRONG_DATA);
+      return 0;
       }
 
       //move p,q over pub key, this only work because adr<rsa_pub> < adr<p>
+      if ( (len_p > ksz )|| (len_q > ksz)) {
+        THROW(SW_WRONG_DATA);
+        return 0;
+      }
       p = G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset;
       q = p + len_p;
-
       os_memmove(pq+ksz-len_p,   p, len_p);
-      os_memmove(pq+2*ksz-len_q, q, len_q);
       os_memset(pq,     0, ksz-len_p);
+      os_memmove(pq+2*ksz-len_q, q, len_q);
       os_memset(pq+ksz, 0, ksz-len_q);
+      
       //regenerate RSA private key
       cx_rsa_generate_pair(ksz<<1, rsa_pub, rsa_priv, e, pq);
 
@@ -421,6 +452,7 @@ int gpg_apdu_put_data(unsigned int ref) {
       curve = gpg_oid2curve(&keygpg->attributes.value[1], keygpg->attributes.length-1);
       if (curve == 0) {
        THROW(SW_WRONG_DATA);
+       return 0;
       }
       ksz = 32;
       if (ksz == 32) {
@@ -440,6 +472,7 @@ int gpg_apdu_put_data(unsigned int ref) {
     // --- UNSUPPORTED KEY ---
     else {
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
+      return 0;
     }
     break;
   } //endof of 3fff
@@ -450,45 +483,45 @@ int gpg_apdu_put_data(unsigned int ref) {
   case 0x5B:
     if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->name.value)) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(N_gpg_pstate->name.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
     gpg_nvm_write(&N_gpg_pstate->name.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
-    sw = SW_OK;
     break;
     /* Login data */
   case 0x5E:
     if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->login.value)) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(N_gpg_pstate->login.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
     gpg_nvm_write(&N_gpg_pstate->login.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
-    sw = SW_OK;
     break;
         /* Language preferences */
   case 0x5F2D:
     if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->lang.value)) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(N_gpg_pstate->lang.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
     gpg_nvm_write(&N_gpg_pstate->lang.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
-    sw = SW_OK;
     break;
     /* Sex */
   case 0x5F35:
     if (G_gpg_vstate.io_length != sizeof(N_gpg_pstate->sex)) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(N_gpg_pstate->sex, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-    sw = SW_OK;
     break;
     /* Uniform resource locator */
   case 0x5F50:
    if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->url.value)) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(N_gpg_pstate->url.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
     gpg_nvm_write(&N_gpg_pstate->url.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
-    sw = SW_OK;
     break;
 
     /* ----------------- Cardholder certificate ----------------- */
@@ -508,8 +541,8 @@ int gpg_apdu_put_data(unsigned int ref) {
     ptr_v = G_gpg_vstate.kslot->dec.CA.value;
     goto WRITE_CA;
    default:
-     sw = SW_REFERENCED_DATA_NOT_FOUND;
-     break;
+     THROW(SW_REFERENCED_DATA_NOT_FOUND);
+      return 0;
    }
    WRITE_CA:
      if (G_gpg_vstate.io_length > GPG_EXT_CARD_HOLDER_CERT_LENTH) {
@@ -517,7 +550,6 @@ int gpg_apdu_put_data(unsigned int ref) {
     }
     gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
     gpg_nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
-    sw = SW_OK;
     break;
 
     /* ----------------- Algorithm attributes ----------------- */
@@ -536,10 +568,10 @@ int gpg_apdu_put_data(unsigned int ref) {
   WRITE_ATTRIBUTES:
      if (G_gpg_vstate.io_length > 12) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
     gpg_nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
-    sw = SW_OK;
     break;
 
     /* ----------------- PWS status ----------------- */
@@ -569,9 +601,9 @@ int gpg_apdu_put_data(unsigned int ref) {
   WRITE_FINGERPRINTS:
     if (G_gpg_vstate.io_length != 20) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 20);
-    sw = SW_OK;
     break;
 
     /* ----------------- Generation date/time ----------------- */
@@ -587,9 +619,9 @@ int gpg_apdu_put_data(unsigned int ref) {
   WRITE_DATE:
     if (G_gpg_vstate.io_length != 4) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 4);
-    sw = SW_OK;
     break;
 
     /* ----------------- AES key ----------------- */
@@ -638,9 +670,9 @@ int gpg_apdu_put_data(unsigned int ref) {
  WRITE_UIF:
     if (G_gpg_vstate.io_length != 2) {
       THROW(SW_WRONG_LENGTH);
+      return 0;
     }
     gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 2);
-    sw = SW_OK;
     break;
 
  /* ----------------- WAT ----------------- */
@@ -648,6 +680,7 @@ int gpg_apdu_put_data(unsigned int ref) {
     sw = SW_REFERENCED_DATA_NOT_FOUND;
     break;
   }
+
   gpg_io_discard(1);
   return sw;
 

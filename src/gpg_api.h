@@ -67,6 +67,7 @@ void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V) ;
 
 void gpg_io_fetch_buffer(unsigned char  * buffer, unsigned int len) ;
 unsigned int gpg_io_fetch_u32(void) ;
+unsigned int gpg_io_fetch_u24(void) ;
 unsigned int gpg_io_fetch_u16(void) ;
 unsigned int gpg_io_fetch_u8(void) ;
 int gpg_io_fetch_t(unsigned int *T) ;

@@ -162,6 +162,15 @@ unsigned int gpg_io_fetch_u32() {
   return v32;
 }
 
+unsigned int gpg_io_fetch_u24() {
+  unsigned int  v24;
+  v24 =  ( (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset+0] << 16) |
+           (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset+1] << 8) |
+           (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset+2] << 0) );
+  G_gpg_vstate.io_offset += 3;
+  return v24;
+}
+
 unsigned int gpg_io_fetch_u16() {
   unsigned int  v16;
   v16 =  ( (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset+0] << 8) |
@@ -269,6 +278,7 @@ int gpg_io_do(unsigned int io_flags) {
         (G_io_apdu_buffer[2] != 0x00) ||
         (G_io_apdu_buffer[3] != 0x00) ) {
         THROW(SW_COMMAND_NOT_ALLOWED);
+        return 0;
       }
     }
     os_memmove(G_io_apdu_buffer,  G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, G_gpg_vstate.io_length);
@@ -329,7 +339,8 @@ int gpg_io_do(unsigned int io_flags) {
         (G_io_apdu_buffer[1] != G_gpg_vstate.io_ins) ||
         (G_io_apdu_buffer[2] != G_gpg_vstate.io_p1) ||
         (G_io_apdu_buffer[3] != G_gpg_vstate.io_p2) ) {
-          THROW(SW_COMMAND_NOT_ALLOWED);
+      THROW(SW_COMMAND_NOT_ALLOWED);
+      return 0;
     }
     G_gpg_vstate.io_cla = G_io_apdu_buffer[0];
     G_gpg_vstate.io_lc  = G_io_apdu_buffer[4];
