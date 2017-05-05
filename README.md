@@ -21,6 +21,8 @@ This release is in beta stage with known missing parts (see also Add-on) :
 
 ### NanoS
 
+For both, source and binary installation, use the 1RC6 tag. 
+
 #### From source
 
 Building from sources requires the the Nano S SDK 1.3.1.4 on firmware 1.3.1. See
