@@ -21,7 +21,7 @@ This release is in beta stage with known missing parts (see also Add-on) :
 
 ### NanoS
 
-For both, source and binary installation, use the 1RC6 tag. 
+For both, source and binary installation, use the 1RC7 tag. 
 
 #### From source
 
