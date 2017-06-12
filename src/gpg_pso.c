@@ -26,6 +26,11 @@ const unsigned char gpg_oid_sha512[] = {
   0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0x04, 0x40
 };
 
+static void gpg_pso_reset_PW1() {
+  if (N_gpg_pstate->PW_status[0] ==0) {
+     gpg_pin_set_verified(gpg_pin_get_pin(PIN_ID_PW1),0);
+  }
+}
 
 static int gpg_sign(gpg_key_t *sigkey) {
     // --- RSA
@@ -50,7 +55,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
       }
       if (key->size != ksz) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
-        return 0;
+        return SW_CONDITIONS_NOT_SATISFIED;
       }
 
       //sign
@@ -71,6 +76,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
       //send
       gpg_io_discard(0);
       gpg_io_inserted(ksz);
+      gpg_pso_reset_PW1();
       return SW_OK;
     }
     // --- ECDSA/EdDSA
@@ -83,7 +89,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
       key = &sigkey->key.ecfp256;
       if (key->d_len != 32) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
-        return 0;
+        return SW_CONDITIONS_NOT_SATISFIED;
       }
       //sign
       if (sigkey->attributes.value[0] == 19) {
@@ -120,11 +126,12 @@ static int gpg_sign(gpg_key_t *sigkey) {
       }
       
       //send
+      gpg_pso_reset_PW1();
       return SW_OK;
     }
     // --- PSO:CDS NOT SUPPORTED
     THROW(SW_REFERENCED_DATA_NOT_FOUND);
-    return 0;
+    return SW_REFERENCED_DATA_NOT_FOUND;
 }
 
 
@@ -133,7 +140,12 @@ int gpg_apdu_pso(unsigned int pso) {
   switch(pso) {
   // --- PSO:CDS ---
   case 0x9e9a: {
-    return gpg_sign(&G_gpg_vstate.kslot->sig);
+    unsigned int cnt;
+    int sw;
+    sw =  gpg_sign(&G_gpg_vstate.kslot->sig);
+    cnt = G_gpg_vstate.kslot->sig_count+1;
+    nvm_write(&G_gpg_vstate.kslot->sig_count,&cnt,sizeof(unsigned int));
+    return sw;
   }
 
   // --- PSO:DEC ---
@@ -149,7 +161,7 @@ int gpg_apdu_pso(unsigned int pso) {
       cx_rsa_private_key_t *key;
       if (G_gpg_vstate.kslot->dec.attributes.value[0] != 0x01) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
-      return 0;
+        return SW_CONDITIONS_NOT_SATISFIED;
       }
       ksz = (G_gpg_vstate.kslot->dec.attributes.value[1]<<8) | G_gpg_vstate.kslot->dec.attributes.value[2];
       ksz = ksz>>3;
@@ -192,7 +204,7 @@ int gpg_apdu_pso(unsigned int pso) {
       key = &G_gpg_vstate.kslot->AES_dec;
       if (!(key->size != 16)) {
         THROW(SW_CONDITIONS_NOT_SATISFIED+5);
-      return 0;
+        return SW_CONDITIONS_NOT_SATISFIED;
       }
       msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
       sz = cx_aes(key,
@@ -212,23 +224,23 @@ int gpg_apdu_pso(unsigned int pso) {
       unsigned int curve;
       if (G_gpg_vstate.kslot->dec.attributes.value[0] != 18) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
-        return 0;
+        return SW_CONDITIONS_NOT_SATISFIED;
       }
       key = &G_gpg_vstate.kslot->dec.key.ecfp256;
       if (key->d_len != 32) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
-        return 0; 
+        return SW_CONDITIONS_NOT_SATISFIED; 
       }
       gpg_io_fetch_l(&l);
       gpg_io_fetch_tl(&t, &l);
       if (t != 0x7f49) {
         THROW(SW_WRONG_DATA);
-        return 0;
+        return SW_WRONG_DATA;
       }
       gpg_io_fetch_tl(&t, &l);
       if (t != 0x86) {
         THROW(SW_WRONG_DATA);
-        return 0;
+        return SW_WRONG_DATA;
       }
             
       curve = gpg_oid2curve(G_gpg_vstate.kslot->dec.attributes.value+1, G_gpg_vstate.kslot->dec.attributes.length-1);
@@ -262,7 +274,7 @@ int gpg_apdu_pso(unsigned int pso) {
     // --- PSO:DEC:xx NOT SUPPORTDED
     default: 
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
-      return 0;
+      return SW_REFERENCED_DATA_NOT_FOUND;
     } 
 
   }
@@ -270,10 +282,10 @@ int gpg_apdu_pso(unsigned int pso) {
   //--- PSO:yy NOT SUPPPORTED ---
   default:
     THROW(SW_REFERENCED_DATA_NOT_FOUND);
-    return 0;
+    return SW_REFERENCED_DATA_NOT_FOUND;
   }
   THROW(SW_REFERENCED_DATA_NOT_FOUND);
-  return 0;
+  return SW_REFERENCED_DATA_NOT_FOUND;
 }
 
 
@@ -284,7 +296,7 @@ int gpg_apdu_internal_authenticate() {
   if (G_gpg_vstate.kslot->aut.attributes.value[0] == 1) {
     if ( G_gpg_vstate.io_length > ((G_gpg_vstate.kslot->aut.attributes.value[1]<<8)|G_gpg_vstate.kslot->aut.attributes.value[2])*40/100) {
       THROW(SW_WRONG_LENGTH);
-      return 0;
+      return SW_WRONG_LENGTH;
     } 
   }  
   return gpg_sign(&G_gpg_vstate.kslot->aut);

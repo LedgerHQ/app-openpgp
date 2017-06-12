@@ -69,12 +69,12 @@ int gpg_apdu_gen() {
     break;
   default:
     THROW(SW_INCORRECT_P1P2);
-    return 0;
+    return SW_INCORRECT_P1P2;
   }
 
   if (G_gpg_vstate.io_lc != 2){
     THROW(SW_WRONG_LENGTH);
-    return 0;
+    return SW_WRONG_LENGTH;
   }
 
   gpg_io_fetch_tl(&t,&l);
@@ -96,7 +96,7 @@ int gpg_apdu_gen() {
     break;
   default:
     THROW(SW_WRONG_DATA);
-    return 0;
+    return SW_WRONG_DATA;
   }
 
   switch ((G_gpg_vstate.io_p1<<8)|G_gpg_vstate.io_p2) {
@@ -210,28 +210,28 @@ int gpg_apdu_gen() {
       case 1024/8:
       if (keygpg->key.rsa1024.size == 0) {
         THROW (SW_REFERENCED_DATA_NOT_FOUND);
-      return 0;
+      return SW_REFERENCED_DATA_NOT_FOUND;
       }
       gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa1024.n);
       break;
       case 2048/8:
         if (keygpg->key.rsa2048.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
-          return 0;
+          return SW_REFERENCED_DATA_NOT_FOUND;
         }
         gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa2048.n);
         break;
       case 3072/8:
         if (keygpg->key.rsa3072.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
-          return 0;
+          return SW_REFERENCED_DATA_NOT_FOUND;
         }
         gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa3072.n);
         break;
       case 4096/8:
         if (keygpg->key.rsa4096.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
-          return 0;
+          return SW_REFERENCED_DATA_NOT_FOUND;
         }
         gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa4096.n);
         break;
@@ -285,5 +285,5 @@ int gpg_apdu_gen() {
   }
   
   THROW(SW_WRONG_DATA);
-  return 0;
+  return SW_WRONG_DATA;
 }

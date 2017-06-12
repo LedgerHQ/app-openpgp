@@ -42,6 +42,7 @@ void gpg_io_set_offset(unsigned int offset) {
   }
   else {
     THROW(ERROR_IO_OFFSET);
+    return ;
   }
 }
 
@@ -76,6 +77,7 @@ void gpg_io_clear() {
 void gpg_io_hole(unsigned int sz) {
   if ((G_gpg_vstate.io_length + sz) > GPG_IO_BUFFER_LENGTH) {
     THROW(ERROR_IO_FULL);
+    return ;
   }
   os_memmove(G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset+sz,
              G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,
@@ -340,7 +342,7 @@ int gpg_io_do(unsigned int io_flags) {
         (G_io_apdu_buffer[2] != G_gpg_vstate.io_p1) ||
         (G_io_apdu_buffer[3] != G_gpg_vstate.io_p2) ) {
       THROW(SW_COMMAND_NOT_ALLOWED);
-      return 0;
+      return SW_COMMAND_NOT_ALLOWED;
     }
     G_gpg_vstate.io_cla = G_io_apdu_buffer[0];
     G_gpg_vstate.io_lc  = G_io_apdu_buffer[4];

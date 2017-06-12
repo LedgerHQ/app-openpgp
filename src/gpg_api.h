@@ -16,6 +16,7 @@
 #ifndef GPG_API_H
 #define  GPG_API_H
 
+int  gpg_oid2curve(unsigned char* oid, unsigned int len);
 
 void gpg_init(void);
 void gpg_init_ux(void);
@@ -34,17 +35,17 @@ int  gpg_apdu_get_challenge(void) ;
 
 int  gpg_apdu_select(void) ;
 
-int  gpg_apdu_verify(int id) ;
-int  gpg_apdu_change_ref_data(int id) ;
+int  gpg_apdu_verify(void) ;
+int  gpg_apdu_change_ref_data(void) ;
 int  gpg_apdu_reset_retry_counter(void) ;
 
-
-int  gpg_oid2curve(unsigned char* oid, unsigned int len);
-int  gpg_is_pin_verified(int id);
-int  gpg_is_pin_blocked(int id);
-int  gpg_set_pin_verified(int id, int verified);
-int  gpg_check_pin(int id, unsigned char *pin_val, unsigned int pin_len);
-void gpg_change_pin(int id, unsigned char *pin_val, unsigned int pin_len);
+gpg_pin_t *gpg_pin_get_pin(int id);
+int  gpg_pin_is_verified(gpg_pin_t *pin);
+int  gpg_pin_is_blocked(gpg_pin_t *pin);
+int  gpg_pin_set_verified(gpg_pin_t *pin, int verified);
+int  gpg_pin_check(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
+void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
+void gpg_pin_sync12(void) ;
 
 /* ----------------------------------------------------------------------- */
 /* ---                                  IO                            ---- */

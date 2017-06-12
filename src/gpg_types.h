@@ -39,9 +39,10 @@
 #define GPG_RSA_DEFAULT_PUB 0x010001U
 
 struct gpg_pin_s {
+  unsigned int  ref;
   //initial pin length, 0 means not set
-  unsigned int length;
-  unsigned int counter;
+  unsigned int  length;
+  unsigned int  counter;
   //only store sha256 of PIN/RC
   unsigned char value[32];
 };
@@ -151,6 +152,7 @@ struct gpg_nv_state_s {
 
   /* PINs */
   gpg_pin_t PW1;
+  gpg_pin_t PW2;
   gpg_pin_t PW3;
   gpg_pin_t RC;
 
@@ -259,10 +261,10 @@ typedef struct  gpg_v_state_s gpg_v_state_t;
 #define IO_OFFSET_END                       (unsigned int)-1
 #define IO_OFFSET_MARK                      (unsigned int)-2
 
-#define PIN_ID_PW1                          1
-#define PIN_ID_PW2                          2
-#define PIN_ID_PW3                          3
-#define PIN_ID_RC                           4
+#define PIN_ID_PW1                          0x81
+#define PIN_ID_PW2                          0x82
+#define PIN_ID_PW3                          0x83
+#define PIN_ID_RC                           0x84
 
 #define PIN_MODE_HOST                       1
 #define PIN_MODE_SCREEN                     2

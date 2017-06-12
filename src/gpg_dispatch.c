@@ -20,12 +20,15 @@
 #include "gpg_vars.h"
 
 
-int gpg_is_verified(id) {
-  return G_gpg_vstate.verified_pin[id] ;
-}
 
 void gpg_check_access_ins() {
   unsigned int ref;
+  gpg_pin_t *pin_pw1, *pin_pw2, *pin_pw3, *pin_rc;
+
+  pin_pw1 = gpg_pin_get_pin(PIN_ID_PW1);
+  pin_pw2 = gpg_pin_get_pin(PIN_ID_PW2);
+  pin_pw3 = gpg_pin_get_pin(PIN_ID_PW3);
+  pin_rc  = gpg_pin_get_pin(PIN_ID_RC);
   ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
   switch (G_gpg_vstate.io_ins) {
@@ -42,7 +45,7 @@ void gpg_check_access_ins() {
     return;
 
   case INS_RESET_RETRY_COUNTER:
-    if (gpg_is_verified(PIN_ID_PW3) || gpg_is_verified(PIN_ID_RC)) {
+    if (gpg_pin_is_verified(pin_pw3) || gpg_pin_is_verified(pin_rc)) {
       return;
     }
 
@@ -54,27 +57,27 @@ void gpg_check_access_ins() {
     if (G_gpg_vstate.io_p1 == 0x81) {
       return;
     }
-    if (gpg_is_verified(PIN_ID_PW3)) {
+    if (gpg_pin_is_verified(pin_pw3)) {
       return;
     } 
     break;
     
   case INS_PSO:
-    if ((ref == 0x9e9a) && gpg_is_verified(PIN_ID_PW1)) {
+    if ((ref == 0x9e9a) && gpg_pin_is_verified(pin_pw1)) {
       //pso:sign
       if (N_gpg_pstate->PW_status[0] == 0) {
-        gpg_set_pin_verified(PIN_ID_PW1,0);
+        gpg_pin_set_verified(pin_pw1, 0);
       }
       return;
     }
-    if ((ref == 0x8086 ) && gpg_is_verified(PIN_ID_PW2)) {
+    if ((ref == 0x8086 ) && gpg_pin_is_verified(pin_pw2)) {
       //pso:dec
       return;
     }
     break;
 
   case INS_INTERNAL_AUTHENTICATE:
-    if (gpg_is_verified(PIN_ID_PW2)) {
+    if (gpg_pin_is_verified(pin_pw2)) {
       return;
     }
     break;  
@@ -83,7 +86,7 @@ void gpg_check_access_ins() {
     return;
 
   case INS_TERMINATE_DF:
-    if (gpg_is_pin_verified(PIN_ID_PW3) || gpg_is_pin_blocked(PIN_ID_PW3)) {
+    if (gpg_pin_is_verified(pin_pw3)) {
       return;
     }
     break;
@@ -96,6 +99,11 @@ void gpg_check_access_ins() {
 
 void gpg_check_access_read_DO() {
   unsigned int ref;
+  gpg_pin_t *pin_pw2, *pin_pw3;
+
+  pin_pw2 = gpg_pin_get_pin(PIN_ID_PW2);
+  pin_pw3 = gpg_pin_get_pin(PIN_ID_PW3);
+ 
   ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
   switch(ref) {
@@ -144,14 +152,14 @@ void gpg_check_access_read_DO() {
 
     //PW1
   case 0x0103:
-    if (gpg_is_verified(PIN_ID_PW2)) {
+    if (gpg_pin_is_verified(pin_pw2)) {
       return;
     }
     break;
 
   //PW3
   case 0x0104:
-     if (gpg_is_verified(PIN_ID_PW3)) {
+     if (gpg_pin_is_verified(pin_pw3)) {
       return;
     }
     break;
@@ -164,15 +172,18 @@ char debugbuff[5];
 
 void gpg_check_access_write_DO() {
   unsigned int ref;
-  ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
+  gpg_pin_t *pin_pw2, *pin_pw3;
 
+  pin_pw2 = gpg_pin_get_pin(PIN_ID_PW2);
+  pin_pw3 = gpg_pin_get_pin(PIN_ID_PW3);
+  ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
   switch(ref) {
   //PW1
   case 0x0101:
   case 0x0103:  
   case 0x01F2:
-    if (gpg_is_verified(PIN_ID_PW2)) {
+    if (gpg_pin_is_verified(pin_pw2)) {
       return;
     }
     break;
@@ -214,7 +225,7 @@ void gpg_check_access_write_DO() {
   case 0x00D6:
   case 0x00D7:
   case 0x00D8:
-    if (gpg_is_verified(PIN_ID_PW3)) {
+    if (gpg_pin_is_verified(pin_pw3)) {
       return;
     }
    break;
@@ -254,7 +265,7 @@ int gpg_dispatch() {
 
   case INS_TERMINATE_DF:
     gpg_io_discard(0);
-    if (G_gpg_vstate.verified_pin[PIN_ID_PW3] || (N_gpg_pstate->PW3.counter == 0)) {
+    if (gpg_pin_is_verified(gpg_pin_get_pin(PIN_ID_PW3)) || (N_gpg_pstate->PW3.counter == 0)) {
       gpg_install(STATE_TERMINATE);
       return(SW_OK);
       break;
@@ -335,17 +346,16 @@ int gpg_dispatch() {
         (G_gpg_vstate.io_p2 == 0x82) ||
         (G_gpg_vstate.io_p2 == 0x83)
         ) {
-      sw = gpg_apdu_verify(G_gpg_vstate.io_p2&0x0F);
+      sw = gpg_apdu_verify();
       break;
     }
-    THROW(0x9BF0);
-    //THROW(SW_INCORRECT_P1P2);
+    THROW(SW_INCORRECT_P1P2);
 
   case INS_CHANGE_REFERENCE_DATA:
       if ((G_gpg_vstate.io_p2 == 0x81) ||
           (G_gpg_vstate.io_p2 == 0x83)
           ) {
-        sw = gpg_apdu_change_ref_data(G_gpg_vstate.io_p2&0x0F);
+        sw = gpg_apdu_change_ref_data();
         break;
       }
       THROW(SW_INCORRECT_P1P2);

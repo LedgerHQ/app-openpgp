@@ -211,6 +211,8 @@ void gpg_init() {
     gpg_nvm_write(N_gpg_pstate->magic, (void*)C_MAGIC, sizeof(C_MAGIC));
     os_memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
   }
+  //ensure pin1 and pin2 are sync in case of powerloss
+  gpg_pin_sync12();
   //key conf
   G_gpg_vstate.slot  = N_gpg_pstate->config_slot[1];
   G_gpg_vstate.kslot = &N_gpg_pstate->keys[G_gpg_vstate.slot];
@@ -252,16 +254,20 @@ int gpg_install(unsigned char app_state) {
     G_gpg_vstate.work.io_buffer[0] = 0x39;
     gpg_nvm_write(&N_gpg_pstate->sex, G_gpg_vstate.work.io_buffer, 1);
 
-    //default PW1: 1 2 3 4 5 6
+    //default PW1/PW2: 1 2 3 4 5 6
     os_memmove(pin.value,  C_sha256_PW1, sizeof(C_sha256_PW1));
     pin.length  = 6;
     pin.counter = 3;
+    pin.ref = PIN_ID_PW1;
     gpg_nvm_write(&N_gpg_pstate->PW1, &pin, sizeof(gpg_pin_t));
+    pin.ref = PIN_ID_PW2;
+    gpg_nvm_write(&N_gpg_pstate->PW2, &pin, sizeof(gpg_pin_t));
 
     //default PW3: 1 2 3 4 5 6 7 8
     os_memmove(pin.value,  C_sha256_PW2, sizeof(C_sha256_PW2));
     pin.length  = 8;
     pin.counter = 3;
+    pin.ref = PIN_ID_PW3;
     gpg_nvm_write(&N_gpg_pstate->PW3, &pin, sizeof(gpg_pin_t));
 
     //PWs status
@@ -269,7 +275,7 @@ int gpg_install(unsigned char app_state) {
     G_gpg_vstate.work.io_buffer[1] = GPG_MAX_PW_LENGTH;
     G_gpg_vstate.work.io_buffer[2] = GPG_MAX_PW_LENGTH;
     G_gpg_vstate.work.io_buffer[3] = GPG_MAX_PW_LENGTH;
-    gpg_nvm_write(&N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer, 4);
+    gpg_nvm_write(&N_gpg_pstate->PW_status, G_gpg_vstate.work.io_buffer, 4);
 
     //config slot
     G_gpg_vstate.work.io_buffer[0] = GPG_KEYS_SLOTS;
