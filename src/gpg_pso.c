@@ -183,7 +183,7 @@ int gpg_apdu_pso(unsigned int pso) {
      
       if ((key == NULL) || (key->size != ksz)) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
-      return 0;
+        return SW_CONDITIONS_NOT_SATISFIED;
       }
       msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
       sz = cx_rsa_decrypt(key,
