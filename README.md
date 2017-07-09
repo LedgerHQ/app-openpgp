@@ -22,7 +22,14 @@ This release has known missing parts (see also Add-on) :
 
 ### NanoS
 
-For both, source and binary installation, use the 1RC7 tag. 
+For both, source and binary installation, use the most recent tag. 
+
+#### From Binary
+
+Use the Chrome App "Ledger Manager". See https://www.ledgerwallet.com/apps/manager for details.
+
+As "OpenPGP card" application is not fully compliant with UI and documentation guidelines, the 
+application is in developper section: click on "Show delevoppers items" on the bottom right corner. 
 
 #### From source
 
@@ -34,11 +41,6 @@ The SDK must be slightly modified:
   - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c and - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/inc/usbd_ccid_if.h by the one provided in sdk/ directory
   - edit script.ld and modify the stack size : STACK_SIZE = 832;
 
-#### From Binary
-
-Use the Chrome App "Ledger Manager". See https://www.ledgerwallet.com/apps/manager for details.
-
-As "OpenPGP card" application is not fully released, click on "Show delevoppers items" on the bottom right corner. 
 
 ### Host
 
