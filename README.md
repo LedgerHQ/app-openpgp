@@ -11,13 +11,14 @@ The application supports:
   - ECDH with  secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and curve25519 curves
 
 
-This release is in beta stage with known missing parts (see also Add-on) :
+This release has known missing parts (see also Add-on) :
 
    * Ledger Blue support
    * Seed mode ON/OFF via apdu
 
 
 ## Installation
+(See also **Configuration**)
 
 ### NanoS
 
@@ -70,6 +71,12 @@ This 3 entries must be added at the end of each list.
 
 TODO
 
+## Configuration
+
+Add the following option in ~/.gnupg/scdaemon.conf :
+
+    enable-pinpad-varlen
+    
 
 ## Add-on
 
