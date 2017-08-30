@@ -212,7 +212,7 @@ $endfor$
 %  {\scshape\Large  Ledger SAS \par}
   \vspace{1cm}
   \begin{figure}[h]
-  \includegraphics[width=3cm]{../common/LogoLedgerV.png}
+  \includegraphics{../common/LogoLedgerV.png}
   \centering
   \end{figure}
   {\Large\itshape Cédric Mesnil (cedric@ledger.fr)\par}
