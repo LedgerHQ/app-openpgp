@@ -26,7 +26,7 @@ APPVERSION_N=0
 APPVERSION_P=1
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
-ICONNAME=icon_pgp.gif
+ICONNAME=images/icon_pgp.gif
 
 
 ################
