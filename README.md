@@ -17,68 +17,10 @@ This release has known missing parts (see also Add-on) :
    * Seed mode ON/OFF via apdu
 
 
-## Installation
-(See also **Configuration**)
+## Installation and Usage
 
-### NanoS
+See the full doc at https://github.com/LedgerHQ/blue-app-openpgp-card/blob/master/doc/user/blue-app-openpgp-card.pdf
 
-For both, source and binary installation, use the most recent tag. 
-
-#### From Binary
-
-Use the Chrome App "Ledger Manager". See https://www.ledgerwallet.com/apps/manager for details.
-
-As "OpenPGP card" application is not fully compliant with UI and documentation guidelines, the 
-application is in developper section: click on "Show delevoppers items" on the bottom right corner. 
-
-#### From source
-
-Building from sources requires the the Nano S SDK 1.3.1.4 on firmware 1.3.1. See
-https://github.com/LedgerHQ/nanos-secure-sdk
-
-The SDK must be slightly modified:
-
-  - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c and - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/inc/usbd_ccid_if.h by the one provided in sdk/ directory
-  - edit script.ld and modify the stack size : STACK_SIZE = 832;
-
-
-### Host
-
-#### Linux
-
-You have to have to add the NanoS to /etc/libccid_Info.plist
-
-    In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
-    In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
-    In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
-  
-This 3 entries must be added at the end of each list.
-
-#### MAC
-
-1. First it is necessary to [disable SIP](https://developer.apple.com/library/mac/documentation/Security/Conceptual/System_Integrity_Protection_Guide/ConfiguringSystemIntegrityProtection/ConfiguringSystemIntegrityProtection.html) That doesn't allow the editing of files in /usr/.
-
-2. You have to have to add the NanoS to /usr/libexec/SmartCardServices/drivers/ifd-ccid.bundle/Contents/Info.plist
-
-
-       In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
-       In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
-       In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
-  
-This 3 entries must be added at the end of each list.
-
-3. [Enable SIP](https://developer.apple.com/library/content/documentation/Security/Conceptual/System_Integrity_Protection_Guide/ConfiguringSystemIntegrityProtection/ConfiguringSystemIntegrityProtection.html)
-
-#### Windows
-
-TODO
-
-## Configuration
-
-Add the following option in ~/.gnupg/scdaemon.conf :
-
-    enable-pinpad-varlen
-    
 
 ## Add-on
 
@@ -88,7 +30,7 @@ The GnuPG application implements the following addon:
   - 3 independent key slots
   - seeded key generation
 
-Technical specification is available in doc/gpgcard3.0-addon.rst
+Technical specification is available at https://github.com/LedgerHQ/blue-app-openpgp-card/blob/master/doc/developper/gpgcard3.0-addon.rstdoc/gpgcard3.0-addon.rst
 
    
 ### Key slot
