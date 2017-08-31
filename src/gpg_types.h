@@ -152,7 +152,6 @@ struct gpg_nv_state_s {
 
   /* PINs */
   gpg_pin_t PW1;
-  gpg_pin_t PW2;
   gpg_pin_t PW3;
   gpg_pin_t RC;
 
@@ -174,7 +173,9 @@ struct gpg_v_state_s {
   /* app state */
   unsigned char   selected;
   unsigned char   slot; /* DO 01F2 */
-  gpg_key_slot_t *kslot;
+  gpg_key_slot_t  *kslot;
+  gpg_key_t       *mse_aut;
+  gpg_key_t       *mse_dec;
   unsigned char   seed_mode;
 
   /* io state*/
@@ -285,6 +286,7 @@ typedef struct  gpg_v_state_s gpg_v_state_t;
 #define    INS_PUT_DATA_ODD                 0xdb
 
 #define    INS_VERIFY                       0x20
+#define    INS_MSE                          0x22
 #define    INS_CHANGE_REFERENCE_DATA        0x24
 #define    INS_RESET_RETRY_COUNTER          0x2c
 

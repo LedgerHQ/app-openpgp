@@ -23,12 +23,7 @@
 
 void gpg_check_access_ins() {
   unsigned int ref;
-  gpg_pin_t *pin_pw1, *pin_pw2, *pin_pw3, *pin_rc;
-
-  pin_pw1 = gpg_pin_get_pin(PIN_ID_PW1);
-  pin_pw2 = gpg_pin_get_pin(PIN_ID_PW2);
-  pin_pw3 = gpg_pin_get_pin(PIN_ID_PW3);
-  pin_rc  = gpg_pin_get_pin(PIN_ID_RC);
+  
   ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
   switch (G_gpg_vstate.io_ins) {
@@ -45,7 +40,7 @@ void gpg_check_access_ins() {
     return;
 
   case INS_RESET_RETRY_COUNTER:
-    if (gpg_pin_is_verified(pin_pw3) || gpg_pin_is_verified(pin_rc)) {
+    if (gpg_pin_is_verified(PIN_ID_PW3) || gpg_pin_is_verified(PIN_ID_RC)) {
       return;
     }
 
@@ -57,27 +52,30 @@ void gpg_check_access_ins() {
     if (G_gpg_vstate.io_p1 == 0x81) {
       return;
     }
-    if (gpg_pin_is_verified(pin_pw3)) {
+    if (gpg_pin_is_verified(PIN_ID_PW3)) {
       return;
     } 
     break;
     
+  case INS_MSE:
+    return ;
+
   case INS_PSO:
-    if ((ref == 0x9e9a) && gpg_pin_is_verified(pin_pw1)) {
+    if ((ref == 0x9e9a) && gpg_pin_is_verified(PIN_ID_PW1)) {
       //pso:sign
       if (N_gpg_pstate->PW_status[0] == 0) {
-        gpg_pin_set_verified(pin_pw1, 0);
+        gpg_pin_set_verified(PIN_ID_PW1, 0);
       }
       return;
     }
-    if ((ref == 0x8086 ) && gpg_pin_is_verified(pin_pw2)) {
-      //pso:dec
+    if (((ref == 0x8086 )||(ref == 0x8680)) && gpg_pin_is_verified(PIN_ID_PW2)) {
+      //pso:dec/enc
       return;
     }
     break;
 
   case INS_INTERNAL_AUTHENTICATE:
-    if (gpg_pin_is_verified(pin_pw2)) {
+    if (gpg_pin_is_verified(PIN_ID_PW2)) {
       return;
     }
     break;  
@@ -86,7 +84,7 @@ void gpg_check_access_ins() {
     return;
 
   case INS_TERMINATE_DF:
-    if (gpg_pin_is_verified(pin_pw3)) {
+    if (gpg_pin_is_verified(PIN_ID_PW3)) {
       return;
     }
     break;
@@ -99,10 +97,6 @@ void gpg_check_access_ins() {
 
 void gpg_check_access_read_DO() {
   unsigned int ref;
-  gpg_pin_t *pin_pw2, *pin_pw3;
-
-  pin_pw2 = gpg_pin_get_pin(PIN_ID_PW2);
-  pin_pw3 = gpg_pin_get_pin(PIN_ID_PW3);
  
   ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
@@ -152,14 +146,14 @@ void gpg_check_access_read_DO() {
 
     //PW1
   case 0x0103:
-    if (gpg_pin_is_verified(pin_pw2)) {
+    if (gpg_pin_is_verified(PIN_ID_PW2)) {
       return;
     }
     break;
 
   //PW3
   case 0x0104:
-     if (gpg_pin_is_verified(pin_pw3)) {
+     if (gpg_pin_is_verified(PIN_ID_PW3)) {
       return;
     }
     break;
@@ -183,7 +177,7 @@ void gpg_check_access_write_DO() {
   case 0x0101:
   case 0x0103:  
   case 0x01F2:
-    if (gpg_pin_is_verified(pin_pw2)) {
+    if (gpg_pin_is_verified(PIN_ID_PW2)) {
       return;
     }
     break;
@@ -225,7 +219,7 @@ void gpg_check_access_write_DO() {
   case 0x00D6:
   case 0x00D7:
   case 0x00D8:
-    if (gpg_pin_is_verified(pin_pw3)) {
+    if (gpg_pin_is_verified(PIN_ID_PW3)) {
       return;
     }
    break;
@@ -242,7 +236,10 @@ int gpg_dispatch() {
   unsigned int tag,t,l;
   int sw;
 
-
+  if ((G_gpg_vstate.io_cla != 0x00) && (G_gpg_vstate.io_cla != 0x10)) {
+    THROW(SW_CLA_NOT_SUPPORTED);
+    return SW_CLA_NOT_SUPPORTED;
+  }
 
   tag = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
@@ -265,7 +262,7 @@ int gpg_dispatch() {
 
   case INS_TERMINATE_DF:
     gpg_io_discard(0);
-    if (gpg_pin_is_verified(gpg_pin_get_pin(PIN_ID_PW3)) || (N_gpg_pstate->PW3.counter == 0)) {
+    if (gpg_pin_is_verified(PIN_ID_PW3) || (N_gpg_pstate->PW3.counter == 0)) {
       gpg_install(STATE_TERMINATE);
       return(SW_OK);
       break;
@@ -361,7 +358,7 @@ int gpg_dispatch() {
       THROW(SW_INCORRECT_P1P2);
 
   case INS_RESET_RETRY_COUNTER:
-  if ((G_gpg_vstate.io_p2 == 0x81) &&
+    if ((G_gpg_vstate.io_p2 == 0x81) &&
       ( (G_gpg_vstate.io_p1 == 0) ||
         (G_gpg_vstate.io_p1 == 2) )
      ) {
@@ -375,6 +372,11 @@ int gpg_dispatch() {
      sw = gpg_apdu_gen();
      break;
 
+     /* --- MSE --- */
+  case INS_MSE:
+     sw = gpg_apdu_mse(tag);
+     break;
+     
      /* --- PSO --- */
   case INS_PSO:
      sw = gpg_apdu_pso(tag);

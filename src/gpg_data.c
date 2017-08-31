@@ -316,7 +316,7 @@ int gpg_apdu_put_data(unsigned int ref) {
       break;
     default:
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
-      break;
+      return 0;
     }
     //fecth 7f78
     gpg_io_fetch_tl(&t,&l);
@@ -343,6 +343,7 @@ int gpg_apdu_put_data(unsigned int ref) {
       case 0x95:
       case 0x96:
       case 0x97:
+      case 0x99:
         break;
       default:
         THROW(SW_REFERENCED_DATA_NOT_FOUND);

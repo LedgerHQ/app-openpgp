@@ -28,7 +28,7 @@ const unsigned char gpg_oid_sha512[] = {
 
 static void gpg_pso_reset_PW1() {
   if (N_gpg_pstate->PW_status[0] ==0) {
-     gpg_pin_set_verified(gpg_pin_get_pin(PIN_ID_PW1),0);
+     gpg_pin_set_verified(PIN_ID_PW1,0);
   }
 }
 
@@ -134,7 +134,6 @@ static int gpg_sign(gpg_key_t *sigkey) {
     return SW_REFERENCED_DATA_NOT_FOUND;
 }
 
-
 int gpg_apdu_pso(unsigned int pso) {
   unsigned int t,l,ksz;
   switch(pso) {
@@ -146,6 +145,27 @@ int gpg_apdu_pso(unsigned int pso) {
     cnt = G_gpg_vstate.kslot->sig_count+1;
     nvm_write(&G_gpg_vstate.kslot->sig_count,&cnt,sizeof(unsigned int));
     return sw;
+  }
+  // --- PSO:ENC ---
+  case 0x8680: {
+    unsigned int msg_len;
+    cx_aes_key_t *key;
+    unsigned int sz;
+    key = &G_gpg_vstate.kslot->AES_dec;
+    if (!(key->size != 16)) {
+      THROW(SW_CONDITIONS_NOT_SATISFIED+5);
+      return SW_CONDITIONS_NOT_SATISFIED;
+    }
+    msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+    sz = cx_aes(key,
+                CX_ENCRYPT|CX_CHAIN_CBC|CX_LAST,
+                G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, msg_len,
+                G_gpg_vstate.work.io_buffer+1);
+    //send
+    gpg_io_discard(0);
+    G_gpg_vstate.work.io_buffer[0] = 0x02;
+    gpg_io_inserted(1+sz);
+    return SW_OK;
   }
 
   // --- PSO:DEC ---
@@ -159,25 +179,25 @@ int gpg_apdu_pso(unsigned int pso) {
     // --- PSO:DEC:RSA
     case 0x00: {
       cx_rsa_private_key_t *key;
-      if (G_gpg_vstate.kslot->dec.attributes.value[0] != 0x01) {
+      if (G_gpg_vstate.mse_dec->attributes.value[0] != 0x01) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
         return SW_CONDITIONS_NOT_SATISFIED;
       }
-      ksz = (G_gpg_vstate.kslot->dec.attributes.value[1]<<8) | G_gpg_vstate.kslot->dec.attributes.value[2];
+      ksz = (G_gpg_vstate.mse_dec->attributes.value[1]<<8) | G_gpg_vstate.mse_dec->attributes.value[2];
       ksz = ksz>>3;
       key = NULL;
       switch(ksz) {
         case 1024/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.kslot->dec.key.rsa1024;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa1024;
           break;
         case 2048/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.kslot->dec.key.rsa2048;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa2048;
           break;
         case 3072/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.kslot->dec.key.rsa3072;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa3072;
           break;
         case 4096/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.kslot->dec.key.rsa4096;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa4096;
           break;
       }
      
@@ -208,7 +228,7 @@ int gpg_apdu_pso(unsigned int pso) {
       }
       msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
       sz = cx_aes(key,
-                  CX_DECRYPT|CX_LAST,
+                  CX_DECRYPT|CX_CHAIN_CBC|CX_LAST,
                   G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, msg_len,
                   G_gpg_vstate.work.io_buffer);
       //send
@@ -222,11 +242,11 @@ int gpg_apdu_pso(unsigned int pso) {
       cx_ecfp_private_key_t *key;
       unsigned int sz;
       unsigned int curve;
-      if (G_gpg_vstate.kslot->dec.attributes.value[0] != 18) {
+      if (G_gpg_vstate.mse_dec->attributes.value[0] != 0x12) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
         return SW_CONDITIONS_NOT_SATISFIED;
       }
-      key = &G_gpg_vstate.kslot->dec.key.ecfp256;
+      key = &G_gpg_vstate.mse_dec->key.ecfp256;
       if (key->d_len != 32) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
         return SW_CONDITIONS_NOT_SATISFIED; 
@@ -243,7 +263,7 @@ int gpg_apdu_pso(unsigned int pso) {
         return SW_WRONG_DATA;
       }
             
-      curve = gpg_oid2curve(G_gpg_vstate.kslot->dec.attributes.value+1, G_gpg_vstate.kslot->dec.attributes.length-1);
+      curve = gpg_oid2curve(G_gpg_vstate.mse_dec->attributes.value+1, G_gpg_vstate.mse_dec->attributes.length-1);
       if (curve == CX_CURVE_Curve25519) {
         unsigned int i;
         
@@ -290,14 +310,11 @@ int gpg_apdu_pso(unsigned int pso) {
 
 
 int gpg_apdu_internal_authenticate() {
-  gpg_key_t *sigkey;
-  sigkey = &G_gpg_vstate.kslot->aut;
-
-  if (G_gpg_vstate.kslot->aut.attributes.value[0] == 1) {
-    if ( G_gpg_vstate.io_length > ((G_gpg_vstate.kslot->aut.attributes.value[1]<<8)|G_gpg_vstate.kslot->aut.attributes.value[2])*40/100) {
+  if (G_gpg_vstate.mse_aut->attributes.value[0] == 1) {
+    if ( G_gpg_vstate.io_length > ((G_gpg_vstate.mse_aut->attributes.value[1]<<8)|G_gpg_vstate.mse_aut->attributes.value[2])*40/100) {
       THROW(SW_WRONG_LENGTH);
       return SW_WRONG_LENGTH;
     } 
   }  
-  return gpg_sign(&G_gpg_vstate.kslot->aut);
+  return gpg_sign(G_gpg_vstate.mse_aut);
 }

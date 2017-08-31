@@ -40,12 +40,14 @@ int  gpg_apdu_change_ref_data(void) ;
 int  gpg_apdu_reset_retry_counter(void) ;
 
 gpg_pin_t *gpg_pin_get_pin(int id);
-int  gpg_pin_is_verified(gpg_pin_t *pin);
 int  gpg_pin_is_blocked(gpg_pin_t *pin);
-int  gpg_pin_set_verified(gpg_pin_t *pin, int verified);
-int  gpg_pin_check(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
+int  gpg_pin_is_verified(int pinID);
+int  gpg_pin_set_verified(int pinID, int verified);
+int  gpg_pin_check(gpg_pin_t *pin, int pinID,unsigned char *pin_val, unsigned int pin_len);
 void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
-void gpg_pin_sync12(void) ;
+
+int gpg_mse_reset(); 
+int gpg_apdu_mse();
 
 /* ----------------------------------------------------------------------- */
 /* ---                                  IO                            ---- */

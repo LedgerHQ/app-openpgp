@@ -152,12 +152,12 @@ unsigned int ui_pinconfirm_nanos_button(unsigned int button_mask, unsigned int b
   sw = 0x6985;
   switch(button_mask) {
   case BUTTON_EVT_RELEASED|BUTTON_LEFT: // CANCEL
-    gpg_pin_set_verified(gpg_pin_get_pin(G_gpg_vstate.io_p2),0);
+    gpg_pin_set_verified(G_gpg_vstate.io_p2,0);
     sw = 0x6985;            
     break;
 
   case BUTTON_EVT_RELEASED|BUTTON_RIGHT:  // OK
-    gpg_pin_set_verified(gpg_pin_get_pin(G_gpg_vstate.io_p2),1);
+    gpg_pin_set_verified(G_gpg_vstate.io_p2,1);
       sw = 0x9000;
     break;
   default:
@@ -240,9 +240,17 @@ unsigned int ui_pinentry_prepro(const  bagl_element_t* element) {
   else if (element->component.userid == 2) {
     unsigned int i;
     G_gpg_vstate.menu[0] = ' ';
+    #if 1
     for (i = 1; i<= G_gpg_vstate.ux_pinentry[0]; i++) {
-      G_gpg_vstate.menu[i] = C_pin_digit[G_gpg_vstate.ux_pinentry[i]]; 
+        G_gpg_vstate.menu[i] = C_pin_digit[G_gpg_vstate.ux_pinentry[i]]; 
     }
+    #else
+    for (i = 1; i< G_gpg_vstate.ux_pinentry[0]; i++) {
+        G_gpg_vstate.menu[i] = '*'; 
+    }
+    G_gpg_vstate.menu[i] = C_pin_digit[G_gpg_vstate.ux_pinentry[i]]; 
+    i++;
+    #endif
     for (; i<= GPG_MAX_PW_LENGTH;i++) {
       G_gpg_vstate.menu[i] = '-';
     }
@@ -325,15 +333,16 @@ static unsigned int validate_pin() {
 
   if (G_gpg_vstate.io_ins == 0x20) {    
     pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
-    sw = gpg_pin_check(pin, (unsigned char*)(G_gpg_vstate.menu+1), G_gpg_vstate.ux_pinentry[0]);
+    sw = gpg_pin_check(pin, G_gpg_vstate.io_p2, (unsigned char*)(G_gpg_vstate.menu+1), G_gpg_vstate.ux_pinentry[0]);
     gpg_io_discard(1);
     gpg_io_insert_u16(sw);
     gpg_io_do(IO_RETURN_AFTER_TX);
-    if (sw == SW_CONDITIONS_NOT_SATISFIED) {
+    if (sw != SW_OK) {
       snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %d tries remaining", pin->counter );
       ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
-    } 
-    return 0;
+    } else {
+      ui_menu_main_display(0);
+    }
   }
 
   if (G_gpg_vstate.io_ins == 0x24) {
@@ -344,7 +353,7 @@ static unsigned int validate_pin() {
     }
     if (G_gpg_vstate.io_p1 == 3) {
       pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
-      if (gpg_pin_check(pin, G_gpg_vstate.work.io_buffer+1, G_gpg_vstate.work.io_buffer[0])!=SW_OK) {
+      if (gpg_pin_check(pin, G_gpg_vstate.io_p2, G_gpg_vstate.work.io_buffer+1, G_gpg_vstate.work.io_buffer[0])!=SW_OK) {
         gpg_io_discard(1);
         gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
         gpg_io_do(IO_RETURN_AFTER_TX);
@@ -662,7 +671,7 @@ void ui_menu_pinmode_action(unsigned int value) {
     case PIN_MODE_HOST:
     case PIN_MODE_SCREEN:
     case PIN_MODE_CONFIRM:
-      if (!gpg_pin_is_verified(gpg_pin_get_pin(PIN_ID_PW1))) {
+      if (!gpg_pin_is_verified(PIN_ID_PW2)) {
         ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display,0);
        return;
       }
@@ -670,7 +679,7 @@ void ui_menu_pinmode_action(unsigned int value) {
     
     
     case PIN_MODE_TRUST:
-      if (!gpg_pin_is_verified(gpg_pin_get_pin(PIN_ID_PW3))) {
+      if (!gpg_pin_is_verified(PIN_ID_PW3)) {
         ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display,0);
         return;
       }
@@ -767,6 +776,7 @@ void ui_menu_slot_action(unsigned int value) {
      if (s!= G_gpg_vstate.slot) {
        G_gpg_vstate.slot = s;
        G_gpg_vstate.kslot   = &N_gpg_pstate->keys[G_gpg_vstate.slot];
+       gpg_mse_reset();
        ui_CCID_reset();
      }
   }
@@ -785,7 +795,7 @@ void ui_menu_slot_action(unsigned int value) {
 const ux_menu_entry_t ui_menu_info[] = {
   {NULL,  NULL,                 -1, NULL,          "OpenPGP Card",             NULL, 0, 0},
   {NULL,  NULL,                 -1, NULL,          "(c) Ledger SAS",           NULL, 0, 0},
-  {NULL,  NULL,                 -1, NULL,          "Spec  3.0",                NULL, 0, 0},
+  {NULL,  NULL,                 -1, NULL,          "Spec  " XSTR(SPEC_VERSION),NULL, 0, 0},
   {NULL,  NULL,                 -1, NULL,          "App  " XSTR(GPG_VERSION),  NULL, 0, 0},
   {NULL,  ui_menu_main_display,  3, &C_badge_back, "Back",                     NULL, 61, 40},
   UX_MENU_END

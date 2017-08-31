@@ -18,7 +18,7 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
-
+#include "usbd_ccid_impl.h"
 #define SHORT(x)    ((x)>>8)&0xFF, (x)&0xFF
 /* ----------------------*/
 /* -- A Kind of Magic -- */
@@ -171,13 +171,13 @@ const unsigned char C_default_AlgoAttrECC_dec[]   = {
 #else
 const unsigned char C_default_AlgoAttrECC_sig[]   = {
   // eddsa 
-  22,
+  0x16,
   // ed25519
   0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01,
 };
 const unsigned char C_default_AlgoAttrECC_dec[]   = {
   // ecdh
-  18,
+  0x12,
   //cv25519
    0x2B, 0x06, 0x01, 0x04, 0x01, 0x97, 0x55, 0x01, 0x05, 0x01,
 };
@@ -211,11 +211,11 @@ void gpg_init() {
     gpg_nvm_write(N_gpg_pstate->magic, (void*)C_MAGIC, sizeof(C_MAGIC));
     os_memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
   }
-  //ensure pin1 and pin2 are sync in case of powerloss
-  gpg_pin_sync12();
+
   //key conf
   G_gpg_vstate.slot  = N_gpg_pstate->config_slot[1];
   G_gpg_vstate.kslot = &N_gpg_pstate->keys[G_gpg_vstate.slot];
+  gpg_mse_reset();
   //pin conf
   G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
   //ux conf
@@ -260,8 +260,6 @@ int gpg_install(unsigned char app_state) {
     pin.counter = 3;
     pin.ref = PIN_ID_PW1;
     gpg_nvm_write(&N_gpg_pstate->PW1, &pin, sizeof(gpg_pin_t));
-    pin.ref = PIN_ID_PW2;
-    gpg_nvm_write(&N_gpg_pstate->PW2, &pin, sizeof(gpg_pin_t));
 
     //default PW3: 1 2 3 4 5 6 7 8
     os_memmove(pin.value,  C_sha256_PW2, sizeof(C_sha256_PW2));
@@ -288,9 +286,16 @@ int gpg_install(unsigned char app_state) {
     nvm_write(&N_gpg_pstate->default_RSA_exponent, &l, sizeof(unsigned int));
     
     //config pin
+    #if 1
     G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
     gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
-
+    USBD_CCID_activate_pinpad(3);
+    #else
+    G_gpg_vstate.work.io_buffer[0] = PIN_MODE_HOST;
+    gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
+    USBD_CCID_activate_pinpad(0);
+    #endif
+  
     //default key template: RSA 2048)
     
     for (int s = 0; s< GPG_KEYS_SLOTS; s++) {

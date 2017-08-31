@@ -21,12 +21,11 @@
 
 #include "gpg_ux_nanos.h"
 
-gpg_pin_t *gpg_pin_get_pin(int id) {
-  switch (id) {
+gpg_pin_t *gpg_pin_get_pin(int pinref) {
+  switch (pinref) {
   case PIN_ID_PW1 :
-    return &N_gpg_pstate->PW1;
   case PIN_ID_PW2 :
-    return &N_gpg_pstate->PW2;
+    return &N_gpg_pstate->PW1;
   case PIN_ID_PW3:
     return &N_gpg_pstate->PW3;
   case PIN_ID_RC:
@@ -37,8 +36,8 @@ gpg_pin_t *gpg_pin_get_pin(int id) {
 
 
 
-static  int gpg_pin_get_index(unsigned int id) {
-  switch (id) {
+static  int gpg_pin_get_state_index(unsigned int pinref) {
+  switch (pinref) {
   case PIN_ID_PW1 :
     return 1;
   case PIN_ID_PW2 :
@@ -52,28 +51,10 @@ static  int gpg_pin_get_index(unsigned int id) {
   return -1;
 }
 
-void gpg_pin_sync12() {
-  gpg_pin_t *pin1, *pin2;
-  pin1 = gpg_pin_get_pin(PIN_ID_PW1);
-  pin2 = gpg_pin_get_pin(PIN_ID_PW2);
-  if (os_memcmp(pin1, pin2, sizeof(gpg_pin_t))) {
-    pin1 = gpg_pin_get_pin(PIN_ID_PW1);
-    pin2 = gpg_pin_get_pin(PIN_ID_PW2);
-    gpg_nvm_write(pin2, pin1, sizeof(gpg_pin_t));
-  }
-
-}
-static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pin_len) {
+static int gpg_pin_check_internal(gpg_pin_t *pin,  unsigned char *pin_val, int pin_len) {
   cx_sha256_t sha256;
   unsigned int counter;
-  gpg_pin_t *brother;
 
-  brother = NULL;
-  if (pin->ref == PIN_ID_PW1) {
-    brother = gpg_pin_get_pin(PIN_ID_PW2);
-  } else if  (pin->ref == PIN_ID_PW2) {
-    brother = gpg_pin_get_pin(PIN_ID_PW1);
-  } 
 
   if (pin->counter == 0) {
     return SW_PIN_BLOCKED;
@@ -81,9 +62,6 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pi
 
   counter = pin->counter-1;
   gpg_nvm_write(&(pin->counter), &counter, sizeof(int));
-  if (brother) {
-    gpg_nvm_write(&(brother->counter), &counter, sizeof(int));
-  }
   cx_sha256_init(&sha256);
   cx_hash((cx_hash_t*)&sha256, CX_LAST, pin_val, pin_len, NULL);
   if (os_memcmp(sha256.acc, pin->value, 32)) {
@@ -92,29 +70,28 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pi
 
   counter = 3;
   gpg_nvm_write(&(pin->counter), &counter, sizeof(int));
-  if (brother) {
-    gpg_nvm_write(&(brother->counter), &counter, sizeof(int));
-  }
   return SW_OK;
 }
 
-static void gpg_pin_check_throw(gpg_pin_t *pin, unsigned char *pin_val, int pin_len) {
+static void gpg_pin_check_throw(gpg_pin_t *pin, int pinID,
+                                unsigned char *pin_val, int pin_len) {
   int sw;
-  gpg_pin_set_verified(pin,0);
+  gpg_pin_set_verified(pinID,0);
   sw = gpg_pin_check_internal(pin,pin_val,pin_len);
   if (sw == SW_OK) {
-    gpg_pin_set_verified(pin,1);
+    gpg_pin_set_verified(pinID,1);
     return;
   }
   THROW(sw);
 }
 
-int gpg_pin_check(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
+int gpg_pin_check(gpg_pin_t *pin, int pinID,
+                  unsigned char *pin_val, unsigned int pin_len) {
   int sw;
+  gpg_pin_set_verified(pinID,0);
   sw = gpg_pin_check_internal(pin,pin_val,pin_len);
-  gpg_pin_set_verified(pin,0);
   if (sw == SW_OK) {
-   gpg_pin_set_verified(pin,1);
+   gpg_pin_set_verified(pinID,1);
   }
   return sw;
 }
@@ -130,12 +107,11 @@ void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
   newpin.counter = 3;
 
   gpg_nvm_write(pin, &newpin, sizeof(gpg_pin_t));
-  gpg_pin_sync12();
 }
 
-int gpg_pin_set_verified(gpg_pin_t *pin, int verified) {
+int gpg_pin_set_verified(int pinID, int verified) {
   int idx;
-  idx = gpg_pin_get_index(pin->ref);
+  idx = gpg_pin_get_state_index(pinID);
   if (idx >= 0) {
    G_gpg_vstate.verified_pin[idx]=verified;
    return verified;
@@ -143,9 +119,9 @@ int gpg_pin_set_verified(gpg_pin_t *pin, int verified) {
  return 0;
 }
 
-int gpg_pin_is_verified(gpg_pin_t *pin) {
+int gpg_pin_is_verified(int pinID) {
   int idx;
-  idx = gpg_pin_get_index(pin->ref);
+  idx = gpg_pin_get_state_index(pinID);
   if (idx >= 0) {
    return G_gpg_vstate.verified_pin[idx];
  }
@@ -167,12 +143,15 @@ int gpg_apdu_verify() {
     return SW_WRONG_DATA;
   }
   
-  gpg_pin_set_verified(pin,0);
-  if (gpg_pin_is_blocked(pin)) {
-    THROW(SW_PIN_BLOCKED);
-    return SW_PIN_BLOCKED;
-  }
-  if (G_gpg_vstate.io_length == 0) {
+  
+
+   //PINPAD
+  if (G_gpg_vstate.io_cla==0xFF) {
+    if (gpg_pin_is_blocked(pin)) {
+      THROW(SW_PIN_BLOCKED);
+      return SW_PIN_BLOCKED;
+    }
+
     if (G_gpg_vstate.pinmode == PIN_MODE_SCREEN) {
       //Delegate pin check to ui 
       gpg_io_discard(1);
@@ -186,16 +165,46 @@ int gpg_apdu_verify() {
       return 0;
     }
     if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
-        gpg_pin_set_verified(pin,1);
+        gpg_pin_set_verified(G_gpg_vstate.io_p2,1);
         gpg_io_discard(1);
         return SW_OK;
     }
+    THROW(SW_WRONG_DATA);
+    return SW_WRONG_DATA;
   }
-  gpg_pin_check_throw(pin,
-                      G_gpg_vstate.work.io_buffer+ G_gpg_vstate.io_offset,
-                      G_gpg_vstate.io_length);
+
+  //NORMAL CHECK
+  if ((G_gpg_vstate.io_p1==0) && G_gpg_vstate.io_length) {
+    if (gpg_pin_is_blocked(pin)) {
+      THROW(SW_PIN_BLOCKED);
+      return SW_PIN_BLOCKED;
+    }
+    gpg_pin_check_throw(pin, G_gpg_vstate.io_p2, 
+                        G_gpg_vstate.work.io_buffer+ G_gpg_vstate.io_offset,
+                        G_gpg_vstate.io_length);
+    gpg_io_discard(1);
+    return SW_OK;
+  }
+
   gpg_io_discard(1);
-  return SW_OK;
+
+  //STATUS REQUEST
+  if ((G_gpg_vstate.io_p1==0) && G_gpg_vstate.io_length==0) {  
+    if (gpg_pin_is_verified(G_gpg_vstate.io_p2)) {
+      return SW_OK;
+    }
+    return 0x63C0 | pin->counter;
+  }
+
+  //RESET REQUEST
+  if ((G_gpg_vstate.io_p1==0xFF) && G_gpg_vstate.io_length==0) {  
+    gpg_pin_set_verified(G_gpg_vstate.io_p2,0);
+    return SW_OK;
+  }
+
+  THROW(SW_WRONG_DATA);
+  return SW_WRONG_DATA;
+
 }
 
 int gpg_apdu_change_ref_data() {
@@ -208,7 +217,7 @@ int gpg_apdu_change_ref_data() {
     return SW_WRONG_DATA;
   }
 
-  gpg_pin_set_verified(pin,0);
+  gpg_pin_set_verified(pin->ref,0);
   
   
   // --- RC pin ---
@@ -252,7 +261,7 @@ int gpg_apdu_change_ref_data() {
     len = pin->length;
   }
 
-  gpg_pin_check_throw(pin,
+  gpg_pin_check_throw(pin, pin->ref,
                       G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,
                       len);
 
@@ -281,7 +290,7 @@ int gpg_apdu_reset_retry_counter() {
   pin_rc = gpg_pin_get_pin(PIN_ID_RC);
 
   if (G_gpg_vstate.io_p1 == 2) {
-    if (!gpg_pin_is_verified(pin_pw3)) {
+    if (!gpg_pin_is_verified(PIN_ID_PW3)) {
       THROW(SW_SECURITY_STATUS_NOT_SATISFIED);
       return SW_SECURITY_STATUS_NOT_SATISFIED;
     }
@@ -296,7 +305,7 @@ int gpg_apdu_reset_retry_counter() {
       rc_len = pin_rc->length;
     }
     pw1_len = G_gpg_vstate.io_length-rc_len;
-    gpg_pin_check_throw(pin_rc,
+    gpg_pin_check_throw(pin_rc,pin_rc->ref,
                         G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,
                         rc_len);
   }
