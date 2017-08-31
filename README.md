@@ -30,7 +30,7 @@ The GnuPG application implements the following addon:
   - 3 independent key slots
   - seeded key generation
 
-Technical specification is available at https://github.com/LedgerHQ/blue-app-openpgp-card/blob/master/doc/developper/gpgcard3.0-addon.rstdoc/gpgcard3.0-addon.rst
+Technical specification is available at https://github.com/LedgerHQ/blue-app-openpgp-card/blob/master/doc/developper/gpgcard3.0-addon.rst
 
    
 ### Key slot
