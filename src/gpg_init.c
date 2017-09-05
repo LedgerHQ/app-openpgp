@@ -92,7 +92,7 @@ int gpg_oid2curve(unsigned char* oid, unsigned int len) {
 /* -------------------------------*/
 
 const unsigned char C_ext_capabilities[10] = {
-  //-SM, +getchallenge, +keyimport, +PWchangeable, +privateDO, +algAttrChangeable, +AES, -RFU
+  //-SM, +getchallenge, +keyimport, +PWchangeable, +privateDO, +algAttrChangeable, +AES, -KDF
   0x7E,
   // No SM,
   0x00,
@@ -104,8 +104,8 @@ const unsigned char C_ext_capabilities[10] = {
   SHORT(GPG_EXT_PRIVATE_DO_LENGTH),
   //PIN block formart 2 not supported
   0x00,
-  //RFU
-  0x00
+  //MSE
+  0x01
 
 };
 

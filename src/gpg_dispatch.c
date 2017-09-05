@@ -236,7 +236,7 @@ int gpg_dispatch() {
   unsigned int tag,t,l;
   int sw;
 
-  if ((G_gpg_vstate.io_cla != 0x00) && (G_gpg_vstate.io_cla != 0x10)) {
+  if ((G_gpg_vstate.io_cla != 0x00) && (G_gpg_vstate.io_cla != 0x10) && (G_gpg_vstate.io_cla != 0xEF)) {
     THROW(SW_CLA_NOT_SUPPORTED);
     return SW_CLA_NOT_SUPPORTED;
   }
@@ -269,7 +269,6 @@ int gpg_dispatch() {
     }
     THROW(SW_CONDITIONS_NOT_SATISFIED);
   }
-
 
 
   /* Other commands allowed if not terminated */

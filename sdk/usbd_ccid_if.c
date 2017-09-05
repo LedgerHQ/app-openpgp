@@ -513,7 +513,7 @@ uint8_t SC_Secure(uint32_t dwLength, uint8_t bBWI, uint16_t wLevelParameter,
     case 0: // verify pin
       //ret_len = dwLength - 15;
       ret_len = 5;
-      os_memmove(G_io_apdu_buffer, pbuf+15, 5);
+      off = 15;
       break;
 
     case 1: // modify pin
@@ -531,7 +531,6 @@ uint8_t SC_Secure(uint32_t dwLength, uint8_t bBWI, uint16_t wLevelParameter,
       }
       //ret_len = dwLength - off;
       ret_len = 5;
-      os_memmove(G_io_apdu_buffer, pbuf+off, 5);
       break;
 
     default: // unsupported
@@ -540,7 +539,9 @@ uint8_t SC_Secure(uint32_t dwLength, uint8_t bBWI, uint16_t wLevelParameter,
       CCID_Send_Reply(&USBD_Device);
       return SLOTERROR_CMD_NOT_SUPPORTED;
   }
-  return SC_XferBlock(G_io_apdu_buffer, ret_len, &ret_len);
+  pbuf += off;
+  pbuf[0] = 0xEF; 
+  return SC_XferBlock(pbuf, ret_len, &ret_len);
 }
 
 // prepare the apdu to be processed by the application

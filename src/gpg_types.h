@@ -179,6 +179,7 @@ struct gpg_v_state_s {
   unsigned char   seed_mode;
 
   /* io state*/
+
   unsigned char   io_cla;
   unsigned char   io_ins;
   unsigned char   io_p1;

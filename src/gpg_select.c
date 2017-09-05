@@ -36,6 +36,9 @@ int gpg_apdu_select() {
     }
 
     gpg_io_discard(0);
+    if (N_gpg_pstate->histo[7] != 0x07) {
+      THROW(SW_STATE_TERMINATED);
+    }
     sw = SW_OK;
   } else {
     THROW(SW_FILE_NOT_FOUND);

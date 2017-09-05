@@ -247,7 +247,7 @@ int gpg_io_fetch(unsigned char* buffer, int len) {
 int gpg_io_do(unsigned int io_flags) {
 
   //if pending input chaining
-  if (G_gpg_vstate.io_cla & 0x01) {
+  if (G_gpg_vstate.io_cla & 0x10) {
     goto in_chaining;
   }
 

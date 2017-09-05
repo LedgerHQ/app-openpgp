@@ -654,10 +654,27 @@ int gpg_apdu_put_data(unsigned int ref) {
     }
 
     /* ----------------- RC ----------------- */
-  case 0xD3:
-    sw = gpg_apdu_change_ref_data();
-    break;
+  case 0xD3: {
+    gpg_pin_t *pin;
 
+    pin = gpg_pin_get_pin(PIN_ID_RC);
+    if (G_gpg_vstate.io_length == 0) {
+      gpg_nvm_write(pin, NULL, sizeof(gpg_pin_t));
+
+    }
+    else if ((G_gpg_vstate.io_length > GPG_MAX_PW_LENGTH) ||
+             (G_gpg_vstate.io_length < 8)) {
+      THROW(SW_WRONG_DATA);
+      return SW_WRONG_DATA;
+    } else {
+      gpg_pin_set(pin,
+                  G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,
+                  G_gpg_vstate.io_length);
+    }
+    sw =  SW_OK;
+    break;
+  }
+  
     /* ----------------- UIF ----------------- */
   case 0xD6:
     ptr_v = G_gpg_vstate.kslot->sig.UIF;

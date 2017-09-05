@@ -83,6 +83,7 @@ static void gpg_pin_check_throw(gpg_pin_t *pin, int pinID,
     return;
   }
   THROW(sw);
+  return;
 }
 
 int gpg_pin_check(gpg_pin_t *pin, int pinID,
@@ -143,10 +144,8 @@ int gpg_apdu_verify() {
     return SW_WRONG_DATA;
   }
   
-  
-
-   //PINPAD
-  if (G_gpg_vstate.io_cla==0xFF) {
+  //PINPAD
+  if (G_gpg_vstate.io_cla == 0xEF) {
     if (gpg_pin_is_blocked(pin)) {
       THROW(SW_PIN_BLOCKED);
       return SW_PIN_BLOCKED;
@@ -220,25 +219,7 @@ int gpg_apdu_change_ref_data() {
   gpg_pin_set_verified(pin->ref,0);
   
   
-  // --- RC pin ---
-  if (pin->ref == PIN_ID_RC) {
-    newlen = G_gpg_vstate.io_length;
-    if (newlen == 0) {
-      gpg_nvm_write(pin, NULL, sizeof(gpg_pin_t));
-
-    }
-    else if ((newlen > GPG_MAX_PW_LENGTH) ||
-             (newlen < 8)) {
-        THROW(SW_WRONG_DATA);
-      return SW_WRONG_DATA;
-    } else {
-      gpg_pin_set(pin,
-                      G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,
-                      newlen);
-    }
-    gpg_io_discard(1);
-    return SW_OK;
-  }
+  
 
   // --- PW1/PW3 pin ---
   if (gpg_pin_is_blocked(pin)) {

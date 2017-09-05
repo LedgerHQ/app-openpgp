@@ -109,6 +109,7 @@ class GPGCard() :
         if device.startswith("ledger:"):
             self.token = getDongle(True)
             self.exchange = self._exchange_ledger
+            self.disconnect = self._disconnect_ledger
         elif device.startswith("pcsc:"):
             allreaders = readers()
             for r in allreaders:
@@ -120,11 +121,14 @@ class GPGCard() :
                     self.connection = r.createConnection()
                     self.connection.connect()
                     self.exchange = self._exchange_pcsc
+                    self.disconnect = self._disconnect_pcsc
                 else:
                     #print("No")
                     pass
         if not self.token:
             print("No token")
+
+
 
 
     ### APDU  interface ###
@@ -159,6 +163,14 @@ class GPGCard() :
         sw = (sw1<<8)|sw2
         #print("xch S resp: %s %.04x"%(binascii.hexlify(resp),sw))
         return resp,sw
+    
+    def _disconnect_ledger(self):
+        return self.token.close()        
+
+    def _disconnect_pcsc(self):
+        r = self.connection.disconnect()
+        #self.connection.releaseContext()
+        return r
 
     def select(self):
         apdu = binascii.unhexlify(b"00A4040006D27600012401")
