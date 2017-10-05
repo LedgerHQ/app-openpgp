@@ -1,0 +1,196 @@
+Step1: ...
+-----
+Jump into any temp dir 
+
+
+Step2: install nanos
+----- 
+Do a fresh install of gpg application 1.1.0 from google app manager
+
+
+Step3: setup conf
+-----
+Create a 'manual-test' directory   
+    $ mkdir manual-test
+
+Create a 'manual-test/gnupg'
+    $ mkdir manual-test/gnupg
+
+Create a 'manual-test/gnupg/scdaemon.conf' file with content:
+    reader-port "Ledger Token [Nano S] (0001) 01 00"
+    allow-admin
+    card-timeout 1
+    debug-level expert
+    debug 11
+    log-file /tmp/scdaemon.log
+
+Jump into manual-test dir
+
+Step4: change to host pin style
+-----
+Launch gpg NanoS application and:
+    $ killall scdaemon gpg-agent
+    $ gpg2 --homedir  `pwd`/gnupg --card-edit
+    gpg: WARNING: unsafe permissions on homedir '/home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg'
+    gpg: keybox '/home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg/pubring.kbx' created
+
+    Reader ...........: Ledger Token [Nano S] (0001) 01 00
+    Application ID ...: D2760001240103002C97DDD38BA90000
+    Version ..........: 3.0
+    Manufacturer .....: unknown
+    Serial number ....: DDD38BA9
+    Name of cardholder: [not set]
+    Language prefs ...: [not set]
+    Sex ..............: unspecified
+    URL of public key : [not set]
+    Login data .......: [not set]
+    Signature PIN ....: not forced
+    Key attributes ...: rsa2048 rsa2048 rsa2048
+    Max. PIN lengths .: 12 12 12
+    PIN retry counter : 3 0 3
+    Signature counter : 0
+    Signature key ....: [none]
+    Encryption key....: [none]
+    Authentication key: [none]
+    General key info..: [none]
+
+    gpg/card> verify
+
+    Reader ...........: Ledger Token [Nano S] (0001) 01 00
+    Application ID ...: D2760001240103002C97DDD38BA90000
+    Version ..........: 3.0
+    Manufacturer .....: unknown
+    Serial number ....: DDD38BA9
+    Name of cardholder: [not set]
+    Language prefs ...: [not set]
+    Sex ..............: unspecified
+    URL of public key : [not set]
+    Login data .......: [not set]
+    Signature PIN ....: not forced
+    Key attributes ...: rsa2048 rsa2048 rsa2048
+    Max. PIN lengths .: 12 12 12
+    PIN retry counter : 3 0 3
+    Signature counter : 0
+    Signature key ....: [none]
+    Encryption key....: [none]
+    Authentication key: [none]
+    General key info..: [none]
+
+    gpg/card> 
+
+Then on nanos, goto settings->PIN mode, and select 'Host'
+Then on nanos, goto settings->PIN mode, and select 'Set as default'
+
+unplug and replug the nanos
+
+relaunch the openpgp application
+
+Goto settings->PIN mode, and check you have "Host # +"  (DASH and PLUS)
+
+
+Step5: create 2048bits RSA keys
+-----
+
+
+In 'manual-test' directory, ask key generation. Nota that during this phase PIN has to be validate on Nanos
+
+    $ killall scdaemon gpg-agent
+    $ gpg2 --homedir  `pwd`/gnupg --card-edit
+    gpg: WARNING: unsafe permissions on homedir '/home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg'
+
+    Reader ...........: Ledger Token [Nano S] (0001) 01 00
+    Application ID ...: D2760001240103002C97DDD38BA90000
+    Version ..........: 3.0
+    Manufacturer .....: unknown
+    Serial number ....: DDD38BA9
+    Name of cardholder: [not set]
+    Language prefs ...: [not set]
+    Sex ..............: unspecified
+    URL of public key : [not set]
+    Login data .......: [not set]
+    Signature PIN ....: not forced
+    Key attributes ...: rsa2048 rsa2048 rsa2048
+    Max. PIN lengths .: 12 12 12
+    PIN retry counter : 3 0 3
+    Signature counter : 0
+    Signature key ....: [none]
+    Encryption key....: [none]
+    Authentication key: [none]
+    General key info..: [none]
+
+    gpg/card> admin
+    Admin commands are allowed
+
+    gpg/card> generate
+    Make off-card backup of encryption key? (Y/n) n
+
+    Please note that the factory settings of the PINs are
+       PIN = '123456'     Admin PIN = '12345678'
+    You should change them using the command --change-pin
+
+    What keysize do you want for the Signature key? (2048) 2048
+    What keysize do you want for the Encryption key? (2048) 2048
+    What keysize do you want for the Authentication key? (2048) 2048
+    Please specify how long the key should be valid.
+             0 = key does not expire
+          <n>  = key expires in n days
+          <n>w = key expires in n weeks
+          <n>m = key expires in n months
+          <n>y = key expires in n years
+    Key is valid for? (0) 0
+    Key does not expire at all
+    Is this correct? (y/N) y
+
+    GnuPG needs to construct a user ID to identify your key.
+
+    Real name: testkey
+    Email address: 
+    Comment: 
+    You selected this USER-ID:
+        "testkey"
+
+    Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit? O
+    gpg: /home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg/trustdb.gpg: trustdb created
+    gpg: key 5ED17DF289C757A2 marked as ultimately trusted
+    gpg: directory '/home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg/openpgp-revocs.d' created
+    gpg: revocation certificate stored as '/home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg/openpgp-revocs.d/7FDC3D2FCD3558CB06631EAB5ED17DF289C757A2.rev'
+    public and secret key created and signed.
+
+
+    gpg/card> quit
+    pub   rsa2048 2017-10-03 [SC]
+          7FDC3D2FCD3558CB06631EAB5ED17DF289C757A2
+    uid                      testkey
+    sub   rsa2048 2017-10-03 [A]
+    sub   rsa2047 2017-10-03 [E]
+
+
+
+Step6: encrypt/decrypt
+-----
+encrypt
+
+    $ killall scdaemon gpg-agent
+    $ echo CLEAR > foo.txt
+    $ gpg2 --homedir  `pwd`/gnupg -e -r testkey foo.txt
+     gpg: WARNING: unsafe permissions on homedir '/home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg'
+     gpg: checking the trustdb
+     gpg: marginals needed: 3  completes needed: 1  trust model: pgp
+     gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
+
+Force pin to asked
+
+    $ killall gpg-agent scdaemon 
+
+decrypt
+
+    $ gpg2 --homedir  `pwd`/gnupg foo.txt.gpg
+     gpg: WARNING: unsafe permissions on homedir '/home/cme/Projects/Git/ledgerblue/blue-app-openpgp-card/manual-test/gnupg'
+     gpg: encrypted with 2047-bit RSA key, ID 602FE5EB7BFA4B00, created 2017-10-03
+       "testkey"
+     File 'foo.txt' exists. Overwrite? (y/N) y
+
+Step7: pin on screen 
+------
+
+Restart from Step1, but skip step4
