@@ -163,9 +163,9 @@ class GPGCard() :
         sw = (sw1<<8)|sw2
         #print("xch S resp: %s %.04x"%(binascii.hexlify(resp),sw))
         return resp,sw
-    
+
     def _disconnect_ledger(self):
-        return self.token.close()        
+        return self.token.close()
 
     def _disconnect_pcsc(self):
         r = self.connection.disconnect()
@@ -266,7 +266,7 @@ class GPGCard() :
                 self.sig_date            = dates[0:4]
                 self.dec_date            = dates[4:8]
                 self.aut_date            = dates[8:12]
-        
+
         self.cardholder_cert             = self.get_data(0x7f21)
 
         self.UIF_SIG,sw                  = self.get_data(0xD6)
@@ -289,13 +289,13 @@ class GPGCard() :
         self.put_data(0x0102,  self.private_02)
         self.put_data(0x0103,  self.private_03)
         self.put_data(0x0104,  self.private_04)
-        
+
         self.put_data(0x5b,   self.name)
         self.put_data(0x5e,   self.login)
         self.put_data(0x5f2d, self.lang)
         self.put_data(0x5f35, self.sex)
         self.put_data(0x5f50, self.url)
-        
+
         self.put_data(0xc1,   self.sig_attribute)
         self.put_data(0xc2,   self.dec_attribute)
         self.put_data(0xc3,   self.aut_attribute)
@@ -326,13 +326,13 @@ class GPGCard() :
              self.name, self.login, self.sex, self.url,
              self.sig_attribute, self.dec_attribute, self.aut_attribute,
              self.PW_status,
-             self.sig_fingerprints, self.dec_fingerprints, self.aut_fingerprints, 
-             self.sig_CA_fingerprints, self.dec_CA_fingerprints, self.aut_CA_fingerprints, 
-             self.sig_date, self.dec_date, self.aut_date, 
+             self.sig_fingerprints, self.dec_fingerprints, self.aut_fingerprints,
+             self.sig_CA_fingerprints, self.dec_CA_fingerprints, self.aut_CA_fingerprints,
+             self.sig_date, self.dec_date, self.aut_date,
              self.cardholder_cert,
              self.UIF_SIG, self.UIF_DEC, self.UIF_AUT),
             f, 2)
-        
+
 
     def restore(self, file_name, seed_key=False):
         f = open(file_name,mode='r+b')
@@ -341,9 +341,9 @@ class GPGCard() :
          self.name, self.login, self.sex, self.url,
          self.sig_attribute, self.dec_attribute, self.aut_attribute,
          self.status,
-         self.sig_fingerprints, self.dec_fingerprints, self.aut_fingerprints, 
-         self.sig_CA_fingerprints, self.dec_CA_fingerprints, self.aut_CA_fingerprints, 
-         self.sig_date, self.dec_date, self.aut_date, 
+         self.sig_fingerprints, self.dec_fingerprints, self.aut_fingerprints,
+         self.sig_CA_fingerprints, self.dec_CA_fingerprints, self.aut_CA_fingerprints,
+         self.sig_date, self.dec_date, self.aut_date,
          self.cardholder_cert,
          self.UIF_SIG, self.UIF_DEC, self.UIF_AUT) = pickle.load(f)
         self.set_all()
@@ -742,4 +742,3 @@ class GPGCard() :
             'e': tags[0x82],
             'd': tags[0x98],
             }
-
