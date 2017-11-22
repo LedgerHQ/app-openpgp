@@ -282,7 +282,7 @@ int gpg_apdu_put_data(unsigned int ref) {
     if (G_gpg_vstate.io_length != 4) {
       THROW(SW_WRONG_LENGTH);
     }
-    G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] &= ~0x07;
+    G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 3] &= ~0x07;
     nvm_write(&N_gpg_pstate->AID[10], &G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset], 4);
     break;
 
