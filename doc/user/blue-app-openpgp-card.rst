@@ -121,9 +121,9 @@ Linux
 
 You have to have to add the NanoS to /etc/libccid_Info.plist
 
-    In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
-    In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
-    In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
+   - In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
+   - In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
+   - In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
   
 These 3 entries must be added at the end of each list.
 
@@ -135,9 +135,9 @@ MAC
 2. You have to add the Nano S to /usr/libexec/SmartCardServices/drivers/ifd-ccid.bundle/Contents/Info.plist
 
 
-       In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
-       In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
-       In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
+       - In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
+       - In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
+       - In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
   
 This 3 entries must be added at the end of each list.
 
