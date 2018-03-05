@@ -91,6 +91,115 @@ void ui_info(const char* msg1, const char* msg2, const void *menu_display, unsig
   UX_MENU_DISPLAY(0, G_gpg_vstate.ui_dogsays, NULL);
 };
 
+
+/* ------------------------------ UIF CONFIRM UX ----------------------------- */
+unsigned int ui_uifconfirm_nanos_button(unsigned int button_mask, unsigned int button_mask_counter);
+unsigned int ui_uifconfirm_prepro(const  bagl_element_t* element);
+
+const bagl_element_t ui_uifconfirm_nanos[] = {
+  // type             userid    x    y    w    h    str   rad  fill              fg        bg     font_id                   icon_id  
+  { {BAGL_RECTANGLE,  0x00,     0,   0, 128,  32,    0,    0,  BAGL_FILL,  0x000000, 0xFFFFFF,    0,                         0}, 
+    NULL, 
+    0, 
+    0, 0, 
+    NULL, NULL, NULL},
+
+  { {BAGL_ICON,       0x00,    3,   12,   7,   7,    0,    0,         0,   0xFFFFFF, 0x000000,    0,                          BAGL_GLYPH_ICON_CROSS  }, 
+    NULL, 
+    0, 
+    0, 0, 
+    NULL, NULL, NULL },
+    
+  { {BAGL_ICON,       0x00,  117,   13,   8,   6,    0,    0,         0,   0xFFFFFF, 0x000000,    0,                          BAGL_GLYPH_ICON_CHECK  }, 
+     NULL, 
+     0, 
+     0, 0, 
+     NULL, NULL, NULL },
+
+  { {BAGL_LABELINE,   0x01,    0,   12, 128,  32,    0,    0,         0,   0xFFFFFF, 0x000000,    BAGL_FONT_OPEN_SANS_EXTRABOLD_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, 
+    G_gpg_vstate.menu,  
+    0, 
+    0, 0, 
+    NULL, NULL, NULL },
+  { {BAGL_LABELINE,   0x02,    0,   26, 128,  32,    0,    0,         0,   0xFFFFFF, 0x000000,    BAGL_FONT_OPEN_SANS_EXTRABOLD_11px|BAGL_FONT_ALIGNMENT_CENTER, 0  }, 
+    G_gpg_vstate.menu,  
+    0, 
+    0, 0, 
+    NULL, NULL, NULL },
+};
+
+void ui_menu_uifconfirm_display(unsigned int value) {
+ UX_DISPLAY(ui_uifconfirm_nanos, (void*)ui_uifconfirm_prepro);   
+}
+
+unsigned int ui_uifconfirm_prepro(const  bagl_element_t* element) {
+  if (element->component.userid == 1) {
+    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Confirm Operation:");
+    return 1;
+  }
+  if (element->component.userid == 2) {
+    unsigned int uif_case = (G_gpg_vstate.io_ins<<16)|(G_gpg_vstate.io_p1<<8)|(G_gpg_vstate.io_p2);
+    switch (uif_case) {
+    case 0x002A9E9A:
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Signature");
+      return 1;
+    case 0x002A8680:
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Encryption");
+      return 1;
+    case 0x002A8086:
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+      return 1;
+    case 0x0088000:
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+      return 1;
+    } 
+  }
+  snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Please Cancel");
+  return 1;
+}
+
+unsigned int ui_uifconfirm_nanos_button(unsigned int button_mask, unsigned int button_mask_counter) {
+  unsigned int sw;
+
+  sw = 0x6985;
+  switch(button_mask) {
+  case BUTTON_EVT_RELEASED|BUTTON_LEFT: // CANCEL
+    gpg_io_discard(1);
+    gpg_io_insert_u16(sw);  
+    gpg_io_do(IO_RETURN_AFTER_TX);
+    ui_menu_main_display(0);
+    sw = 0x6985;            
+    break;
+
+  case BUTTON_EVT_RELEASED|BUTTON_RIGHT:  // OK
+    BEGIN_TRY {
+      TRY {
+        G_gpg_vstate.UIF_flags = 1;
+        sw = gpg_apdu_pso();
+      }
+      CATCH_OTHER(e) {
+        gpg_io_discard(1);
+        if ( (e & 0xFFFF0000) ||
+             ( ((e&0xF000)!=0x6000) && ((e&0xF000)!=0x9000) ) ) {
+          gpg_io_insert_u32(e);
+          sw = 0x6f42;
+        } else {
+          sw = e;
+        }
+      }
+      FINALLY {
+        G_gpg_vstate.UIF_flags = 0;
+        gpg_io_insert_u16(sw);  
+        gpg_io_do(IO_RETURN_AFTER_TX);
+        ui_menu_main_display(0);
+      }
+      break;
+
+    } END_TRY;
+  }
+  return 0;
+}
+
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
 
 const bagl_element_t ui_pinconfirm_nanos[] = {
@@ -663,7 +772,8 @@ void ui_menu_pinmode_action(unsigned int value) {
       }  else {
         s = 3;
       }
-      USBD_CCID_activate_pinpad(s);
+      #warning USBD_CCID_activate_pinpad commented
+      //USBD_CCID_activate_pinpad(s);
     }
   }
   else {

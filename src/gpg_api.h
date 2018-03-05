@@ -28,7 +28,7 @@ int  gpg_apdu_get_data(unsigned int ref)  ;
 int  gpg_apdu_get_next_data(unsigned int ref)  ;
 int  gpg_apdu_put_data(unsigned int ref) ;
 
-int  gpg_apdu_pso(unsigned int ref);
+int  gpg_apdu_pso(void);
 int  gpg_apdu_internal_authenticate(void);
 int  gpg_apdu_gen(void );
 int  gpg_apdu_get_challenge(void) ;

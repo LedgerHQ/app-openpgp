@@ -83,7 +83,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
     if ((sigkey->attributes.value[0] == 19) ||
         (sigkey->attributes.value[0] == 22)) {
       cx_ecfp_private_key_t *key;
-      unsigned int sz,i,rs_len;
+      unsigned int sz,i,rs_len,info;
       unsigned char *rs;
 
       key = &sigkey->key.ecfp256;
@@ -97,7 +97,8 @@ static int gpg_sign(gpg_key_t *sigkey) {
                            CX_RND_TRNG,
                            CX_NONE,
                            G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
-                           G_gpg_vstate.work.io_buffer);
+                           G_gpg_vstate.work.io_buffer,
+                           &info);
         //reencode r,s in MPI format
         gpg_io_discard(0);
       
@@ -116,11 +117,12 @@ static int gpg_sign(gpg_key_t *sigkey) {
           rs += 2;
         }
       } else{
-        sz = cx_eddsa_sign(key, NULL,
+        sz = cx_eddsa_sign(key,
                            CX_NONE,
                            CX_SHA512,
                            G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
-                           G_gpg_vstate.work.io_buffer+128);
+                           NULL, 0,
+                           G_gpg_vstate.work.io_buffer+128, &info);
         gpg_io_discard(0);
         gpg_io_insert(G_gpg_vstate.work.io_buffer+128, sz);
       }
@@ -134,8 +136,30 @@ static int gpg_sign(gpg_key_t *sigkey) {
     return SW_REFERENCED_DATA_NOT_FOUND;
 }
 
-int gpg_apdu_pso(unsigned int pso) {
+int gpg_apdu_pso() {
   unsigned int t,l,ksz;
+
+  unsigned int pso;
+
+  pso = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
+
+  //UIF HANDLE
+  switch(pso) {
+  // --- PSO:CDS ---
+  case 0x9e9a: 
+    if ((G_gpg_vstate.kslot->sig.UIF[0]) && ((G_gpg_vstate.UIF_flags)==0)) {
+      ui_menu_uifconfirm_display(0);
+      return 0;
+    }
+
+  case 0x8680: 
+    if ((G_gpg_vstate.kslot->dec.UIF[0]) && ((G_gpg_vstate.UIF_flags)==0)) {
+      ui_menu_uifconfirm_display(0);
+      return 0;
+    }
+  }
+
+
   switch(pso) {
   // --- PSO:CDS ---
   case 0x9e9a: {
@@ -296,7 +320,6 @@ int gpg_apdu_pso(unsigned int pso) {
       THROW(SW_REFERENCED_DATA_NOT_FOUND);
       return SW_REFERENCED_DATA_NOT_FOUND;
     } 
-
   }
   
   //--- PSO:yy NOT SUPPPORTED ---
@@ -310,6 +333,11 @@ int gpg_apdu_pso(unsigned int pso) {
 
 
 int gpg_apdu_internal_authenticate() {
+  if ((G_gpg_vstate.kslot->aut.UIF[0]) && ((G_gpg_vstate.UIF_flags)==0)) {
+    ui_menu_uifconfirm_display(0);
+    return 0;
+  }
+
   if (G_gpg_vstate.mse_aut->attributes.value[0] == 1) {
     if ( G_gpg_vstate.io_length > ((G_gpg_vstate.mse_aut->attributes.value[1]<<8)|G_gpg_vstate.mse_aut->attributes.value[2])*40/100) {
       THROW(SW_WRONG_LENGTH);

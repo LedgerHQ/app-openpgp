@@ -62,7 +62,7 @@ void gpg_check_access_ins() {
 
   case INS_PSO:
     if ((ref == 0x9e9a) && gpg_pin_is_verified(PIN_ID_PW1)) {
-      //pso:sign
+      //pso:sign      
       if (N_gpg_pstate->PW_status[0] == 0) {
         gpg_pin_set_verified(PIN_ID_PW1, 0);
       }
@@ -236,7 +236,9 @@ int gpg_dispatch() {
   unsigned int tag,t,l;
   int sw;
 
-  if ((G_gpg_vstate.io_cla != 0x00) && (G_gpg_vstate.io_cla != 0x10) && (G_gpg_vstate.io_cla != 0xEF)) {
+  if ((G_gpg_vstate.io_cla != 0x00) && 
+      (G_gpg_vstate.io_cla != 0x10) && 
+      (G_gpg_vstate.io_cla != 0xEF)) {
     THROW(SW_CLA_NOT_SUPPORTED);
     return SW_CLA_NOT_SUPPORTED;
   }
@@ -378,8 +380,9 @@ int gpg_dispatch() {
      
      /* --- PSO --- */
   case INS_PSO:
-     sw = gpg_apdu_pso(tag);
+     sw = gpg_apdu_pso();
      break;
+
   case INS_INTERNAL_AUTHENTICATE:
      sw = gpg_apdu_internal_authenticate();
      break;

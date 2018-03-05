@@ -149,10 +149,7 @@ void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V) {
 /* ----------------------------------------------------------------------- */
 /* FECTH data from received buffer                                         */
 /* ----------------------------------------------------------------------- */
-void gpg_io_fetch_buffer(unsigned char* buffer, unsigned int len) {
-  os_memmove(buffer, G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, len);
-  G_gpg_vstate.io_offset += len;
-}
+
 
 unsigned int gpg_io_fetch_u32() {
   unsigned int  v32;

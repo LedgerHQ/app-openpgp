@@ -122,7 +122,7 @@ const unsigned char C_ext_length[8] = {
 const unsigned char C_default_AID[]  = {
   0xD2,  0x76,  0x00,  0x01,  0x24,  0x01,
   //version
-  0x03,  0x00,
+  0x02,  0x00,
   //manufacturer
   0x2C,  0x97,
   //serial
@@ -289,7 +289,8 @@ int gpg_install(unsigned char app_state) {
     #if 1
     G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
     gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
-    USBD_CCID_activate_pinpad(3);
+    #warning USBD_CCID_activate_pinpad commented
+    //USBD_CCID_activate_pinpad(3);
     #else
     G_gpg_vstate.work.io_buffer[0] = PIN_MODE_HOST;
     gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);

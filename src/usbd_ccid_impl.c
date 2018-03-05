@@ -40,6 +40,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_ccid_core.h"
+#include "usbd_ccid_impl.h"
+#define CCID_INTR_IN_EP 0x81
+#define CCID_INTR_EPIN_SIZE 16
 
 #ifdef HAVE_USB_CLASS_CCID
 
@@ -57,7 +60,7 @@ static const uint8_t const USBD_PRODUCT_FS_STRING[] = {
   'e', 0,
 };
 
-#elif TARGET_ID == 0x31100002 // nano s
+#elif TARGET_ID == 0x31100003 // nano s
 #define USBD_PID                      0x0001
 static const uint8_t const USBD_PRODUCT_FS_STRING[] = {
   6*2+2,

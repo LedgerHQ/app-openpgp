@@ -178,6 +178,8 @@ struct gpg_v_state_s {
   gpg_key_t       *mse_dec;
   unsigned char   seed_mode;
 
+  unsigned char   UIF_flags;
+
   /* io state*/
 
   unsigned char   io_cla;
@@ -230,7 +232,7 @@ struct gpg_v_state_s {
   unsigned char pinmode;
 
   /* ux menus */
-  char          menu[64];
+  char          menu[112];
   unsigned char ux_pinentry[12];
   unsigned int  ux_key;
   unsigned int  ux_type;

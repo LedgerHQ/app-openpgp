@@ -19,10 +19,19 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
+const unsigned char C_MF[] = {0x3F, 0x00};
 
 int gpg_apdu_select() {
   int sw;
-  if ( (G_gpg_vstate.io_length == 6) &&
+
+  //MF
+  if ( (G_gpg_vstate.io_length == 2) &&
+   (os_memcmp(G_gpg_vstate.work.io_buffer, C_MF, G_gpg_vstate.io_length) == 0) ) {
+    gpg_io_discard(0);
+    sw = SW_OK;
+  } 
+  //AID APP
+  else if ( (G_gpg_vstate.io_length == 6) &&
        (os_memcmp(G_gpg_vstate.work.io_buffer, N_gpg_pstate->AID, G_gpg_vstate.io_length) == 0) ) {
     G_gpg_vstate.DO_current = 0;
     G_gpg_vstate.DO_reccord = 0;
@@ -40,7 +49,9 @@ int gpg_apdu_select() {
       THROW(SW_STATE_TERMINATED);
     }
     sw = SW_OK;
-  } else {
+  } 
+  //NOT FOUND
+  else {
     THROW(SW_FILE_NOT_FOUND);
     return SW_FILE_NOT_FOUND;
   }
