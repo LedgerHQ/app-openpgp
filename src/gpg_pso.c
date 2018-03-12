@@ -97,7 +97,8 @@ static int gpg_sign(gpg_key_t *sigkey) {
                            CX_RND_TRNG,
                            CX_NONE,
                            G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
-                           G_gpg_vstate.work.io_buffer);
+                           G_gpg_vstate.work.io_buffer,
+                           NULL);
         //reencode r,s in MPI format
         gpg_io_discard(0);
       
@@ -116,11 +117,12 @@ static int gpg_sign(gpg_key_t *sigkey) {
           rs += 2;
         }
       } else{
-        sz = cx_eddsa_sign(key, NULL,
+        sz = cx_eddsa_sign(key,
                            CX_NONE,
-                           CX_SHA512,
-                           G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
-                           G_gpg_vstate.work.io_buffer+128);
+                           CX_SHA512, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
+                           NULL, 0,
+                           G_gpg_vstate.work.io_buffer+128,
+                           NULL);
         gpg_io_discard(0);
         gpg_io_insert(G_gpg_vstate.work.io_buffer+128, sz);
       }

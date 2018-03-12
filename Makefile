@@ -1,53 +1,74 @@
-# Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
-# 
+#*******************************************************************************
+#   Ledger Nano S
+#   (c) 2016 Ledger
+#
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
-# 
+#
 #      http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
+#*******************************************************************************
+
 
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 include $(BOLOS_SDK)/Makefile.defines
 
-APPNAME = "OpenPGP"
-APP_LOAD_PARAMS=--appFlags 0x40  --path "2152157255" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
+APP_LOAD_PARAMS=--appFlags 0x40 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
+
+APPNAME = OpenPGP
+
+SPECVERSION="3.3.1"
 
 APPVERSION_M=1
 APPVERSION_N=1
-APPVERSION_P=0
-
+APPVERSION_P=1
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
-SPECVERSION="3.3.1"
-ICONNAME=images/icon_pgp.gif
 
+ifeq ($(TARGET_NAME),TARGET_BLUE)
+ICONNAME=images/icon_pgp_blue.gif
+else
+ICONNAME=images/icon_pgp.gif
+endif
+
+DEFINES   += $(GPG_CONFIG) GPG_VERSION=$(APPVERSION) GPG_NAME=$(APPNAME) SPEC_VERSION=$(SPECVERSION)
 
 ################
 # Default rule #
 ################
+
 all: default
 
 ############
 # Platform #
 ############
+#SCRIPT_LD :=  script.ld
 
-DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=128
-DEFINES   += HAVE_BAGL HAVE_PRINTF HAVE_SPRINTF
-DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=7 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
+ifneq ($(NO_CONSENT),)
+DEFINES   += NO_CONSENT
+endif
+
+DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
+DEFINES   += HAVE_BAGL HAVE_SPRINTF
+#DEFINES   += HAVE_PRINTF PRINTF=screen_printf
+DEFINES   += PRINTF\(...\)=
+DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
+#DEFINES  += HAVE_BLE
+DEFINES   += UNUSED\(x\)=\(void\)x
+DEFINES   += APPVERSION=\"$(APPVERSION)\"
+DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
+
 DEFINES   += HAVE_USB_CLASS_CCID
 
-DEFINES   += $(GPG_CONFIG) GPG_VERSION=$(APPVERSION) GPG_NAME=$(APPNAME) SPEC_VERSION=$(SPECVERSION)
-
 ##############
-#  Compiler  #
+# Compiler #
 ##############
 #GCCPATH   := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
 #CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
@@ -55,6 +76,8 @@ CC       := $(CLANGPATH)clang
 
 #CFLAGS   += -O0 -gdwarf-2  -gstrict-dwarf
 CFLAGS   += -O3 -Os
+#CFLAGS   += -fno-jump-tables -fno-lookup-tables -fsave-optimization-record
+#$(info $(CFLAGS))
 
 AS     := $(GCCPATH)arm-none-eabi-gcc
 
@@ -66,9 +89,9 @@ LDLIBS   += -lm -lgcc -lc
 # import rules to compile glyphs(/pone)
 include $(BOLOS_SDK)/Makefile.glyphs
 
-### computed variables
-APP_SOURCE_PATH  += src
-SDK_SOURCE_PATH  += lib_stusb lib_stusb_impl
+### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
+APP_SOURCE_PATH  += src src/lib_stusb_impl
+SDK_SOURCE_PATH  += lib_stusb 
 
 
 load: all
@@ -81,5 +104,5 @@ delete:
 include $(BOLOS_SDK)/Makefile.rules
 
 #add dependency on custom makefile filename
-dep/%.d: %.c Makefile.genericwallet
+dep/%.d: %.c Makefile
 

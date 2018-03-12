@@ -370,6 +370,7 @@ the reader and the delegated PIN support.
 Edit the file ~/.gnupg/scdaemon.conf and add the following lines:
 
  | ``reader-port "Ledger Token [Nano S] (0001) 01 00"``
+ | ``allow-admin``
  | ``enable-pinpad-varlen``
 
 
