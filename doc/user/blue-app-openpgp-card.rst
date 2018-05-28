@@ -185,6 +185,7 @@ The full menu layout is :
 |             Set on
 |             Set off
 |       PIN mode
+|       UIF mode
 |    \ *Choose:*
 |             Host
 |             On Screen
@@ -246,8 +247,39 @@ A key template is defined by the OpenGPG card application specification. It
 describes the key to be generated with the ``generate`` command in 
 ``gpg --card-edit``
 
-The problem is there is no way with the ``gpg`` command line to easily set
-up the desired template. The menu fixes that.
+The problem is there is no way with the ``gpg --card-edit`` command line 
+to easily set up the desired template, except for Ed25519. 
+
+To set up a new ECC template you have tow choice: the NanoS menu or the
+gpg-connect-agent tools.
+
+
+
+**gpg-connect-agent** (recommended) 
+
+This method suppose you have correctly configured your GnuPG tool. 
+See the dedicated section for that.
+
+In a terminal launch : 
+
+     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 1 <tag> <curvename>" /bye
+     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 2 18    <curvename>" /bye
+     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 3 <tag> <curvename>" /bye
+
+This 3 commands fix, in that order, the template for Signature, Decryption, Authentication keys.
+
+Supported curve name are:
+
+- secp256k1 with tag 19
+- nistp256 with tag 19
+- brainpoolP256r1 with tag 19
+- cv25519 (only for key 2)
+- ed25519  with tag 22 (only for key 1 and 3)
+
+
+To show the current template use the  ``gpg --card-status`` command.
+
+**NanoS menu**
 
 First under *Choose Key* menu, select the one of three keys for which you want to modify
 the template. Then under "Choose Type", select the desired key template. 
@@ -255,9 +287,10 @@ Finally select "Set Template" entry to set it.
 
 To show the current template use the  ``gpg --card-status`` command.
 
-
 Seed mode
 ~~~~~~~~~
+
+**WARNING** : SEED  MODE IS EXPERIMENTAL
 
 When generating new keys on NanoS, those keys can be generated randomly
 or in a deterministic way. The deterministic way is specified in [GPGADD].
@@ -266,6 +299,7 @@ The current mode is displayed in the first sub menu. To activate the seeded
 
 When the application starts, the seeded mode is always set to *OFF*
 
+**WARNING** : SEED  MODE IS EXPERIMENTAL
 
 PIN mode
 ~~~~~~~~
@@ -339,6 +373,17 @@ This is the default mode after application installation.
 
 Act as if the PIN is always validated. This is a dangerous mode which should only be
 used in a highly secure environment.  
+
+UIF mode
+~~~~~~~~
+
+
+By activating UIF mode for either signature, decryption or authentication, a user validation
+will be ask by the device each time the related operation is performed.
+
+To activate  or deactivate the UIF, select the operation to protect and press both button.
+When activated, a '+' symbol appears after the operation name.
+
 
 Reset
 ~~~~~

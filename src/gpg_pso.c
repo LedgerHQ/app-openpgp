@@ -18,6 +18,7 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
+#include "gpg_ux_nanos.h"
 
 const unsigned char gpg_oid_sha256[] = {
   0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20
@@ -41,16 +42,16 @@ static int gpg_sign(gpg_key_t *sigkey) {
       ksz = ksz>>3;
       switch(ksz) {
         case 1024/8:
-          key = (cx_rsa_private_key_t *)&sigkey->key.rsa1024;
+          key = (cx_rsa_private_key_t *)&sigkey->priv_key.rsa1024;
           break;
         case 2048/8:
-          key = (cx_rsa_private_key_t *)&sigkey->key.rsa2048;
+          key = (cx_rsa_private_key_t *)&sigkey->priv_key.rsa2048;
           break;
         case 3072/8:
-          key = (cx_rsa_private_key_t *)&sigkey->key.rsa3072;
+          key = (cx_rsa_private_key_t *)&sigkey->priv_key.rsa3072;
           break;
         case 4096/8:
-          key = (cx_rsa_private_key_t *)&sigkey->key.rsa4096;
+          key = (cx_rsa_private_key_t *)&sigkey->priv_key.rsa4096;
           break;
       }
       if (key->size != ksz) {
@@ -83,21 +84,21 @@ static int gpg_sign(gpg_key_t *sigkey) {
     if ((sigkey->attributes.value[0] == 19) ||
         (sigkey->attributes.value[0] == 22)) {
       cx_ecfp_private_key_t *key;
-      unsigned int sz,i,rs_len,info;
+      unsigned int sz,i,rs_len;
       unsigned char *rs;
 
-      key = &sigkey->key.ecfp256;
-      if (key->d_len != 32) {
-        THROW(SW_CONDITIONS_NOT_SATISFIED);
-        return SW_CONDITIONS_NOT_SATISFIED;
-      }
+      key = &sigkey->priv_key.ecfp;
       //sign
       if (sigkey->attributes.value[0] == 19) {
-
+        sz = gpg_curve2domainlen(key->curve);
+        if ((sz == 0) || (key->d_len != sz)) {
+          THROW(SW_CONDITIONS_NOT_SATISFIED);
+          return SW_CONDITIONS_NOT_SATISFIED;
+        }
         sz = cx_ecdsa_sign(key,
                            CX_RND_TRNG,
                            CX_NONE,
-                           G_gpg_vstate.work.io_buffer, 32/*G_gpg_vstate.io_length*/,
+                           G_gpg_vstate.work.io_buffer, sz,
                            G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH,
                            NULL);
         //reencode r,s in MPI format
@@ -149,19 +150,27 @@ int gpg_apdu_pso() {
   switch(pso) {
   // --- PSO:CDS ---
   case 0x9e9a: 
-    if ((G_gpg_vstate.kslot->sig.UIF[0]) && ((G_gpg_vstate.UIF_flags)==0)) {
-      ui_menu_uifconfirm_display(0);
-      return 0;
+    if (G_gpg_vstate.kslot->sig.UIF[0]) {
+      if ((G_gpg_vstate.UIF_flags)==0) {
+        ui_menu_uifconfirm_display(0);
+        return 0;
+      } 
+      G_gpg_vstate.UIF_flags = 0;
     }
-
-  case 0x8680: 
-    if ((G_gpg_vstate.kslot->dec.UIF[0]) && ((G_gpg_vstate.UIF_flags)==0)) {
-      ui_menu_uifconfirm_display(0);
-      return 0;
+    break;
+  // --- PSO:DEC ---
+  case 0x8096: 
+    if (G_gpg_vstate.kslot->dec.UIF[0]) {
+      if ((G_gpg_vstate.UIF_flags)==0) {
+        ui_menu_uifconfirm_display(0);
+        return 0;
+      }
+      G_gpg_vstate.UIF_flags = 0;
     }
+    break;
   }
 
-
+  // --- PSO:ENC ---
   switch(pso) {
   // --- PSO:CDS ---
   case 0x9e9a: {
@@ -214,16 +223,16 @@ int gpg_apdu_pso() {
       key = NULL;
       switch(ksz) {
         case 1024/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa1024;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->priv_key.rsa1024;
           break;
         case 2048/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa2048;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->priv_key.rsa2048;
           break;
         case 3072/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa3072;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->priv_key.rsa3072;
           break;
         case 4096/8:
-          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->key.rsa4096;
+          key = (cx_rsa_private_key_t *)&G_gpg_vstate.mse_dec->priv_key.rsa4096;
           break;
       }
      
@@ -272,11 +281,7 @@ int gpg_apdu_pso() {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
         return SW_CONDITIONS_NOT_SATISFIED;
       }
-      key = &G_gpg_vstate.mse_dec->key.ecfp256;
-      if (key->d_len != 32) {
-        THROW(SW_CONDITIONS_NOT_SATISFIED);
-        return SW_CONDITIONS_NOT_SATISFIED; 
-      }
+      key = &G_gpg_vstate.mse_dec->priv_key.ecfp;
       gpg_io_fetch_l(&l);
       gpg_io_fetch_tl(&t, &l);
       if (t != 0x7f49) {
@@ -290,6 +295,10 @@ int gpg_apdu_pso() {
       }
             
       curve = gpg_oid2curve(G_gpg_vstate.mse_dec->attributes.value+1, G_gpg_vstate.mse_dec->attributes.length-1);
+      if (key->curve != curve) {
+        THROW(SW_CONDITIONS_NOT_SATISFIED);
+        return SW_CONDITIONS_NOT_SATISFIED; 
+      }
       if (curve == CX_CURVE_Curve25519) {
         unsigned int i;
         
@@ -335,9 +344,13 @@ int gpg_apdu_pso() {
 
 
 int gpg_apdu_internal_authenticate() {
-  if ((G_gpg_vstate.kslot->aut.UIF[0]) && ((G_gpg_vstate.UIF_flags)==0)) {
-    ui_menu_uifconfirm_display(0);
-    return 0;
+    // --- PSO:AUTH ---
+  if (G_gpg_vstate.kslot->aut.UIF[0]) {
+    if ((G_gpg_vstate.UIF_flags)==0) {
+      ui_menu_uifconfirm_display(0);
+      return 0;
+    }
+    G_gpg_vstate.UIF_flags = 0;
   }
 
   if (G_gpg_vstate.mse_aut->attributes.value[0] == 1) {

@@ -113,29 +113,20 @@ int gpg_apdu_gen() {
 
       ksz = (keygpg->attributes.value[1]<<8)|keygpg->attributes.value[2];
       ksz = ksz >> 3;
+      rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa.public;
+      rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa.private; 
+      pkey      = &keygpg->priv_key.rsa;
       switch(ksz) {
       case 1024/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa1024.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa1024.private; 
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa1024;
         pkey_size = sizeof(cx_rsa_1024_private_key_t);
         break;
       case 2048/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa2048.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa2048.private;
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa2048;
         pkey_size = sizeof(cx_rsa_2048_private_key_t);
         break;
       case 3072/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa3072.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa3072.private;
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa3072;
         pkey_size = sizeof(cx_rsa_3072_private_key_t);
         break;
       case 4096/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa4096.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa4096.private;
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa4096;
         pkey_size = sizeof(cx_rsa_4096_private_key_t);
         break;
       }
@@ -173,19 +164,24 @@ int gpg_apdu_gen() {
       unsigned int   curve,keepprivate;
       keepprivate = 0;
       curve = gpg_oid2curve(keygpg->attributes.value+1, keygpg->attributes.length-1);
+      if (curve == CX_CURVE_NONE) {
+        THROW(SW_REFERENCED_DATA_NOT_FOUND);
+        return SW_REFERENCED_DATA_NOT_FOUND;
+      }
       if ((G_gpg_vstate.io_p2 == 0x01) | (G_gpg_vstate.seed_mode)) {
+        ksz = gpg_curve2domainlen(curve);
         gpg_pso_derive_slot_seed(G_gpg_vstate.slot,   seed);
-        gpg_pso_derive_key_seed(seed, name, 1, seed, 32);
-        cx_ecfp_init_private_key(curve,seed, 32, &G_gpg_vstate.work.ecfp256.private);
+        gpg_pso_derive_key_seed(seed, name, 1, seed, ksz);
+        cx_ecfp_init_private_key(curve,seed, ksz, &G_gpg_vstate.work.ecfp.private);
         keepprivate = 1;
       }
 
       cx_ecfp_generate_pair(curve,
-                            &G_gpg_vstate.work.ecfp256.public,
-                            &G_gpg_vstate.work.ecfp256.private,
+                            &G_gpg_vstate.work.ecfp.public,
+                            &G_gpg_vstate.work.ecfp.private,
                             keepprivate);
-      nvm_write(&keygpg->key.ecfp256,     &G_gpg_vstate.work.ecfp256.private, sizeof(cx_ecfp_private_key_t));
-      nvm_write(&keygpg->pub_key.ecfp256, &G_gpg_vstate.work.ecfp256.public, sizeof(cx_ecfp_public_key_t));
+      nvm_write(&keygpg->priv_key.ecfp,     &G_gpg_vstate.work.ecfp.private, sizeof(cx_ecfp_private_key_t));
+      nvm_write(&keygpg->pub_key.ecfp, &G_gpg_vstate.work.ecfp.public, sizeof(cx_ecfp_public_key_t));
       if (reset_cnt) {
         reset_cnt = 0;
         nvm_write(&G_gpg_vstate.kslot->sig_count,&reset_cnt,sizeof(unsigned int));
@@ -207,32 +203,32 @@ int gpg_apdu_gen() {
       gpg_io_mark();
       switch(ksz) {
       case 1024/8:
-      if (keygpg->key.rsa1024.size == 0) {
+      if (keygpg->priv_key.rsa1024.size == 0) {
         THROW (SW_REFERENCED_DATA_NOT_FOUND);
       return SW_REFERENCED_DATA_NOT_FOUND;
       }
-      gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa1024.n);
+      gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->priv_key.rsa1024.n);
       break;
       case 2048/8:
-        if (keygpg->key.rsa2048.size == 0) {
+        if (keygpg->priv_key.rsa2048.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
           return SW_REFERENCED_DATA_NOT_FOUND;
         }
-        gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa2048.n);
+        gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->priv_key.rsa2048.n);
         break;
       case 3072/8:
-        if (keygpg->key.rsa3072.size == 0) {
+        if (keygpg->priv_key.rsa3072.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
           return SW_REFERENCED_DATA_NOT_FOUND;
         }
-        gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa3072.n);
+        gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->priv_key.rsa3072.n);
         break;
       case 4096/8:
-        if (keygpg->key.rsa4096.size == 0) {
+        if (keygpg->priv_key.rsa4096.size == 0) {
           THROW (SW_REFERENCED_DATA_NOT_FOUND);
           return SW_REFERENCED_DATA_NOT_FOUND;
         }
-        gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->key.rsa4096.n);
+        gpg_io_insert_tlv(0x81,ksz,(unsigned char*)&keygpg->priv_key.rsa4096.n);
         break;
       }
       gpg_io_insert_tlv(0x82, 4, keygpg->pub_key.rsa);

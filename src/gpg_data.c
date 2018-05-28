@@ -367,34 +367,25 @@ int gpg_apdu_put_data(unsigned int ref) {
       //check length
       ksz = (keygpg->attributes.value[1]<<8)|keygpg->attributes.value[2];
       ksz = ksz >> 3;
+      rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa.public;
+      rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa.private; 
+      pkey      = &keygpg->priv_key.rsa;
       switch(ksz) {
       case 1024/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa1024.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa1024.private; 
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa1024;
         pkey_size = sizeof(cx_rsa_1024_private_key_t);
-        pq = G_gpg_vstate.work.rsa1024.public.n;
+        pq = G_gpg_vstate.work.rsa.public1024.n;
         break;
       case 2048/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa2048.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa2048.private;
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa2048;
         pkey_size = sizeof(cx_rsa_2048_private_key_t);
-        pq = G_gpg_vstate.work.rsa2048.public.n;
+        pq = G_gpg_vstate.work.rsa.public2048.n;
         break;
       case 3072/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa3072.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa3072.private;
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa3072;
         pkey_size = sizeof(cx_rsa_3072_private_key_t);
-        pq = G_gpg_vstate.work.rsa3072.public.n;
+        pq = G_gpg_vstate.work.rsa.public3072.n;
         break;
       case 4096/8:
-        rsa_pub   = (cx_rsa_public_key_t*)&G_gpg_vstate.work.rsa4096.public;
-        rsa_priv  = (cx_rsa_private_key_t*)&G_gpg_vstate.work.rsa4096.private;
-        pkey      = (cx_rsa_private_key_t*)&keygpg->key.rsa4096;
         pkey_size = sizeof(cx_rsa_4096_private_key_t);
-        pq = G_gpg_vstate.work.rsa4096.public.n;
+        pq = G_gpg_vstate.work.rsa.public4096.n;
         break;
       }
       ksz = ksz>>1;
@@ -460,14 +451,14 @@ int gpg_apdu_put_data(unsigned int ref) {
        THROW(SW_WRONG_DATA);
        return 0;
       }
-      ksz = 32;
-      if (ksz == 32) {
-        G_gpg_vstate.work.ecfp256.private.curve = curve;
-        G_gpg_vstate.work.ecfp256.private.d_len = ksz;
-        os_memmove(G_gpg_vstate.work.ecfp256.private.d, G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,ksz);
-        cx_ecfp_generate_pair(curve, &G_gpg_vstate.work.ecfp256.public, &G_gpg_vstate.work.ecfp256.private, 1);
-        nvm_write(&keygpg->pub_key.ecfp256,  &G_gpg_vstate.work.ecfp256.public, sizeof(cx_ecfp_public_key_t));
-        nvm_write(&keygpg->key.ecfp256,  &G_gpg_vstate.work.ecfp256.private, sizeof(cx_ecfp_private_key_t));
+      ksz = gpg_curve2domainlen(curve);
+      if (ksz == len_p) {
+        G_gpg_vstate.work.ecfp.private.curve = curve;
+        G_gpg_vstate.work.ecfp.private.d_len = ksz;
+        os_memmove(G_gpg_vstate.work.ecfp.private.d, G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,ksz);
+        cx_ecfp_generate_pair(curve, &G_gpg_vstate.work.ecfp.public, &G_gpg_vstate.work.ecfp.private, 1);
+        nvm_write(&keygpg->pub_key.ecfp,  &G_gpg_vstate.work.ecfp.public, sizeof(cx_ecfp_public_key_t));
+        nvm_write(&keygpg->priv_key.ecfp,  &G_gpg_vstate.work.ecfp.private, sizeof(cx_ecfp_private_key_t));
         if (reset_cnt) {
           reset_cnt = 0;
           nvm_write(&G_gpg_vstate.kslot->sig_count,&reset_cnt,sizeof(unsigned int));

@@ -34,3 +34,5 @@ const char * const C_NOT_ALLOWED        = "Not Allowed ";
 
 const char * const C_DEFAULT_MODE       = "Default mode";
 
+
+const char * const C_UIF_LOCKED         = "UIF locked";

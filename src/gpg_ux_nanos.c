@@ -134,7 +134,7 @@ void ui_menu_uifconfirm_display(unsigned int value) {
 
 unsigned int ui_uifconfirm_prepro(const  bagl_element_t* element) {
   if (element->component.userid == 1) {
-    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Confirm Operation:");
+    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Confirm:");
     return 1;
   }
   if (element->component.userid == 2) {
@@ -175,7 +175,14 @@ unsigned int ui_uifconfirm_nanos_button(unsigned int button_mask, unsigned int b
     BEGIN_TRY {
       TRY {
         G_gpg_vstate.UIF_flags = 1;
-        sw = gpg_apdu_pso();
+        if (G_gpg_vstate.io_ins == INS_PSO) {
+          sw = gpg_apdu_pso();
+        } else if (G_gpg_vstate.io_ins == INS_INTERNAL_AUTHENTICATE) {
+          sw = gpg_apdu_internal_authenticate();
+        } else {
+          gpg_io_discard(1);
+          sw = 0x6985;
+        }
       }
       CATCH_OTHER(e) {
         gpg_io_discard(1);
@@ -499,12 +506,17 @@ static unsigned int validate_pin() {
 #define LABEL_AUT      "Authentication"
 #define LABEL_DEC      "Decryption"
 
-#define LABEL_RSA2048  "RSA 2048"
-#define LABEL_RSA3072  "RSA 3072"
-#define LABEL_RSA4096  "RSA 4096"
-#define LABEL_NISTP256 "NIST P256"
-#define LABEL_BPOOLR1  "Brainpool R1"
-#define LABEL_Ed25519  "Ed25519"
+#define LABEL_RSA2048     "RSA 2048"
+#define LABEL_RSA3072     "RSA 3072"
+#define LABEL_RSA4096     "RSA 4096"
+#define LABEL_NISTP256    "NIST P256"
+//#define LABEL_NISTP384    "NIST P384"
+//#define LABEL_NISTP521    "NIST P521"
+#define LABEL_SECP256K1   "SEPC 256K1"
+#define LABEL_BPOOL256R1  "Brainpool 256R1"
+//#define LABEL_BPOOL384R1  "Brainpool 384R1"
+//#define LABEL_BPOOL512R1  "Brainpool 512R1"
+#define LABEL_Ed25519     "Ed25519"
 
 const ux_menu_entry_t ui_menu_template[] = {
   {ui_menu_tmpl_key,           NULL,  -1, NULL,          "Choose key...",   NULL, 0, 0},
@@ -548,12 +560,34 @@ const bagl_element_t* ui_menu_template_preprocessor(const ux_menu_entry_t* entry
       case 4096:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_RSA4096);
         break;
+
       case CX_CURVE_SECP256R1:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_NISTP256);
         break;
-      case CX_CURVE_BrainPoolP256R1:
-        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOLR1);
+        /*
+      case CX_CURVE_SECP384R1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_NISTP384);
         break;
+      case CX_CURVE_SECP521R1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_NISTP521);
+        break;
+        */
+      case CX_CURVE_SECP256K1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_SECP256K1);
+        break;
+
+      case CX_CURVE_BrainPoolP256R1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOL256R1);
+        break;
+        /*
+      case CX_CURVE_BrainPoolP384R1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOL384R1);
+        break;
+      case CX_CURVE_BrainPoolP512R1:
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOL512R1);
+        break;
+        */
+
       case CX_CURVE_Ed25519:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_Ed25519);
         break;
@@ -574,7 +608,8 @@ void  ui_menu_tmpl_set_action(unsigned int value) {
   LV(attributes,GPG_KEY_ATTRIBUTES_LENGTH);
   gpg_key_t* dest;
   const char* err;
-
+  const unsigned char *oid;
+  unsigned int oid_len;
   err = NULL;
   
   os_memset(&attributes, 0, sizeof(attributes));
@@ -591,24 +626,21 @@ void  ui_menu_tmpl_set_action(unsigned int value) {
     attributes.length = 6;
     break;
 
+  case CX_CURVE_SECP256K1:
   case CX_CURVE_SECP256R1:
-    if (G_gpg_vstate.ux_key == 2) {
-      attributes.value[0] = 18; //ecdh
-    } else {
-      attributes.value[0] = 19; //ecdsa
-   }
-   os_memmove(attributes.value+1, C_OID_SECP256R1, sizeof(C_OID_SECP256R1));
-   attributes.length = 1+sizeof(C_OID_SECP256R1);
-   break;
-
+  //case CX_CURVE_SECP384R1:
+  //case CX_CURVE_SECP521R1:
   case CX_CURVE_BrainPoolP256R1:
-    if (G_gpg_vstate.ux_key == 2) {
+  //case CX_CURVE_BrainPoolP384R1:
+  //case CX_CURVE_BrainPoolP512R1:
+  if (G_gpg_vstate.ux_key == 2) {
       attributes.value[0] = 18; //ecdh
     } else {
       attributes.value[0] = 19; //ecdsa
     }
-    os_memmove(attributes.value+1, C_OID_BRAINPOOL256R1, sizeof(C_OID_BRAINPOOL256R1));
-    attributes.length = 1+sizeof(C_OID_BRAINPOOL256R1);
+    oid = gpg_curve2oid(G_gpg_vstate.ux_type, &oid_len);
+    os_memmove(attributes.value+1, oid, sizeof(oid_len));
+    attributes.length = 1+oid_len;
     break;
 
   case CX_CURVE_Ed25519: 
@@ -623,7 +655,7 @@ void  ui_menu_tmpl_set_action(unsigned int value) {
     }
     break;
 
-    default:
+  default:
     err = TEMPLATE_TYPE;
     goto ERROR;
   }
@@ -670,13 +702,18 @@ void ui_menu_tmpl_key_action(unsigned int value) {
 
 
 const ux_menu_entry_t ui_menu_tmpl_type[] = {
-  {NULL,             ui_menu_tmpl_type_action,   2048,                     NULL,   LABEL_RSA2048,   NULL,  0,  0},
-  {NULL,             ui_menu_tmpl_type_action,   3072,                     NULL,   LABEL_RSA3072,   NULL,  0,  0},
-  {NULL,             ui_menu_tmpl_type_action,   4096,                     NULL,   LABEL_RSA4096,   NULL,  0,  0},
-  {NULL,             ui_menu_tmpl_type_action,   CX_CURVE_SECP256R1,       NULL,   LABEL_NISTP256,  NULL,  0,  0},
-  {NULL,             ui_menu_tmpl_type_action,   CX_CURVE_BrainPoolP256R1, NULL,   LABEL_BPOOLR1,   NULL,  0,  0},  
-  {NULL,             ui_menu_tmpl_type_action,   CX_CURVE_Ed25519,         NULL,   LABEL_Ed25519,   NULL,  0,  0},
-  {ui_menu_template,                    NULL,    1,              &C_badge_back,   "Back",          NULL, 61, 40},
+  {NULL,             ui_menu_tmpl_type_action,  2048,                     NULL,  LABEL_RSA2048,    NULL,  0,  0},
+  {NULL,             ui_menu_tmpl_type_action,  3072,                     NULL,  LABEL_RSA3072,    NULL,  0,  0},
+  {NULL,             ui_menu_tmpl_type_action,  4096,                     NULL,  LABEL_RSA4096,    NULL,  0,  0},
+  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP256R1,       NULL,  LABEL_NISTP256,   NULL,  0,  0},
+//  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP384R1,       NULL,  LABEL_NISTP384,   NULL,  0,  0},
+//  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP521R1,       NULL,  LABEL_NISTP521,   NULL,  0,  0},
+  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP256K1,       NULL,  LABEL_SECP256K1,  NULL,  0,  0},
+  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP256R1, NULL,  LABEL_BPOOL256R1, NULL,  0,  0},  
+//  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP384R1, NULL,  LABEL_BPOOL384R1, NULL,  0,  0},  
+//  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP512R1, NULL,  LABEL_BPOOL512R1, NULL,  0,  0},  
+  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_Ed25519,         NULL,  LABEL_Ed25519,    NULL,  0,  0},
+  {ui_menu_template,                    NULL,   1,               &C_badge_back,  "Back",           NULL, 61, 40},
   UX_MENU_END
 };
 
@@ -803,6 +840,84 @@ void ui_menu_pinmode_action(unsigned int value) {
   // redisplay first entry of the idle menu
   ui_menu_pinmode_display(0);
 }
+
+
+
+/* ------------------------------- UIF MODE UX ------------------------------ */
+const ux_menu_entry_t ui_menu_uifmode[];
+void ui_menu_uifmode_display(unsigned int value);
+const bagl_element_t*  ui_menu_uifmode_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element);
+void ui_menu_uifmode_action(unsigned int value);
+
+const ux_menu_entry_t ui_menu_uifmode[] = {
+  {NULL,       NULL,                    -1, NULL,  "Activate (+) for:", NULL, 0, 0},
+  {NULL,       ui_menu_uifmode_action,   1, NULL,  "Signature",         NULL, 0, 0},
+  {NULL,       ui_menu_uifmode_action,   2, NULL,  "Decryption",        NULL, 0, 0},
+  {NULL,       ui_menu_uifmode_action,   3, NULL,  "Authentication",    NULL, 0, 0},
+  {ui_menu_settings,             NULL,   1, &C_badge_back,  "Back",    NULL, 61, 40},
+  UX_MENU_END
+};
+
+void ui_menu_uifmode_display(unsigned int value) {
+   UX_MENU_DISPLAY(value, ui_menu_uifmode, ui_menu_uifmode_preprocessor);
+}
+
+const bagl_element_t*  ui_menu_uifmode_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
+  if (element->component.userid==0x20) {
+    if ((entry->userid >= 1) && (entry->userid<=3)) {
+      unsigned char uif[2] ;
+      uif[0] = 0;
+      uif[1] = 0;
+      switch (entry->userid) {
+        case 1:
+        *uif = G_gpg_vstate.kslot->sig.UIF[0]?'+':' ';
+        break;
+        case 2:
+        *uif = G_gpg_vstate.kslot->dec.UIF[0]?'+':' ';
+        break;
+        case 3:
+        *uif = G_gpg_vstate.kslot->aut.UIF[0]?'+':' ';
+        break;
+      }
+      snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s  %s", 
+               (char*)PIC(entry->line1), uif);
+      element->text = G_gpg_vstate.menu;  
+      element->component.height = 32;
+    }
+  }
+  return element;
+}
+
+void ui_menu_uifmode_action(unsigned int value) {
+    unsigned char *uif;
+    unsigned char new_uif;
+    switch (value) {
+    case 1:
+      uif = &G_gpg_vstate.kslot->sig.UIF[0];
+      break;
+    case 2:
+      uif = &G_gpg_vstate.kslot->dec.UIF[0];
+      break;
+    case 3:
+      uif = &G_gpg_vstate.kslot->aut.UIF[0];
+      break;    
+    default:
+        ui_info(INVALID_SELECTION, NULL, ui_menu_uifmode_display,0);
+        return;
+    }
+    if (uif[0] == 0) {
+      new_uif = 1;
+      gpg_nvm_write(&uif[0], &new_uif, 1);
+    } else if (uif[0] == 1) {
+      new_uif = 0;      
+      gpg_nvm_write(&uif[0], &new_uif, 1) ;
+    } else /*if (uif[0] == 2 )*/ {
+      ui_info(UIF_LOCKED, NULL, ui_menu_uifmode_display,0);
+      return;
+    }
+  ui_menu_uifmode_display(value);
+}
+
 /* -------------------------------- RESET UX --------------------------------- */
 
 const ux_menu_entry_t ui_menu_reset[] = {
@@ -829,6 +944,7 @@ const ux_menu_entry_t ui_menu_settings[] = {
   {NULL,    ui_menu_template_display,     0, NULL,          "Key template", NULL, 0, 0},
   {NULL,        ui_menu_seed_display,     0, NULL,          "Seed mode",    NULL, 0, 0},
   {NULL,     ui_menu_pinmode_display,     0, NULL,          "PIN mode",     NULL, 0, 0},
+  {NULL,     ui_menu_uifmode_display,     0, NULL,          "UIF mode",     NULL, 0, 0},
   {ui_menu_reset,               NULL,     0, NULL,          "Reset",        NULL, 0, 0},
   {NULL,        ui_menu_main_display,     2, &C_badge_back, "Back",         NULL, 61, 40},
   UX_MENU_END

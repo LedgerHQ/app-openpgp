@@ -18,7 +18,9 @@
 
 void USBD_CCID_activate_pinpad(int enabled);
 
-int  gpg_oid2curve(unsigned char* oid, unsigned int len);
+unsigned int   gpg_oid2curve(unsigned char* oid, unsigned int len);
+unsigned char* gpg_curve2oid(unsigned int cv, unsigned int *len);
+unsigned int   gpg_curve2domainlen(unsigned int cv);
 
 void gpg_init(void);
 void gpg_init_ux(void);

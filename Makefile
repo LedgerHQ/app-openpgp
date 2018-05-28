@@ -15,13 +15,6 @@
 #  limitations under the License.
 #*******************************************************************************
 
-BOLOS_SDK=/home/cme/Projects/Git/ledger/nanos-secure-sdk-cslashm
-
-
-CLANGPATH=/home/cme/Projects/Git/ledger/compilers/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-16.10/bin/
-GCCPATH=/home/cme/Projects/Git/ledger/compilers/gcc-arm-none-eabi-5_3-2016q1/bin/
-
-
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
@@ -34,8 +27,8 @@ APPNAME = OpenPGP
 SPECVERSION="3.3.1"
 
 APPVERSION_M=1
-APPVERSION_N=1
-APPVERSION_P=1
+APPVERSION_N=2
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
@@ -81,7 +74,7 @@ DEFINES   += HAVE_USB_CLASS_CCID
 CC       := $(CLANGPATH)clang 
 
 #CFLAGS   += -O0 -gdwarf-2  -gstrict-dwarf
-CFLAGS   += -O3 -Os
+CFLAGS   += -O3 -Os 
 #CFLAGS   += -fno-jump-tables -fno-lookup-tables -fsave-optimization-record
 #$(info $(CFLAGS))
 
@@ -96,7 +89,7 @@ LDLIBS   += -lm -lgcc -lc
 include $(BOLOS_SDK)/Makefile.glyphs
 
 ### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
-APP_SOURCE_PATH  += src src/lib_stusb_impl
+APP_SOURCE_PATH  += src
 SDK_SOURCE_PATH  += lib_stusb 
 
 
@@ -107,7 +100,7 @@ delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
 # import generic rules from the sdk
-include $(BOLOS_SDK)/Makefile.rules
+include Makefile.rules
 
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile

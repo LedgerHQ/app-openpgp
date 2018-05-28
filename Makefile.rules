@@ -1,0 +1,29 @@
+#*******************************************************************************
+#   Ledger SDK
+#   (c) 2017 Ledger
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#*******************************************************************************
+
+
+#Make the SDK modified SDK sources prioritar to the original ones
+
+SOURCE_PATH   += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) | grep "\.c$$")))) $(BOLOS_SDK)/src $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) | grep "\.c$$"))) 
+SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep "\.c$$") ) $(GLYPH_DESTC)
+INCLUDES_PATH := $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) | grep "\.h$$")))) $(dir $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) | grep "\.h$$")))) include $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm 
+
+VPATH := $(dir $(SOURCE_FILES))
+OBJECT_FILES := $(sort $(addprefix obj/, $(addsuffix .o, $(basename $(notdir $(SOURCE_FILES))))))
+DEPEND_FILES := $(sort $(addprefix dep/, $(addsuffix .d, $(basename $(notdir $(SOURCE_FILES))))))
+
+include $(BOLOS_SDK)/Makefile.rules_generic

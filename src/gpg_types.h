@@ -36,7 +36,7 @@
 
 #define  GPG_KEY_ATTRIBUTES_LENGTH            12
 
-#define GPG_RSA_DEFAULT_PUB 0x010001U
+#define GPG_RSA_DEFAULT_PUB 0x00010001U
 
 struct gpg_pin_s {
   unsigned int  ref;
@@ -66,15 +66,25 @@ typedef struct gpg_key_s {
   LV(attributes,GPG_KEY_ATTRIBUTES_LENGTH);
   /*  key value */
   union {
+    cx_rsa_private_key_t       rsa;
     cx_rsa_1024_private_key_t  rsa1024;
     cx_rsa_2048_private_key_t  rsa2048;
     cx_rsa_3072_private_key_t  rsa3072;
     cx_rsa_4096_private_key_t  rsa4096;
-    cx_ecfp_private_key_t      ecfp256;
-  } key;
+    
+    cx_ecfp_private_key_t      ecfp;
+    cx_ecfp_256_private_key_t  ecfp256;
+    cx_ecfp_384_private_key_t  ecfp384;
+    cx_ecfp_512_private_key_t  ecfp512;
+    cx_ecfp_640_private_key_t  ecfp640;
+  } priv_key;
   union {
-    unsigned char             rsa[4];
-    cx_ecfp_public_key_t      ecfp256;
+    unsigned char              rsa[4];
+    cx_ecfp_public_key_t       ecfp;
+    cx_ecfp_256_public_key_t   ecfp256;
+    cx_ecfp_384_public_key_t   ecfp384;
+    cx_ecfp_512_public_key_t   ecfp512;
+    cx_ecfp_640_public_key_t   ecfp640;
   } pub_key;
   /* C7 C8 C9 , C5 = C7|C8|C9*/
   unsigned char fingerprints[20];
@@ -193,26 +203,41 @@ struct gpg_v_state_s {
   unsigned short  io_mark;
   union {
     unsigned char io_buffer[GPG_IO_BUFFER_LENGTH];
+
     struct {
-      cx_rsa_1024_public_key_t public;
-      cx_rsa_1024_private_key_t private;
-    }rsa1024;
+      union {
+        cx_rsa_public_key_t      public;
+        cx_rsa_1024_public_key_t public1024;
+        cx_rsa_2048_public_key_t public2048;
+        cx_rsa_3072_public_key_t public3072;
+        cx_rsa_4096_public_key_t public4096;
+      };
+      union {
+        cx_rsa_private_key_t      private;
+        cx_rsa_1024_private_key_t private1024;
+        cx_rsa_2048_private_key_t private2048;
+        cx_rsa_3072_private_key_t private3072;
+        cx_rsa_4096_private_key_t private4096;
+      };
+    } rsa;
+
     struct {
-      cx_rsa_2048_public_key_t public;
-      cx_rsa_2048_private_key_t private;
-    }rsa2048;
-    struct {
-      cx_rsa_3072_public_key_t public;
-      cx_rsa_3072_private_key_t private;
-    }rsa3072;
-    struct {
-      cx_rsa_4096_public_key_t public;
-      cx_rsa_4096_private_key_t private;
-    }rsa4096;
-    struct {
-      cx_ecfp_public_key_t public;
-      cx_ecfp_private_key_t private;
-    }ecfp256;
+      union{
+        cx_ecfp_public_key_t       public;
+        cx_ecfp_256_public_key_t   public256;
+        cx_ecfp_384_public_key_t   public384;
+        cx_ecfp_512_public_key_t   public512;
+        cx_ecfp_640_public_key_t   public640;
+      };
+      union {
+        cx_ecfp_private_key_t      private;
+        cx_ecfp_256_private_key_t  private256;
+        cx_ecfp_384_private_key_t  private384;
+        cx_ecfp_512_private_key_t  private512;
+        cx_ecfp_640_private_key_t  private640;
+      };
+    }ecfp;
+
     struct {
       unsigned char md_buffer[GPG_IO_BUFFER_LENGTH-MAX(sizeof(cx_sha3_t),sizeof(cx_sha256_t))];
       union {
