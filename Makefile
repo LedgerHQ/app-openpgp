@@ -15,6 +15,12 @@
 #  limitations under the License.
 #*******************************************************************************
 
+BOLOS_SDK=/home/cme/Projects/Git/ledger/nanos-secure-sdk-cslashm
+
+
+CLANGPATH=/home/cme/Projects/Git/ledger/compilers/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-16.10/bin/
+GCCPATH=/home/cme/Projects/Git/ledger/compilers/gcc-arm-none-eabi-5_3-2016q1/bin/
+
 
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)

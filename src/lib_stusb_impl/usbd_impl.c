@@ -322,7 +322,7 @@ static __ALIGN_BEGIN const uint8_t const N_USBD_CfgDesc[] __ALIGN_END =
 #ifdef HAVE_IO_U2F
   /* HID FIDO ################################################################################################ */
 
-  /************** Descriptor of KBD HID interface ****************/
+  /************** Descriptor of HID FIDO interface ****************/
   0x09,         /*bLength: Interface Descriptor size*/
   USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
   U2F_INTF,         /*bInterfaceNumber: Number of Interface*/

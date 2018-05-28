@@ -46,12 +46,12 @@ static void gpg_pso_derive_key_seed(unsigned char *Sn, unsigned char* key_name, 
   h[1] = idx;
 
   cx_sha256_init(&G_gpg_vstate.work.md.sha256);
-  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, 0,       Sn,      32, NULL);
-  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, 0,       (unsigned char *)key_name, 4, NULL);
-  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, CX_LAST, h   , 2, h);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, 0,       Sn,      32, NULL, 0);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, 0,       (unsigned char *)key_name, 4, NULL, 0);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha256, CX_LAST, h   , 2, h,32);
 
   cx_sha3_xof_init(&G_gpg_vstate.work.md.sha3, 256, Ski_len);
-  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski);
+  cx_hash((cx_hash_t*)&G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski, Ski_len);
 }
 
 
@@ -153,8 +153,7 @@ int gpg_apdu_gen() {
         cx_math_next_prime(pq+size,size);
       }
 
-
-      cx_rsa_generate_pair(ksz, rsa_pub, rsa_priv, N_gpg_pstate->default_RSA_exponent, pq);
+      cx_rsa_generate_pair(ksz, rsa_pub, rsa_priv, N_gpg_pstate->default_RSA_exponent, 4, pq);
 
       nvm_write(pkey, rsa_priv, pkey_size);
       nvm_write(&keygpg->pub_key.rsa[0], rsa_pub->e, 4);
@@ -262,7 +261,7 @@ int gpg_apdu_gen() {
       curve = gpg_oid2curve(keygpg->attributes.value+1, keygpg->attributes.length-1);
       if (curve == CX_CURVE_Ed25519) {
         os_memmove(G_gpg_vstate.work.io_buffer+128, keygpg->pub_key.ecfp256.W,keygpg->pub_key.ecfp256.W_len);
-        cx_edward_compress_point(CX_CURVE_Ed25519, G_gpg_vstate.work.io_buffer+128);
+        cx_edward_compress_point(CX_CURVE_Ed25519, G_gpg_vstate.work.io_buffer+128, 65);
         gpg_io_insert_tlv(0x86, 32, G_gpg_vstate.work.io_buffer+129); //129: discard 02
       } else if (curve == CX_CURVE_Curve25519) {
         unsigned int i,len;

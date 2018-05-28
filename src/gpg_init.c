@@ -283,8 +283,12 @@ int gpg_install(unsigned char app_state) {
     gpg_nvm_write(&N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer, 3);
     
     //config rsa pub
-    l = GPG_RSA_DEFAULT_PUB;
-    nvm_write(&N_gpg_pstate->default_RSA_exponent, &l, sizeof(unsigned int));
+    #define GPG_RSA_DEFAULT_PUB 0x00010001
+    G_gpg_vstate.work.io_buffer[0] = (GPG_RSA_DEFAULT_PUB>>24)&0xFF;
+    G_gpg_vstate.work.io_buffer[1] = (GPG_RSA_DEFAULT_PUB>>16)&0xFF;
+    G_gpg_vstate.work.io_buffer[2] = (GPG_RSA_DEFAULT_PUB>>8)&0xFF; 
+    G_gpg_vstate.work.io_buffer[3] = (GPG_RSA_DEFAULT_PUB>>0)&0xFF;
+    nvm_write(&N_gpg_pstate->default_RSA_exponent, G_gpg_vstate.work.io_buffer, 4);
     
     //config pin
     #if 1
@@ -300,7 +304,7 @@ int gpg_install(unsigned char app_state) {
     //default key template: RSA 2048)
     
     for (int s = 0; s< GPG_KEYS_SLOTS; s++) {
-#if 1
+#if 0
       l = sizeof(C_default_AlgoAttrRSA);
       gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.value, (void*)C_default_AlgoAttrRSA, l);
       gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.length, &l, sizeof(unsigned int));

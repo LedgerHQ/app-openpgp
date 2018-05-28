@@ -93,11 +93,12 @@ static int gpg_sign(gpg_key_t *sigkey) {
       }
       //sign
       if (sigkey->attributes.value[0] == 19) {
+
         sz = cx_ecdsa_sign(key,
                            CX_RND_TRNG,
                            CX_NONE,
-                           G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
-                           G_gpg_vstate.work.io_buffer,
+                           G_gpg_vstate.work.io_buffer, 32/*G_gpg_vstate.io_length*/,
+                           G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH,
                            NULL);
         //reencode r,s in MPI format
         gpg_io_discard(0);
@@ -121,7 +122,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
                            CX_NONE,
                            CX_SHA512, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
                            NULL, 0,
-                           G_gpg_vstate.work.io_buffer+128,
+                           G_gpg_vstate.work.io_buffer+128, GPG_IO_BUFFER_LENGTH-128,
                            NULL);
         gpg_io_discard(0);
         gpg_io_insert(G_gpg_vstate.work.io_buffer+128, sz);
@@ -162,7 +163,7 @@ int gpg_apdu_pso(unsigned int pso) {
     sz = cx_aes(key,
                 CX_ENCRYPT|CX_CHAIN_CBC|CX_LAST,
                 G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, msg_len,
-                G_gpg_vstate.work.io_buffer+1);
+                G_gpg_vstate.work.io_buffer+1, GPG_IO_BUFFER_LENGTH-1);
     //send
     gpg_io_discard(0);
     G_gpg_vstate.work.io_buffer[0] = 0x02;
@@ -232,7 +233,7 @@ int gpg_apdu_pso(unsigned int pso) {
       sz = cx_aes(key,
                   CX_DECRYPT|CX_CHAIN_CBC|CX_LAST,
                   G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, msg_len,
-                  G_gpg_vstate.work.io_buffer);
+                  G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
       //send
       gpg_io_discard(0);
       gpg_io_inserted(sz);
@@ -275,8 +276,8 @@ int gpg_apdu_pso(unsigned int pso) {
         G_gpg_vstate.work.io_buffer[511] = 0x02;
         sz = cx_ecdh(key,
                     CX_ECDH_X,
-                    G_gpg_vstate.work.io_buffer+511,
-                    G_gpg_vstate.work.io_buffer+256);
+                    G_gpg_vstate.work.io_buffer+511, 65, 
+                    G_gpg_vstate.work.io_buffer+256, 160);
         for (i = 0; i <=31; i++) { 
           G_gpg_vstate.work.io_buffer[128+i] = G_gpg_vstate.work.io_buffer[287-i];
         }
@@ -284,8 +285,8 @@ int gpg_apdu_pso(unsigned int pso) {
       } else {
         sz = cx_ecdh(key,
                     CX_ECDH_X,
-                    G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset,
-                    G_gpg_vstate.work.io_buffer+128);
+                    G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, 65,
+                    G_gpg_vstate.work.io_buffer+128, 160);
       }
       //send
       gpg_io_discard(0);

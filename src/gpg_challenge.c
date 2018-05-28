@@ -44,16 +44,16 @@ int gpg_apdu_get_challenge() {
     chain[0] = 'r'; chain[1]='n'; chain[2] = 'd';
 
     cx_sha256_init(&G_gpg_vstate.work.md.sha256);    
-    cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha256, 0, Sr, 32, NULL);
-    cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha256, 0, chain, 3, NULL);
+    cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha256, 0, Sr, 32, NULL, 0);
+    cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha256, 0, chain, 3, NULL, 0);
     hlen=cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha256, 
                  CX_LAST, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length, 
-                 G_gpg_vstate.work.io_buffer);
+                 G_gpg_vstate.work.io_buffer, 32);
     
     cx_sha3_xof_init(&G_gpg_vstate.work.md.sha3, 256, olen);
     cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha3, 
             CX_LAST, G_gpg_vstate.work.io_buffer, hlen, 
-            G_gpg_vstate.work.io_buffer);
+            G_gpg_vstate.work.io_buffer,olen);
   } else {
     cx_rng(G_gpg_vstate.work.io_buffer, olen);
   }

@@ -67,7 +67,7 @@ int gpg_apdu_get_data(unsigned int ref)  {
     break;
     /* ----------------- Config RSA exponent ----------------- */
   case 0x01F8:
-    gpg_io_insert_u32(N_gpg_pstate->default_RSA_exponent);
+    gpg_io_insert(N_gpg_pstate->default_RSA_exponent,4);
     break;
 
    /* ----------------- Application ----------------- */
@@ -433,7 +433,12 @@ int gpg_apdu_put_data(unsigned int ref) {
       os_memset(pq+ksz, 0, ksz-len_q);
       
       //regenerate RSA private key
-      cx_rsa_generate_pair(ksz<<1, rsa_pub, rsa_priv, e, pq);
+      unsigned char _e[4];
+      _e[0] = e>>24;
+      _e[1] = e>>16;
+      _e[2] = e>>8;
+      _e[3] = e>>0;
+      cx_rsa_generate_pair(ksz<<1, rsa_pub, rsa_priv, _e, 4, pq);
 
       //write keys
       nvm_write(&keygpg->pub_key.rsa, rsa_pub->e, 4);
