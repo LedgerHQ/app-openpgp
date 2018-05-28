@@ -63,7 +63,7 @@ static int gpg_pin_check_internal(gpg_pin_t *pin,  unsigned char *pin_val, int p
   counter = pin->counter-1;
   gpg_nvm_write(&(pin->counter), &counter, sizeof(int));
   cx_sha256_init(&sha256);
-  cx_hash((cx_hash_t*)&sha256, CX_LAST, pin_val, pin_len, NULL);
+  cx_hash((cx_hash_t*)&sha256, CX_LAST, pin_val, pin_len, NULL, 0);
   if (os_memcmp(sha256.acc, pin->value, 32)) {
     return SW_SECURITY_STATUS_NOT_SATISFIED;
   }
@@ -103,7 +103,7 @@ void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
   gpg_pin_t newpin;
 
   cx_sha256_init(&sha256);
-  cx_hash((cx_hash_t*)&sha256, CX_LAST, pin_val, pin_len, newpin.value);
+  cx_hash((cx_hash_t*)&sha256, CX_LAST, pin_val, pin_len, newpin.value, 32);
   newpin.length = pin_len;
   newpin.counter = 3;
 

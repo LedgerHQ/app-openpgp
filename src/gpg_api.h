@@ -16,6 +16,8 @@
 #ifndef GPG_API_H
 #define  GPG_API_H
 
+void USBD_CCID_activate_pinpad(int enabled);
+
 int  gpg_oid2curve(unsigned char* oid, unsigned int len);
 
 void gpg_init(void);

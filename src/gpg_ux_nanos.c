@@ -772,8 +772,8 @@ void ui_menu_pinmode_action(unsigned int value) {
       }  else {
         s = 3;
       }
-      #warning USBD_CCID_activate_pinpad commented
-      //USBD_CCID_activate_pinpad(s);
+      //#warning USBD_CCID_activate_pinpad commented
+      USBD_CCID_activate_pinpad(s);
     }
   }
   else {

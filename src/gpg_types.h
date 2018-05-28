@@ -116,7 +116,7 @@ struct gpg_nv_state_s {
   /* 01F1 (01F2 is volatile)*/
   unsigned char config_slot[3];
   /* RSA exponent */
-  unsigned int default_RSA_exponent;
+  unsigned char default_RSA_exponent[4];
 
   /*  0101 0102 0103 0104 */
   LV(private_DO1, GPG_EXT_PRIVATE_DO_LENGTH);

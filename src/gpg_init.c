@@ -18,7 +18,8 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
-#include "usbd_ccid_impl.h"
+#include "usbd_impl.h"
+
 #define SHORT(x)    ((x)>>8)&0xFF, (x)&0xFF
 /* ----------------------*/
 /* -- A Kind of Magic -- */
@@ -122,7 +123,7 @@ const unsigned char C_ext_length[8] = {
 const unsigned char C_default_AID[]  = {
   0xD2,  0x76,  0x00,  0x01,  0x24,  0x01,
   //version
-  0x02,  0x00,
+  0x03,  0x00,
   //manufacturer
   0x2C,  0x97,
   //serial
@@ -282,15 +283,18 @@ int gpg_install(unsigned char app_state) {
     gpg_nvm_write(&N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer, 3);
     
     //config rsa pub
-    l = GPG_RSA_DEFAULT_PUB;
-    nvm_write(&N_gpg_pstate->default_RSA_exponent, &l, sizeof(unsigned int));
+    #define GPG_RSA_DEFAULT_PUB 0x00010001
+    G_gpg_vstate.work.io_buffer[0] = (GPG_RSA_DEFAULT_PUB>>24)&0xFF;
+    G_gpg_vstate.work.io_buffer[1] = (GPG_RSA_DEFAULT_PUB>>16)&0xFF;
+    G_gpg_vstate.work.io_buffer[2] = (GPG_RSA_DEFAULT_PUB>>8)&0xFF; 
+    G_gpg_vstate.work.io_buffer[3] = (GPG_RSA_DEFAULT_PUB>>0)&0xFF;
+    nvm_write(&N_gpg_pstate->default_RSA_exponent, G_gpg_vstate.work.io_buffer, 4);
     
     //config pin
     #if 1
     G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
     gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
-    #warning USBD_CCID_activate_pinpad commented
-    //USBD_CCID_activate_pinpad(3);
+    USBD_CCID_activate_pinpad(3);
     #else
     G_gpg_vstate.work.io_buffer[0] = PIN_MODE_HOST;
     gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
@@ -300,7 +304,7 @@ int gpg_install(unsigned char app_state) {
     //default key template: RSA 2048)
     
     for (int s = 0; s< GPG_KEYS_SLOTS; s++) {
-#if 1
+#if 0
       l = sizeof(C_default_AlgoAttrRSA);
       gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.value, (void*)C_default_AlgoAttrRSA, l);
       gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.length, &l, sizeof(unsigned int));
@@ -322,4 +326,16 @@ int gpg_install(unsigned char app_state) {
   }
 
   return 0;
+}
+
+
+#define USBD_OFFSET_CfgDesc_bPINSupport  (sizeof(USBD_CfgDesc)-16)
+void USBD_CCID_activate_pinpad(int enabled) {  
+  unsigned short length;
+  uint8_t *cfgDesc;
+  unsigned char e;
+  e = enabled?3:0;
+  length = 0;
+  cfgDesc = USBD_GetCfgDesc_impl(&length);
+  nvm_write(cfgDesc+(length-16), &e,1);
 }

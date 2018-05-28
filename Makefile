@@ -1,6 +1,6 @@
 #*******************************************************************************
 #   Ledger App
-#   (c) 2017 Ledger
+#   (c) 2016-2018 Ledger
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -15,28 +15,36 @@
 #  limitations under the License.
 #*******************************************************************************
 
+BOLOS_SDK=/home/cme/Projects/Git/ledger/nanos-secure-sdk-cslashm
+
+
+CLANGPATH=/home/cme/Projects/Git/ledger/compilers/clang+llvm-4.0.0-x86_64-linux-gnu-ubuntu-16.10/bin/
+GCCPATH=/home/cme/Projects/Git/ledger/compilers/gcc-arm-none-eabi-5_3-2016q1/bin/
+
+
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 include $(BOLOS_SDK)/Makefile.defines
 
-APPNAME = "OpenPGP"
-APP_LOAD_PARAMS=--appFlags 0x50 --path "" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
+APP_LOAD_PARAMS=--appFlags 0x40 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
+
+APPNAME = OpenPGP
+
+SPECVERSION="3.3.1"
 
 APPVERSION_M=1
-APPVERSION_N=2
-APPVERSION_P=0
+APPVERSION_N=1
+APPVERSION_P=1
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
-ICONNAME=blue_app_cxt.gif
+ICONNAME=images/icon_pgp_blue.gif
 else
-ICONNAME=nanos_app_cxt.gif
+ICONNAME=images/icon_pgp.gif
 endif
 
-
-DEFINES   += $(CXT_CONFIG) CXT_VERSION=$(APPVERSION) CXT_NAME=$(APPNAME) SPEC_VERSION=$(SPECVERSION)
-DEFINES   += DEBUGLEDGER
+DEFINES   += $(GPG_CONFIG) GPG_VERSION=$(APPVERSION) GPG_NAME=$(APPNAME) SPEC_VERSION=$(SPECVERSION)
 
 ################
 # Default rule #
@@ -47,18 +55,23 @@ all: default
 ############
 # Platform #
 ############
+#SCRIPT_LD :=  script.ld
+
+ifneq ($(NO_CONSENT),)
+DEFINES   += NO_CONSENT
+endif
 
 DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
 DEFINES   += HAVE_BAGL HAVE_SPRINTF
 #DEFINES   += HAVE_PRINTF PRINTF=screen_printf
 DEFINES   += PRINTF\(...\)=
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
-
-DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERSION_N) LEDGER_PATCH_VERSION=$(APPVERSION_P) TCS_LOADER_PATCH_VERSION=0
-
+#DEFINES  += HAVE_BLE
 DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
+DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 
+DEFINES   += HAVE_USB_CLASS_CCID
 
 ##############
 # Compiler #
@@ -67,12 +80,15 @@ DEFINES   += APPVERSION=\"$(APPVERSION)\"
 #CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
 CC       := $(CLANGPATH)clang 
 
-#CFLAGS   += -O0
+#CFLAGS   += -O0 -gdwarf-2  -gstrict-dwarf
 CFLAGS   += -O3 -Os
+#CFLAGS   += -fno-jump-tables -fno-lookup-tables -fsave-optimization-record
+#$(info $(CFLAGS))
 
 AS     := $(GCCPATH)arm-none-eabi-gcc
 
 LD       := $(GCCPATH)arm-none-eabi-gcc
+#LDFLAGS  += -O0 -gdwarf-2  -gstrict-dwarf
 LDFLAGS  += -O3 -Os
 LDLIBS   += -lm -lgcc -lc 
 
@@ -80,15 +96,9 @@ LDLIBS   += -lm -lgcc -lc
 include $(BOLOS_SDK)/Makefile.glyphs
 
 ### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
-APP_SOURCE_PATH  += src
-SDK_SOURCE_PATH  += lib_stusb qrcode
-#use the SDK U2F+HIDGEN USB profile
-SDK_SOURCE_PATH  += lib_u2f lib_stusb_impl
+APP_SOURCE_PATH  += src src/lib_stusb_impl
+SDK_SOURCE_PATH  += lib_stusb 
 
-DEFINES   += U2F_PROXY_MAGIC=\"BTC\"
-DEFINES   += HAVE_IO_U2F HAVE_U2F USB_SEGMENT_SIZE=64 
-DEFINES   += BLE_SEGMENT_SIZE=20
-DEFINES   += HAVE_USB_CLASS_CCID
 
 load: all
 	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
