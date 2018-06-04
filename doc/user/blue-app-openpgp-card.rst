@@ -96,15 +96,7 @@ The application is ready to use!
 From source
 ~~~~~~~~~~~~~
 
-Building from sources requires the the Nano S SDK 1.3.1.4 on firmware 1.3.1. See https://github.com/LedgerHQ/nanos-secure-sdk
-
-The SDK must be slightly modified:
-
-   - replace lib_stusb/STM32_USB_Device_Library/Class/CCID/src/usbd_ccid_if.c
-     and lib_stusb/STM32_USB_Device_Library/Class/CCID/inc/usbd_ccid_if.h by the 
-     one provided in sdk/ directory
-   - edit script.ld and modify the stack size : STACK_SIZE = 832;
-
+Building from sources requires the the Nano S SDK 1.4.2.1 on firmware 1.4.2. See https://github.com/LedgerHQ/nanos-secure-sdk
 
 Refer to the SDK documentation for the compiling/loading...
 

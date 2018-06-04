@@ -88,7 +88,9 @@ static int gpg_sign(gpg_key_t *sigkey) {
       unsigned char *rs;
 
       key = &sigkey->priv_key.ecfp;
+
       //sign
+      #define RS (G_gpg_vstate.work.io_buffer+(GPG_IO_BUFFER_LENGTH-256))
       if (sigkey->attributes.value[0] == 19) {
         sz = gpg_curve2domainlen(key->curve);
         if ((sz == 0) || (key->d_len != sz)) {
@@ -99,13 +101,13 @@ static int gpg_sign(gpg_key_t *sigkey) {
                            CX_RND_TRNG,
                            CX_NONE,
                            G_gpg_vstate.work.io_buffer, sz,
-                           G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH,
+                           RS, 256,
                            NULL);
         //reencode r,s in MPI format
         gpg_io_discard(0);
       
-        rs_len =  G_gpg_vstate.work.io_buffer[3];
-        rs     =  &G_gpg_vstate.work.io_buffer[4];
+        rs_len =  RS[3];
+        rs     =  &RS[4];
       
         for (i = 0; i<2; i++) {
           if (*rs == 0) {
@@ -124,12 +126,13 @@ static int gpg_sign(gpg_key_t *sigkey) {
                            CX_SHA512, 
                            G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length,
                            NULL, 0,
-                           G_gpg_vstate.work.io_buffer+128, GPG_IO_BUFFER_LENGTH-128,
+                           RS, 256,
                            NULL);
         gpg_io_discard(0);
-        gpg_io_insert(G_gpg_vstate.work.io_buffer+128, sz);
+        gpg_io_insert(RS, sz);
       }
-      
+      #undef RS
+
       //send
       gpg_pso_reset_PW1();
       return SW_OK;
