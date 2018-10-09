@@ -56,6 +56,9 @@ def decode_tlv(tlv) :
         tlv = tlv[o+l:]
     return tags
 
+class GPGCardExcpetion(Exception):
+    pass
+
 class GPGCard() :
     def __init__(self):
         self.reset()
@@ -103,9 +106,14 @@ class GPGCard() :
         self.private_02          = b''
         self.private_03          = b''
 
+        #keys
+        self.sig_key             = b''
+        self.dec_key             = b''
+        self.aut_key             = b''
 
 
     def connect(self, device):
+        self.token = None
         if device.startswith("ledger:"):
             self.token = getDongle(True)
             self.exchange = self._exchange_ledger
@@ -132,7 +140,7 @@ class GPGCard() :
 
 
     ### APDU  interface ###
-    def _exchange_ledger(self,cmd,sw=0x9000):
+    def _exchange_ledger(self,cmd,data=None, sw=0x9000):
         resp = b''
         cond = True
         while cond:
@@ -150,10 +158,25 @@ class GPGCard() :
                     cond = False
         return resp,sw
 
-    def _exchange_pcsc(self,apdu,sw=0x9000):
-        #print("xch S cmd : %s"%(binascii.hexlify(apdu)))
+    def _exchange_pcsc(self,apdu, data=None, sw_expected=0x9000, sw_mask=0xFFFF):
+        if data:
+            data = [x for x in data]
         apdu = [x for x in apdu]
+
+        #send
+        if data: 
+            while len(data) > 0xFE:
+                apdux = apdu[0:5]+[0xfe]+data[0:0xFE]
+                apdux[0] |= 0x10
+                resp, sw1, sw2 = self.connection.transmit(apdux)
+                sw = (sw1<<8)|sw2
+                if sw != 0x9000:
+                    return resp,sw
+                data = data[0xFE:]
+            apdu = apdu+[len(data)]+data
         resp, sw1, sw2 = self.connection.transmit(apdu)
+
+        #receive
         while sw1==0x61:
             apdu = binascii.unhexlify(b"00c00000%.02x"%sw2)
             apdu = [x for x in apdu]
@@ -161,8 +184,9 @@ class GPGCard() :
             resp = resp + resp2
         resp = bytes(resp)
         sw = (sw1<<8)|sw2
-        #print("xch S resp: %s %.04x"%(binascii.hexlify(resp),sw))
-        return resp,sw
+        if sw&sw_mask == sw_expected:
+            return resp,sw
+        raise GPGCardExcpetion(binascii.hexlify(resp), "%.04x"%sw)
 
     def _disconnect_ledger(self):
         return self.token.close()
@@ -188,12 +212,14 @@ class GPGCard() :
         apdu = binascii.unhexlify(b"00CA%.04x00"%tag)
         return self.exchange(apdu)
 
-    def put_data(self,tag,value):
-        apdu = binascii.unhexlify(b"00DA%.04x%.02x"%(tag,len(value)))+value
-        return self.exchange(apdu)
+    def put_data(self,tag,value):        
+        return self.exchange(binascii.unhexlify(b"00DA%.04x"%tag), value)
 
-    def verify(self,id,value):
-        apdu = binascii.unhexlify(b"002000%.02x%.02x"%(id,len(value)))+value
+    def verify(self,id,value, pinpad=False):
+        if pinpad:
+            apdu = binascii.unhexlify(b"EF2000%.02x00"%id)
+        else:
+            apdu = binascii.unhexlify(b"002000%.02x%.02x"%(id,len(value)))+value
         return self.exchange(apdu)
 
     def change_reference_data(self,id,value,new_value):
@@ -215,7 +241,7 @@ class GPGCard() :
         return self.exchange(apdu)
 
     ### API  interfaces  ###
-    def get_all(self):
+    def get_all(self, with_key=False):
         self.reset()
 
         self.AID,sw                      = self.get_data(0x4f)
@@ -283,7 +309,15 @@ class GPGCard() :
         self.private_03,sw               = self.get_data(0x0103)
         self.private_04,sw               = self.get_data(0x0104)
 
-    def set_all(self):
+        if with_key:
+            self.sig_key,sw              = self.get_data(0x00B6)
+            self.dec_key,sw              = self.get_data(0x00B8)
+            self.aut_key,sw              = self.get_data(0x00A4)
+
+        return True
+
+    def set_all(self, with_key= False):
+        
         self.put_data(0x4f,    self.AID[10:14])
         self.put_data(0x0101,  self.private_01)
         self.put_data(0x0102,  self.private_02)
@@ -317,9 +351,15 @@ class GPGCard() :
         self.put_data(0xd7, self.UIF_DEC)
         self.put_data(0xd8, self.UIF_AUT)
 
-    def backup(self, file_name):
+        if with_key:
+            self.put_data(0x00B6, self.sig_key)
+            self.put_data(0x00B8, self.dec_key)
+            self.put_data(0x00A4, self.aut_key)
+        return True
+
+    def backup(self, file_name, with_key=False):
         f = open(file_name,mode='w+b')
-        self.get_all();
+        self.get_all(with_key)
         pickle.dump(
             (self.AID,
              self.private_01, self.private_02, self.private_03, self.private_04,
@@ -330,8 +370,10 @@ class GPGCard() :
              self.sig_CA_fingerprints, self.dec_CA_fingerprints, self.aut_CA_fingerprints,
              self.sig_date, self.dec_date, self.aut_date,
              self.cardholder_cert,
-             self.UIF_SIG, self.UIF_DEC, self.UIF_AUT),
+             self.UIF_SIG, self.UIF_DEC, self.UIF_AUT,
+             self.sig_key, self.dec_key, self.aut_key),
             f, 2)
+        return True
 
 
     def restore(self, file_name, seed_key=False):
@@ -340,13 +382,15 @@ class GPGCard() :
          self.private_01, self.private_02, self.private_03, self.private_04,
          self.name, self.login, self.sex, self.url,
          self.sig_attribute, self.dec_attribute, self.aut_attribute,
-         self.status,
+         self.PW_status,
          self.sig_fingerprints, self.dec_fingerprints, self.aut_fingerprints,
          self.sig_CA_fingerprints, self.dec_CA_fingerprints, self.aut_CA_fingerprints,
          self.sig_date, self.dec_date, self.aut_date,
          self.cardholder_cert,
-         self.UIF_SIG, self.UIF_DEC, self.UIF_AUT) = pickle.load(f)
-        self.set_all()
+         self.UIF_SIG, self.UIF_DEC, self.UIF_AUT,
+         self.sig_key, self.dec_key, self.aut_key) = pickle.load(f)
+        with_key = len(self.sig_key)>0 and  len(self.dec_key)>0 and len(self.aut_key)>0
+        self.set_all(with_key)
         if seed_key :
             apdu = binascii.unhexlify(b"0047800102B600")
             self.exchange(apdu)
@@ -354,7 +398,7 @@ class GPGCard() :
             self.exchange(apdu)
             apdu = binascii.unhexlify(b"0047800102A400")
             self.exchange(apdu)
-
+        return True
 
 
 
@@ -399,9 +443,9 @@ class GPGCard() :
             d['SM'] = ('Secure Messaging',  "no")
 
         if b1&0x40 :
-            d['CHAL'] = ('GET CHALLENGE',  "yes")
+            d['CHAL'] = ('Get Challenge',  "yes")
         else:
-            d['CHAL'] = ('GET CHALLENGE',  "no")
+            d['CHAL'] = ('Get Challenge',  "no")
 
         if b1&0x20 :
             d['KEY'] = ('Key import',  "yes")
@@ -479,6 +523,12 @@ class GPGCard() :
         return d
 
     #USER Info
+    def set_serial(self, ser):
+        ser=binascii.unhexlify(ser)
+        
+        self.AID = self.AID[0:10]+ser
+        self.put_data(0x4f,    self.AID[10:14])
+
     # internals are always store as byres, get/set automatically convert from/to
     def set_name(self,name):
         """ Args:
@@ -532,13 +582,13 @@ class GPGCard() :
 
 
     #PINs
-    def verify_pin(self,id,value):
+    def verify_pin(self,id,value, pinpad=False):
         """ Args:
               id    (int) : 0x81, 0x82, ox83
               value (str) :  ascii string
         """
         value = value.encode('ascii')
-        resp,sw = self.verify(id,value)
+        resp,sw = self.verify(id,value, pinpad)
         return sw == 0x9000
 
     def change_pin(self, id, value,new_value):
@@ -605,6 +655,20 @@ class GPGCard() :
         else:
             fprint = '-'
         return fprints.decode('ascii')
+
+    def set_key_fingerprints(self, key, fprints):
+
+        fprints = binascii.unhexlify(fprints)
+        if key=='sig':
+            self.sig_fingerprints = fprints
+            self.put_data(0xc7, fprints)
+        if key=='aut':
+            self.aut_fingerprints = fprints
+            self.put_data(0xc9, fprints)
+        if key=='dec':
+            self.dec_fingerprints = fprints
+            self.put_data(0xc8, fprints)
+
 
     def get_key_CA_fingerprints(self, key):
         """

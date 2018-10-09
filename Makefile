@@ -15,6 +15,7 @@
 #  limitations under the License.
 #*******************************************************************************
 
+-include Makefile.env
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
@@ -27,8 +28,8 @@ APPNAME = OpenPGP
 SPECVERSION="3.3.1"
 
 APPVERSION_M=1
-APPVERSION_N=2
-APPVERSION_P=1
+APPVERSION_N=3
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
@@ -95,6 +96,9 @@ SDK_SOURCE_PATH  += lib_stusb
 
 load: all
 	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
+
+run:
+	python -m ledgerblue.runApp --appName $(APPNAME)
 
 delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)

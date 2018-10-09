@@ -91,6 +91,10 @@ void gpg_check_access_ins() {
 
   case INS_ACTIVATE_FILE:
     return;
+
+  default:
+    THROW(SW_INS_NOT_SUPPORTED);
+    break;
   }
   THROW(SW_CONDITIONS_NOT_SATISFIED);
 }
@@ -144,7 +148,7 @@ void gpg_check_access_read_DO() {
   case 0x00D8:
     return;
 
-    //PW1
+    //PW2
   case 0x0103:
     if (gpg_pin_is_verified(PIN_ID_PW2)) {
       return;
@@ -152,6 +156,9 @@ void gpg_check_access_read_DO() {
     break;
 
   //PW3
+  case 0x00B6:
+  case 0x00A4:
+  case 0x00B8:
   case 0x0104:
      if (gpg_pin_is_verified(PIN_ID_PW3)) {
       return;
@@ -173,7 +180,7 @@ void gpg_check_access_write_DO() {
   ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
   switch(ref) {
-  //PW1
+  //PW2
   case 0x0101:
   case 0x0103:  
   case 0x01F2:
@@ -196,6 +203,9 @@ void gpg_check_access_write_DO() {
   case 0x5F50:
   case 0x5F48:
   case 0x7F21:
+  case 0x00B6:
+  case 0x00A4:
+  case 0x00B8:
   case 0x00C1:
   case 0x00C2:
   case 0x00C3:
@@ -206,8 +216,9 @@ void gpg_check_access_write_DO() {
   case 0x00C9:
   case 0x00C6:
   case 0x00CA:
-  case 0x00CD:
+  case 0x00CB:
   case 0x00CC:
+  case 0x00CD:
   case 0x00CE:
   case 0x00CF:
   case 0x00D0:
@@ -223,9 +234,7 @@ void gpg_check_access_write_DO() {
       return;
     }
    break;
-
   } 
-
   THROW(SW_CONDITIONS_NOT_SATISFIED);
 }
 
@@ -252,7 +261,6 @@ int gpg_dispatch() {
     return sw;
     break;
 
-
     /* --- ACTIVATE/TERMINATE FILE --- */
   case INS_ACTIVATE_FILE:
     gpg_io_discard(0);
@@ -270,6 +278,7 @@ int gpg_dispatch() {
       break;
     }
     THROW(SW_CONDITIONS_NOT_SATISFIED);
+    break;
   }
 
 
@@ -322,8 +331,16 @@ int gpg_dispatch() {
 
   case INS_GET_DATA:
     gpg_check_access_read_DO();
-
-    sw = gpg_apdu_get_data(tag);
+    switch(tag) {
+      case 0x00B6:
+      case 0x00A4:
+      case 0x00B8:
+      sw = gpg_apdu_get_key_data(tag);
+      break;
+    default:
+      sw = gpg_apdu_get_data(tag);
+      break;
+    }
     break;
 
   case INS_GET_NEXT_DATA:
@@ -335,7 +352,16 @@ int gpg_dispatch() {
     case INS_PUT_DATA_ODD:
     case INS_PUT_DATA:
     gpg_check_access_write_DO();
-    sw = gpg_apdu_put_data(tag);
+    switch(tag) {
+      case 0x00B6:
+      case 0x00A4:
+      case 0x00B8:
+      sw = gpg_apdu_put_key_data(tag);
+      break;
+    default:
+      sw = gpg_apdu_put_data(tag);
+      break;
+    }
     break;
 
     /* --- PIN -- */

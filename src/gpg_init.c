@@ -252,7 +252,10 @@ const unsigned char C_default_Histo[]  = {
   0x90, 0x00
 };
 
-const unsigned char C_default_AlgoAttrRSA[]   = {
+
+// Default template: RSA2048
+#if 1
+const unsigned char C_default_AlgoAttr_sig[]   = {
   // RSA
   0x01,
   // Modulus default length 2048
@@ -262,41 +265,44 @@ const unsigned char C_default_AlgoAttrRSA[]   = {
   // std: e,p,q with modulus (n)
   0x01
 };
+const unsigned char C_default_AlgoAttr_dec[]   = {
+  // RSA
+  0x01,
+  // Modulus default length 2048
+  0x08,  0x00,
+  // PubExp length  32
+  0x00,  0x20,
+  // std: e,p,q with modulus (n)
+  0x01
+};
+#endif
 
+// Default template: NIST P256
 #if 0
-const unsigned char C_default_AlgoAttrECC_sig[]   = {
+const unsigned char C_default_AlgoAttr_sig[]   = {
   // ecdsa 
   0x13,
   // NIST-P256
   0x2A,0x86,0x48,0xCE,0x3D,0x03,0x01,0x07
 };
-const unsigned char C_default_AlgoAttrECC_dec[]   = {
+const unsigned char C_default_AlgoAttr_dec[]   = {
   // ecdh
   0x12,
   // NIST-P256
   0x2A,0x86,0x48,0xCE,0x3D,0x03,0x01,0x07
 };
-#elif 0
-const unsigned char C_default_AlgoAttrECC_sig[]   = {
-  // ecdsa 
-  0x13,
-  // NIST-P384
-  0x2B, 0x81, 0x04, 0x00 , 0x22
-};
-const unsigned char C_default_AlgoAttrECC_dec[]   = {
-  // ecdh
-  0x12,
-  // NIST-P384
-  0x2B, 0x81, 0x04, 0x00 , 0x22
-};
-#elif 1
-const unsigned char C_default_AlgoAttrECC_sig[]   = {
+#endif
+
+
+// Default template: Ed/Cv-25519
+#if 0
+const unsigned char C_default_AlgoAttr_sig[]   = {
   // eddsa 
   0x16,
   // ed25519
   0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01,
 };
-const unsigned char C_default_AlgoAttrECC_dec[]   = {
+const unsigned char C_default_AlgoAttr_dec[]   = {
   // ecdh
   0x12,
   //cv25519
@@ -410,15 +416,9 @@ int gpg_install(unsigned char app_state) {
     nvm_write(&N_gpg_pstate->default_RSA_exponent, G_gpg_vstate.work.io_buffer, 4);
     
     //config pin
-    #if 1
     G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
     gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
     USBD_CCID_activate_pinpad(3);
-    #else
-    G_gpg_vstate.work.io_buffer[0] = PIN_MODE_HOST;
-    gpg_nvm_write(&N_gpg_pstate->config_pin, G_gpg_vstate.work.io_buffer, 1);
-    USBD_CCID_activate_pinpad(0);
-    #endif
   
     //default key template: RSA 2048)
     
@@ -426,32 +426,19 @@ int gpg_install(unsigned char app_state) {
       unsigned char uif[2];
       uif[0] = 0x00;
       uif[1] = 0x20;
-#if 1
-      l = sizeof(C_default_AlgoAttrRSA);
-      gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.value, (void*)C_default_AlgoAttrRSA, l);
+      l = sizeof(C_default_AlgoAttr_sig);
+      gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.value, (void*)C_default_AlgoAttr_sig, l);
       gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.length, &l, sizeof(unsigned int));
-      gpg_nvm_write(&N_gpg_pstate->keys[s].aut.attributes.value, (void*)C_default_AlgoAttrRSA, l);
+      gpg_nvm_write(&N_gpg_pstate->keys[s].aut.attributes.value, (void*)C_default_AlgoAttr_sig, l);
       gpg_nvm_write(&N_gpg_pstate->keys[s].aut.attributes.length, &l, sizeof(unsigned int));
-      gpg_nvm_write(&N_gpg_pstate->keys[s].dec.attributes.value, (void*)C_default_AlgoAttrRSA, l);
+      l = sizeof(C_default_AlgoAttr_dec);
+      gpg_nvm_write(&N_gpg_pstate->keys[s].dec.attributes.value, (void*)C_default_AlgoAttr_dec, l);
       gpg_nvm_write(&N_gpg_pstate->keys[s].dec.attributes.length, &l, sizeof(unsigned int));
- #else 
-      l = sizeof(C_default_AlgoAttrECC_sig);
-      gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.value, (void*)C_default_AlgoAttrECC_sig, l);
-      gpg_nvm_write(&N_gpg_pstate->keys[s].sig.attributes.length, &l, sizeof(unsigned int));
-      gpg_nvm_write(&N_gpg_pstate->keys[s].aut.attributes.value, (void*)C_default_AlgoAttrECC_sig, l);
-      gpg_nvm_write(&N_gpg_pstate->keys[s].aut.attributes.length, &l, sizeof(unsigned int));
-      l = sizeof(C_default_AlgoAttrECC_dec);
-      gpg_nvm_write(&N_gpg_pstate->keys[s].dec.attributes.value, (void*)C_default_AlgoAttrECC_dec, l);
-      gpg_nvm_write(&N_gpg_pstate->keys[s].dec.attributes.length, &l, sizeof(unsigned int));
-#endif
       gpg_nvm_write(&N_gpg_pstate->keys[s].sig.UIF, &uif, 2);
       gpg_nvm_write(&N_gpg_pstate->keys[s].dec.UIF, &uif, 2);
       gpg_nvm_write(&N_gpg_pstate->keys[s].aut.UIF, &uif, 2);
-
-
     }
   }
-
   return 0;
 }
 

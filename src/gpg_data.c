@@ -700,3 +700,181 @@ int gpg_apdu_put_data(unsigned int ref) {
 
 
 }
+
+static void gpg_init_keyenc(cx_aes_key_t *keyenc) {
+  unsigned char seed[32];
+
+  gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
+  gpg_pso_derive_key_seed(seed, (unsigned char*)PIC("key "), 1, seed,      16);
+  cx_aes_init_key(seed, 16, keyenc);
+}
+
+//cmd   
+//resp  TID API COMPAT len_pub len_priv priv
+int gpg_apdu_get_key_data(unsigned int ref) {
+  cx_aes_key_t keyenc;
+  gpg_key_t   *keygpg;
+  unsigned int len = 0;
+  gpg_init_keyenc(&keyenc);
+  
+  switch(ref) {
+  case 0x00B6:
+    keygpg = &G_gpg_vstate.kslot->sig;
+    break;
+  case 0x00B8:
+    keygpg = &G_gpg_vstate.kslot->dec;
+    break;
+  case 0x00A4:
+    keygpg = &G_gpg_vstate.kslot->aut;
+    break;
+  default:
+    THROW(SW_WRONG_DATA);
+    return SW_WRONG_DATA;
+  }
+
+  gpg_io_discard(1);
+  //clear part
+  gpg_io_insert_u32(TARGET_ID);
+  gpg_io_insert_u32(CX_APILEVEL);
+  gpg_io_insert_u32(CX_COMPAT_APILEVEL);
+  
+  //encrypted part
+  switch(keygpg->attributes.value[0]) {
+  case 0x01: //RSA
+    //insert pubkey;
+    gpg_io_insert_u32(4);
+    gpg_io_insert(keygpg->pub_key.rsa, 4);
+
+    //insert privkey
+    gpg_io_mark();
+    len = cx_aes(&keyenc,
+                 CX_ENCRYPT|CX_CHAIN_CBC|CX_PAD_ISO9797M2|CX_LAST, 
+                 (unsigned char*)&keygpg->priv_key.rsa4096, sizeof(cx_rsa_4096_private_key_t), 
+                 G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, GPG_IO_BUFFER_LENGTH-G_gpg_vstate.io_offset);
+    gpg_io_inserted(len);
+    gpg_io_set_offset(IO_OFFSET_MARK);
+    gpg_io_insert_u32(len);
+    gpg_io_set_offset(IO_OFFSET_END);
+    break;
+
+  case 18: //ECC
+  case 19:
+  case 22:
+    //insert pubkey;
+    gpg_io_insert_u32(sizeof(cx_ecfp_640_public_key_t));
+    gpg_io_insert((unsigned char*)&keygpg->pub_key.ecfp640, sizeof(cx_ecfp_640_public_key_t));
+
+    //insert privkey
+    gpg_io_mark();
+    len = cx_aes(&keyenc,
+                 CX_ENCRYPT|CX_CHAIN_CBC|CX_PAD_ISO9797M2|CX_LAST, 
+                 (unsigned char*)&keygpg->priv_key.ecfp640, sizeof(cx_ecfp_640_private_key_t), 
+                 G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, GPG_IO_BUFFER_LENGTH-G_gpg_vstate.io_offset);
+    gpg_io_inserted(len);
+    gpg_io_set_offset(IO_OFFSET_MARK);
+    gpg_io_insert_u32(len);
+    gpg_io_set_offset(IO_OFFSET_END);
+    break;
+
+  default:
+     THROW(SW_REFERENCED_DATA_NOT_FOUND);
+     return SW_REFERENCED_DATA_NOT_FOUND;
+  }
+  return SW_OK;
+}
+
+//cmd   TID API COMPAT len_pub len_priv priv
+//resp  -
+int gpg_apdu_put_key_data(unsigned int ref) {
+  cx_aes_key_t keyenc;
+  gpg_key_t   *keygpg;
+  unsigned int len;
+  unsigned int offset;
+  
+  gpg_init_keyenc(&keyenc);
+
+  switch(ref) {
+  case 0xB6:
+    keygpg = &G_gpg_vstate.kslot->sig;
+    break;
+  case 0xB8:
+    keygpg = &G_gpg_vstate.kslot->dec;
+    break;
+  case 0xA4:
+    keygpg = &G_gpg_vstate.kslot->aut;
+    break;
+  default:
+    THROW(SW_WRONG_DATA);
+    return SW_WRONG_DATA;
+  }
+
+  /* unsigned int target_id = */  
+  gpg_io_fetch_u32();
+  /* unsigned int cx_apilevel = */
+  gpg_io_fetch_u32();
+  /* unsigned int cx_compat_apilevel = */
+  gpg_io_fetch_u32();
+
+  switch(keygpg->attributes.value[0]) {
+  case 0x01: //RSA
+    //insert pubkey;
+    len = gpg_io_fetch_u32();
+    if (len != 4) {
+      THROW(SW_WRONG_DATA);
+      return SW_WRONG_DATA;
+    }
+    gpg_io_fetch_nv(keygpg->pub_key.rsa, len);
+
+    //insert privkey
+    len = gpg_io_fetch_u32();
+    if (len > (G_gpg_vstate.io_length-G_gpg_vstate.io_offset)) {
+      THROW(SW_WRONG_DATA);
+    }
+    offset = G_gpg_vstate.io_offset;
+    gpg_io_discard(0);
+    len = cx_aes(&keyenc,
+                 CX_DECRYPT|CX_CHAIN_CBC|CX_PAD_ISO9797M2|CX_LAST, 
+                 G_gpg_vstate.work.io_buffer+offset, len, 
+                 G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
+    if (len != sizeof(cx_rsa_4096_private_key_t)) {
+       THROW(SW_WRONG_DATA); 
+    }
+    gpg_nvm_write((unsigned char*)&keygpg->priv_key.rsa4096, G_gpg_vstate.work.io_buffer, len);
+    break;
+
+  case 18: //ECC
+  case 19:
+  case 22:
+    //insert pubkey;
+    len = gpg_io_fetch_u32();
+    if (len != sizeof(cx_ecfp_640_public_key_t)) {
+      THROW(SW_WRONG_DATA);
+      return SW_WRONG_DATA;
+    }
+    gpg_io_fetch_nv((unsigned char*)&keygpg->pub_key.ecfp640, len);
+
+    //insert privkey
+    len = gpg_io_fetch_u32();
+    if (len > (G_gpg_vstate.io_length-G_gpg_vstate.io_offset)) {
+      THROW(SW_WRONG_DATA);
+    }
+    offset = G_gpg_vstate.io_offset;
+    gpg_io_discard(0);
+    len = cx_aes(&keyenc,
+                 CX_DECRYPT|CX_CHAIN_CBC|CX_PAD_ISO9797M2|CX_LAST, 
+                 G_gpg_vstate.work.io_buffer+offset, len, 
+                 G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
+    if (len != sizeof(cx_ecfp_640_private_key_t)) {
+       THROW(SW_WRONG_DATA);
+       return SW_WRONG_DATA;
+    }
+    gpg_nvm_write((unsigned char*)&keygpg->priv_key.ecfp640, G_gpg_vstate.work.io_buffer, len);
+    break;
+
+  default:
+     THROW(SW_REFERENCED_DATA_NOT_FOUND);
+     return SW_REFERENCED_DATA_NOT_FOUND;
+  }
+  gpg_io_discard(1);
+  return SW_OK;
+}

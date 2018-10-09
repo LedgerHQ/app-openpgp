@@ -65,6 +65,9 @@ typedef struct gpg_key_s {
   /*  C1 C2 C3 */
   LV(attributes,GPG_KEY_ATTRIBUTES_LENGTH);
   /*  key value */
+  /* WARN: changing the cx_<key>_t structures breaks backup/restore. Adapt backup/restore code
+   * to ensure backward compatibility.
+   */ 
   union {
     cx_rsa_private_key_t       rsa;
     cx_rsa_1024_private_key_t  rsa1024;
@@ -96,9 +99,6 @@ typedef struct gpg_key_s {
   unsigned char date[4];
   /* D6/D7/D8- */
   unsigned char UIF[2];
-
-
-
 } gpg_key_t;
 
 

@@ -31,7 +31,12 @@ int  gpg_apdu_select_data(unsigned int ref, int reccord) ;
 int  gpg_apdu_get_data(unsigned int ref)  ;
 int  gpg_apdu_get_next_data(unsigned int ref)  ;
 int  gpg_apdu_put_data(unsigned int ref) ;
+int  gpg_apdu_get_key_data(unsigned int ref);
+int  gpg_apdu_put_key_data(unsigned int ref);
 
+void gpg_pso_derive_slot_seed(int slot, unsigned char *seed);
+void gpg_pso_derive_key_seed(unsigned char *Sn, unsigned char* key_name, unsigned int idx,
+                             unsigned char *Ski,  unsigned int Ski_len);
 int  gpg_apdu_pso(void);
 int  gpg_apdu_internal_authenticate(void);
 int  gpg_apdu_gen(void );

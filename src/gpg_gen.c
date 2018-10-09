@@ -22,7 +22,7 @@
 /* @in slot     slot num [0 ; GPG_KEYS_SLOTS[
  * @out seed    32 bytes master seed for given slot
  */
-static void gpg_pso_derive_slot_seed(int slot, unsigned char *seed) { 
+void gpg_pso_derive_slot_seed(int slot, unsigned char *seed) { 
   unsigned int path[2];
   unsigned char chain[32];
 
@@ -38,8 +38,8 @@ static void gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
  * @out Ski        generated sub_seed
  * @in  Ski_len    sub-seed length
  */
-static void gpg_pso_derive_key_seed(unsigned char *Sn, unsigned char* key_name, unsigned int idx,
-                                    unsigned char *Ski,  unsigned int Ski_len) {
+void gpg_pso_derive_key_seed(unsigned char *Sn, unsigned char* key_name, unsigned int idx,
+                             unsigned char *Ski,  unsigned int Ski_len) {
  
   unsigned char h[32];
   h[0] = idx >>8;
@@ -59,7 +59,7 @@ static void gpg_pso_derive_key_seed(unsigned char *Sn, unsigned char* key_name, 
 int gpg_apdu_gen() {
   unsigned int t,l,ksz,reset_cnt;
   gpg_key_t *keygpg;
-  unsigned char seed[32];
+  unsigned char seed[66];
   unsigned char* name;
 
   switch ((G_gpg_vstate.io_p1<<8)|G_gpg_vstate.io_p2) {
@@ -168,7 +168,7 @@ int gpg_apdu_gen() {
         THROW(SW_REFERENCED_DATA_NOT_FOUND);
         return SW_REFERENCED_DATA_NOT_FOUND;
       }
-      if ((G_gpg_vstate.io_p2 == 0x01) | (G_gpg_vstate.seed_mode)) {
+      if ((G_gpg_vstate.io_p2 == 0x01) || (G_gpg_vstate.seed_mode)) {
         ksz = gpg_curve2domainlen(curve);
         gpg_pso_derive_slot_seed(G_gpg_vstate.slot,   seed);
         gpg_pso_derive_key_seed(seed, name, 1, seed, ksz);
