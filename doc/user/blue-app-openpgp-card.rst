@@ -46,7 +46,7 @@ Introduction
 
 GnuPG application for Ledger Blue and Nano S
 
-This application implements "The OpenPGP card" specification revision 3.0. This specification is available in doc directory and at https://g10code.com/p-card.html .
+This application implements "The OpenPGP card" specification revision 3.3. This specification is available in doc directory and at https://g10code.com/p-card.html .
 
 The application supports:
 
@@ -169,7 +169,6 @@ The full menu layout is :
 |                    RSA 3072
 |                    RSA 4096
 |                    NIST P256
-|                    Brainpool 256R1
 |                    ED25519
 |             Set Template
 |       Seed mode
@@ -195,6 +194,7 @@ The full menu layout is :
 | A "**+**" after the entry label means current value.
 
 
+
 Device Info
 -------------
 
@@ -212,6 +212,8 @@ encode the current slot value.
 
 Select Slot
 -------------
+
+This menu is only available on ``XL`` version
 
 A Slot is a set of
 three key pairs *Signature, Decryption, Authentication* as defined by gnupg 
@@ -264,7 +266,6 @@ Supported curve name are:
 
 - secp256k1 with tag 19
 - nistp256 with tag 19
-- brainpoolP256r1 with tag 19
 - cv25519 (only for key 2)
 - ed25519  with tag 22 (only for key 1 and 3)
 
@@ -860,8 +861,8 @@ generate the two other under a new identity and will erase existing keys
 on the current slot on the device.
 
 Nevertheless, if you want to use a different identity for ssh login, you can use
-another slot on the device. See `Nano S OpenPGP Card application explained`_
-and `Generate new key pair`_.
+another slot on the device. See `Nano S OpenPGP Card application explained`
+and `Generate new key pair`.
 
 
 Add sub-key
@@ -1078,6 +1079,166 @@ Now, if everything is correctly  setup and running, an ``ssh-add -l`` should sho
 And you should be able to ssh to your remote server with your gpg key!
 
 
+
+Backup and Restore
+------------------
+
+Introduction
+~~~~~~~~~~~~
+
+"The OpenPGP card" specification does not provide any mechanism for backuping you key. 
+Thus if you generate your keys on device and loose it, you definitively loose you private key.
+
+In order to avoid such extreme panic situation, a backup/restore mechanism is provided.
+At any time you can backup a snapshot of your device data, including your private keys. 
+All public data are retrieve in clear form. The private key are stored
+encrypted with a key derived from your seed, i.e. from your 24 BIP words.
+
+The backup/restore tool is located in ``pytools`` directory:
+
+ | ``usage: gpgcli.py [-h] [--adm-pin PIN] [--backup] [--backup-keys] [--file FILE]``
+ | ``                 [--pinpad] [--reader READER] [--reset] [--restore]``
+ | ``                 [--set-serial SERIAL] [--set-fp SIG:DEC:AUT] [--seed-key]``
+ | ``                 [--user-pin PIN]``
+ |
+ | ``optional arguments:``
+ | ``  -h, --help            show this help message and exit``
+ | ``  --adm-pin PIN         Administrative PIN, if pinpad not used``
+ | ``  --backup              Perfom a full backup except the key``
+ | ``  --backup-keys         Perfom keys encrypted backup``
+ | ``  --file FILE           basckup/restore file``
+ | ``  --pinpad              PIN validation will be deledated to pinpad``
+ | ``  --reader READER       PCSC reader``
+ | ``  --reset               Reset the application. All data are erased``
+ | ``  --restore             Perfom a full restore except the key``
+ | ``  --set-serial SERIAL   set the four serial bytes``
+ | ``  --set-fp SIG:DEC:AUT  sig:dec:aut fingerprints, 20 bytes each in hexa``
+ | ``  --seed-key            Regenerate all keys, based on seed mode``
+ | ``  --slot SLOT           slot to backup``
+ | ``  --user-pin PIN        User PIN, if pinpad not used``
+
+
+First you must either provide your pin codes or use the pinpad (onscreen pin). This is 
+done by giving either ``--adm-pin`` AND ``--user-pin`` or ``--pinpad``. Note that
+using ``--xx-pin`` may compromise your pin codes.
+
+Then you must precise if you want a backup or a restore with ``--backup`` or ``--restore``
+
+By default backup is performed without saving keys, assuming you use the seed mode.
+If you also want to backup keys you have to pass the ``--backup-keys`` option.
+
+Note that backup and restore works on current slot, so you have to perform a backup per slot
+even if some data are shared. You can precise the slot/backup to restore with ``--slot``
+
+
+
+Backup and Restore example
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+full backup command:
+  
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad --backup-keys``
+
+backup command without private keys:
+
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad ``
+
+
+full restore command:
+  
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad``
+
+
+full restore command with seed key generation:
+  
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad --seed``
+
+Restore without backup
+~~~~~~~~~~~~~~~~~~~~~~
+
+If you have seeded key but do not have done a backup and still have your keyring, there is a 
+solution to restore at least the key and their related information: serial and fingerprints. 
+All other information such as name, url, ... shall be set manually with ``gpg --card-edit``.
+
+
+
+**Step 1: retrieve information**
+
+Run the command ``gpg --edit-key John``, replace John by your own key id.
+
+ |  ``$ gpg --edit-key John``
+ |  ``gpg: WARNING: unsafe permissions on homedir './test/ring'``
+ |  ``gpg (GnuPG) 2.2.4; Copyright (C) 2017 Free Software Foundation, Inc.``
+ |  ``This is free software: you are free to change and redistribute it.``
+ |  ``There is NO WARRANTY, to the extent permitted by law.``
+ |
+ |  ``Secret key is available.``
+ |
+ |  ``sec  ed25519/8451AAF7D43D1095``
+ |  ``     created: 2018-10-10  expires: never       usage: SC  ``
+ |  ``     card-no: 2C97 FD6C11BE``
+ |  ``     trust: ultimate      validity: ultimate``
+ |  ``ssb  ed25519/C5A8FB078520ABBB``
+ |  ``     created: 2018-10-10  expires: never       usage: A   ``
+ |  ``     card-no: 2C97 FD6C11BE``
+ |  ``ssb  cv25519/0953D871FC4B9EA4``
+ |  ``     created: 2018-10-10  expires: never       usage: E   ``
+ |  ``     card-no: 2C97 FD6C11BE``
+ |  ``[ultimate] (1). John Doe``
+ |
+ |  ``gpg> ``
+ |
+ 
+
+The ``usage`` field tells you each key purpose: ``SC`` or ``S`` for signature, ``A`` for authentication, ``E`` for encryption.
+
+The ``card-no``field provides you with the serial number of the card on which the key are stored.
+You should have three or less keys with the same serial. These are the keys we want to restore.
+
+For each key you also have the key template (rsa2048, rsa3072, rsa4096, ed2559, cv25519) followed by the
+short fingerprint, e.g. ``ed25519/8451AAF7D43D1095``
+
+Note the serial and the three key template names: ``FD6C11BE`` , ``ed25519:cv25519:ed25519``. 
+Take care of the order: ``SC:E:A``.
+
+Now type the ``quit`` command.
+
+To get the full fingerprint of each key, run (yes twice ``--fingerprint``):
+
+``gpg --fingerprint --fingerprint John``,
+
+
+ |  ``$ gpg --fingerprint --fingerprint John``
+ |  ``gpg: WARNING: unsafe permissions on homedir './test/ring'``
+ |  ``pub   ed25519 2018-10-10 [SC]``
+ |  ``      2C68 8345 BDDA 0EDF B24D  B4FB 8451 AAF7 D43D 1095``
+ |  ``uid           [ultimate] John Doe``
+ |  ``sub   ed25519 2018-10-10 [A]``
+ |  ``      CEC5 9AE6 A766 14BC 3C6D  37D9 C5A8 FB07 8520 ABBB``
+ |  ``sub   cv25519 2018-10-10 [E]``
+ |  ``      DF15 7BD4 AC3B D1EE 9910  99C8 0953 D871 FC4B 9EA4``
+
+Assemble the three full fingerprint, corresponding to the one identified previously, 
+in the the following order ``SC:E:A`` : 
+
+``2C688345BDDA0EDFB24DB4FB8451AAF7D43D1095:DF157BD4AC3BD1EE991099C80953D871FC4B9EA4:
+CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB``.
+
+
+
+
+**Step 1: restore**
+
+Plug you Nano S and run the OpenPGP application. 
+
+Finally run the following command :
+
+ | ``python3 -m gpgcard.gpgcli --pinpad  --set-template ed255519:cv25519:ed255519 --set-fingerprints ``
+ | ``  '2C688345BDDA0EDFB24DB4FB8451AAF7D43D1095:DF157BD4AC3BD1EE991099C80953D871FC4B9EA4:CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB'``
+ | ``  --set-serial 'FD6C11BE' --seed ``
+
+
+
 Trouble/FAQ
 -----------
 
@@ -1110,6 +1271,7 @@ Add the follwing option to ~/.gnupg/scdaemon.conf
  | ``debug-all``
 
 Make a nice issue report under github providing log and and command line you run.  
+
 **!*WARNING*!** : this may reveal confidential information such as key values. Do your log with a test key.
 
 

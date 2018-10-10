@@ -212,7 +212,7 @@ class GPGCard() :
         apdu = binascii.unhexlify(b"00CA%.04x00"%tag)
         return self.exchange(apdu)
 
-    def put_data(self,tag,value):        
+    def put_data(self,tag,value):
         return self.exchange(binascii.unhexlify(b"00DA%.04x"%tag), value)
 
     def verify(self,id,value, pinpad=False):
@@ -244,6 +244,7 @@ class GPGCard() :
     def get_all(self, with_key=False):
         self.reset()
 
+        self.slot,sw                     = self.get_data(0x01F2)
         self.AID,sw                      = self.get_data(0x4f)
         self.login ,sw                   = self.get_data(0x5e)
         self.url,sw                      = self.get_data(0x5f50)
@@ -316,7 +317,7 @@ class GPGCard() :
 
         return True
 
-    def set_all(self, with_key= False):
+    def set_all(self):
         
         self.put_data(0x4f,    self.AID[10:14])
         self.put_data(0x0101,  self.private_01)
@@ -351,15 +352,22 @@ class GPGCard() :
         self.put_data(0xd7, self.UIF_DEC)
         self.put_data(0xd8, self.UIF_AUT)
 
-        if with_key:
+        if len(self.sig_key):
             self.put_data(0x00B6, self.sig_key)
+        if len(self.dec_key):
             self.put_data(0x00B8, self.dec_key)
+        if len(self.aut_key):
             self.put_data(0x00A4, self.aut_key)
         return True
 
+
+    def _backup_file_name(self,file_name):
+        return  file_name+"_slot%d"%(self.slot[0]+1)+".pickle"
+
     def backup(self, file_name, with_key=False):
-        f = open(file_name,mode='w+b')
         self.get_all(with_key)
+        file_name = self._backup_file_name(file_name)
+        f = open(file_name,mode='w+b')
         pickle.dump(
             (self.AID,
              self.private_01, self.private_02, self.private_03, self.private_04,
@@ -376,7 +384,8 @@ class GPGCard() :
         return True
 
 
-    def restore(self, file_name, seed_key=False):
+    def restore(self, file_name):
+        file_name = self._backup_file_name(file_name)
         f = open(file_name,mode='r+b')
         (self.AID,
          self.private_01, self.private_02, self.private_03, self.private_04,
@@ -388,19 +397,18 @@ class GPGCard() :
          self.sig_date, self.dec_date, self.aut_date,
          self.cardholder_cert,
          self.UIF_SIG, self.UIF_DEC, self.UIF_AUT,
-         self.sig_key, self.dec_key, self.aut_key) = pickle.load(f)
-        with_key = len(self.sig_key)>0 and  len(self.dec_key)>0 and len(self.aut_key)>0
-        self.set_all(with_key)
-        if seed_key :
-            apdu = binascii.unhexlify(b"0047800102B600")
-            self.exchange(apdu)
-            apdu = binascii.unhexlify(b"0047800102B800")
-            self.exchange(apdu)
-            apdu = binascii.unhexlify(b"0047800102A400")
-            self.exchange(apdu)
+         self.sig_key, self.dec_key, self.aut_key) = pickle.load(f)        
+        self.set_all()
         return True
 
-
+    def seed_key(self):
+        apdu = binascii.unhexlify(b"0047800102B600")
+        self.exchange(apdu)
+        apdu = binascii.unhexlify(b"0047800102B800")
+        self.exchange(apdu)
+        apdu = binascii.unhexlify(b"0047800102A400")
+        self.exchange(apdu)
+    
 
     def decode_AID(self):
         return  {
@@ -521,6 +529,13 @@ class GPGCard() :
         d['CNT3'] = ('PW3 counter', "%x"%self.PW_status[6])
 
         return d
+
+    #slot
+    def select_slot(self, slot):
+        """ Args:
+              slot (int) : slot id (1 to MAX) to select
+        """
+        self.put_data( 0x01F2, (slot-1).to_bytes(1,'big'))
 
     #USER Info
     def set_serial(self, ser):
@@ -751,10 +766,16 @@ class GPGCard() :
         print ("NONE: %s"%binascii.hexlify(attributes))
         return None
 
-    def set_template(self, template):
+    def set_template(self, sig, dec, aut):
         """
         See get_template
         """
+        if (sig):
+            self.put_data(0x00C1, binascii.unhexlify(sig))
+        if dec:
+            self.put_data(0x00C2, binascii.unhexlify(dec))
+        if aut:
+            self.put_data(0x00C3, binascii.unhexlify(aut))
         pass
 
 

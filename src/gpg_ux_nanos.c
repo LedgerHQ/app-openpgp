@@ -50,10 +50,12 @@ void ui_menu_seed_action(unsigned int value) ;
 const ux_menu_entry_t ui_menu_reset[] ;
 void ui_menu_reset_action(unsigned int value);
 
+#if GPG_MULTISLOT
 const ux_menu_entry_t ui_menu_slot[];
 void ui_menu_slot_display(unsigned int value);
 const bagl_element_t*  ui_menu_slot_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element);
 void ui_menu_slot_action(unsigned int value);
+#endif
 
 const ux_menu_entry_t ui_menu_settings[] ;
 
@@ -571,11 +573,10 @@ const bagl_element_t* ui_menu_template_preprocessor(const ux_menu_entry_t* entry
       case CX_CURVE_SECP521R1:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_NISTP521);
         break;
-        */
       case CX_CURVE_SECP256K1:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_SECP256K1);
         break;
-
+        */
         /*
       case CX_CURVE_BrainPoolP256R1:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOL256R1);
@@ -626,11 +627,11 @@ void  ui_menu_tmpl_set_action(unsigned int value) {
     attributes.length = 6;
     break;
 
-  case CX_CURVE_SECP256K1:
   case CX_CURVE_SECP256R1:
+  //case CX_CURVE_SECP256K1:
   //case CX_CURVE_SECP384R1:
   //case CX_CURVE_SECP521R1:
-  case CX_CURVE_BrainPoolP256R1:
+  //case CX_CURVE_BrainPoolP256R1:
   //case CX_CURVE_BrainPoolP384R1:
   //case CX_CURVE_BrainPoolP512R1:
   if (G_gpg_vstate.ux_key == 2) {
@@ -708,7 +709,7 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
   {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP256R1,       NULL,  LABEL_NISTP256,   NULL,  0,  0},
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP384R1,       NULL,  LABEL_NISTP384,   NULL,  0,  0},
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP521R1,       NULL,  LABEL_NISTP521,   NULL,  0,  0},
-  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP256K1,       NULL,  LABEL_SECP256K1,  NULL,  0,  0},
+//  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP256K1,       NULL,  LABEL_SECP256K1,  NULL,  0,  0},
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP256R1, NULL,  LABEL_BPOOL256R1, NULL,  0,  0},  
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP384R1, NULL,  LABEL_BPOOL384R1, NULL,  0,  0},  
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP512R1, NULL,  LABEL_BPOOL512R1, NULL,  0,  0},  
@@ -953,6 +954,7 @@ const ux_menu_entry_t ui_menu_settings[] = {
 
 /* --------------------------------- SLOT UX --------------------------------- */
 
+#if GPG_MULTISLOT
 #if GPG_KEYS_SLOTS != 3
 #error menu definition not correct for current value of GPG_KEYS_SLOTS
 #endif
@@ -1009,6 +1011,8 @@ void ui_menu_slot_action(unsigned int value) {
   // redisplay first entry of the idle menu
   ui_menu_slot_display(value);
 }
+#endif
+
 /* --------------------------------- INFO UX --------------------------------- */
 
 #if GPG_KEYS_SLOTS != 3
@@ -1033,8 +1037,10 @@ const ux_menu_entry_t ui_menu_info[] = {
 /* --------------------------------- MAIN UX --------------------------------- */
 
 const ux_menu_entry_t ui_menu_main[] = {
-  {NULL,                       NULL,  0, NULL,              "",            NULL, 0, 0},
+  {NULL,                       NULL,  0, NULL,              "",            "", 0, 0},
+#if GPG_MULTISLOT  
   {NULL,       ui_menu_slot_display,  0, NULL,              "Select slot", NULL, 0, 0},
+#endif
   {ui_menu_settings,           NULL,  0, NULL,              "Settings",    NULL, 0, 0},
   {ui_menu_info,               NULL,  0, NULL,              "About",       NULL, 0, 0},
   {NULL,              os_sched_exit,  0, &C_icon_dashboard, "Quit app" ,   NULL, 50, 29},
@@ -1043,26 +1049,30 @@ const ux_menu_entry_t ui_menu_main[] = {
 extern const  uint8_t N_USBD_CfgDesc[];
 const bagl_element_t* ui_menu_main_preprocessor(const ux_menu_entry_t* entry, bagl_element_t* element) {
   if (entry == &ui_menu_main[0]) {
-    if(element->component.userid==0x20) {      
-      unsigned int serial;
-      char name[20];
-      
-      serial = MIN(N_gpg_pstate->name.length,19);
-      os_memset(name, 0, 20);
-      os_memmove(name, N_gpg_pstate->name.value, serial);
-      serial = (N_gpg_pstate->AID[10] << 24) |
-               (N_gpg_pstate->AID[11] << 16) |
-               (N_gpg_pstate->AID[12] <<  8) |
-               (N_gpg_pstate->AID[13] |(G_gpg_vstate.slot+1));
-      os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
-      snprintf(G_gpg_vstate.menu,  sizeof(G_gpg_vstate.menu), "< User: %s / SLOT: %d / Serial: %x >", 
-               name, G_gpg_vstate.slot+1, serial);
-      
-      element->component.stroke = 10; // 1 second stop in each way
-      element->component.icon_id = 26; // roundtrip speed in pixel/s
-      element->text = G_gpg_vstate.menu;
-      UX_CALLBACK_SET_INTERVAL(bagl_label_roundtrip_duration_ms(element, 7));
+    if(element->component.userid==0x21) {    
+      os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));  
+      os_memmove(G_gpg_vstate.menu, N_gpg_pstate->name.value, 12);
+      if (G_gpg_vstate.menu[0] == 0) {
+        os_memmove(G_gpg_vstate.menu, "<No Name>", 9);
+      }
     }
+    if(element->component.userid==0x22) {
+      unsigned int serial;
+      serial = (G_gpg_vstate.kslot->serial[0] << 24) |
+               (G_gpg_vstate.kslot->serial[1] << 16) |
+               (G_gpg_vstate.kslot->serial[2] <<  8) |
+               (G_gpg_vstate.kslot->serial[3]);
+      os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+#if GPG_MULTISLOT      
+      snprintf(G_gpg_vstate.menu,  sizeof(G_gpg_vstate.menu), "ID: %x / %d", 
+               serial, G_gpg_vstate.slot+1);
+#else
+      snprintf(G_gpg_vstate.menu,  sizeof(G_gpg_vstate.menu), "ID: %x", 
+               serial);
+#endif
+
+    }
+    element->text = G_gpg_vstate.menu;
   }
   return element;
 }

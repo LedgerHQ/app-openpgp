@@ -32,7 +32,11 @@
 /* accpet long PW, but less than one sha256 block */
 #define GPG_MAX_PW_LENGTH                     12
 
+#if GPG_MULTISLOT
 #define GPG_KEYS_SLOTS                        3
+#else
+#define GPG_KEYS_SLOTS                        3
+#endif
 
 #define  GPG_KEY_ATTRIBUTES_LENGTH            12
 
@@ -103,6 +107,7 @@ typedef struct gpg_key_s {
 
 
 typedef struct gpg_key_slot_s{
+  unsigned char serial[4];
   /* */
   gpg_key_t sig;
   gpg_key_t aut;
@@ -303,6 +308,8 @@ typedef struct  gpg_v_state_s gpg_v_state_t;
 
 
 /* ---  INS  --- */
+#define    INS_EXIT                         0x02
+
 #define    INS_SELECT                       0xa4
 #define    INS_TERMINATE_DF                 0xe6
 #define    INS_ACTIVATE_FILE                0x44

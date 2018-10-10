@@ -15,26 +15,31 @@
 
 import sys
 import argparse
+import binascii
 
 from .gpgcard import GPGCard
 
 def get_argparser():
         parser = argparse.ArgumentParser(epilog="""
-Note 1: reset, backup, restore are always executed in THIS order
+reset, backup, restore are always executed in THIS order. 
+
+Template identifiers are ed2559, cv25519, rsa2048, rsa3072, rsa4096.
  """
 )
-        parser.add_argument('--adm-pin',   metavar='PIN',          help='Administrative PIN, if pinpad not used')
-        parser.add_argument('--backup',                            help='Perfom a full backup except the key',              action='store_true')                           
-        parser.add_argument('--backup-keys',                       help='Perfom keys encrypted backup',                     action='store_true')                           
-        parser.add_argument('--file',                              help='basckup/restore file',                             type=str, default='backup_card.pickle')
-        parser.add_argument('--pinpad',                            help='PIN validation will be deledated to pinpad',       action='store_true')
-        parser.add_argument('--reader',                            help='PCSC reader',                                      type=str, default='pcsc:Ledger') 
-        parser.add_argument('--reset',                             help='Reset the application. All data are erased',       action='store_true')
-        parser.add_argument('--restore',                           help='Perfom a full restore except the key',             action='store_true')
-        parser.add_argument('--set-serial', metavar='SERIAL',      help='set the four serial bytes')
-        parser.add_argument('--set-fp',     metavar='SIG:DEC:AUT', help='sig:dec:aut fingerprints, 20 bytes each in hexa')
-        parser.add_argument('--seed-key',                          help='Regenerate all keys, based on seed mode',          action='store_true')
-        parser.add_argument('--user-pin',   metavar='PIN',         help='User PIN, if pinpad not used')
+        parser.add_argument('--adm-pin',          metavar='PIN',         help='Administrative PIN, if pinpad not used')
+        parser.add_argument('--backup',                                  help='Perfom a full backup except the key',              action='store_true')                           
+        parser.add_argument('--backup-keys',                             help='Perfom keys encrypted backup',                     action='store_true')                           
+        parser.add_argument('--file',                                    help='basckup/restore file',                             type=str, default='gpg_backup')
+        parser.add_argument('--pinpad',                                  help='PIN validation will be deledated to pinpad',       action='store_true')
+        parser.add_argument('--reader',                                  help='PCSC reader',                                      type=str, default='pcsc:Ledger') 
+        parser.add_argument('--reset',                                   help='Reset the application. All data are erased',       action='store_true')
+        parser.add_argument('--restore',                                 help='Perfom a full restore except the key',             action='store_true')
+        parser.add_argument('--set-serial',       metavar='SERIAL',      help='set the four serial bytes')
+        parser.add_argument('--set-templates',    metavar='SIG:DEC:AUT', help='sig:dec:aut templates identifier')
+        parser.add_argument('--set-fingerprints', metavar='SIG:DEC:AUT', help='sig:dec:aut fingerprints, 20 bytes each in hexa')
+        parser.add_argument('--seed-key',                                help='Regenerate all keys, based on seed mode',          action='store_true')
+        parser.add_argument('--slot',             metavar='SLOT',        help='slot to backup',                                   type=int, default=1)
+        parser.add_argument('--user-pin',         metavar='PIN',         help='User PIN, if pinpad not used')
         return parser
 
 def banner():
@@ -67,7 +72,7 @@ if not args.pinpad:
 
 try:
 
-    print("Connect to card...", end='', flush=True)
+    print("Connect to card %s..."%args.reader, end='', flush=True)
     gpgcard = GPGCard()
     gpgcard.connect(args.reader)
     print("OK")
@@ -81,10 +86,14 @@ try:
            error("PIN not verified")
     print("OK")
 
+    print("Select slot %d..."%args.slot, end='', flush=True)
+    gpgcard.select_slot(args.slot)
+    print("OK")
+
     if args.reset:
         print("Reset application...", end='', flush=True)
-        if not gpgcard.terminate() or not gpgcard.activate():
-            error ("NOK")
+        gpgcard.terminate() 
+        gpgcard.activate()
         print("OK")
 
     print("Get card info...", end='', flush=True)
@@ -99,24 +108,42 @@ try:
 
     if args.restore:
         print("Restore application...", end='', flush=True)
-        if not gpgcard.restore(args.file, args.seed_key):
+        if not gpgcard.restore(args.file):
             error("NOK")
         print("OK", flush=True)
 
-    if args.set_fp:
+    if args.set_templates:
+        print("Set template...", end='', flush=True)
+        templates= {
+          'rsa2048'  : "010800002001",
+          'rsa3072'  : "010C00002001",
+          'rsa4096'  : "011000002001",
+          'nistp256' : "132A8648CE3D030107",
+          'ed255519' : "162B06010401DA470F01",
+          'cv25519'  : "122B060104019755010501"
+          }
+        sig,dec,aut = args.set_templates.split(":")
+        gpgcard.set_template(templates[sig],templates[dec],templates[aut])
+        print("OK", flush=True)
+        
+    if (args.seed_key):
+        print("Seed Key...", end='', flush=True)
+        gpgcard.seed_key();
+        print("OK", flush=True)        
+
+    if args.set_fingerprints:
         print("Set fingerprints...", end='', flush=True)
-        sig,dec,aut = args.setfp.split(":")
-        if (not gpgcard.set_key_fingerprints("sig", sig) or 
-            not gpgcard.set_key_fingerprints("dec", dec) or
-            not gpgcard.set_key_fingerprints("aut", aut)):
-            error("NOK")
+        sig,dec,aut = args.set_fingerprints.split(":")
+        gpgcard.set_key_fingerprints("sig", sig)
+        gpgcard.set_key_fingerprints("dec", dec)
+        gpgcard.set_key_fingerprints("aut", aut)
         print("OK", flush=True)
 
     if args.set_serial:
         print("Set serial...", end='', flush=True)
-        serial = binascii.unhexilify(args.set_serial)
-        if len(serial>8) :
+        if len(args.set_serial) != 8 :
             error('Serial must be a 4 bytes hexa string value (8 characters)')
+        serial = binascii.unhexlify(args.set_serial)
         gpgcard.set_serial(args.set_serial)
         print("OK", flush=True)
 except Exception as e:

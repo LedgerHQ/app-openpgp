@@ -73,8 +73,9 @@ int gpg_apdu_get_data(unsigned int ref)  {
    /* ----------------- Application ----------------- */
     /*  Full Application identifier  */
   case 0x004F:
-    gpg_io_insert(N_gpg_pstate->AID, 16);
-    G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset-3] |= G_gpg_vstate.slot+1;
+    gpg_io_insert(N_gpg_pstate->AID, 10);
+    gpg_io_insert(G_gpg_vstate.kslot->serial, 4);
+    gpg_io_insert_u16(0x0000);
     break;
     /* Historical bytes, */
   case 0x5F52:
@@ -104,6 +105,7 @@ int gpg_apdu_get_data(unsigned int ref)  {
     /* ----------------- aid, histo, ext_length, ... ----------------- */
   case 0x6E:
     gpg_io_insert_tlv(0x4F,   16, N_gpg_pstate->AID);
+    os_memmove(G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset-6, G_gpg_vstate.kslot->serial, 4);
     gpg_io_insert_tlv(0x5F52, 15, N_gpg_pstate->histo);
     gpg_io_insert_tlv(0x7F66, sizeof(C_ext_length), C_ext_length);
 
@@ -282,8 +284,7 @@ int gpg_apdu_put_data(unsigned int ref) {
     if (G_gpg_vstate.io_length != 4) {
       THROW(SW_WRONG_LENGTH);
     }
-    G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset+3] &= ~0x07;
-    nvm_write(&N_gpg_pstate->AID[10], &G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset], 4);
+    nvm_write(G_gpg_vstate.kslot->serial, &G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset], 4);
     break;
 
     /* ----------------- Extended Header list -----------------*/

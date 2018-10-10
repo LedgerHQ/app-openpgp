@@ -66,6 +66,12 @@ This add-on specification propose new type of random generation:
 - seeded prime number generation
 
 
+Key Backup
+~~~~~~~~~~
+
+A full keybackup mecanism is provided. 
+
+
 GPG-ledger
 ==========
 
@@ -178,6 +184,43 @@ For a given length *L* and seed *S*:
   - return rp
 
 
+
+Key Backup & Restore
+~~~~~~~~~~~~~~~~~~~~
+
+In order to backup/restore private key the commands `put_data` and 
+`get_data` accept the tag `B6` (signature key), `B8`(encryption key), 
+`A4` (authentication).
+
+put_data command accept the exact output of get_data. The get_data command
+return both the public and private key.
+
+For security and confidentiality private key is returned encryped in AES.
+The key used is derived according to previously described AES key derivation 
+with name 'key '.
+
+
+The data payload is formatted as follow:
+
+  +-------+--------------------------------------------------+
+  | size  |  Description                                     |
+  +=======+==================================================+
+  | 4     | OS Target ID                                     |
+  +-------+--------------------------------------------------+
+  | 4     | API Level                                        |
+  +-------+--------------------------------------------------+
+  | 4     | compliance Level                                 |
+  +-------+--------------------------------------------------+
+  | 4     | public key size                                  |
+  +-------+--------------------------------------------------+
+  | var   | public key                                       |
+  +-------+--------------------------------------------------+
+  | 4     | private key size                                 |
+  +-------+--------------------------------------------------+
+  | var   | encrypted private key                            |
+  +-------+--------------------------------------------------+
+
+
 APDU Modification
 -----------------
 
@@ -243,7 +286,7 @@ Byte 3 is endoced as follow:
   +-------+------------+-------------+
   |  01F1 |  Always    |  Verify PW3 |
   +-------+------------+-------------+
-  |  01F2 |  Always    |  Verify PW1 |
+  |  01F2 |  Always    |  Verify PW2 |
   +-------+------------+-------------+
 
 

@@ -242,17 +242,17 @@ int gpg_io_fetch(unsigned char* buffer, int len) {
 #define MAX_OUT GPG_APDU_LENGTH
 
 int gpg_io_do(unsigned int io_flags) {
+  unsigned int rx = 0;
 
   //if pending input chaining
   if (G_gpg_vstate.io_cla & 0x10) {
     goto in_chaining;
   }
 
-
   if (io_flags & IO_ASYNCH_REPLY) {
     // if IO_ASYNCH_REPLY has been  set,
     //  gpg_io_exchange will return when  IO_RETURN_AFTER_TX will set in ui 
-    gpg_io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
+    rx = gpg_io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
   } else {
     // --- full out chaining ---
     G_gpg_vstate.io_offset = 0;
@@ -270,7 +270,7 @@ int gpg_io_do(unsigned int io_flags) {
         xx = G_gpg_vstate.io_length-2;
       }
       G_io_apdu_buffer[tx+1] = xx;
-      gpg_io_exchange(CHANNEL_APDU, tx+2);
+      rx = gpg_io_exchange(CHANNEL_APDU, tx+2);
       //check get response
       if ((G_io_apdu_buffer[0] != 0x00) ||
         (G_io_apdu_buffer[1] != 0xc0) ||
@@ -283,14 +283,22 @@ int gpg_io_do(unsigned int io_flags) {
     os_memmove(G_io_apdu_buffer,  G_gpg_vstate.work.io_buffer+G_gpg_vstate.io_offset, G_gpg_vstate.io_length);
     
     if (io_flags & IO_RETURN_AFTER_TX) {
-      gpg_io_exchange(CHANNEL_APDU |IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
+      rx = gpg_io_exchange(CHANNEL_APDU |IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
       return 0;
     } else {
-       gpg_io_exchange(CHANNEL_APDU,  G_gpg_vstate.io_length);
+       rx = gpg_io_exchange(CHANNEL_APDU,  G_gpg_vstate.io_length);
     }
   }
 
   //--- full in chaining ---
+  if (rx < 4) {
+      THROW(SW_COMMAND_NOT_ALLOWED);
+      return SW_COMMAND_NOT_ALLOWED;
+  }
+  if (rx == 4) {
+    G_io_apdu_buffer[4]=0;
+    rx = 4;
+  }
   G_gpg_vstate.io_offset = 0;
   G_gpg_vstate.io_length = 0;
   G_gpg_vstate.io_cla = G_io_apdu_buffer[0];
@@ -332,14 +340,19 @@ int gpg_io_do(unsigned int io_flags) {
 
     G_io_apdu_buffer[0] = 0x90;
     G_io_apdu_buffer[1] = 0x00;
-    gpg_io_exchange(CHANNEL_APDU, 2);
+    rx = gpg_io_exchange(CHANNEL_APDU, 2);
   in_chaining:
-    if (((G_io_apdu_buffer[0] & 0xEF) !=   (G_gpg_vstate.io_cla& 0xEF)) ||
+    if ((rx < 4) ||
+        ((G_io_apdu_buffer[0] & 0xEF) !=   (G_gpg_vstate.io_cla& 0xEF)) ||
         (G_io_apdu_buffer[1] != G_gpg_vstate.io_ins) ||
         (G_io_apdu_buffer[2] != G_gpg_vstate.io_p1) ||
         (G_io_apdu_buffer[3] != G_gpg_vstate.io_p2) ) {
       THROW(SW_COMMAND_NOT_ALLOWED);
       return SW_COMMAND_NOT_ALLOWED;
+    }
+    if (rx == 4) {
+      G_io_apdu_buffer[4]=0;
+      rx = 4;
     }
     G_gpg_vstate.io_cla = G_io_apdu_buffer[0];
     G_gpg_vstate.io_lc  = G_io_apdu_buffer[4];

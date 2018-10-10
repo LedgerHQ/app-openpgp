@@ -23,14 +23,21 @@ include $(BOLOS_SDK)/Makefile.defines
 
 APP_LOAD_PARAMS=--appFlags 0x40 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
 
-APPNAME = OpenPGP
+ifeq ($(MULTISLOT),)
+GPG_MULTISLOT:=0
+APPNAME:=OpenPGP
+else
+GPG_MULTISLOT:=1
+APPNAME+=OpenPGP.XL
+endif
 
-SPECVERSION="3.3.1"
 
-APPVERSION_M=1
-APPVERSION_N=3
-APPVERSION_P=0
-APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
+SPECVERSION:="3.3.1"
+
+APPVERSION_M:=1
+APPVERSION_N:=3
+APPVERSION_P:=0
+APPVERSION:=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
 ICONNAME=images/icon_pgp_blue.gif
@@ -38,7 +45,7 @@ else
 ICONNAME=images/icon_pgp.gif
 endif
 
-DEFINES   += $(GPG_CONFIG) GPG_VERSION=$(APPVERSION) GPG_NAME=$(APPNAME) SPEC_VERSION=$(SPECVERSION)
+DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT) $(GPG_CONFIG) GPG_VERSION=$(APPVERSION) GPG_NAME=$(APPNAME) SPEC_VERSION=$(SPECVERSION)
 
 ################
 # Default rule #
@@ -100,6 +107,8 @@ load: all
 run:
 	python -m ledgerblue.runApp --appName $(APPNAME)
 
+exit:
+	echo -e "0020008206313233343536\n0002000000" |scriptor -r "Ledger Nano S [Nano S] (0001) 01 00" 
 delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 

@@ -27,6 +27,12 @@ void gpg_check_access_ins() {
   ref = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2 ;
 
   switch (G_gpg_vstate.io_ins) {
+  case INS_EXIT:
+    if (gpg_pin_is_verified(PIN_ID_PW2)) {
+      return;
+    }
+    break;
+
   case INS_SELECT:
     return;
   case INS_GET_DATA:
@@ -43,6 +49,7 @@ void gpg_check_access_ins() {
     if (gpg_pin_is_verified(PIN_ID_PW3) || gpg_pin_is_verified(PIN_ID_RC)) {
       return;
     }
+    break;
 
   case INS_PUT_DATA:
   case INS_PUT_DATA_ODD:
@@ -298,6 +305,12 @@ int gpg_dispatch() {
     sw = debug_apdu();
     break;
 #endif
+
+  case INS_EXIT:
+    os_sched_exit(0);
+    sw = SW_OK;
+    break;
+
     /* --- CHALLENGE --- */
   case INS_GET_CHALLENGE:
     sw = gpg_apdu_get_challenge();
