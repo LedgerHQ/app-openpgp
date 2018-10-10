@@ -513,7 +513,7 @@ static unsigned int validate_pin() {
 //#define LABEL_NISTP384    "NIST P384"
 //#define LABEL_NISTP521    "NIST P521"
 #define LABEL_SECP256K1   "SEPC 256K1"
-#define LABEL_BPOOL256R1  "Brainpool 256R1"
+//#define LABEL_BPOOL256R1  "Brainpool 256R1"
 //#define LABEL_BPOOL384R1  "Brainpool 384R1"
 //#define LABEL_BPOOL512R1  "Brainpool 512R1"
 #define LABEL_Ed25519     "Ed25519"
@@ -576,10 +576,10 @@ const bagl_element_t* ui_menu_template_preprocessor(const ux_menu_entry_t* entry
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_SECP256K1);
         break;
 
+        /*
       case CX_CURVE_BrainPoolP256R1:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOL256R1);
         break;
-        /*
       case CX_CURVE_BrainPoolP384R1:
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu)," %s", LABEL_BPOOL384R1);
         break;
@@ -709,7 +709,7 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP384R1,       NULL,  LABEL_NISTP384,   NULL,  0,  0},
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP521R1,       NULL,  LABEL_NISTP521,   NULL,  0,  0},
   {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_SECP256K1,       NULL,  LABEL_SECP256K1,  NULL,  0,  0},
-  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP256R1, NULL,  LABEL_BPOOL256R1, NULL,  0,  0},  
+//  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP256R1, NULL,  LABEL_BPOOL256R1, NULL,  0,  0},  
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP384R1, NULL,  LABEL_BPOOL384R1, NULL,  0,  0},  
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP512R1, NULL,  LABEL_BPOOL512R1, NULL,  0,  0},  
   {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_Ed25519,         NULL,  LABEL_Ed25519,    NULL,  0,  0},
