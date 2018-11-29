@@ -311,6 +311,11 @@ and which one is the default when the application starts.
 The default mode can be changed by first selecting the desired mode and then
 selecting the *Set default" menu. Note that *Trust*  can not be set as default mode.
 
+Before you can change the PIN mode, you need to verify the PIN on the client. To do this, 
+run ``gpg --card-edit``, then  ``admin`` and finally ``verify`` on you PC. You will then
+be asked to enter the current PIN. After doing so, you can change the PIN mode on your
+device.
+
 
 Note that *On Screen*", "*Confirm only*" and "*Trust*" may not work if the 
 client application does not support it. In that case the "*Host*" should be 
