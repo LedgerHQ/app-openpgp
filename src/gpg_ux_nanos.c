@@ -726,9 +726,6 @@ void ui_menu_tmpl_type_action(unsigned int value) {
 /* --------------------------------- SEED UX --------------------------------- */
 
 const ux_menu_entry_t ui_menu_seed[] = {
-  #if GPG_KEYS_SLOTS != 3
-  #error menu definition not correct for current value of GPG_KEYS_SLOTS
-  #endif
   {NULL,                NULL, 0, NULL,          "",        NULL, 0, 0},
   {NULL, ui_menu_seed_action, 1, NULL,          "Set on",  NULL, 0, 0},
   {NULL, ui_menu_seed_action, 0, NULL,          "Set off", NULL, 0, 0},
@@ -922,9 +919,6 @@ void ui_menu_uifmode_action(unsigned int value) {
 /* -------------------------------- RESET UX --------------------------------- */
 
 const ux_menu_entry_t ui_menu_reset[] = {
-  #if GPG_KEYS_SLOTS != 3
-  #error menu definition not correct for current value of GPG_KEYS_SLOTS
-  #endif
   {NULL,   NULL,                 0, NULL,          "Really Reset ?", NULL, 0, 0},
   {NULL,   ui_menu_main_display, 0, &C_badge_back, "No",         NULL, 61, 40},
   {NULL,   ui_menu_reset_action, 0, NULL,          "Yes",           NULL, 0, 0},
@@ -1015,10 +1009,6 @@ void ui_menu_slot_action(unsigned int value) {
 
 /* --------------------------------- INFO UX --------------------------------- */
 
-#if GPG_KEYS_SLOTS != 3
-#error menu definition not correct for current value of GPG_KEYS_SLOTS
-#endif
-
 #define STR(x)  #x
 #define XSTR(x) STR(x)
 
@@ -1054,6 +1044,12 @@ const bagl_element_t* ui_menu_main_preprocessor(const ux_menu_entry_t* entry, ba
       os_memmove(G_gpg_vstate.menu, N_gpg_pstate->name.value, 12);
       if (G_gpg_vstate.menu[0] == 0) {
         os_memmove(G_gpg_vstate.menu, "<No Name>", 9);
+      } else {
+        for (int i = 0; i<12; i++) {
+          if (G_gpg_vstate.menu[i] == 0x3c) {
+            G_gpg_vstate.menu[i] = ' ';
+          }
+        }
       }
     }
     if(element->component.userid==0x22) {

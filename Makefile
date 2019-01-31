@@ -24,19 +24,24 @@ include $(BOLOS_SDK)/Makefile.defines
 APP_LOAD_PARAMS=--appFlags 0x40 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
 
 ifeq ($(MULTISLOT),)
+MULTISLOT := 0
+endif
+
+ifeq ($(MULTISLOT),0)
 GPG_MULTISLOT:=0
 APPNAME:=OpenPGP
 else
 GPG_MULTISLOT:=1
-APPNAME+=OpenPGP.XL
+APPNAME:=OpenPGP.XL
 endif
 
+APP_LOAD_PARAMS=--appFlags 0x40 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
 
 SPECVERSION:="3.3.1"
 
 APPVERSION_M:=1
 APPVERSION_N:=3
-APPVERSION_P:=0
+APPVERSION_P:=1
 APPVERSION:=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
@@ -51,7 +56,22 @@ DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT) $(GPG_CONFIG) GPG_VERSION=$(APPVERSI
 # Default rule #
 ################
 
+.PHONY: allvariants listvariants 
+
 all: default
+	mkdir -p release
+	cp -a bin/app.elf   release/$(APPNAME).elf
+	cp -a bin/app.hex   release/$(APPNAME).hex
+	cp -a debug/app.asm release/$(APPNAME).asm
+	cp -a debug/app.map release/$(APPNAME).map
+
+
+listvariants:
+	@echo VARIANTS MULTISLOT 0 1
+
+allvariants:
+	make  MULTISLOT=0 clean all
+	make  MULTISLOT=1 clean all
 
 ############
 # Platform #
@@ -102,6 +122,17 @@ SDK_SOURCE_PATH  += lib_stusb
 
 
 load: all
+ifeq ($(MULTISLOT),0)
+	cp -a release/openpgp.elf bin/app.elf   
+	cp -a release/openpgp.hex bin/app.hex   
+	cp -a release/openpgp.asm debug/app.asm 
+	cp -a release/openpgp.map debug/app.map 
+else
+	cp -a release/openpgp-XL.elf bin/app.elf   
+	cp -a release/openpgp-XL.hex bin/app.hex   
+	cp -a release/openpgp-XL.asm debug/app.asm 
+	cp -a release/openpgp-XL.map debug/app.map 	
+endif
 	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
 run:
@@ -109,6 +140,7 @@ run:
 
 exit:
 	echo -e "0020008206313233343536\n0002000000" |scriptor -r "Ledger Nano S [Nano S] (0001) 01 00" 
+
 delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
@@ -118,5 +150,3 @@ include Makefile.rules
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
 
-listvariants:
-	@echo VARIANTS NONE openpgp

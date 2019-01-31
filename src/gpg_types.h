@@ -35,7 +35,7 @@
 #if GPG_MULTISLOT
 #define GPG_KEYS_SLOTS                        3
 #else
-#define GPG_KEYS_SLOTS                        3
+#define GPG_KEYS_SLOTS                        1
 #endif
 
 #define  GPG_KEY_ATTRIBUTES_LENGTH            12
