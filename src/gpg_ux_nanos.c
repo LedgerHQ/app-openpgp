@@ -151,7 +151,7 @@ unsigned int ui_uifconfirm_prepro(const  bagl_element_t* element) {
     case 0x002A8086:
       snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
       return 1;
-    case 0x0088000:
+    case 0x00880000:
       snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
       return 1;
     } 
@@ -714,7 +714,7 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP384R1, NULL,  LABEL_BPOOL384R1, NULL,  0,  0},  
 //  {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP512R1, NULL,  LABEL_BPOOL512R1, NULL,  0,  0},  
   {NULL,             ui_menu_tmpl_type_action,  CX_CURVE_Ed25519,         NULL,  LABEL_Ed25519,    NULL,  0,  0},
-  {ui_menu_template,                    NULL,   1,               &C_badge_back,  "Back",           NULL, 61, 40},
+  {ui_menu_template,                    NULL,   0,               &C_badge_back,  "Back",           NULL, 61, 40},
   UX_MENU_END
 };
 
@@ -729,7 +729,7 @@ const ux_menu_entry_t ui_menu_seed[] = {
   {NULL,                NULL, 0, NULL,          "",        NULL, 0, 0},
   {NULL, ui_menu_seed_action, 1, NULL,          "Set on",  NULL, 0, 0},
   {NULL, ui_menu_seed_action, 0, NULL,          "Set off", NULL, 0, 0},
-  {ui_menu_settings,    NULL, 1, &C_badge_back, "Back",    NULL, 61, 40},
+  {ui_menu_settings,    NULL, 0, &C_badge_back, "Back",    NULL, 61, 40},
   UX_MENU_END
 };
 
@@ -766,7 +766,7 @@ const ux_menu_entry_t ui_menu_pinmode[] = {
   {NULL,       ui_menu_pinmode_action,  0x8000|PIN_MODE_CONFIRM, NULL,  "Confirm only",  NULL, 0, 0},
   {NULL,       ui_menu_pinmode_action,  0x8000|PIN_MODE_TRUST,   NULL,  "Trust",         NULL, 0, 0},
   {NULL,       ui_menu_pinmode_action,  128,                     NULL,  "Set Default",   NULL, 0, 0},
-  {ui_menu_settings,             NULL,    1,            &C_badge_back,  "Back",          NULL, 61, 40},
+  {ui_menu_settings,             NULL,    0,            &C_badge_back,  "Back",          NULL, 61, 40},
   UX_MENU_END
 };
 
@@ -852,7 +852,7 @@ const ux_menu_entry_t ui_menu_uifmode[] = {
   {NULL,       ui_menu_uifmode_action,   1, NULL,  "Signature",         NULL, 0, 0},
   {NULL,       ui_menu_uifmode_action,   2, NULL,  "Decryption",        NULL, 0, 0},
   {NULL,       ui_menu_uifmode_action,   3, NULL,  "Authentication",    NULL, 0, 0},
-  {ui_menu_settings,             NULL,   1, &C_badge_back,  "Back",    NULL, 61, 40},
+  {ui_menu_settings,             NULL,   0, &C_badge_back,  "Back",    NULL, 61, 40},
   UX_MENU_END
 };
 

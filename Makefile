@@ -122,17 +122,10 @@ SDK_SOURCE_PATH  += lib_stusb
 
 
 load: all
-ifeq ($(MULTISLOT),0)
-	cp -a release/openpgp.elf bin/app.elf   
-	cp -a release/openpgp.hex bin/app.hex   
-	cp -a release/openpgp.asm debug/app.asm 
-	cp -a release/openpgp.map debug/app.map 
-else
-	cp -a release/openpgp-XL.elf bin/app.elf   
-	cp -a release/openpgp-XL.hex bin/app.hex   
-	cp -a release/openpgp-XL.asm debug/app.asm 
-	cp -a release/openpgp-XL.map debug/app.map 	
-endif
+	cp -a release/$(APPNAME).elf bin/app.elf   
+	cp -a release/$(APPNAME).hex bin/app.hex   
+	cp -a release/$(APPNAME).asm debug/app.asm 
+	cp -a release/$(APPNAME).map debug/app.map 
 	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
 run:
