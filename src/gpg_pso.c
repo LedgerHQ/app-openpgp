@@ -162,7 +162,7 @@ int gpg_apdu_pso() {
     }
     break;
   // --- PSO:DEC ---
-  case 0x8096: 
+  case 0x8086: 
     if (G_gpg_vstate.kslot->dec.UIF[0]) {
       if ((G_gpg_vstate.UIF_flags)==0) {
         ui_menu_uifconfirm_display(0);
