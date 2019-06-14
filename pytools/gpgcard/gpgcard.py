@@ -62,6 +62,7 @@ class GPGCardExcpetion(Exception):
 class GPGCard() :
     def __init__(self):
         self.reset()
+        self.log = False
 
     def reset(self):
         #token info
@@ -158,29 +159,43 @@ class GPGCard() :
                     cond = False
         return resp,sw
 
+    def log_apdu(self,l):
+        self.log = l
+
+    def alog(self, m,dt,sw=0):
+        if self.log:
+            print("%s %.04x %s"%(m,sw,''.join(["%.02x"%b for b in dt])))
+
     def _exchange_pcsc(self,apdu, data=None, sw_expected=0x9000, sw_mask=0xFFFF):
         if data:
             data = [x for x in data]
         apdu = [x for x in apdu]
-
         #send
         if data: 
             while len(data) > 0xFE:
                 apdux = apdu[0:5]+[0xfe]+data[0:0xFE]
                 apdux[0] |= 0x10
+                self.alog('send', apdux)
                 resp, sw1, sw2 = self.connection.transmit(apdux)
                 sw = (sw1<<8)|sw2
+                self.alog('recv',resp,sw)
                 if sw != 0x9000:
                     return resp,sw
                 data = data[0xFE:]
             apdu = apdu+[len(data)]+data
+        self.alog('send', apdu)
         resp, sw1, sw2 = self.connection.transmit(apdu)
-
+        sw = (sw1<<8)|sw2
+        self.alog('recv', resp, sw)
+    
         #receive
         while sw1==0x61:
             apdu = binascii.unhexlify(b"00c00000%.02x"%sw2)
             apdu = [x for x in apdu]
+            self.alog('send', apdu)
             resp2, sw1, sw2 = self.connection.transmit(apdu)
+            sw = (sw1<<8)|sw2
+            self.alog('recv', resp2, sw)
             resp = resp + resp2
         resp = bytes(resp)
         sw = (sw1<<8)|sw2
@@ -315,6 +330,7 @@ class GPGCard() :
             self.dec_key,sw              = self.get_data(0x00B8)
             self.aut_key,sw              = self.get_data(0x00A4)
 
+      
         return True
 
     def set_all(self):
@@ -353,6 +369,7 @@ class GPGCard() :
         self.put_data(0xd8, self.UIF_AUT)
 
         if len(self.sig_key):
+            print('COUCOU')
             self.put_data(0x00B6, self.sig_key)
         if len(self.dec_key):
             self.put_data(0x00B8, self.dec_key)
@@ -362,7 +379,7 @@ class GPGCard() :
 
 
     def _backup_file_name(self,file_name):
-        return  file_name+"_slot%d"%(self.slot[0]+1)+".pickle"
+        return  file_name #file_name+"_slot%d"%(self.slot[0]+1)+".pickle"
 
     def backup(self, file_name, with_key=False):
         self.get_all(with_key)
@@ -397,7 +414,7 @@ class GPGCard() :
          self.sig_date, self.dec_date, self.aut_date,
          self.cardholder_cert,
          self.UIF_SIG, self.UIF_DEC, self.UIF_AUT,
-         self.sig_key, self.dec_key, self.aut_key) = pickle.load(f)        
+         self.sig_key, self.dec_key, self.aut_key) = pickle.load(f)      
         self.set_all()
         return True
 

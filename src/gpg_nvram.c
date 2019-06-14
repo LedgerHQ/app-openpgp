@@ -19,4 +19,8 @@
 #include "gpg_api.h"
 #include "gpg_vars.h"
 
+#ifdef TARGET_NANOX
+const gpg_nv_state_t N_state_pic;
+#else
 gpg_nv_state_t N_state_pic;
+#endif

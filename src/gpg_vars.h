@@ -31,10 +31,15 @@ extern const unsigned char C_OID_BRAINPOOL256T1[9];
 extern const unsigned char C_OID_Ed25519[9];
 extern const unsigned char C_OID_cv25519[10];
 
-extern gpg_v_state_t  G_gpg_vstate;
-extern gpg_nv_state_t N_state_pic;
-#define N_gpg_pstate  ((WIDE  gpg_nv_state_t *)PIC(&N_state_pic))
+extern gpg_v_state_t G_gpg_vstate;
 
+#ifdef TARGET_NANOX
+extern const gpg_nv_state_t N_state_pic;
+#define N_gpg_pstate ((volatile gpg_nv_state_t *)PIC(&N_state_pic))
+#else
+extern gpg_nv_state_t N_state_pic;
+#define N_gpg_pstate ((WIDE gpg_nv_state_t *)PIC(&N_state_pic))
+#endif
 
 #ifdef GPG_DEBUG_MAIN
 extern int apdu_n;

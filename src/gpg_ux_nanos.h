@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-
 #ifndef GPG_UX_NANOS_H
 #define GPG_UX_NANOS_H
 

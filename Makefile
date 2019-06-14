@@ -21,12 +21,11 @@ $(error Environment variable BOLOS_SDK is not set)
 endif
 include $(BOLOS_SDK)/Makefile.defines
 
-APP_LOAD_PARAMS=--appFlags 0x40 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
+APP_LOAD_PARAMS=--appFlags 0x240 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
 
 ifeq ($(MULTISLOT),)
 MULTISLOT := 0
 endif
-
 ifeq ($(MULTISLOT),0)
 GPG_MULTISLOT:=0
 APPNAME:=OpenPGP
@@ -35,22 +34,36 @@ GPG_MULTISLOT:=1
 APPNAME:=OpenPGP.XL
 endif
 
-APP_LOAD_PARAMS=--appFlags 0x40 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
-
-SPECVERSION:="3.3.1"
+ifeq ($(TARGET_NAME),TARGET_BLUE)
+ICONNAME = images/icon_monero_blue.gif
+else ifeq ($(TARGET_NAME),TARGET_NANOX)
+ICONNAME = images/icon_pgp_nanox.gif
+else
+ICONNAME = images/icon_pgp.gif
+endif
 
 APPVERSION_M:=1
 APPVERSION_N:=3
-APPVERSION_P:=1
+APPVERSION_P:=2
 APPVERSION:=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
+SPECVERSION:="3.3.1"
 
-ifeq ($(TARGET_NAME),TARGET_BLUE)
-ICONNAME=images/icon_pgp_blue.gif
+DEFINES   += $(OPENPGP_CONFIG)
+DEFINES   += OPENPGP_VERSION_MAJOR=$(APPVERSION_M) OPENPGP_VERSION_MINOR=$(APPVERSION_N) OPENPGP_VERSION_MICRO=$(APPVERSION_P)
+DEFINES   += OPENPGP_VERSION=$(APPVERSION)
+DEFINES   += OPENPGP_NAME=$(APPNAME)
+DEFINES   += SPEC_VERSION=$(SPECVERSION)
+DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT) 
+
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+DEFINES   += UI_NANO_X
+DEFINES   += GPG_SHAKE256
+else ifeq ($(TARGET_NAME),TARGET_BLUE)
+DEFINES   += UI_BLUE
 else
-ICONNAME=images/icon_pgp.gif
+DEFINES   += UI_NANO_S
 endif
 
-DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT) $(GPG_CONFIG) GPG_VERSION=$(APPVERSION) GPG_NAME=$(APPNAME) SPEC_VERSION=$(SPECVERSION)
 
 ################
 # Default rule #
@@ -82,17 +95,50 @@ ifneq ($(NO_CONSENT),)
 DEFINES   += NO_CONSENT
 endif
 
-DEFINES   += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
+DEFINES   += OS_IO_SEPROXYHAL
 DEFINES   += HAVE_BAGL HAVE_SPRINTF
-#DEFINES   += HAVE_PRINTF PRINTF=screen_printf
-DEFINES   += PRINTF\(...\)=
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
-#DEFINES  += HAVE_BLE
-DEFINES   += UNUSED\(x\)=\(void\)x
-DEFINES   += APPVERSION=\"$(APPVERSION)\"
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 
+DEFINES   += USB_SEGMENT_SIZE=64
+DEFINES   += U2F_PROXY_MAGIC=\"MOON\"
+#DEFINES   += HAVE_IO_U2F HAVE_U2F
+
+DEFINES   += UNUSED\(x\)=\(void\)x
+DEFINES   += APPVERSION=\"$(APPVERSION)\"
+
 DEFINES   += HAVE_USB_CLASS_CCID
+
+
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+# DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
+# DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
+
+DEFINES           += IO_SEPROXYHAL_BUFFER_SIZE_B=300
+DEFINES       += HAVE_GLO096
+DEFINES       += HAVE_BAGL BAGL_WIDTH=128 BAGL_HEIGHT=64
+DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
+DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
+DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
+DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
+DEFINES           += HAVE_UX_FLOW
+else
+DEFINES           += IO_SEPROXYHAL_BUFFER_SIZE_B=128
+endif
+
+# Enabling debug PRINTF
+DEBUG = 0
+ifneq ($(DEBUG),0)
+
+        ifeq ($(TARGET_NAME),TARGET_NANOX)
+                DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
+        else
+                DEFINES   += HAVE_PRINTF PRINTF=screen_printf
+        endif
+else
+        DEFINES   += PRINTF\(...\)=
+endif
+
 
 ##############
 # Compiler #
@@ -118,8 +164,15 @@ include $(BOLOS_SDK)/Makefile.glyphs
 
 ### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
 APP_SOURCE_PATH  += src
-SDK_SOURCE_PATH  += lib_stusb 
+SDK_SOURCE_PATH  += lib_stusb lib_stusb_impl 
+#SDK_SOURCE_PATH  += lib_u2f
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+SDK_SOURCE_PATH  += lib_ux
+endif
 
+
+cformat:
+	clang-format -i src/*.c src/*.h
 
 load: all
 	cp -a release/$(APPNAME).elf bin/app.elf   
@@ -137,9 +190,12 @@ exit:
 delete:
 	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
+
+
 # import generic rules from the sdk
 include Makefile.rules
 
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
+
 

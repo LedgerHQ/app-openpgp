@@ -29,9 +29,11 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "os.h"
-#include "usbd_ccid_if.h"
+#include "sdk_compat.h"
 
 #ifdef HAVE_USB_CLASS_CCID
+
+#include "usbd_ccid_if.h"
 
 #if CCID_BULK_EPIN_SIZE > USB_SEGMENT_SIZE
   #error configuration error, the USB MAX SEGMENT SIZE does not support the CCID endpoint (CCID_BULK_EPIN_SIZE vs USB_SEGMENT_SIZE)
@@ -531,16 +533,14 @@ uint8_t SC_Secure(uint32_t dwLength, uint8_t bBWI, uint16_t wLevelParameter,
   UNUSED(returnLen);
   // return SLOTERROR_CMD_NOT_SUPPORTED;
   uint16_t ret_len,off;
-  switch(pbuf[0]) 
-  {
+  switch(pbuf[0]) {
   case 0: // verify pin
     off = 15;
     //ret_len = dwLength - 15;
     ret_len = 5;
     break;
   case 1: // modify pin
-    switch(pbuf[11]) 
-    {
+    switch(pbuf[11])  {
     case 3:
       off = 20;
       break;

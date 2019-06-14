@@ -18,19 +18,21 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
-
 #include "os_io_seproxyhal.h"
+
+#ifdef TARGET_NANOX
+#include "ux.h"
+ux_state_t        G_ux;
+bolos_ux_params_t G_ux_params;
+#else
+ux_state_t           ux;
+#endif
 
 #ifndef GPG_DEBUG_MAIN
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-ux_state_t ux;
-
 #else
 extern unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-int apdu_n;
-
+int                  apdu_n;
 #endif
 
-
-gpg_v_state_t  G_gpg_vstate;
-
+gpg_v_state_t G_gpg_vstate;

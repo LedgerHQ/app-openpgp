@@ -14,25 +14,21 @@
  * limitations under the License.
  */
 
-
-
 #include "os.h"
 #include "cx.h"
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
 
-
 #include "os_io_seproxyhal.h"
 #include "string.h"
 #include "glyphs.h"
 
-
 /* ----------------------------------------------------------------------- */
 /* ---                        Blue  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
-/* screeen size: 
-  blue; 320x480 
+/* screeen size:
+  blue; 320x480
   nanoS:  128x32
 */
 #if 0

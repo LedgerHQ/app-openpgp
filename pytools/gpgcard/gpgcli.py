@@ -39,7 +39,8 @@ Template identifiers are ed2559, cv25519, rsa2048, rsa3072, rsa4096.
         parser.add_argument('--set-fingerprints', metavar='SIG:DEC:AUT', help='sig:dec:aut fingerprints, 20 bytes each in hexa')
         parser.add_argument('--seed-key',                                help='Regenerate all keys, based on seed mode',          action='store_true')
         parser.add_argument('--slot',             metavar='SLOT',        help='slot to backup',                                   type=int, default=1)
-        parser.add_argument('--user-pin',         metavar='PIN',         help='User PIN, if pinpad not used')
+        parser.add_argument('--user-pin',         metavar='PIN',         help='User PIN, if pinpad not used'),
+        parser.add_argument('--apdu',                                    help='Log APDU exchange',                                action='store_true')
         return parser
 
 def banner():
@@ -74,6 +75,8 @@ try:
 
     print("Connect to card %s..."%args.reader, end='', flush=True)
     gpgcard = GPGCard()
+    if args.apdu:
+        gpgcard.log_apdu(args.apdu)
     gpgcard.connect(args.reader)
     print("OK")
 

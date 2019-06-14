@@ -27,11 +27,12 @@
 
 #pragma message "Override SDK source file :" __FILE__ 
 
+#ifdef HAVE_USB_CLASS_CCID
+
+#include "sdk_compat.h"
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_ccid_cmd.h"
-
-#ifdef HAVE_USB_CLASS_CCID
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/

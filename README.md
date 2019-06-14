@@ -1,14 +1,14 @@
 ## GnuPG application: blue-app-gnupg
 
-GnuPG application for Ledger Blue and Nano S
+GnuPG application for Nano S and Nano X
 
 This application implements "The OpenPGP card" specification revision 3.0. This specification is available in *doc* directory and at https://g10code.com/p-card.html .
 
 The application supports:
   - RSA with key up to 4096 bits 
-  - ECDSA with secp256k1, secp256r1, brainpool 256r1 and brainpool 256t1 curves
+  - ECDSA with secp256k1
   - EDDSA with Ed25519 curve 
-  - ECDH with  secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and curve25519 curves
+  - ECDH with secp256k1 and curve25519 curves
 
 
 This release has known missing parts (see also Add-on) :

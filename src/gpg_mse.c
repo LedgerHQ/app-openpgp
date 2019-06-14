@@ -20,28 +20,25 @@
 #include "gpg_vars.h"
 
 static int gpg_mse_set(int crt, int ref) {
-
   if (crt == 0xA4) {
     if (ref == 0x02) {
-        G_gpg_vstate.mse_aut = &G_gpg_vstate.kslot->dec;
+      G_gpg_vstate.mse_aut = &G_gpg_vstate.kslot->dec;
     }
     if (ref == 0x03) {
-        G_gpg_vstate.mse_aut = &G_gpg_vstate.kslot->aut;
+      G_gpg_vstate.mse_aut = &G_gpg_vstate.kslot->aut;
     }
   }
 
   if (crt == 0xB8) {
     if (ref == 0x02) {
-        G_gpg_vstate.mse_dec = &G_gpg_vstate.kslot->dec;
+      G_gpg_vstate.mse_dec = &G_gpg_vstate.kslot->dec;
     }
     if (ref == 0x03) {
-        G_gpg_vstate.mse_dec = &G_gpg_vstate.kslot->aut;
+      G_gpg_vstate.mse_dec = &G_gpg_vstate.kslot->aut;
     }
   }
   return 0;
 }
-
-
 
 int gpg_mse_reset() {
   gpg_mse_set(0xA4, 0x03);
@@ -50,29 +47,26 @@ int gpg_mse_reset() {
 }
 
 int gpg_apdu_mse() {
-  int crt,ref;
-  
+  int crt, ref;
 
-  if ((G_gpg_vstate.io_p1 != 0x41) || 
-      ((G_gpg_vstate.io_p2 != 0xA4)&&(G_gpg_vstate.io_p2 != 0xB8))) {
+  if ((G_gpg_vstate.io_p1 != 0x41) || ((G_gpg_vstate.io_p2 != 0xA4) && (G_gpg_vstate.io_p2 != 0xB8))) {
     THROW(SW_INCORRECT_P1P2);
     return SW_INCORRECT_P1P2;
   }
 
-  crt =  gpg_io_fetch_u16();
+  crt = gpg_io_fetch_u16();
   if (crt != 0x8301) {
     THROW(SW_WRONG_DATA);
     return SW_WRONG_DATA;
   }
 
-  ref =  gpg_io_fetch_u8();
-  if ((ref != 0x02) &&  (ref != 0x03)) {
+  ref = gpg_io_fetch_u8();
+  if ((ref != 0x02) && (ref != 0x03)) {
     THROW(SW_WRONG_DATA);
     return SW_WRONG_DATA;
   }
 
-  gpg_mse_set(crt,ref);
+  gpg_mse_set(crt, ref);
   gpg_io_discard(1);
   return SW_OK;
-
 }

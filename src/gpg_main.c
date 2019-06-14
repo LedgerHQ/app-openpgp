@@ -28,7 +28,6 @@
 #include "string.h"
 #include "glyphs.h"
 
-
 /* ----------------------------------------------------------------------- */
 /* ---                            Application Entry                    --- */
 /* ----------------------------------------------------------------------- */
@@ -45,8 +44,7 @@ void gpg_main(void) {
       }
       CATCH_OTHER(e) {
         gpg_io_discard(1);
-        if ( (e & 0xFFFF0000) ||
-             ( ((e&0xF000)!=0x6000) && ((e&0xF000)!=0x9000) ) ) {
+        if ((e & 0xFFFF0000) || (((e & 0xF000) != 0x6000) && ((e & 0xF000) != 0x9000))) {
           gpg_io_insert_u32(e);
           sw = 0x6f42;
         } else {
@@ -64,9 +62,7 @@ void gpg_main(void) {
     }
     END_TRY;
   }
-
 }
-
 
 unsigned char io_event(unsigned char channel) {
   // nothing done with the event, throw an error on the transport layer if
@@ -81,7 +77,6 @@ unsigned char io_event(unsigned char channel) {
     UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
     break;
 
-
   // other events are propagated to the UX just in case
   default:
     UX_DEFAULT_EVENT();
@@ -91,11 +86,10 @@ unsigned char io_event(unsigned char channel) {
     UX_DISPLAYED_EVENT({});
     break;
   case SEPROXYHAL_TAG_TICKER_EVENT:
-    UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, 
-    {
-       // only allow display when not locked of overlayed by an OS UX.
-      if (UX_ALLOWED ) {
-        UX_REDISPLAY(); 
+    UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {
+      // only allow display when not locked of overlayed by an OS UX.
+      if (UX_ALLOWED) {
+        UX_REDISPLAY();
       }
     });
     break;
@@ -125,8 +119,7 @@ unsigned short io_exchange_al(unsigned char channel, unsigned short tx_len) {
       return 0; // nothing received from the master so far (it's a tx
       // transaction)
     } else {
-      return io_seproxyhal_spi_recv(G_io_apdu_buffer,
-                                    sizeof(G_io_apdu_buffer), 0);
+      return io_seproxyhal_spi_recv(G_io_apdu_buffer, sizeof(G_io_apdu_buffer), 0);
     }
 
   default:
@@ -153,39 +146,36 @@ __attribute__((section(".boot"))) int main(void) {
   // exit critical section
   __asm volatile("cpsie i");
 
-
   // ensure exception will work as planned
   os_boot();
-  for(;;) {
+  for (;;) {
     UX_INIT();
 
     BEGIN_TRY {
       TRY {
-      
-        //start communication with MCU
+        // start communication with MCU
         io_seproxyhal_init();
 
         USB_power(1);
+#if HAVE_USB_CLASS_CCID
         io_usb_ccid_set_card_inserted(1);
-  
+#endif
 
-        //set up
+        // set up
         gpg_init();
-  
-        //set up initial screen
+
+        // set up initial screen
         ui_init();
 
-
-
-        //start the application
-        //the first exchange will:
+        // start the application
+        // the first exchange will:
         // - display the  initial screen
         // - send the ATR
         // - receive the first command
         gpg_main();
       }
       CATCH(EXCEPTION_IO_RESET) {
-                // reset IO and UX
+        // reset IO and UX
         continue;
       }
       CATCH_ALL {

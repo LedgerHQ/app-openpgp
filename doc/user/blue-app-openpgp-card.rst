@@ -1130,7 +1130,8 @@ using ``--xx-pin`` may compromise your pin codes.
 Then you must precise if you want a backup or a restore with ``--backup`` or ``--restore``
 
 By default backup is performed without saving keys, assuming you use the seed mode.
-If you also want to backup keys you have to pass the ``--backup-keys`` option.
+If you also want to backup keys you have to pass the ``--backup-keys`` option. 
+In a general manner it is better to also save your keys with ``--backup-keys`` option.
 
 Note that backup and restore works on current slot, so you have to perform a backup per slot
 even if some data are shared. You can precise the slot/backup to restore with ``--slot``
@@ -1140,23 +1141,25 @@ even if some data are shared. You can precise the slot/backup to restore with ``
 Backup and Restore example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+First you must have the path of the `ledger-app-openpgp-card/pytools` in your PYTHONPATH.
+
 full backup command:
   
- | ``python3 -m gpgcard.gpgcli --backup --pinpad --backup-keys``
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad --backup-keys --file my_bck_file_name.pickle``
 
 backup command without private keys:
 
- | ``python3 -m gpgcard.gpgcli --backup --pinpad ``
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad --file my_bck_file_name.pickle``
 
 
 full restore command:
   
- | ``python3 -m gpgcard.gpgcli --backup --pinpad``
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad --file my_bck_file_name.pickle``
 
 
 full restore command with seed key generation:
   
- | ``python3 -m gpgcard.gpgcli --backup --pinpad --seed``
+ | ``python3 -m gpgcard.gpgcli --backup --pinpad --seed --file my_bck_file_name.pickle``
 
 Restore without backup
 ~~~~~~~~~~~~~~~~~~~~~~
