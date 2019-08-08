@@ -23,15 +23,16 @@ include $(BOLOS_SDK)/Makefile.defines
 
 APP_LOAD_PARAMS=--appFlags 0x240 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS) 
 
-ifeq ($(MULTISLOT),)
-MULTISLOT := 0
+ifeq ($(APPNAME),)
+APPNAME = OpenPGP
 endif
-ifeq ($(MULTISLOT),0)
+ifeq ($(APPNAME),OpenPGP)
 GPG_MULTISLOT:=0
-APPNAME:=OpenPGP
-else
+else ifeq ($(APPNAME),OpenPGP.XL)
 GPG_MULTISLOT:=1
 APPNAME:=OpenPGP.XL
+else 
+$(error APPNAME ($(APPNAME)) is not set or unknown)
 endif
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
@@ -80,7 +81,7 @@ all: default
 
 
 listvariants:
-	@echo VARIANTS MULTISLOT 0 1
+	@echo VARIANTS APPNAME OpenPGP OpenPGP.XL
 
 allvariants:
 	make  MULTISLOT=0 clean all

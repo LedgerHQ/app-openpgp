@@ -369,7 +369,6 @@ class GPGCard() :
         self.put_data(0xd8, self.UIF_AUT)
 
         if len(self.sig_key):
-            print('COUCOU')
             self.put_data(0x00B6, self.sig_key)
         if len(self.dec_key):
             self.put_data(0x00B8, self.dec_key)

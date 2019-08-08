@@ -1027,9 +1027,9 @@ void ui_menu_settings_display(unsigned int value) {
 void ui_menu_slot_action(unsigned int value);
 void ui_menu_slot_predisplay(void);
 
-#define SIG_BUFF G_gpg_vstate.ux_buff1
-#define DEC_BUFF G_gpg_vstate.ux_buff2
-#define AUT_BUFF G_gpg_vstate.ux_buff3
+#define SLOT1 G_gpg_vstate.ux_buff1
+#define SLOT2 G_gpg_vstate.ux_buff2
+#define SLOT3 G_gpg_vstate.ux_buff3
 
 UX_STEP_CB_INIT(ux_menu_slot_1_step, bn, ui_menu_slot_predisplay(), ui_menu_slot_action(1), {"Select Slot", SLOT1});
 
@@ -1039,9 +1039,9 @@ UX_STEP_CB_INIT(ux_menu_slot_3_step, bn, ui_menu_slot_predisplay(), ui_menu_slot
 
 UX_STEP_CB(ux_menu_slot_4_step, bn, ui_menu_slot_action(128), {"Set selected Slot", "as default slot"});
 
-UX_STEP_CB(ux_menu_uif_5_step,
-           bn,
-           ui_menu_settings_display(0),
+  UX_STEP_CB(ux_menu_slot_5_step,
+           pn,
+           ui_menu_main_display(1),
            {
                &C_icon_back,
                "Back",
@@ -1051,7 +1051,8 @@ UX_FLOW(ux_flow_slot,
         &ux_menu_slot_1_step,
         &ux_menu_slot_2_step,
         &ux_menu_slot_3_step,
-        &ux_menu_slot_4_step &ux_menu_slot_5_step);
+        &ux_menu_slot_4_step,
+        &ux_menu_slot_5_step);
 
 void ui_menu_slot_predisplay() {
   snprintf(SLOT1, sizeof(SLOT1), "1 %s %s", 1 == N_gpg_pstate->config_slot[1] + 1 ? "#" : " ",
