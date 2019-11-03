@@ -18,16 +18,15 @@
 
 #include "bolos_target.h"
 
-#if TARGET_ID == 0x31100004
-//Use original naming of NanoS 1.5.5
-
-#elif TARGET_ID == 0x33000004
+#if (TARGET_ID == 0x33000004) || ((TARGET_ID == 0x31100004) && (CX_APILEVEL >= 10))
 #include "os_io_usb.h"
 // from NanoX 1.2.4 remap G_io_apdu_xx
 #define G_io_apdu_state       G_io_app.apdu_state
 #define G_io_apdu_length      G_io_app.apdu_length
 #define G_io_apdu_state       G_io_app.apdu_state
 
+#elif TARGET_ID == 0x31100004
+//Use original naming of NanoS 1.5.5
 
 #else
 //Unknown
