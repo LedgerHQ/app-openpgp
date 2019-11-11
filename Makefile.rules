@@ -15,6 +15,12 @@
 #  limitations under the License.
 #*******************************************************************************
 
+# temporary redef, to ensure wider compliance of the SDK with pre-1.6 apps
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+SDK_SOURCE_PATH += lib_bagl
+else
+SDK_SOURCE_PATH += lib_ux
+endif
 
 #Make the SDK modified SDK sources prioritar to the original ones
 
