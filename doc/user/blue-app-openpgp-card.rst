@@ -241,24 +241,68 @@ A key template is defined by the OpenGPG card application specification. It
 describes the key to be generated with the ``generate`` command in 
 ``gpg --card-edit``
 
-The problem is there is no way with the ``gpg --card-edit`` command line 
-to easily set up the desired template, except for Ed25519. 
-
-To set up a new ECC template you have tow choice: the NanoS menu or the
-gpg-connect-agent tools.
+To set up a new ECC template you have three choices: the NanoS menu, the
+``gpg-connect-agent`` tool and last, the ``gpg --edit-card`` interactive setup.
 
 
+**gpg --card-edit** (recommended)
 
-**gpg-connect-agent** (recommended) 
+This method suppose you have a recent GnuPG tool and that you correctly configured it.
+See the dedicated section for that.
+
+In a terminal launch :
+
+ | ``$ gpg --card-edit``
+ | ``gpg/card> admin``
+ | ``Admin commands are allowed``
+ | ````
+ | ``gpg/card> set-key``
+ | ``Changing card key attribute for: Signature key``
+ | ``Please select what kind of key you want:``
+ |    ``(1) RSA``
+ |    ``(2) ECC``
+ | ``Your selection? 2``
+ | ``Please select which elliptic curve you want:``
+ |    ``(1) Curve 25519``
+ |    ``(4) NIST P-384``
+ | ``Your selection? 1``
+ | ``The card will now be re-configured to generate a key of type: ed25519``
+ | ``Note: There is no guarantee that the card supports the requested size.``
+ |       ``If the key generation does not succeed, please check the``
+ |       ``documentation of your card to see what sizes are allowed.``
+ | ``Changing card key attribute for: Encryption key``
+ | ``Please select what kind of key you want:``
+ |    ``(1) RSA``
+ |    ``(2) ECC``
+ | ``Your selection? 2``
+ | ``Please select which elliptic curve you want:``
+ |    ``(1) Curve 25519``
+ |    ``(4) NIST P-384``
+ | ``Your selection? 1``
+ | ``The card will now be re-configured to generate a key of type: cv25519``
+ | ``Changing card key attribute for: Authentication key``
+ | ``Please select what kind of key you want:``
+ |    ``(1) RSA``
+ |    ``(2) ECC``
+ | ``Your selection? 2``
+ | ``Please select which elliptic curve you want:``
+ |    ``(1) Curve 25519``
+ |    ``(4) NIST P-384``
+ | ``Your selection? 1``
+ | ``The card will now be re-configured to generate a key of type: ed25519``
+
+To show the current template use the  ``gpg --card-status`` command.
+
+**gpg-connect-agent**
 
 This method suppose you have correctly configured your GnuPG tool. 
 See the dedicated section for that.
 
 In a terminal launch : 
 
-     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 1 <tag> <curvename>" /bye
-     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 2 18    <curvename>" /bye
-     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 3 <tag> <curvename>" /bye
+ | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 1 <tag> <curvename>" /bye``
+ | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 2 18    <curvename>" /bye``
+ | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 3 <tag> <curvename>" /bye``
 
 This 3 commands fix, in that order, the template for Signature, Decryption, Authentication keys.
 
@@ -1282,6 +1326,101 @@ Make a nice issue report under github providing log and and command line you run
 
 **!*WARNING*!** : this may reveal confidential information such as key values. Do your log with a test key.
 
+ | ````
+
+**Q:** I'm having issue when using SSH, there is no pinpad prompt either on my host nor my Nano
+(``sign_and_send_pubkey: signing failed: agent refused operation``)
+
+**R:** You might need to add this command to your .bashrc/.zshrc :
+
+ | ``gpg-connect-agent updatestartuptty /bye >/dev/null``
+
+Be aware that when using **Host** PIN mode, you will have to enter your PIN directly on your
+computer and if you use a ncurses-like PIN entry program. In some cases, you will be prompted
+to the first shell that uses the above command (at least on Mac).
+
+ | ````
+
+**Q:** My mac is not able to see my ``Ledger Token``
+
+**R:** For some reason, SC communication on Mac takes some times or mess it up sometimes.
+
+To troubleshot those issues, you can try to reload the ``scdaemon`` using this command :
+
+ | ``gpgconf --reload scdaemon``
+ | ``gpgconf --reload gpg-agent``
+
+If not successful, you can try to trigger daemons to restart by sending a **SIGTERM** like so :
+
+ | ``kill -TERM $(pgrep gpg-agent) $(pgrep scdaemon)``.
+
+Changing USB port might also help sometimes. Do not hesitate.
+
+ | ````
+
+**Q:** My mac is **STILL* not able to see my ``Ledger Token``
+
+**R:** This might be related to your CCID drivers. Mojave comes with the version ``1.4.27``
+pre-installed. You can manually install a more recent version from this
+`website<https://ccid.apdu.fr/files/>` and install it this way :
+
+ | ``CCID_VERSION=1.4.30``
+ | ``wget https://ccid.apdu.fr/files/ccid-${CCID_VERSION}.tar.bz2``
+ | ``tar xzvf ccid-${CCID_VERSION}.tar.bz2``
+ | ``cd ccid-${CCID_VERSION}``
+ | ``./MacOSX/configure``
+ | ``make``
+ | ``make install``
+
+Installing the driver depends on ``libusb`` which can be installed using the following
+``brew install libusb``. It also requires static linking against it, if you use
+dynamic linking you will have the following output when using the ``./MacOSX/configure`` step :
+
+ | ``/usr/local/Cellar/libusb/1.0.23/lib/libusb-1.0.0.dylib``
+ | ``/usr/local/Cellar/libusb/1.0.23/lib/libusb-1.0.dylib``
+ | ``*****************************``
+ | ``Dynamic library libusb found in /usr/local/Cellar/libusb/1.0.23/lib``
+ | ``*****************************``
+ | ``Rename it to force a static link``
+
+You can use the following :
+
+ | ``LIBUSB_VERSION=1.0.23``
+ | ````
+ | ``for f in /usr/local/Cellar/libusb/${LIBUSB_VERSION}/lib/*.dylib; do``
+ |     ``mv $f $f.fake``
+ | ``done``
+ | ````
+ | ``./MacOSX/configure``
+ | ````
+ | ``for f in /usr/local/Cellar/libusb/${LIBUSB_VERSION}/lib/*.dylib.fake; do``
+ |     ``ORIG="$( echo $f | sed 's#.fake##g' )"``
+ |     ``mv $f ${ORIG}``
+ | ``done``
+
+Once installed, you should see the new driver installed using this command ```` :
+
+ | ``SmartCards:``
+ | ````
+ |     ``Readers:``
+ | ````
+ |     ``Reader Drivers:``
+ | ````
+ |       ``#01: org.debian.alioth.pcsclite.smartcardccid:1.4.27``
+ |         ``(/usr/libexec/SmartCardServices/drivers/ifd-ccid.bundle)``
+ |       ``#02: org.debian.alioth.pcsclite.smartcardccid:1.4.30``
+ |         ``(/usr/local/libexec/SmartCardServices/drivers/ifd-ccid.bundle)``
+ | ````
+ |     ``Tokend Drivers:``
+ | ````
+ |     ``SmartCard Drivers:``
+ | ````
+ |       ``#01: com.apple.CryptoTokenKit.pivtoken:1.0``
+ |         ``(/System/Library/Frameworks/CryptoTokenKit.framework/PlugIns/pivtoken.appex)``
+ | ````
+ |     ``Available SmartCards (keychain):``
+ | ````
+ |     ``Available SmartCards (token):``
 
 Annexes
 =======
