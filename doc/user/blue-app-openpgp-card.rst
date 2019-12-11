@@ -76,7 +76,7 @@ From Binary
 
 Use the "Ledger Manager" Chrome App. See https://www.ledgerwallet.com/apps/manager for details.
 
-As the "OpenPGP card" application is not fully compliant with UI and documentation guidelines, the application is in developer section: click on "Show delevopers items" on the bottom right corner to see it.
+As the "OpenPGP card" application is not fully compliant with UI and documentation guidelines, the application is in developer section: click on "Show developers items" on the bottom right corner to see it.
 
    - Launch the Ledger Manager. See `Ledger Manager <https://www.ledgerwallet.com/apps/manager>`_  
      and  ` <https://ledger.groovehq.com/knowledge_base/topics/ledger-manager>`_ 
@@ -86,7 +86,7 @@ As the "OpenPGP card" application is not fully compliant with UI and documentati
    - Click on *show developer items* on the bottom right corner;
    - Click on the green bottom arrow icon near the Ledger *Open PGP* logo;
    - Confirm the installation when required on your device by pressing the 
-     right button above the checkmark;
+     right button above the check mark;
    - Quit the Ledger Manager
 
 
@@ -374,7 +374,7 @@ The PIN is entered on the external computer.
 
 The PIN is entered on the Nano S or Blue screen. For  entering the PIN choose the
 next digit by using the left or right button. When the digit you expect is displayed
-select it by pressing both buttons ar the same time
+select it by pressing both buttons at the same time
 
 .. image:: pin_entry.png
     :align: middle
@@ -393,7 +393,7 @@ If you want to change the previous digit select the **'C'** (Cancel) letter.
     :align: middle
   
 
-Finnaly if you want to abort the PIN entry, select the **'A'** (Abort) letter.
+Finally if you want to abort the PIN entry, select the **'A'** (Abort) letter.
 
 .. image:: pin_abort.png
     :align: middle
@@ -849,7 +849,7 @@ moved.
  | ``     created: 2017-04-26  expires: never       usage: E   ``
  | ``[ultimate] (1). RSA 4096``
 
-**Say goobye with saving!**
+**Say goodbye with saving!**
 
  | ``gpg> `` *save*
 
@@ -898,7 +898,7 @@ There are two solutions for that, either generate one on the device
 or add an authentication sub-key to your existing master gpg key.
 
 Once done, it is necessary to configure ssh to point to the right key and
-delegate the authentication to *gpg-ssg-agent* instead of *ssh-agent*.
+delegate the authentication to *gpg-ssh-agent* instead of *ssh-agent*.
 
 
 Generate new key on device
@@ -1115,7 +1115,7 @@ Export your authentication key, identifier by its fingerprint, in a SSH complian
  | ``5FwZwkuogygaJdN/44MayHFmOZmzx9CAgYgLpTzen35+CcyhlqCqi+HjNlnHL2DDWd4iR``
  | ``d3Y6pY8LjS3xQkECc3Bhedptp17D+H9AVJt openpgp:0x2F68F035``
  
-Finaly copy the above export (``ssh-rsa AAAAB...Jt openpgp:0x2F68F035``) into the 
+Finally copy the above export (``ssh-rsa AAAAB...Jt openpgp:0x2F68F035``) into the 
 ~/.ssh/authorized_keys file on your remote server.
 
 
@@ -1316,7 +1316,7 @@ Add the following option to ~/.gnupg/gpg-agent.conf
  | ``debug-level guru``
  | ``log-file /tmp/gpgagent.log``
 
-Add the follwing option to ~/.gnupg/scdaemon.conf
+Add the following option to ~/.gnupg/scdaemon.conf
  
  | ``log-file /tmp/scd.log``
  | ``debug-level guru``
