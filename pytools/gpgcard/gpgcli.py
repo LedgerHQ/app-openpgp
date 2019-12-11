@@ -67,7 +67,7 @@ if args.backup and args.restore:
 
 
 if not args.pinpad:
-    if not args.adm_pin is None or not args.user_pin:
+    if not args.adm_pin or not args.user_pin:
         error('If pinpad is not use, userpin and admpin must be provided')
 
 
