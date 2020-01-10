@@ -1180,6 +1180,8 @@ In a general manner it is better to also save your keys with ``--backup-keys`` o
 Note that backup and restore works on current slot, so you have to perform a backup per slot
 even if some data are shared. You can precise the slot/backup to restore with ``--slot``
 
+If you encounter an error when performing the backup/restore, reload your scdaemon with 
+``gpgconf --reload scdaemon``
 
 
 Backup and Restore example
@@ -1198,12 +1200,13 @@ backup command without private keys:
 
 full restore command:
   
- | ``python3 -m gpgcard.gpgcli --backup --pinpad --file my_bck_file_name.pickle``
+ | ``python3 -m gpgcard.gpgcli --restore --pinpad --file my_bck_file_name.pickle``
 
 
 full restore command with seed key generation:
   
- | ``python3 -m gpgcard.gpgcli --backup --pinpad --seed --file my_bck_file_name.pickle``
+ | ``python3 -m gpgcard.gpgcli --restore --pinpad --seed-key --file my_bck_file_name.pickle``
+
 
 Restore without backup
 ~~~~~~~~~~~~~~~~~~~~~~
