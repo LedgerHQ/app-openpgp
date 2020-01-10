@@ -76,7 +76,7 @@ From Binary
 
 Use the "Ledger Manager" Chrome App. See https://www.ledgerwallet.com/apps/manager for details.
 
-As the "OpenPGP card" application is not fully compliant with UI and documentation guidelines, the application is in developer section: click on "Show delevopers items" on the bottom right corner to see it.
+As the "OpenPGP card" application is not fully compliant with UI and documentation guidelines, the application is in developer section: click on "Show developers items" on the bottom right corner to see it.
 
    - Launch the Ledger Manager. See `Ledger Manager <https://www.ledgerwallet.com/apps/manager>`_  
      and  ` <https://ledger.groovehq.com/knowledge_base/topics/ledger-manager>`_ 
@@ -86,7 +86,7 @@ As the "OpenPGP card" application is not fully compliant with UI and documentati
    - Click on *show developer items* on the bottom right corner;
    - Click on the green bottom arrow icon near the Ledger *Open PGP* logo;
    - Confirm the installation when required on your device by pressing the 
-     right button above the checkmark;
+     right button above the check mark;
    - Quit the Ledger Manager
 
 
@@ -241,24 +241,68 @@ A key template is defined by the OpenGPG card application specification. It
 describes the key to be generated with the ``generate`` command in 
 ``gpg --card-edit``
 
-The problem is there is no way with the ``gpg --card-edit`` command line 
-to easily set up the desired template, except for Ed25519. 
-
-To set up a new ECC template you have tow choice: the NanoS menu or the
-gpg-connect-agent tools.
+To set up a new ECC template you have three choices: the NanoS menu, the
+``gpg-connect-agent`` tool and last, the ``gpg --edit-card`` interactive setup.
 
 
+**gpg --card-edit** (recommended)
 
-**gpg-connect-agent** (recommended) 
+This method suppose you have a recent GnuPG tool and that you correctly configured it.
+See the dedicated section for that.
+
+In a terminal launch :
+
+ | ``$ gpg --card-edit``
+ | ``gpg/card> admin``
+ | ``Admin commands are allowed``
+ | ````
+ | ``gpg/card> set-key``
+ | ``Changing card key attribute for: Signature key``
+ | ``Please select what kind of key you want:``
+ |    ``(1) RSA``
+ |    ``(2) ECC``
+ | ``Your selection? 2``
+ | ``Please select which elliptic curve you want:``
+ |    ``(1) Curve 25519``
+ |    ``(4) NIST P-384``
+ | ``Your selection? 1``
+ | ``The card will now be re-configured to generate a key of type: ed25519``
+ | ``Note: There is no guarantee that the card supports the requested size.``
+ |       ``If the key generation does not succeed, please check the``
+ |       ``documentation of your card to see what sizes are allowed.``
+ | ``Changing card key attribute for: Encryption key``
+ | ``Please select what kind of key you want:``
+ |    ``(1) RSA``
+ |    ``(2) ECC``
+ | ``Your selection? 2``
+ | ``Please select which elliptic curve you want:``
+ |    ``(1) Curve 25519``
+ |    ``(4) NIST P-384``
+ | ``Your selection? 1``
+ | ``The card will now be re-configured to generate a key of type: cv25519``
+ | ``Changing card key attribute for: Authentication key``
+ | ``Please select what kind of key you want:``
+ |    ``(1) RSA``
+ |    ``(2) ECC``
+ | ``Your selection? 2``
+ | ``Please select which elliptic curve you want:``
+ |    ``(1) Curve 25519``
+ |    ``(4) NIST P-384``
+ | ``Your selection? 1``
+ | ``The card will now be re-configured to generate a key of type: ed25519``
+
+To show the current template use the  ``gpg --card-status`` command.
+
+**gpg-connect-agent**
 
 This method suppose you have correctly configured your GnuPG tool. 
 See the dedicated section for that.
 
 In a terminal launch : 
 
-     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 1 <tag> <curvename>" /bye
-     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 2 18    <curvename>" /bye
-     gpg-connect-agent "SCD SETATTR KEY-ATTR --force 3 <tag> <curvename>" /bye
+ | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 1 <tag> <curvename>" /bye``
+ | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 2 18    <curvename>" /bye``
+ | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 3 <tag> <curvename>" /bye``
 
 This 3 commands fix, in that order, the template for Signature, Decryption, Authentication keys.
 
@@ -330,7 +374,7 @@ The PIN is entered on the external computer.
 
 The PIN is entered on the Nano S or Blue screen. For  entering the PIN choose the
 next digit by using the left or right button. When the digit you expect is displayed
-select it by pressing both buttons ar the same time
+select it by pressing both buttons at the same time
 
 .. image:: pin_entry.png
     :align: middle
@@ -349,7 +393,7 @@ If you want to change the previous digit select the **'C'** (Cancel) letter.
     :align: middle
   
 
-Finnaly if you want to abort the PIN entry, select the **'A'** (Abort) letter.
+Finally if you want to abort the PIN entry, select the **'A'** (Abort) letter.
 
 .. image:: pin_abort.png
     :align: middle
@@ -805,7 +849,7 @@ moved.
  | ``     created: 2017-04-26  expires: never       usage: E   ``
  | ``[ultimate] (1). RSA 4096``
 
-**Say goobye with saving!**
+**Say goodbye with saving!**
 
  | ``gpg> `` *save*
 
@@ -854,7 +898,7 @@ There are two solutions for that, either generate one on the device
 or add an authentication sub-key to your existing master gpg key.
 
 Once done, it is necessary to configure ssh to point to the right key and
-delegate the authentication to *gpg-ssg-agent* instead of *ssh-agent*.
+delegate the authentication to *gpg-ssh-agent* instead of *ssh-agent*.
 
 
 Generate new key on device
@@ -1071,7 +1115,7 @@ Export your authentication key, identifier by its fingerprint, in a SSH complian
  | ``5FwZwkuogygaJdN/44MayHFmOZmzx9CAgYgLpTzen35+CcyhlqCqi+HjNlnHL2DDWd4iR``
  | ``d3Y6pY8LjS3xQkECc3Bhedptp17D+H9AVJt openpgp:0x2F68F035``
  
-Finaly copy the above export (``ssh-rsa AAAAB...Jt openpgp:0x2F68F035``) into the 
+Finally copy the above export (``ssh-rsa AAAAB...Jt openpgp:0x2F68F035``) into the 
 ~/.ssh/authorized_keys file on your remote server.
 
 
@@ -1272,7 +1316,7 @@ Add the following option to ~/.gnupg/gpg-agent.conf
  | ``debug-level guru``
  | ``log-file /tmp/gpgagent.log``
 
-Add the follwing option to ~/.gnupg/scdaemon.conf
+Add the following option to ~/.gnupg/scdaemon.conf
  
  | ``log-file /tmp/scd.log``
  | ``debug-level guru``
@@ -1282,6 +1326,101 @@ Make a nice issue report under github providing log and and command line you run
 
 **!*WARNING*!** : this may reveal confidential information such as key values. Do your log with a test key.
 
+ | ````
+
+**Q:** I'm having issue when using SSH, there is no pinpad prompt either on my host nor my Nano
+(``sign_and_send_pubkey: signing failed: agent refused operation``)
+
+**R:** You might need to add this command to your .bashrc/.zshrc :
+
+ | ``gpg-connect-agent updatestartuptty /bye >/dev/null``
+
+Be aware that when using **Host** PIN mode, you will have to enter your PIN directly on your
+computer and if you use a ncurses-like PIN entry program. In some cases, you will be prompted
+to the first shell that uses the above command (at least on Mac).
+
+ | ````
+
+**Q:** My mac is not able to see my ``Ledger Token``
+
+**R:** For some reason, SC communication on Mac takes some times or mess it up sometimes.
+
+To troubleshot those issues, you can try to reload the ``scdaemon`` using this command :
+
+ | ``gpgconf --reload scdaemon``
+ | ``gpgconf --reload gpg-agent``
+
+If not successful, you can try to trigger daemons to restart by sending a **SIGTERM** like so :
+
+ | ``kill -TERM $(pgrep gpg-agent) $(pgrep scdaemon)``.
+
+Changing USB port might also help sometimes. Do not hesitate.
+
+ | ````
+
+**Q:** My mac is **STILL* not able to see my ``Ledger Token``
+
+**R:** This might be related to your CCID drivers. Mojave comes with the version ``1.4.27``
+pre-installed. You can manually install a more recent version from this
+`website<https://ccid.apdu.fr/files/>` and install it this way :
+
+ | ``CCID_VERSION=1.4.30``
+ | ``wget https://ccid.apdu.fr/files/ccid-${CCID_VERSION}.tar.bz2``
+ | ``tar xzvf ccid-${CCID_VERSION}.tar.bz2``
+ | ``cd ccid-${CCID_VERSION}``
+ | ``./MacOSX/configure``
+ | ``make``
+ | ``make install``
+
+Installing the driver depends on ``libusb`` which can be installed using the following
+``brew install libusb``. It also requires static linking against it, if you use
+dynamic linking you will have the following output when using the ``./MacOSX/configure`` step :
+
+ | ``/usr/local/Cellar/libusb/1.0.23/lib/libusb-1.0.0.dylib``
+ | ``/usr/local/Cellar/libusb/1.0.23/lib/libusb-1.0.dylib``
+ | ``*****************************``
+ | ``Dynamic library libusb found in /usr/local/Cellar/libusb/1.0.23/lib``
+ | ``*****************************``
+ | ``Rename it to force a static link``
+
+You can use the following :
+
+ | ``LIBUSB_VERSION=1.0.23``
+ | ````
+ | ``for f in /usr/local/Cellar/libusb/${LIBUSB_VERSION}/lib/*.dylib; do``
+ |     ``mv $f $f.fake``
+ | ``done``
+ | ````
+ | ``./MacOSX/configure``
+ | ````
+ | ``for f in /usr/local/Cellar/libusb/${LIBUSB_VERSION}/lib/*.dylib.fake; do``
+ |     ``ORIG="$( echo $f | sed 's#.fake##g' )"``
+ |     ``mv $f ${ORIG}``
+ | ``done``
+
+Once installed, you should see the new driver installed using this command ```` :
+
+ | ``SmartCards:``
+ | ````
+ |     ``Readers:``
+ | ````
+ |     ``Reader Drivers:``
+ | ````
+ |       ``#01: org.debian.alioth.pcsclite.smartcardccid:1.4.27``
+ |         ``(/usr/libexec/SmartCardServices/drivers/ifd-ccid.bundle)``
+ |       ``#02: org.debian.alioth.pcsclite.smartcardccid:1.4.30``
+ |         ``(/usr/local/libexec/SmartCardServices/drivers/ifd-ccid.bundle)``
+ | ````
+ |     ``Tokend Drivers:``
+ | ````
+ |     ``SmartCard Drivers:``
+ | ````
+ |       ``#01: com.apple.CryptoTokenKit.pivtoken:1.0``
+ |         ``(/System/Library/Frameworks/CryptoTokenKit.framework/PlugIns/pivtoken.appex)``
+ | ````
+ |     ``Available SmartCards (keychain):``
+ | ````
+ |     ``Available SmartCards (token):``
 
 Annexes
 =======
