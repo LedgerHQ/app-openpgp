@@ -129,7 +129,7 @@ try:
         gpgcard.set_template(templates[sig],templates[dec],templates[aut])
         print("OK", flush=True)
         
-    if (args.seed_key):
+    if args.seed_key:
         print("Seed Key...", end='', flush=True)
         gpgcard.seed_key();
         print("OK", flush=True)        
@@ -137,9 +137,12 @@ try:
     if args.set_fingerprints:
         print("Set fingerprints...", end='', flush=True)
         sig,dec,aut = args.set_fingerprints.split(":")
-        gpgcard.set_key_fingerprints("sig", sig)
-        gpgcard.set_key_fingerprints("dec", dec)
-        gpgcard.set_key_fingerprints("aut", aut)
+        if sig:
+            gpgcard.set_key_fingerprints("sig", sig)
+        if dec:
+            gpgcard.set_key_fingerprints("dec", dec)
+        if aut:
+            gpgcard.set_key_fingerprints("aut", aut)
         print("OK", flush=True)
 
     if args.set_serial:

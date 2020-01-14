@@ -103,21 +103,29 @@ Refer to the SDK documentation for the compiling/loading...
 System Configuration
 --------------------
 
-For Linux and MAC, until version 1.4.27, Ledger CCID interface is not supported 
-by default by pcscd and must be manually added 
+You need to install CCID.
+For Linux and MAC, the Ledger NanoS CCID interface is not supported
+by default by pcscd and must be manually added for CCID versions earlier than 1.4.28.
+The support of the NanoX is expected to be released as part of the upcoming version 1.4.32.
 
-For windows....
+For Windows....
 
 Linux
 ~~~~~
 
-You have to have to add the NanoS to /etc/libccid_Info.plist
+If you are using an old version of CCID, you have to have to add the NanoS to /etc/libccid_Info.plist
 
    - In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
    - In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
    - In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
   
 These 3 entries must be added at the end of each list.
+
+For the NanoX :
+
+   - In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
+   - In  <key>ifdProductID</key>     add the entry  <string>0x0004</string>
+   - In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
 
 MAC
 ~~~
@@ -241,8 +249,8 @@ A key template is defined by the OpenGPG card application specification. It
 describes the key to be generated with the ``generate`` command in 
 ``gpg --card-edit``
 
-To set up a new ECC template you have three choices: the NanoS menu, the
-``gpg-connect-agent`` tool and last, the ``gpg --edit-card`` interactive setup.
+To set up a new ECC template you have three choices: the ``gpg --edit-card``
+interactive setup, the ``gpg-connect-agent`` tool and the NanoS menu.
 
 
 **gpg --card-edit** (recommended)
@@ -256,7 +264,7 @@ In a terminal launch :
  | ``gpg/card> admin``
  | ``Admin commands are allowed``
  | ````
- | ``gpg/card> set-key``
+ | ``gpg/card> key-attr``
  | ``Changing card key attribute for: Signature key``
  | ``Please select what kind of key you want:``
  |    ``(1) RSA``
@@ -1279,7 +1287,9 @@ in the the following order ``SC:E:A`` :
 ``2C688345BDDA0EDFB24DB4FB8451AAF7D43D1095:DF157BD4AC3BD1EE991099C80953D871FC4B9EA4:
 CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB``.
 
+If you only have one key to restore you can omit the others, for example to only restore the authentication key :
 
+``::CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB``
 
 
 **Step 1: restore**
@@ -1290,7 +1300,7 @@ Finally run the following command :
 
  | ``python3 -m gpgcard.gpgcli --pinpad  --set-template ed255519:cv25519:ed255519 --set-fingerprints ``
  | ``  '2C688345BDDA0EDFB24DB4FB8451AAF7D43D1095:DF157BD4AC3BD1EE991099C80953D871FC4B9EA4:CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB'``
- | ``  --set-serial 'FD6C11BE' --seed ``
+ | ``  --set-serial 'FD6C11BE' --seed-key ``
 
 
 
