@@ -24,7 +24,8 @@ unsigned int   gpg_curve2domainlen(unsigned int cv);
 
 void gpg_init(void);
 void gpg_init_ux(void);
-int  gpg_install(unsigned char app_state);
+void gpg_install(unsigned char app_state);
+void gpg_install_slot(gpg_key_slot_t *slot);
 int  gpg_dispatch(void);
 
 int gpg_apdu_select_data(unsigned int ref, int reccord);

@@ -1,11 +1,11 @@
 # Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
-# 
+#
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
-# 
+#
 #      http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -171,7 +171,7 @@ class GPGCard() :
             data = [x for x in data]
         apdu = [x for x in apdu]
         #send
-        if data: 
+        if data:
             while len(data) > 0xFE:
                 apdux = apdu[0:5]+[0xfe]+data[0:0xFE]
                 apdux[0] |= 0x10
@@ -187,7 +187,7 @@ class GPGCard() :
         resp, sw1, sw2 = self.connection.transmit(apdu)
         sw = (sw1<<8)|sw2
         self.alog('recv', resp, sw)
-    
+
         #receive
         while sw1==0x61:
             apdu = binascii.unhexlify(b"00c00000%.02x"%sw2)
@@ -221,6 +221,10 @@ class GPGCard() :
 
     def terminate(self):
         apdu = binascii.unhexlify(b"00E60000")
+        return self.exchange(apdu)
+
+    def get_log(self):
+        apdu = binascii.unhexlify(b"00040000")
         return self.exchange(apdu)
 
     def get_data(self,tag):
@@ -330,11 +334,11 @@ class GPGCard() :
             self.dec_key,sw              = self.get_data(0x00B8)
             self.aut_key,sw              = self.get_data(0x00A4)
 
-      
+
         return True
 
     def set_all(self):
-        
+
         self.put_data(0x4f,    self.AID[10:14])
         self.put_data(0x0101,  self.private_01)
         self.put_data(0x0102,  self.private_02)
@@ -413,7 +417,7 @@ class GPGCard() :
          self.sig_date, self.dec_date, self.aut_date,
          self.cardholder_cert,
          self.UIF_SIG, self.UIF_DEC, self.UIF_AUT,
-         self.sig_key, self.dec_key, self.aut_key) = pickle.load(f)      
+         self.sig_key, self.dec_key, self.aut_key) = pickle.load(f)
         self.set_all()
         return True
 
@@ -424,7 +428,7 @@ class GPGCard() :
         self.exchange(apdu)
         apdu = binascii.unhexlify(b"0047800102A400")
         self.exchange(apdu)
-    
+
 
     def decode_AID(self):
         return  {
@@ -556,7 +560,7 @@ class GPGCard() :
     #USER Info
     def set_serial(self, ser):
         ser=binascii.unhexlify(ser)
-        
+
         self.AID = self.AID[0:10]+ser
         self.put_data(0x4f,    self.AID[10:14])
 

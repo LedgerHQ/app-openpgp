@@ -96,44 +96,21 @@ unsigned int ui_uifconfirm_prepro(const bagl_element_t *element);
 
 const bagl_element_t ui_uifconfirm_nanos[] = {
     // type             userid    x    y    w    h    str   rad  fill              fg        bg     font_id icon_id
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0},
+     NULL},
 
     {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_CROSS},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
      NULL},
 
     {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_CHECK},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
      NULL},
 
     {{BAGL_LABELINE, 0x01, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu},
     {{BAGL_LABELINE, 0x02, 0, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu},
 };
 
 void ui_menu_uifconfirm_display(unsigned int value) {
@@ -218,44 +195,21 @@ unsigned int ui_uifconfirm_nanos_button(unsigned int button_mask, unsigned int b
 
 const bagl_element_t ui_pinconfirm_nanos[] = {
     // type             userid    x    y    w    h    str   rad  fill              fg        bg     font_id icon_id
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0},
+     NULL},
 
     {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_CROSS},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
      NULL},
 
     {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_CHECK},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
      NULL},
 
     {{BAGL_LABELINE, 0x01, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu},
     {{BAGL_LABELINE, 0x02, 0, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu},
 };
 
 void ui_menu_pinconfirm_display(unsigned int value) {
@@ -308,44 +262,21 @@ unsigned int ui_pinconfirm_nanos_button(unsigned int button_mask, unsigned int b
 
 const bagl_element_t ui_pinentry_nanos[] = {
     // type             userid    x    y    w    h    str   rad  fill              fg        bg     font_id icon_id
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 32, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0},
+     NULL},
 
     {{BAGL_ICON, 0x00, 3, 12, 7, 7, 0, 0, 0, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_DOWN},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
      NULL},
 
     {{BAGL_ICON, 0x00, 117, 13, 8, 6, 0, 0, 0, 0xFFFFFF, 0x000000, 0, BAGL_GLYPH_ICON_UP},
-     NULL,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
      NULL},
 
     {{BAGL_LABELINE, 0x01, 0, 12, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu},
     {{BAGL_LABELINE, 0x02, 0, 26, 128, 32, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_REGULAR_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu},
 };
 
 static const char C_pin_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '<', 'A', 'V'};
@@ -941,13 +872,29 @@ void ui_menu_reset_action(unsigned int value) {
   ui_CCID_reset();
   ui_menu_main_display(0);
 }
+
+/* ------------------------------ RESET KEY SLOT ----------------------------- */
+void ui_menu_reset_slot_action(unsigned int value);
+
+const ux_menu_entry_t ui_menu_reset_slot[] = {{NULL, NULL, 0, NULL, "Really Reset ?", NULL, 0, 0},
+                                         {NULL, ui_menu_main_display, 0, &C_badge_back, "No", NULL, 61, 40},
+                                         {NULL, ui_menu_reset_slot_action, 0, NULL, "Yes", NULL, 0, 0},
+                                         UX_MENU_END};
+
+void ui_menu_reset_slot_action(unsigned int value) {
+  gpg_install_slot(G_gpg_vstate.kslot);
+  ui_menu_main_display(0);
+}
+
+
 /* ------------------------------- SETTINGS UX ------------------------------- */
 
 const ux_menu_entry_t ui_menu_settings[] = {{NULL, ui_menu_template_display, 0, NULL, "Key template", NULL, 0, 0},
                                             {NULL, ui_menu_seed_display, 0, NULL, "Seed mode", NULL, 0, 0},
                                             {NULL, ui_menu_pinmode_display, 0, NULL, "PIN mode", NULL, 0, 0},
                                             {NULL, ui_menu_uifmode_display, 0, NULL, "UIF mode", NULL, 0, 0},
-                                            {ui_menu_reset, NULL, 0, NULL, "Reset", NULL, 0, 0},
+                                            {ui_menu_reset, NULL, 0, NULL, "Reset App", NULL, 0, 0},
+                                            {ui_menu_reset_slot, NULL, 0, NULL, "Reset Slot", NULL, 0, 0},
                                             {NULL, ui_menu_main_display, 2, &C_badge_back, "Back", NULL, 61, 40},
                                             UX_MENU_END};
 
@@ -1030,7 +977,7 @@ const ux_menu_entry_t ui_menu_main[] = {{NULL, NULL, 0, NULL, "", "", 0, 0},
 #endif
                                         {ui_menu_settings, NULL, 0, NULL, "Settings", NULL, 0, 0},
                                         {ui_menu_info, NULL, 0, NULL, "About", NULL, 0, 0},
-                                        {NULL, os_sched_exit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
+                                        {NULL, (void*)os_sched_exit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
                                         UX_MENU_END};
 extern const uint8_t  N_USBD_CfgDesc[];
 const bagl_element_t *ui_menu_main_preprocessor(const ux_menu_entry_t *entry, bagl_element_t *element) {

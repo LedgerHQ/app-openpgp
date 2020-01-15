@@ -980,6 +980,25 @@ void ui_menu_reset_action(unsigned int value) {
   ui_menu_main_display(0);
 }
 
+/* ------------------------------ RESET SLOT UX ------------------------------ */
+
+void ui_menu_reset_slot_action(unsigned int value);
+
+UX_STEP_CB(ux_menu_reset_slot_1_step, bnn, ui_menu_settings_display(4), {"Ooops, NO!", "Do not reset", "the key slot"});
+
+UX_STEP_CB(ux_menu_reset_slot_2_step, bn, ui_menu_reset_slot_action(0), {"YES!", "Reset the slot"});
+
+UX_FLOW(ux_flow_reset_slot, &ux_menu_reset_slot_1_step, &ux_menu_reset_slot_2_step);
+
+void ui_menu_reset_slot_display(unsigned int value) {
+  ux_flow_init(value, ux_flow_reset_slot, NULL);
+}
+
+void ui_menu_reset_slot_action(unsigned int value) {
+  gpg_install_slot(G_gpg_vstate.kslot);
+  ui_menu_main_display(0);
+}
+
 /* ------------------------------- SETTINGS UX ------------------------------- */
 
 const char *const settings_getter_values[] = {"Key template", "Seed mode", "PIN mode", "UIF mode", "Reset", "Back"};

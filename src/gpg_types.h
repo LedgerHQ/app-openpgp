@@ -207,7 +207,6 @@ struct gpg_v_state_s {
   unsigned short io_mark;
   union {
     unsigned char io_buffer[GPG_IO_BUFFER_LENGTH];
-
     struct {
       union {
         cx_rsa_public_key_t public;
@@ -279,6 +278,9 @@ struct gpg_v_state_s {
   char ux_buff5[32];
 #endif
 
+    #ifdef GPG_LOG
+    unsigned char log_buffer[32];
+    #endif
 #ifdef GPG_DEBUG
   unsigned char print;
 #endif
@@ -316,6 +318,9 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 
 /* ---  INS  --- */
 #define INS_EXIT 0x02
+#ifdef GPG_LOG
+#define INS_GET_LOG 0x04
+#endif
 
 #define INS_SELECT 0xa4
 #define INS_TERMINATE_DF 0xe6

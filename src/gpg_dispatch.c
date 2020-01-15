@@ -30,6 +30,11 @@ void gpg_check_access_ins() {
       return;
     }
     break;
+  #ifdef GPG_LOG
+  #warning GPG_LOG activated
+  case INS_GET_LOG:
+    return;
+  #endif
 
   case INS_SELECT:
     return;
@@ -256,6 +261,13 @@ int gpg_dispatch() {
   tag = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2;
 
   switch (G_gpg_vstate.io_ins) {
+  #ifdef GPG_LOG
+  case INS_GET_LOG:
+    gpg_io_discard(1);
+    gpg_io_insert(G_gpg_vstate.log_buffer, 32);
+    return SW_OK;
+  #endif
+
     /* --- SELECT --- */
   case INS_SELECT:
     sw = gpg_apdu_select();

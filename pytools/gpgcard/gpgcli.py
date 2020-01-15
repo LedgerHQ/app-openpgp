@@ -1,11 +1,11 @@
 # Copyright 2018 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
-# 
+#
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
-# 
+#
 #      http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,17 +21,17 @@ from .gpgcard import GPGCard
 
 def get_argparser():
         parser = argparse.ArgumentParser(epilog="""
-reset, backup, restore are always executed in THIS order. 
+reset, backup, restore are always executed in THIS order.
 
 Template identifiers are ed2559, cv25519, rsa2048, rsa3072, rsa4096.
  """
 )
         parser.add_argument('--adm-pin',          metavar='PIN',         help='Administrative PIN, if pinpad not used')
-        parser.add_argument('--backup',                                  help='Perfom a full backup except the key',              action='store_true')                           
-        parser.add_argument('--backup-keys',                             help='Perfom keys encrypted backup',                     action='store_true')                           
+        parser.add_argument('--backup',                                  help='Perfom a full backup except the key',              action='store_true')
+        parser.add_argument('--backup-keys',                             help='Perfom keys encrypted backup',                     action='store_true')
         parser.add_argument('--file',                                    help='basckup/restore file',                             type=str, default='gpg_backup')
         parser.add_argument('--pinpad',                                  help='PIN validation will be deledated to pinpad',       action='store_true')
-        parser.add_argument('--reader',                                  help='PCSC reader',                                      type=str, default='pcsc:Ledger') 
+        parser.add_argument('--reader',                                  help='PCSC reader',                                      type=str, default='pcsc:Ledger')
         parser.add_argument('--reset',                                   help='Reset the application. All data are erased',       action='store_true')
         parser.add_argument('--restore',                                 help='Perfom a full restore except the key',             action='store_true')
         parser.add_argument('--set-serial',       metavar='SERIAL',      help='set the four serial bytes')
@@ -49,7 +49,7 @@ def banner():
 GPG Ledger Admin Tool v0.1.
 Copyright 2018 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
 
-""" 
+"""
     )
 
 
@@ -95,7 +95,7 @@ try:
 
     if args.reset:
         print("Reset application...", end='', flush=True)
-        gpgcard.terminate() 
+        gpgcard.terminate()
         gpgcard.activate()
         print("OK")
 
@@ -128,11 +128,11 @@ try:
         sig,dec,aut = args.set_templates.split(":")
         gpgcard.set_template(templates[sig],templates[dec],templates[aut])
         print("OK", flush=True)
-        
+
     if args.seed_key:
         print("Seed Key...", end='', flush=True)
         gpgcard.seed_key();
-        print("OK", flush=True)        
+        print("OK", flush=True)
 
     if args.set_fingerprints:
         print("Set fingerprints...", end='', flush=True)

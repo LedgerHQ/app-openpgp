@@ -252,7 +252,7 @@ const unsigned char C_default_AlgoAttr_dec[] = {
 // Default template: NIST P256 132A8648CE3D030107 / 122A8648CE3D030107
 #if 0
 const unsigned char C_default_AlgoAttr_sig[]   = {
-  // ecdsa 
+  // ecdsa
   0x13,
   // NIST-P256
   0x2A,0x86,0x48,0xCE,0x3D,0x03,0x01,0x07
@@ -268,7 +268,7 @@ const unsigned char C_default_AlgoAttr_dec[]   = {
 // Default template: Ed/Cv-25519 162B06010401DA470F01 / 122B060104019755010501
 #if 0
 const unsigned char C_default_AlgoAttr_sig[]   = {
-  // eddsa 
+  // eddsa
   0x16,
   // ed25519
   0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01,
@@ -323,9 +323,34 @@ void gpg_init_ux() {
 /* ----------------------------------------------------------------------- */
 /* ---  Install/ReInstall GPGapp                                       --- */
 /* ----------------------------------------------------------------------- */
-int gpg_install(unsigned char app_state) {
-  gpg_pin_t    pin;
+void gpg_install_slot(gpg_key_slot_t *slot) {
+  unsigned char tmp[4];
   unsigned int l;
+
+  gpg_nvm_write(slot, 0, sizeof(gpg_key_slot_t));
+
+  cx_rng(tmp, 4);
+  gpg_nvm_write((void *)(slot->serial), tmp, 4);
+
+  l      = sizeof(C_default_AlgoAttr_sig);
+  gpg_nvm_write((void *)(&slot->sig.attributes.value), (void *)C_default_AlgoAttr_sig, l);
+  gpg_nvm_write((void *)(&slot->sig.attributes.length), &l, sizeof(unsigned int));
+  gpg_nvm_write((void *)(&slot->aut.attributes.value), (void *)C_default_AlgoAttr_sig, l);
+  gpg_nvm_write((void *)(&slot->aut.attributes.length), &l, sizeof(unsigned int));
+
+  l = sizeof(C_default_AlgoAttr_dec);
+  gpg_nvm_write((void *)(&slot->dec.attributes.value), (void *)C_default_AlgoAttr_dec, l);
+  gpg_nvm_write((void *)(&slot->dec.attributes.length), &l, sizeof(unsigned int));
+
+  tmp[0] = 0x00;
+  tmp[1] = 0x20;
+  gpg_nvm_write((void *)(&slot->sig.UIF), &tmp, 2);
+  gpg_nvm_write((void *)(&slot->dec.UIF), &tmp, 2);
+  gpg_nvm_write((void *)(&slot->aut.UIF), &tmp, 2);
+}
+
+void gpg_install(unsigned char app_state) {
+  gpg_pin_t    pin;
 
   // full reset data
   gpg_nvm_write((void *)(N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
@@ -339,11 +364,6 @@ int gpg_install(unsigned char app_state) {
   os_memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));
   gpg_nvm_write((void *)(N_gpg_pstate->AID), &G_gpg_vstate.work.io_buffer, sizeof(C_default_AID));
 
-  // Serial
-  cx_rng(G_gpg_vstate.work.io_buffer, 4 * GPG_KEYS_SLOTS);
-  for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
-    gpg_nvm_write((void *)(N_gpg_pstate->keys[s].serial), G_gpg_vstate.work.io_buffer + 4 * s, 4);
-  }
 
   if (app_state == STATE_ACTIVATE) {
     // default sex: none
@@ -390,25 +410,10 @@ int gpg_install(unsigned char app_state) {
     USBD_CCID_activate_pinpad(3);
 
     // default key template: RSA 2048)
-
     for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
-      unsigned char uif[2];
-      uif[0] = 0x00;
-      uif[1] = 0x20;
-      l      = sizeof(C_default_AlgoAttr_sig);
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].sig.attributes.value), (void *)C_default_AlgoAttr_sig, l);
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].sig.attributes.length), &l, sizeof(unsigned int));
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].aut.attributes.value), (void *)C_default_AlgoAttr_sig, l);
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].aut.attributes.length), &l, sizeof(unsigned int));
-      l = sizeof(C_default_AlgoAttr_dec);
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].dec.attributes.value), (void *)C_default_AlgoAttr_dec, l);
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].dec.attributes.length), &l, sizeof(unsigned int));
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].sig.UIF), &uif, 2);
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].dec.UIF), &uif, 2);
-      gpg_nvm_write((void *)(&N_gpg_pstate->keys[s].aut.UIF), &uif, 2);
+      gpg_install_slot(&N_gpg_pstate->keys[s]);
     }
   }
-  return 0;
 }
 
 #define USBD_OFFSET_CfgDesc_bPINSupport (sizeof(USBD_CfgDesc) - 16)
