@@ -371,7 +371,7 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
       }
     }
     // cancel digit
-    else if (digit == 'C') {
+    else if (digit == '<') {
       if (offset > 1) {
         offset--;
         G_gpg_vstate.ux_pinentry[0] = offset;
@@ -399,7 +399,7 @@ static unsigned int validate_pin() {
   unsigned int offset, len, sw;
   gpg_pin_t *  pin;
 
-  for (offset = 1; offset < G_gpg_vstate.ux_pinentry[0]; offset++) {
+  for (offset = 1; offset <= G_gpg_vstate.ux_pinentry[0]; offset++) {
     G_gpg_vstate.menu[offset] = C_pin_digit[G_gpg_vstate.ux_pinentry[offset]];
   }
 
