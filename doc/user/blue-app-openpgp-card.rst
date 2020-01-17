@@ -46,7 +46,7 @@ Introduction
 
 GnuPG application for Ledger Blue and Nano S
 
-This application implements "The OpenPGP card" specification revision 3.3. This specification is available in doc directory and at https://g10code.com/p-card.html .
+This application implements "The OpenPGP card" specification revision 3.1. This specification is available in doc directory and at https://g10code.com/p-card.html .
 
 The application supports:
 
