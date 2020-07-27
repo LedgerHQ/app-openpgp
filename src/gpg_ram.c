@@ -36,3 +36,7 @@ int                  apdu_n;
 #endif
 
 gpg_v_state_t G_gpg_vstate;
+
+#ifdef HAVE_RSA
+union cx_u G_cx;
+#endif // HAVE_RSA

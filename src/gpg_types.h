@@ -17,9 +17,7 @@
 #define GPG_TYPES_H
 
 #include "os_io_seproxyhal.h"
-#ifdef TARGET_NANOX
 #include "ux.h"
-#endif
 
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
