@@ -18,6 +18,7 @@
 
 #include "os.h"
 #include "cx.h"
+#include "ux.h"
 #include "os_io_seproxyhal.h"
 #include "gpg_types.h"
 #include "gpg_api.h"
@@ -46,4 +47,9 @@ extern int apdu_n;
 #endif
 
 extern ux_state_t ux;
+
+#ifdef HAVE_RSA
+#include "cx_ram.h"
+extern union cx_u G_cx;
+#endif // HAVE_RSA
 #endif

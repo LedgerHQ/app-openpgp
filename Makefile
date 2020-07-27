@@ -114,6 +114,14 @@ DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
 DEFINES   += HAVE_USB_CLASS_CCID
 
+# RSA addition.
+DEFINES       += HAVE_RSA
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
+SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_rsa.c
+SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_pkcs1.c
+SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_utils.c
+# RSA - End
+
 
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 # DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
@@ -214,8 +222,8 @@ delete:
 
 
 # import generic rules from the user and SDK
--include Makefile.rules
-#include $(BOLOS_SDK)/Makefile.rules
+#-include Makefile.rules
+include $(BOLOS_SDK)/Makefile.rules
 
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
