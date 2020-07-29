@@ -114,6 +114,11 @@ DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
 DEFINES   += HAVE_USB_CLASS_CCID
 
+ifeq ($(NO_CXNG),)
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/include
+SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src
+endif
+
 # RSA addition.
 DEFINES       += HAVE_RSA
 INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
@@ -222,8 +227,8 @@ delete:
 
 
 # import generic rules from the user and SDK
-#-include Makefile.rules
-include $(BOLOS_SDK)/Makefile.rules
+-include Makefile.rules
+#include $(BOLOS_SDK)/Makefile.rules
 
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile

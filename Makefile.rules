@@ -24,9 +24,9 @@ endif
 
 #Make the SDK modified SDK sources prioritar to the original ones
 
-SOURCE_PATH   += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) | grep "\.c$$")))) $(BOLOS_SDK)/src $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) | grep "\.c$$"))) 
-SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) | grep "\.c$$") ) $(GLYPH_DESTC)
-INCLUDES_PATH := $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) | grep "\.h$$")))) $(dir $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) | grep "\.h$$")))) include $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm 
+SOURCE_PATH   += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) -name '*.c' -or -name '*.s')))) $(BOLOS_SDK)/src $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) -name '*.c' -or -name '*.s')))
+SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) -name '*.c' -or -name '*.s') ) $(GLYPH_DESTC)
+INCLUDES_PATH += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) | grep "\.h$$")))) $(dir $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) | grep "\.h$$")))) include $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm
 
 VPATH := $(dir $(SOURCE_FILES))
 OBJECT_FILES := $(sort $(addprefix obj/, $(addsuffix .o, $(basename $(notdir $(SOURCE_FILES))))))
