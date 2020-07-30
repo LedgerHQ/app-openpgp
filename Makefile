@@ -116,7 +116,6 @@ DEFINES   += HAVE_USB_CLASS_CCID
 
 ifeq ($(NO_CXNG),)
 INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/include
-SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src
 endif
 
 # RSA addition.
