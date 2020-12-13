@@ -27,7 +27,7 @@ int gpg_apdu_get_challenge() {
   } else {
     olen = G_gpg_vstate.io_le;
   }
-  if (olen > GPG_EXT_CHALLENGE_LENTH) {
+  if (olen == 0 || olen > GPG_EXT_CHALLENGE_LENTH) {
     THROW(SW_WRONG_LENGTH);
     return SW_WRONG_LENGTH;
   }
