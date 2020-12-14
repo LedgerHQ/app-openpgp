@@ -306,6 +306,7 @@ int gpg_io_do(unsigned int io_flags) {
 
   case INS_GET_CHALLENGE:
     if (G_gpg_vstate.io_p1 == 0) {
+      G_gpg_vstate.io_le = G_io_apdu_buffer[4];
       break;
     }
 
