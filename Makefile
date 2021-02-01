@@ -114,6 +114,18 @@ DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
 DEFINES   += HAVE_USB_CLASS_CCID
 
+ifeq ($(NO_CXNG),)
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/include
+endif
+
+# RSA addition.
+DEFINES       += HAVE_RSA
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
+SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_rsa.c
+SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_pkcs1.c
+SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_utils.c
+# RSA - End
+
 
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 # DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
