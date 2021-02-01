@@ -1,0 +1,9 @@
+# Glyphs auto-generated
+src/glyphs.*
+
+# Build files
+dep
+obj
+release
+bin
+debug
