@@ -63,7 +63,7 @@ It was tested with a Ledger Nano X and the CV/ED25519 curves.
 5. (On Ledger) Set Key Templates -> Key: "Decryption" -> Type: "Ed25119" -> Set Template -> OK
 6. (On Computer) Use `GPG` to edit the key with a fixed timestamp:
   ```
-  gpg --faked-system-time 19990101T000000! --card-edit` # note the exclamation mark to keep the time fixed
+  gpg --faked-system-time 19990101T000000! --card-edit # note the exclamation mark to keep the time fixed
   gpg> admin
   gpg> generate
   ... # complete the wizard
