@@ -51,7 +51,25 @@ In this mode key material is generated from the global token seeded.
 
 Please consider SEED mode as experimental.
 
-More details to come... 
+### procedure
+
+The following is a repeatable process that will generate the same keys and fingerprints (even with different card serial numbers).
+It was tested with a Ledger Nano X and the CV/ED25519 curves.
+
+1. (On Ledger) Reset the OpenPGP.XL app.
+2. (On Ledger) Set "Seed mode" to "ON".
+3. (On Ledger) Set Key Templates -> Key: "Authentication" -> Type: "Ed25119" -> Set Template -> OK
+4. (On Ledger) Set Key Templates -> Key: "Signature" -> Type: "Ed25119" -> Set Template -> OK
+5. (On Ledger) Set Key Templates -> Key: "Decryption" -> Type: "Ed25119" -> Set Template -> OK
+6. (On Computer) Use `GPG` to edit the key with a fixed timestamp:
+  ```
+  gpg --faked-system-time 19990101T000000! --card-edit` # note the exclamation mark to keep the time fixed
+  gpg> admin
+  gpg> generate
+  ... # complete the wizard
+  ```
+
+While doing this, ensure that you use the same `--faked-system-time` and "Real Name" and "Email" during the generation wizard to reproduce the same keys each time.
 
 ### On screen reset
 
