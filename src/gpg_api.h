@@ -62,14 +62,6 @@ void       gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_
 int gpg_mse_reset();
 int gpg_apdu_mse();
 
-#ifdef GPG_SHAKE256
-
-void cx_shake256_init(cx_sha3_t *hash, unsigned int out_length);
-void cx_shake256_update(cx_sha3_t *ctx, const uint8_t *data, size_t len);
-int  cx_shake256_final(cx_sha3_t *hash, uint8_t *digest);
-
-#endif
-
 /* ----------------------------------------------------------------------- */
 /* ---                                  IO                            ---- */
 /* ----------------------------------------------------------------------- */
