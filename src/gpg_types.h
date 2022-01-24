@@ -298,7 +298,7 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define ID_DEC 2
 #define ID_SIG 3
 
-#define STATE_ACTIVATE 0x07
+#define STATE_ACTIVATE 0x05
 #define STATE_TERMINATE 0x03
 
 #define IO_OFFSET_END (unsigned int)-1
