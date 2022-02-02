@@ -295,7 +295,7 @@ int gpg_dispatch() {
   }
 
   /* Other commands allowed if not terminated */
-  if (N_gpg_pstate->histo[7] != 0x07) {
+  if (N_gpg_pstate->histo[7] != STATE_ACTIVATE) {
     THROW(SW_STATE_TERMINATED);
   }
 
