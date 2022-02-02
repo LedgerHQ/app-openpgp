@@ -37,10 +37,10 @@ endif
 
 ifeq ($(TARGET_NAME),TARGET_BLUE)
 ICONNAME = images/icon_monero_blue.gif
-else ifeq ($(TARGET_NAME),TARGET_NANOX)
-ICONNAME = images/icon_pgp_nanox.gif
-else
+else ifeq ($(TARGET_NAME),TARGET_NANOS)
 ICONNAME = images/icon_pgp.gif
+else
+ICONNAME = images/icon_pgp_nanox.gif
 endif
 
 APPVERSION_M:=1
@@ -57,14 +57,13 @@ DEFINES   += SPEC_VERSION=$(SPECVERSION)
 DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT)
 #DEFINES   += GPG_LOG
 
-
-ifeq ($(TARGET_NAME),TARGET_NANOX)
+ifeq ($(TARGET_NAME),TARGET_BLUE)
+DEFINES   += UI_BLUE
+else ifeq ($(TARGET_NAME),TARGET_NANOS)
+DEFINES   += UI_NANO_S
+else
 DEFINES   += UI_NANO_X
 DEFINES   += GPG_SHAKE256
-else ifeq ($(TARGET_NAME),TARGET_BLUE)
-DEFINES   += UI_BLUE
-else
-DEFINES   += UI_NANO_S
 endif
 
 
@@ -126,33 +125,32 @@ SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_pkcs1.c
 SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_utils.c
 # RSA - End
 
-
 ifeq ($(TARGET_NAME),TARGET_NANOX)
-# DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
-# DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
+DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
+DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
+endif
 
-DEFINES           += IO_SEPROXYHAL_BUFFER_SIZE_B=300
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=128
+else
+DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=300
 DEFINES       += HAVE_GLO096
 DEFINES       += HAVE_BAGL BAGL_WIDTH=128 BAGL_HEIGHT=64
 DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-DEFINES           += HAVE_UX_FLOW
-DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
-DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
-else
-DEFINES           += IO_SEPROXYHAL_BUFFER_SIZE_B=128
+DEFINES       += HAVE_UX_FLOW
 endif
 
 # Enabling debug PRINTF
 DEBUG = 0
 ifneq ($(DEBUG),0)
 
-        ifeq ($(TARGET_NAME),TARGET_NANOX)
-                DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
-        else
+        ifeq ($(TARGET_NAME),TARGET_NANOS)
                 DEFINES   += HAVE_PRINTF PRINTF=screen_printf
+        else
+                DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
         endif
 	DEFINES += PLINE="PRINTF(\"FILE:%s..LINE:%d\n\",__FILE__,__LINE__)"
 else
@@ -197,9 +195,8 @@ include $(BOLOS_SDK)/Makefile.glyphs
 ### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
 APP_SOURCE_PATH  += src
 SDK_SOURCE_PATH  += lib_stusb lib_stusb_impl
-#SDK_SOURCE_PATH  += lib_u2f
-ifeq ($(TARGET_NAME),TARGET_NANOX)
 SDK_SOURCE_PATH  += lib_ux
+ifeq ($(TARGET_NAME),TARGET_NANOX)
 SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
 endif
 

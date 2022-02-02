@@ -16,10 +16,10 @@
 #*******************************************************************************
 
 # temporary redef, to ensure wider compliance of the SDK with pre-1.6 apps
-ifeq ($(TARGET_NAME),TARGET_NANOX)
-SDK_SOURCE_PATH += lib_bagl
-else
+ifeq ($(TARGET_NAME),TARGET_NANOS)
 SDK_SOURCE_PATH += lib_ux
+else
+SDK_SOURCE_PATH += lib_bagl
 endif
 
 #Make the SDK modified SDK sources prioritar to the original ones

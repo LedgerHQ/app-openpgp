@@ -133,7 +133,7 @@ int gpg_apdu_gen() {
         break;
       case 4096 / 8:
         // temporary removal for nano X
-#ifdef TARGET_NANOX
+#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
         THROW(SW_WRONG_DATA);
         break;
 #else

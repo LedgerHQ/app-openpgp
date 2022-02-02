@@ -182,7 +182,7 @@ static uint8_t const USBD_PRODUCT_FS_STRING[] = {
   'W', 0,
   '2', 0,
 };
-#elif defined(TARGET_NANOX)
+#elif defined(TARGET_NANOX) || defined(TARGET_NANOS2)
 #ifndef HAVE_LEGACY_PID
 #define USBD_PID                      0x4000
 #else // HAVE_LEGACY_PID
