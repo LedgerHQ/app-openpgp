@@ -132,13 +132,7 @@ int gpg_apdu_gen() {
         pkey_size = sizeof(cx_rsa_3072_private_key_t);
         break;
       case 4096 / 8:
-        // temporary removal for nano X
-#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
-        THROW(SW_WRONG_DATA);
-        break;
-#else
         pkey_size = sizeof(cx_rsa_4096_private_key_t);
-#endif
         break;
       default:
         THROW(SW_WRONG_DATA);
