@@ -182,7 +182,7 @@ static uint8_t const USBD_PRODUCT_FS_STRING[] = {
   'W', 0,
   '2', 0,
 };
-#elif defined(TARGET_NANOX) || defined(TARGET_NANOS2)
+#elif defined(TARGET_NANOX)
 #ifndef HAVE_LEGACY_PID
 #define USBD_PID                      0x4000
 #else // HAVE_LEGACY_PID
@@ -197,6 +197,23 @@ static uint8_t const USBD_PRODUCT_FS_STRING[] = {
   'o', 0,
   ' ', 0,
   'X', 0,
+};
+#elif defined(TARGET_NANOS2)
+#ifndef HAVE_LEGACY_PID
+#define USBD_PID                      0x5000
+#else // HAVE_LEGACY_PID
+#define USBD_PID                      0x0005
+#endif // HAVE_LEGACY_PID
+static uint8_t const USBD_PRODUCT_FS_STRING[] = {
+  7*2+2,
+  USB_DESC_TYPE_STRING,
+  'N', 0,
+  'a', 0,
+  'n', 0,
+  'o', 0,
+  ' ', 0,
+  'S', 0,
+  'P', 0,
 };
 #else
 #error unknown TARGET_ID
