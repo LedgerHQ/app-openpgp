@@ -475,7 +475,7 @@ static unsigned int validate_pin() {
 #define LABEL_NISTP256 "NIST P256"
 //#define LABEL_NISTP384    "NIST P384"
 //#define LABEL_NISTP521    "NIST P521"
-#define LABEL_SECP256K1 "SEPC 256K1"
+#define LABEL_SECP256K1 "SECP 256K1"
 //#define LABEL_BPOOL256R1  "Brainpool 256R1"
 //#define LABEL_BPOOL384R1  "Brainpool 384R1"
 //#define LABEL_BPOOL512R1  "Brainpool 512R1"

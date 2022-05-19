@@ -467,7 +467,7 @@ static unsigned int validate_pin() {
 #define LABEL_RSA2048 "RSA 2048"
 #define LABEL_RSA3072 "RSA 3072"
 #define LABEL_RSA4096 "RSA 4096"
-#define LABEL_SECP256K1 "SEPC 256K1"
+#define LABEL_SECP256K1 "SECP 256K1"
 #define LABEL_Ed25519 "Ed25519"
 
 const char *const tmpl_key_getter_values[] = {LABEL_SIG, LABEL_DEC, LABEL_AUT};
