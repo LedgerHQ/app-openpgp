@@ -760,7 +760,7 @@ void ui_menu_pinmode_action(unsigned int value) {
     case PIN_MODE_HOST:
     case PIN_MODE_SCREEN:
     case PIN_MODE_CONFIRM:
-      if (!gpg_pin_is_verified(PIN_ID_PW2)) {
+      if (!gpg_pin_is_verified(PIN_ID_PW1)) {
         ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display, 0);
         return;
       }
