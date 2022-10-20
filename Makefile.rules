@@ -16,13 +16,14 @@
 #*******************************************************************************
 
 # temporary redef, to ensure wider compliance of the SDK with pre-1.6 apps
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-SDK_SOURCE_PATH += lib_ux
-else
+ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
 SDK_SOURCE_PATH += lib_bagl
+else
+SDK_SOURCE_PATH += lib_bagl lib_ux
 endif
 
-#Make the SDK modified SDK sources prioritar to the original ones
+# adding the correct target header to sources
+SDK_SOURCE_PATH += target/$(TARGET)/include
 
 SOURCE_PATH   += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) -name '*.[csS]')))) $(BOLOS_SDK)/src $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) -name '*.[csS]')))
 SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) -name '*.[csS]') ) $(GLYPH_DESTC)
