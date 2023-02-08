@@ -307,7 +307,7 @@ void gpg_init() {
 
   // key conf
   G_gpg_vstate.slot  = N_gpg_pstate->config_slot[1];
-  G_gpg_vstate.kslot = &N_gpg_pstate->keys[G_gpg_vstate.slot];
+  G_gpg_vstate.kslot = (gpg_key_slot_t *)&N_gpg_pstate->keys[G_gpg_vstate.slot];
   gpg_mse_reset();
   // pin conf
   G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
@@ -411,7 +411,7 @@ void gpg_install(unsigned char app_state) {
 
     // default key template: RSA 2048)
     for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
-      gpg_install_slot(&N_gpg_pstate->keys[s]);
+      gpg_install_slot((gpg_key_slot_t *)&N_gpg_pstate->keys[s]);
     }
   }
 }

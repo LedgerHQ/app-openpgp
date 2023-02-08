@@ -25,11 +25,11 @@ gpg_pin_t *gpg_pin_get_pin(int pinref) {
   switch (pinref) {
   case PIN_ID_PW1:
   case PIN_ID_PW2:
-    return &N_gpg_pstate->PW1;
+    return (gpg_pin_t *)&N_gpg_pstate->PW1;
   case PIN_ID_PW3:
-    return &N_gpg_pstate->PW3;
+    return (gpg_pin_t *)&N_gpg_pstate->PW3;
   case PIN_ID_RC:
-    return &N_gpg_pstate->RC;
+    return (gpg_pin_t *)&N_gpg_pstate->RC;
   }
   return NULL;
 }

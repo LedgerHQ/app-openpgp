@@ -40,44 +40,44 @@ int gpg_apdu_get_data(unsigned int ref) {
   switch (ref) {
     /* ----------------- Optional DO for private use ----------------- */
   case 0x0101:
-    gpg_io_insert(N_gpg_pstate->private_DO1.value, N_gpg_pstate->private_DO1.length);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->private_DO1.value, N_gpg_pstate->private_DO1.length);
     break;
   case 0x0102:
-    gpg_io_insert(N_gpg_pstate->private_DO2.value, N_gpg_pstate->private_DO2.length);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->private_DO2.value, N_gpg_pstate->private_DO2.length);
     break;
   case 0x0103:
-    gpg_io_insert(N_gpg_pstate->private_DO3.value, N_gpg_pstate->private_DO3.length);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->private_DO3.value, N_gpg_pstate->private_DO3.length);
     break;
   case 0x0104:
-    gpg_io_insert(N_gpg_pstate->private_DO4.value, N_gpg_pstate->private_DO4.length);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->private_DO4.value, N_gpg_pstate->private_DO4.length);
     break;
 
     /* ----------------- Config key slot ----------------- */
   case 0x01F0:
-    gpg_io_insert(N_gpg_pstate->config_slot, 3);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->config_slot, 3);
     gpg_io_insert_u8(G_gpg_vstate.slot);
     break;
   case 0x01F1:
-    gpg_io_insert(N_gpg_pstate->config_slot, 3);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->config_slot, 3);
     break;
   case 0x01F2:
     gpg_io_insert_u8(G_gpg_vstate.slot);
     break;
     /* ----------------- Config RSA exponent ----------------- */
   case 0x01F8:
-    gpg_io_insert(N_gpg_pstate->default_RSA_exponent, 4);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->default_RSA_exponent, 4);
     break;
 
     /* ----------------- Application ----------------- */
     /*  Full Application identifier  */
   case 0x004F:
-    gpg_io_insert(N_gpg_pstate->AID, 10);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->AID, 10);
     gpg_io_insert(G_gpg_vstate.kslot->serial, 4);
     gpg_io_insert_u16(0x0000);
     break;
     /* Historical bytes, */
   case 0x5F52:
-    gpg_io_insert(N_gpg_pstate->histo, 15);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->histo, 15);
     break;
     /* Extended length information */
   case 0x7F66:
@@ -87,24 +87,24 @@ int gpg_apdu_get_data(unsigned int ref) {
     /* ----------------- User -----------------*/
     /* Login data */
   case 0x005E:
-    gpg_io_insert(N_gpg_pstate->login.value, N_gpg_pstate->login.length);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->login.value, N_gpg_pstate->login.length);
     break;
     /* Uniform resource locator */
   case 0x5F50:
-    gpg_io_insert(N_gpg_pstate->url.value, N_gpg_pstate->url.length);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->url.value, N_gpg_pstate->url.length);
     break;
     /* Name, Language, Sex */
   case 0x65:
-    gpg_io_insert_tlv(0x5B, N_gpg_pstate->name.length, N_gpg_pstate->name.value);
-    gpg_io_insert_tlv(0x5F2D, N_gpg_pstate->lang.length, N_gpg_pstate->lang.value);
-    gpg_io_insert_tlv(0x5F35, 1, N_gpg_pstate->sex);
+    gpg_io_insert_tlv(0x5B, N_gpg_pstate->name.length, (const unsigned char *)N_gpg_pstate->name.value);
+    gpg_io_insert_tlv(0x5F2D, N_gpg_pstate->lang.length, (const unsigned char *)N_gpg_pstate->lang.value);
+    gpg_io_insert_tlv(0x5F35, 1, (const unsigned char *)N_gpg_pstate->sex);
     break;
 
     /* ----------------- aid, histo, ext_length, ... ----------------- */
   case 0x6E:
-    gpg_io_insert_tlv(0x4F, 16, N_gpg_pstate->AID);
+    gpg_io_insert_tlv(0x4F, 16, (const unsigned char *)N_gpg_pstate->AID);
     memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6, G_gpg_vstate.kslot->serial, 4);
-    gpg_io_insert_tlv(0x5F52, 15, N_gpg_pstate->histo);
+    gpg_io_insert_tlv(0x5F52, 15, (const unsigned char *)N_gpg_pstate->histo);
     gpg_io_insert_tlv(0x7F66, sizeof(C_ext_length), C_ext_length);
 
     gpg_io_mark();
@@ -114,7 +114,7 @@ int gpg_apdu_get_data(unsigned int ref) {
     gpg_io_insert_tlv(0xC2, G_gpg_vstate.kslot->dec.attributes.length, G_gpg_vstate.kslot->dec.attributes.value);
     gpg_io_insert_tlv(0xC3, G_gpg_vstate.kslot->aut.attributes.length, G_gpg_vstate.kslot->aut.attributes.value);
     gpg_io_insert_tl(0xC4, 7);
-    gpg_io_insert(N_gpg_pstate->PW_status, 4);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->PW_status, 4);
     gpg_io_insert_u8(N_gpg_pstate->PW1.counter);
     gpg_io_insert_u8(N_gpg_pstate->RC.counter);
     gpg_io_insert_u8(N_gpg_pstate->PW3.counter);
@@ -171,7 +171,7 @@ int gpg_apdu_get_data(unsigned int ref) {
 
     /* ----------------- PW Status Bytes ----------------- */
   case 0x00C4:
-    gpg_io_insert(N_gpg_pstate->PW_status, 4);
+    gpg_io_insert((const unsigned char *)N_gpg_pstate->PW_status, 4);
     gpg_io_insert_u8(N_gpg_pstate->PW1.counter);
     gpg_io_insert_u8(N_gpg_pstate->RC.counter);
     gpg_io_insert_u8(N_gpg_pstate->PW3.counter);
@@ -210,20 +210,20 @@ int gpg_apdu_put_data(unsigned int ref) {
   switch (ref) {
     /*  ----------------- Optional DO for private use ----------------- */
   case 0x0101:
-    ptr_l = &N_gpg_pstate->private_DO1.length;
-    ptr_v = N_gpg_pstate->private_DO1.value;
+    ptr_l = (unsigned int *)&N_gpg_pstate->private_DO1.length;
+    ptr_v = (unsigned char *)N_gpg_pstate->private_DO1.value;
     goto WRITE_PRIVATE_DO;
   case 0x0102:
-    ptr_l = &N_gpg_pstate->private_DO2.length;
-    ptr_v = N_gpg_pstate->private_DO2.value;
+    ptr_l = (unsigned int *)&N_gpg_pstate->private_DO2.length;
+    ptr_v = (unsigned char *)N_gpg_pstate->private_DO2.value;
     goto WRITE_PRIVATE_DO;
   case 0x0103:
-    ptr_l = &N_gpg_pstate->private_DO3.length;
-    ptr_v = N_gpg_pstate->private_DO3.value;
+    ptr_l = (unsigned int *)&N_gpg_pstate->private_DO3.length;
+    ptr_v = (unsigned char *)N_gpg_pstate->private_DO3.value;
     goto WRITE_PRIVATE_DO;
   case 0x0104:
-    ptr_l = &N_gpg_pstate->private_DO4.length;
-    ptr_v = N_gpg_pstate->private_DO4.value;
+    ptr_l = (unsigned int *)&N_gpg_pstate->private_DO4.length;
+    ptr_v = (unsigned char *)N_gpg_pstate->private_DO4.value;
     goto WRITE_PRIVATE_DO;
   WRITE_PRIVATE_DO:
     if (G_gpg_vstate.io_length > GPG_EXT_PRIVATE_DO_LENGTH) {
@@ -246,7 +246,7 @@ int gpg_apdu_put_data(unsigned int ref) {
       THROW(SW_WRONG_DATA);
       return 0;
     }
-    gpg_nvm_write(N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, 3);
+    gpg_nvm_write((void *)N_gpg_pstate->config_slot, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, 3);
     break;
 
   case 0x01F2:
@@ -269,7 +269,7 @@ int gpg_apdu_put_data(unsigned int ref) {
       return 0;
     }
     e = gpg_io_fetch_u32();
-    nvm_write(&N_gpg_pstate->default_RSA_exponent, &e, sizeof(unsigned int));
+    nvm_write((void *)&N_gpg_pstate->default_RSA_exponent, &e, sizeof(unsigned int));
     break;
   }
 
@@ -476,8 +476,8 @@ int gpg_apdu_put_data(unsigned int ref) {
       THROW(SW_WRONG_LENGTH);
       return 0;
     }
-    gpg_nvm_write(N_gpg_pstate->name.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-    gpg_nvm_write(&N_gpg_pstate->name.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
+    gpg_nvm_write((void *)N_gpg_pstate->name.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+    gpg_nvm_write((void *)&N_gpg_pstate->name.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
     break;
     /* Login data */
   case 0x5E:
@@ -485,8 +485,8 @@ int gpg_apdu_put_data(unsigned int ref) {
       THROW(SW_WRONG_LENGTH);
       return 0;
     }
-    gpg_nvm_write(N_gpg_pstate->login.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-    gpg_nvm_write(&N_gpg_pstate->login.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
+    gpg_nvm_write((void *)N_gpg_pstate->login.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+    gpg_nvm_write((void *)&N_gpg_pstate->login.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
     break;
     /* Language preferences */
   case 0x5F2D:
@@ -494,8 +494,8 @@ int gpg_apdu_put_data(unsigned int ref) {
       THROW(SW_WRONG_LENGTH);
       return 0;
     }
-    gpg_nvm_write(N_gpg_pstate->lang.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-    gpg_nvm_write(&N_gpg_pstate->lang.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
+    gpg_nvm_write((void *)N_gpg_pstate->lang.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+    gpg_nvm_write((void *)&N_gpg_pstate->lang.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
     break;
     /* Sex */
   case 0x5F35:
@@ -503,7 +503,7 @@ int gpg_apdu_put_data(unsigned int ref) {
       THROW(SW_WRONG_LENGTH);
       return 0;
     }
-    gpg_nvm_write(N_gpg_pstate->sex, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+    gpg_nvm_write((void *)N_gpg_pstate->sex, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
     break;
     /* Uniform resource locator */
   case 0x5F50:
@@ -511,8 +511,8 @@ int gpg_apdu_put_data(unsigned int ref) {
       THROW(SW_WRONG_LENGTH);
       return 0;
     }
-    gpg_nvm_write(N_gpg_pstate->url.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-    gpg_nvm_write(&N_gpg_pstate->url.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
+    gpg_nvm_write((void *)N_gpg_pstate->url.value, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+    gpg_nvm_write((void *)&N_gpg_pstate->url.length, &G_gpg_vstate.io_length, sizeof(unsigned int));
     break;
 
     /* ----------------- Cardholder certificate ----------------- */
@@ -567,7 +567,7 @@ int gpg_apdu_put_data(unsigned int ref) {
 
     /* ----------------- PWS status ----------------- */
   case 0xC4:
-    gpg_io_fetch_nv(N_gpg_pstate->PW_status, 1);
+    gpg_io_fetch_nv((unsigned char *)N_gpg_pstate->PW_status, 1);
     break;
 
     /* ----------------- Fingerprints ----------------- */
@@ -620,10 +620,10 @@ int gpg_apdu_put_data(unsigned int ref) {
       void *       pkey;
       cx_aes_key_t aes_key;
     case 0xD1:
-      pkey = &N_gpg_pstate->SM_enc;
+      pkey = (void *)&N_gpg_pstate->SM_enc;
       goto init_aes_key;
     case 0xD2:
-      pkey = &N_gpg_pstate->SM_mac;
+      pkey = (void *)&N_gpg_pstate->SM_mac;
       goto init_aes_key;
     case 0xD5:
       pkey = &G_gpg_vstate.kslot->AES_dec;
@@ -636,9 +636,9 @@ int gpg_apdu_put_data(unsigned int ref) {
       /* AES key: one shot */
     case 0xF4:
       cx_aes_init_key(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length, &aes_key);
-      gpg_nvm_write(&N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
+      gpg_nvm_write((void *)&N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
       cx_aes_init_key(G_gpg_vstate.work.io_buffer + 16, G_gpg_vstate.io_length, &aes_key);
-      gpg_nvm_write(&N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
+      gpg_nvm_write((void *)&N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
       break;
     }
 

@@ -1095,12 +1095,12 @@ void ui_menu_slot_action(unsigned int value) {
 
   if (value == 128) {
     s = G_gpg_vstate.slot;
-    gpg_nvm_write(&N_gpg_pstate->config_slot[1], &s, 1);
+    gpg_nvm_write((void *) &N_gpg_pstate->config_slot[1], &s, 1);
   } else {
     s = (unsigned char)(value - 1);
     if (s != G_gpg_vstate.slot) {
       G_gpg_vstate.slot  = s;
-      G_gpg_vstate.kslot = &N_gpg_pstate->keys[G_gpg_vstate.slot];
+      G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
       gpg_mse_reset();
       ui_CCID_reset();
     }

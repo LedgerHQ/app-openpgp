@@ -85,7 +85,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
 // sign
 #define RS (G_gpg_vstate.work.io_buffer + (GPG_IO_BUFFER_LENGTH - 256))
     if (sigkey->attributes.value[0] == 19) {
-      sz = gpg_curve2domainlen(key->curve);
+      sz = (unsigned int) gpg_curve2domainlen(key->curve);
       if ((sz == 0) || (key->d_len != sz)) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
         return SW_CONDITIONS_NOT_SATISFIED;

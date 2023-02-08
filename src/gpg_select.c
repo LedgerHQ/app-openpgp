@@ -30,7 +30,7 @@ int gpg_apdu_select() {
   }
   // AID APP
   else if ((G_gpg_vstate.io_length == 6) &&
-           (memcmp(G_gpg_vstate.work.io_buffer, N_gpg_pstate->AID, G_gpg_vstate.io_length) == 0)) {
+           (memcmp(G_gpg_vstate.work.io_buffer, (const void *)N_gpg_pstate->AID, G_gpg_vstate.io_length) == 0)) {
     G_gpg_vstate.DO_current = 0;
     G_gpg_vstate.DO_reccord = 0;
     G_gpg_vstate.DO_offset  = 0;
