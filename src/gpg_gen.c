@@ -258,7 +258,7 @@ int gpg_apdu_gen() {
       curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
       if (curve == CX_CURVE_Ed25519) {
         memmove(G_gpg_vstate.work.io_buffer + 128, keygpg->pub_key.ecfp256.W, keygpg->pub_key.ecfp256.W_len);
-        cx_edward_compress_point(CX_CURVE_Ed25519, G_gpg_vstate.work.io_buffer + 128, 65);
+        THROW(cx_edwards_compress_point_no_throw(CX_CURVE_Ed25519, G_gpg_vstate.work.io_buffer + 128, 65));
         gpg_io_insert_tlv(0x86, 32, G_gpg_vstate.work.io_buffer + 129); // 129: discard 02
       } else if (curve == CX_CURVE_Curve25519) {
         unsigned int i, len;
