@@ -231,48 +231,24 @@ unsigned int ui_pinconfirm_action(unsigned int value) {
 const bagl_element_t ui_pinentry_nanos[] = {
     // type             userid    x    y    w    h    str   rad  fill              fg        bg     font_id icon_id
 
-    // clrar screen
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 64, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0}, NULL, 0, 0, 0, NULL, NULL, NULL},
+    // clear screen
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 64, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0}, NULL},
 
     // left/rights icons
     {{BAGL_ICON, 0x00, 0, 30, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0, 0},
-     (const char *)&C_icon_down,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     (const char *)&C_icon_down},
     {{BAGL_ICON, 0x00, 120, 30, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0, 0},
-     (const char *)&C_icon_up,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     (const char *)&C_icon_up},
 
     // PIN text identifier
     {{BAGL_LABELINE, 0x01, 10, 25, 117, 15, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_EXTRABOLD_11px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu},
 
     // PIN Value
     {{BAGL_LABELINE, 0x02, 10, 45, 117, 15, 0, 0, 0, 0xFFFFFF, 0x000000,
       BAGL_FONT_OPEN_SANS_LIGHT_16px | BAGL_FONT_ALIGNMENT_CENTER, 0},
-     G_gpg_vstate.menu,
-     0,
-     0,
-     0,
-     NULL,
-     NULL,
-     NULL},
+     G_gpg_vstate.menu}
 };
 static const char C_pin_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '<', 'A', 'V'};
 
