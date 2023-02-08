@@ -151,7 +151,7 @@ int gpg_apdu_gen() {
         cx_math_next_prime(pq + size, size);
       }
 
-      cx_rsa_generate_pair(ksz, rsa_pub, rsa_priv, N_gpg_pstate->default_RSA_exponent, 4, pq);
+      cx_rsa_generate_pair(ksz, rsa_pub, rsa_priv, (const unsigned char *)N_gpg_pstate->default_RSA_exponent, 4, pq);
 
       nvm_write(pkey, rsa_priv, pkey_size);
       nvm_write(&keygpg->pub_key.rsa[0], rsa_pub->e, 4);
