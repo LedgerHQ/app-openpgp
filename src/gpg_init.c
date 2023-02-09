@@ -18,7 +18,9 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
+#ifdef HAVE_USB_CLASS_CCID
 #include "usbd_impl.h"
+#endif
 
 #define SHORT(x) ((x) >> 8) & 0xFF, (x)&0xFF
 /* ----------------------*/
@@ -426,5 +428,7 @@ void USBD_CCID_activate_pinpad(int enabled) {
   length  = 0;
   cfgDesc = USBD_GetCfgDesc_impl(&length);
   nvm_write(cfgDesc + (length - 16), &e, 1);
+#else
+  (void)enabled;
 #endif
 }
