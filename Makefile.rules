@@ -27,10 +27,10 @@ SDK_SOURCE_PATH += target/$(TARGET)/include
 
 SOURCE_PATH   += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) -name '*.[csS]')))) $(BOLOS_SDK)/src $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) -name '*.[csS]')))
 SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) -name '*.[csS]') ) $(GLYPH_DESTC)
-INCLUDES_PATH += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) | grep "\.h$$")))) $(dir $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) | grep "\.h$$")))) include $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm
+INCLUDES_PATH += $(dir $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) -name '*.h')))) include $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm $(dir $(shell find $(APP_SOURCE_PATH) -name '*.h')) $(GLYPH_SRC_DIR)
 
-VPATH := $(dir $(SOURCE_FILES))
-OBJECT_FILES := $(sort $(addprefix obj/, $(addsuffix .o, $(basename $(notdir $(SOURCE_FILES))))))
-DEPEND_FILES := $(sort $(addprefix dep/, $(addsuffix .d, $(basename $(notdir $(SOURCE_FILES))))))
+VPATH += $(dir $(SOURCE_FILES))
+OBJECT_FILES += $(sort $(addprefix $(OBJ_DIR)/, $(addsuffix .o, $(basename $(notdir $(SOURCE_FILES))))))
+DEPEND_FILES += $(sort $(addprefix $(DEP_DIR)/, $(addsuffix .d, $(basename $(notdir $(SOURCE_FILES))))))
 
 include $(BOLOS_SDK)/Makefile.rules_generic
