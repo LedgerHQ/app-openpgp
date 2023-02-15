@@ -77,7 +77,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
   // --- ECDSA/EdDSA
   if ((sigkey->attributes.value[0] == 19) || (sigkey->attributes.value[0] == 22)) {
     cx_ecfp_private_key_t *key;
-    unsigned int           sz, i, rs_len;
+    unsigned int           sz, i, rs_len, info;
     unsigned char *        rs;
 
     key = &sigkey->priv_key.ecfp;
@@ -90,7 +90,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);
         return SW_CONDITIONS_NOT_SATISFIED;
       }
-      sz = cx_ecdsa_sign(key, CX_RND_TRNG, CX_NONE, G_gpg_vstate.work.io_buffer, sz, RS, 256, NULL);
+      sz = cx_ecdsa_sign(key, CX_RND_TRNG, CX_NONE, G_gpg_vstate.work.io_buffer, sz, RS, 256, &info);
       // reencode r,s in MPI format
       gpg_io_discard(0);
 

@@ -20,7 +20,7 @@
 #include "gpg_vars.h"
 #include "os_io_seproxyhal.h"
 
-#ifdef TARGET_NANOX
+#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
 #include "ux.h"
 ux_state_t        G_ux;
 bolos_ux_params_t G_ux_params;
@@ -36,3 +36,7 @@ int                  apdu_n;
 #endif
 
 gpg_v_state_t G_gpg_vstate;
+
+#ifdef HAVE_RSA
+union cx_u G_cx;
+#endif // HAVE_RSA

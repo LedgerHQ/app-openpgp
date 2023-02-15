@@ -53,8 +53,8 @@ void gpg_pso_derive_key_seed(unsigned char *Sn,
   cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32);
 #ifdef GPG_SHAKE256
   cx_shake256_init(&G_gpg_vstate.work.md.sha3, Ski_len);
-  cx_shake256_update(&G_gpg_vstate.work.md.sha3, h, 32);
-  cx_shake256_final(&G_gpg_vstate.work.md.sha3, Ski);
+  cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, 32);
+  cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski);
 #else
   cx_sha3_xof_init(&G_gpg_vstate.work.md.sha3, 256, Ski_len);
   cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski, Ski_len);
@@ -132,13 +132,7 @@ int gpg_apdu_gen() {
         pkey_size = sizeof(cx_rsa_3072_private_key_t);
         break;
       case 4096 / 8:
-        // temporary removal for nano X
-#ifdef TARGET_NANOX
-        THROW(SW_WRONG_DATA);
-        break;
-#else
         pkey_size = sizeof(cx_rsa_4096_private_key_t);
-#endif
         break;
       default:
         THROW(SW_WRONG_DATA);
