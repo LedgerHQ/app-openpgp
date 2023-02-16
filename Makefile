@@ -26,8 +26,13 @@ APP_LOAD_PARAMS=--appFlags 0x240 --path "2152157255'" --curve secp256k1 $(COMMON
 ifeq ($(APPNAME),)
 APPNAME = OpenPGP
 endif
+
 ifeq ($(APPNAME),OpenPGP)
+ifeq ($(TARGET_NAME),TARGET_NANOS)
 GPG_MULTISLOT:=0
+else
+GPG_MULTISLOT:=1
+endif
 else ifeq ($(APPNAME),OpenPGP.XL)
 GPG_MULTISLOT:=1
 APPNAME:=OpenPGP.XL
@@ -78,8 +83,14 @@ all: default
 	cp -a debug/app.map release/$(APPNAME).map
 
 
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+VARIANTS = OpenPGP OpenPGP.XL
+else
+VARIANTS = OpenPGP
+endif
+
 listvariants:
-	@echo VARIANTS APPNAME OpenPGP OpenPGP.XL
+	@echo VARIANTS APPNAME $(VARIANTS)
 
 allvariants:
 	make  MULTISLOT=0 clean all
