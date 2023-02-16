@@ -18,7 +18,6 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
-#include "usbd_impl.h"
 
 #define SHORT(x) ((x) >> 8) & 0xFF, (x)&0xFF
 /* ----------------------*/
@@ -416,7 +415,6 @@ void gpg_install(unsigned char app_state) {
   }
 }
 
-#define USBD_OFFSET_CfgDesc_bPINSupport (sizeof(USBD_CfgDesc) - 16)
 void USBD_CCID_activate_pinpad(int enabled) {
 #ifdef HAVE_USB_CLASS_CCID
   unsigned short length;
@@ -426,5 +424,7 @@ void USBD_CCID_activate_pinpad(int enabled) {
   length  = 0;
   cfgDesc = USBD_GetCfgDesc_impl(&length);
   nvm_write(cfgDesc + (length - 16), &e, 1);
+#else
+  UNUSED(enabled);
 #endif
 }

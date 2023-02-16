@@ -129,6 +129,7 @@ int gpg_apdu_pso() {
   unsigned int t, l, ksz;
 
   unsigned int pso;
+  unsigned int sz;
 
   pso = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2;
 
@@ -172,7 +173,6 @@ int gpg_apdu_pso() {
   case 0x8680: {
     unsigned int  msg_len;
     cx_aes_key_t *key;
-    unsigned int  sz;
     key = &G_gpg_vstate.kslot->AES_dec;
     if (!(key->size != 16)) {
       THROW(SW_CONDITIONS_NOT_SATISFIED + 5);
@@ -192,7 +192,6 @@ int gpg_apdu_pso() {
   case 0x8086: {
     unsigned int msg_len;
     unsigned int pad_byte;
-    unsigned int sz;
     pad_byte = gpg_io_fetch_u8();
 
     switch (pad_byte) {
@@ -237,7 +236,6 @@ int gpg_apdu_pso() {
     // --- PSO:DEC:AES
     case 0x02: {
       cx_aes_key_t *key;
-      unsigned int  sz;
       key = &G_gpg_vstate.kslot->AES_dec;
       if (!(key->size != 16)) {
         THROW(SW_CONDITIONS_NOT_SATISFIED + 5);
@@ -255,7 +253,6 @@ int gpg_apdu_pso() {
     // --- PSO:DEC:ECDH
     case 0xA6: {
       cx_ecfp_private_key_t *key;
-      unsigned int           sz;
       unsigned int           curve;
       if (G_gpg_vstate.mse_dec->attributes.value[0] != 0x12) {
         THROW(SW_CONDITIONS_NOT_SATISFIED);

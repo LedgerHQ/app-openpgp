@@ -286,7 +286,6 @@ int gpg_apdu_put_data(unsigned int ref) {
     unsigned int len_e, len_p, len_q;
     unsigned int endof, ksz, reset_cnt;
     gpg_key_t *  keygpg;
-    unsigned int dh;
     // fecth 4D
     gpg_io_fetch_tl(&t, &l);
     if (t != 0x4D) {
@@ -295,7 +294,6 @@ int gpg_apdu_put_data(unsigned int ref) {
     }
     // fecth B8/B6/A4
     gpg_io_fetch_tl(&t, &l);
-    dh        = 0;
     reset_cnt = 0;
     switch (t) {
     case 0xB6:
@@ -307,7 +305,6 @@ int gpg_apdu_put_data(unsigned int ref) {
       break;
     case 0xB8:
       keygpg = &G_gpg_vstate.kslot->dec;
-      dh     = 0x11;
       break;
     default:
       THROW(SW_REFERENCED_DATA_NOT_FOUND);

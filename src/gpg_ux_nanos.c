@@ -114,6 +114,7 @@ const bagl_element_t ui_uifconfirm_nanos[] = {
 };
 
 void ui_menu_uifconfirm_display(unsigned int value) {
+  UNUSED(value);
   UX_DISPLAY(ui_uifconfirm_nanos, (void *)ui_uifconfirm_prepro);
 }
 
@@ -144,6 +145,7 @@ unsigned int ui_uifconfirm_prepro(const bagl_element_t *element) {
 }
 
 unsigned int ui_uifconfirm_nanos_button(unsigned int button_mask, unsigned int button_mask_counter) {
+  UNUSED(button_mask_counter);
   unsigned int sw;
 
   sw = 0x6985;
@@ -213,6 +215,7 @@ const bagl_element_t ui_pinconfirm_nanos[] = {
 };
 
 void ui_menu_pinconfirm_display(unsigned int value) {
+  UNUSED(value);
   UX_DISPLAY(ui_pinconfirm_nanos, (void *)ui_pinconfirm_prepro);
 }
 
@@ -235,6 +238,7 @@ unsigned int ui_pinconfirm_prepro(const bagl_element_t *element) {
 }
 
 unsigned int ui_pinconfirm_nanos_button(unsigned int button_mask, unsigned int button_mask_counter) {
+  UNUSED(button_mask_counter);
   unsigned int sw;
 
   sw = 0x6985;
@@ -338,11 +342,9 @@ unsigned int ui_pinentry_prepro(const bagl_element_t *element) {
 }
 
 unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int button_mask_counter) {
+  UNUSED(button_mask_counter);
   unsigned int offset = G_gpg_vstate.ux_pinentry[0];
-  unsigned     m_pinentry;
   char         digit;
-
-  m_pinentry = 1;
 
   switch (button_mask) {
   case BUTTON_EVT_RELEASED | BUTTON_LEFT: // Down
@@ -562,6 +564,7 @@ const bagl_element_t *ui_menu_template_preprocessor(const ux_menu_entry_t *entry
 }
 
 void ui_menu_tmpl_set_action(unsigned int value) {
+  UNUSED(value);
   LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
   gpg_key_t *          dest;
   const char *         err;
@@ -862,6 +865,7 @@ const ux_menu_entry_t ui_menu_reset[] = {{NULL, NULL, 0, NULL, "Really Reset ?",
                                          UX_MENU_END};
 
 void ui_menu_reset_action(unsigned int value) {
+  UNUSED(value);
   unsigned char magic[4];
   magic[0] = 0;
   magic[1] = 0;
@@ -882,6 +886,7 @@ const ux_menu_entry_t ui_menu_reset_slot[] = {{NULL, NULL, 0, NULL, "Really Rese
                                          UX_MENU_END};
 
 void ui_menu_reset_slot_action(unsigned int value) {
+  UNUSED(value);
   gpg_install_slot(G_gpg_vstate.kslot);
   ui_menu_main_display(0);
 }
@@ -979,7 +984,6 @@ const ux_menu_entry_t ui_menu_main[] = {{NULL, NULL, 0, NULL, "", "", 0, 0},
                                         {ui_menu_info, NULL, 0, NULL, "About", NULL, 0, 0},
                                         {NULL, (void*)os_sched_exit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
                                         UX_MENU_END};
-extern const uint8_t  N_USBD_CfgDesc[];
 const bagl_element_t *ui_menu_main_preprocessor(const ux_menu_entry_t *entry, bagl_element_t *element) {
   if (entry == &ui_menu_main[0]) {
     if (element->component.userid == 0x21) {

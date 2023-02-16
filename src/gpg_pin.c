@@ -244,12 +244,10 @@ int gpg_apdu_change_ref_data() {
 
 int gpg_apdu_reset_retry_counter() {
   gpg_pin_t *pin_pw1;
-  gpg_pin_t *pin_pw3;
   gpg_pin_t *pin_rc;
   int        rc_len, pw1_len;
 
   pin_pw1 = gpg_pin_get_pin(PIN_ID_PW1);
-  pin_pw3 = gpg_pin_get_pin(PIN_ID_PW3);
   pin_rc  = gpg_pin_get_pin(PIN_ID_RC);
 
   if (G_gpg_vstate.io_p1 == 2) {

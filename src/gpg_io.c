@@ -310,6 +310,7 @@ int gpg_io_do(unsigned int io_flags) {
       break;
     }
 
+  __attribute__((fallthrough));
   case INS_VERIFY:
   case INS_CHANGE_REFERENCE_DATA:
     if (G_io_apdu_buffer[4] == 0) {

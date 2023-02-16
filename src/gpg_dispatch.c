@@ -183,10 +183,7 @@ char debugbuff[5];
 
 void gpg_check_access_write_DO() {
   unsigned int ref;
-  gpg_pin_t *  pin_pw2, *pin_pw3;
 
-  pin_pw2 = gpg_pin_get_pin(PIN_ID_PW2);
-  pin_pw3 = gpg_pin_get_pin(PIN_ID_PW3);
   ref     = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2;
 
   switch (ref) {

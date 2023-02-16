@@ -65,6 +65,7 @@ void gpg_main(void) {
 }
 
 unsigned char io_event(unsigned char channel) {
+  UNUSED(channel);
   // nothing done with the event, throw an error on the transport layer if
   // needed
   // can't have more than one tag in the reply, not supported yet.

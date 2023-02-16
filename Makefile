@@ -115,7 +115,7 @@ DEFINES   += USB_SEGMENT_SIZE=64
 DEFINES   += U2F_PROXY_MAGIC=\"MOON\"
 #DEFINES   += HAVE_IO_U2F HAVE_U2F
 
-DEFINES   += UNUSED\(x\)=\(void\)x
+#DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
 DEFINES   += HAVE_USB_CLASS_CCID
@@ -235,5 +235,3 @@ delete:
 
 #add dependency on custom makefile filename
 dep/%.d: %.c Makefile
-
-
