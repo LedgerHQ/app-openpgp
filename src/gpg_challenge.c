@@ -37,7 +37,7 @@ int gpg_apdu_get_challenge() {
     unsigned char chain[32];
     unsigned char Sr[32];
 
-    os_memset(chain, 0, 32);
+    memset(chain, 0, 32);
     path[0] = 0x80475047;
     path[1] = 0x0F0F0F0F;
     os_perso_derive_node_bip32(CX_CURVE_SECP256K1, path, 2, Sr, chain);

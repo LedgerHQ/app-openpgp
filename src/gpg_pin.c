@@ -60,7 +60,7 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pi
   cx_sha256_init(&G_gpg_vstate.work.md.sha256);
   cx_hash((cx_hash_t *)&G_gpg_vstate.work.md.sha256, CX_LAST, pin_val, pin_len, G_gpg_vstate.work.md.H,
           sizeof(G_gpg_vstate.work.md.H));
-  if (os_memcmp(G_gpg_vstate.work.md.H, pin->value, 32)) {
+  if (memcmp(G_gpg_vstate.work.md.H, pin->value, 32)) {
     return SW_SECURITY_STATUS_NOT_SATISFIED;
   }
 

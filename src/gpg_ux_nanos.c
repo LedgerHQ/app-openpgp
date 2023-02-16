@@ -80,13 +80,13 @@ void ui_CCID_reset(void) {
 }
 
 void ui_info(const char *msg1, const char *msg2, const void *menu_display, unsigned int value) {
-  os_memset(&G_gpg_vstate.ui_dogsays[0], 0, sizeof(ux_menu_entry_t));
+  memset(&G_gpg_vstate.ui_dogsays[0], 0, sizeof(ux_menu_entry_t));
   G_gpg_vstate.ui_dogsays[0].callback = menu_display;
   G_gpg_vstate.ui_dogsays[0].userid   = value;
   G_gpg_vstate.ui_dogsays[0].line1    = msg1;
   G_gpg_vstate.ui_dogsays[0].line2    = msg2;
 
-  os_memset(&G_gpg_vstate.ui_dogsays[1], 0, sizeof(ux_menu_entry_t));
+  memset(&G_gpg_vstate.ui_dogsays[1], 0, sizeof(ux_menu_entry_t));
   UX_MENU_DISPLAY(0, G_gpg_vstate.ui_dogsays, NULL);
 };
 
@@ -283,7 +283,7 @@ static const char C_pin_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', 
 
 void ui_menu_pinentry_display(unsigned int value) {
   if (value == 0) {
-    os_memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
+    memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
     G_gpg_vstate.ux_pinentry[0] = 1;
     G_gpg_vstate.ux_pinentry[1] = 5;
   }
@@ -442,7 +442,7 @@ static unsigned int validate_pin() {
       offset = 1 + G_gpg_vstate.work.io_buffer[0];
       len    = G_gpg_vstate.work.io_buffer[offset];
       if ((len != G_gpg_vstate.work.io_buffer[offset + 1 + len]) ||
-          (os_memcmp(G_gpg_vstate.work.io_buffer + offset + 1, G_gpg_vstate.work.io_buffer + offset + 1 + len + 1,
+          (memcmp(G_gpg_vstate.work.io_buffer + offset + 1, G_gpg_vstate.work.io_buffer + offset + 1 + len + 1,
                      len) != 0)) {
         gpg_io_discard(1);
         gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
@@ -569,7 +569,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
   unsigned int         oid_len;
   err = NULL;
 
-  os_memset(&attributes, 0, sizeof(attributes));
+  memset(&attributes, 0, sizeof(attributes));
   switch (G_gpg_vstate.ux_type) {
   case 2048:
   case 3072:
@@ -596,18 +596,18 @@ void ui_menu_tmpl_set_action(unsigned int value) {
       attributes.value[0] = 19; // ecdsa
     }
     oid = gpg_curve2oid(G_gpg_vstate.ux_type, &oid_len);
-    os_memmove(attributes.value + 1, oid, sizeof(oid_len));
+    memmove(attributes.value + 1, oid, sizeof(oid_len));
     attributes.length = 1 + oid_len;
     break;
 
   case CX_CURVE_Ed25519:
     if (G_gpg_vstate.ux_key == 2) {
       attributes.value[0] = 18; // ecdh
-      os_memmove(attributes.value + 1, C_OID_cv25519, sizeof(C_OID_cv25519));
+      memmove(attributes.value + 1, C_OID_cv25519, sizeof(C_OID_cv25519));
       attributes.length = 1 + sizeof(C_OID_cv25519);
     } else {
       attributes.value[0] = 22; // eddsa
-      os_memmove(attributes.value + 1, C_OID_Ed25519, sizeof(C_OID_Ed25519));
+      memmove(attributes.value + 1, C_OID_Ed25519, sizeof(C_OID_Ed25519));
       attributes.length = 1 + sizeof(C_OID_Ed25519);
     }
     break;
@@ -983,10 +983,10 @@ extern const uint8_t  N_USBD_CfgDesc[];
 const bagl_element_t *ui_menu_main_preprocessor(const ux_menu_entry_t *entry, bagl_element_t *element) {
   if (entry == &ui_menu_main[0]) {
     if (element->component.userid == 0x21) {
-      os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
-      os_memmove(G_gpg_vstate.menu, N_gpg_pstate->name.value, 12);
+      memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+      memmove(G_gpg_vstate.menu, N_gpg_pstate->name.value, 12);
       if (G_gpg_vstate.menu[0] == 0) {
-        os_memmove(G_gpg_vstate.menu, "<No Name>", 9);
+        memmove(G_gpg_vstate.menu, "<No Name>", 9);
       } else {
         for (int i = 0; i < 12; i++) {
           if (G_gpg_vstate.menu[i] == 0x3c) {
@@ -999,7 +999,7 @@ const bagl_element_t *ui_menu_main_preprocessor(const ux_menu_entry_t *entry, ba
       unsigned int serial;
       serial = (G_gpg_vstate.kslot->serial[0] << 24) | (G_gpg_vstate.kslot->serial[1] << 16) |
                (G_gpg_vstate.kslot->serial[2] << 8) | (G_gpg_vstate.kslot->serial[3]);
-      os_memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+      memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
 #if GPG_MULTISLOT
       snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "ID: %x / %d", serial, G_gpg_vstate.slot + 1);
 #else

@@ -26,7 +26,7 @@ void gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
   unsigned int  path[2];
   unsigned char chain[32];
 
-  os_memset(chain, 0, 32);
+  memset(chain, 0, 32);
   path[0] = 0x80475047;
   path[1] = slot + 1;
   os_perso_derive_node_bip32(CX_CURVE_SECP256K1, path, 2, seed, chain);
@@ -257,7 +257,7 @@ int gpg_apdu_gen() {
       gpg_io_mark();
       curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
       if (curve == CX_CURVE_Ed25519) {
-        os_memmove(G_gpg_vstate.work.io_buffer + 128, keygpg->pub_key.ecfp256.W, keygpg->pub_key.ecfp256.W_len);
+        memmove(G_gpg_vstate.work.io_buffer + 128, keygpg->pub_key.ecfp256.W, keygpg->pub_key.ecfp256.W_len);
         cx_edward_compress_point(CX_CURVE_Ed25519, G_gpg_vstate.work.io_buffer + 128, 65);
         gpg_io_insert_tlv(0x86, 32, G_gpg_vstate.work.io_buffer + 129); // 129: discard 02
       } else if (curve == CX_CURVE_Curve25519) {

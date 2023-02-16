@@ -103,7 +103,7 @@ int gpg_apdu_get_data(unsigned int ref) {
     /* ----------------- aid, histo, ext_length, ... ----------------- */
   case 0x6E:
     gpg_io_insert_tlv(0x4F, 16, N_gpg_pstate->AID);
-    os_memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6, G_gpg_vstate.kslot->serial, 4);
+    memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6, G_gpg_vstate.kslot->serial, 4);
     gpg_io_insert_tlv(0x5F52, 15, N_gpg_pstate->histo);
     gpg_io_insert_tlv(0x7F66, sizeof(C_ext_length), C_ext_length);
 
@@ -414,10 +414,10 @@ int gpg_apdu_put_data(unsigned int ref) {
       }
       p = G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset;
       q = p + len_p;
-      os_memmove(pq + ksz - len_p, p, len_p);
-      os_memset(pq, 0, ksz - len_p);
-      os_memmove(pq + 2 * ksz - len_q, q, len_q);
-      os_memset(pq + ksz, 0, ksz - len_q);
+      memmove(pq + ksz - len_p, p, len_p);
+      memset(pq, 0, ksz - len_p);
+      memmove(pq + 2 * ksz - len_q, q, len_q);
+      memset(pq + ksz, 0, ksz - len_q);
 
       // regenerate RSA private key
       unsigned char _e[4];
@@ -450,7 +450,7 @@ int gpg_apdu_put_data(unsigned int ref) {
       if (ksz == len_p) {
         G_gpg_vstate.work.ecfp.private.curve = curve;
         G_gpg_vstate.work.ecfp.private.d_len = ksz;
-        os_memmove(G_gpg_vstate.work.ecfp.private.d, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, ksz);
+        memmove(G_gpg_vstate.work.ecfp.private.d, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, ksz);
         cx_ecfp_generate_pair(curve, &G_gpg_vstate.work.ecfp.public, &G_gpg_vstate.work.ecfp.private, 1);
         nvm_write(&keygpg->pub_key.ecfp, &G_gpg_vstate.work.ecfp.public, sizeof(cx_ecfp_public_key_t));
         nvm_write(&keygpg->priv_key.ecfp, &G_gpg_vstate.work.ecfp.private, sizeof(cx_ecfp_private_key_t));
