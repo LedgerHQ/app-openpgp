@@ -209,16 +209,16 @@ load: all
 	cp -a release/$(APPNAME).hex bin/app.hex
 	cp -a release/$(APPNAME).asm debug/app.asm
 	cp -a release/$(APPNAME).map debug/app.map
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
+	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
 run:
-	python -m ledgerblue.runApp --appName $(APPNAME)
+	python3 -m ledgerblue.runApp --appName $(APPNAME)
 
 exit:
 	echo -e "0020008206313233343536\n0002000000" |scriptor -r "Ledger Nano S [Nano S] (0001) 01 00"
 
 delete:
-	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
+	python3 -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
 
 
