@@ -19,7 +19,7 @@
 #include "gpg_api.h"
 #include "gpg_vars.h"
 
-#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
+#ifndef TARGET_NANOS
 const gpg_nv_state_t N_state_pic;
 #else
 gpg_nv_state_t N_state_pic;

@@ -20,7 +20,7 @@
 #include "gpg_vars.h"
 #include "os_io_seproxyhal.h"
 
-#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
+#ifndef TARGET_NANOS
 #include "ux.h"
 ux_state_t        G_ux;
 bolos_ux_params_t G_ux_params;
