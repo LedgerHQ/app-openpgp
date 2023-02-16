@@ -79,6 +79,8 @@ UX_STEP_CB(ux_menu_popup_1_step, bnnn_paging, ui_menu_main_display(0), {.title =
 UX_FLOW(ux_flow_popup, &ux_menu_popup_1_step);
 
 void ui_info(const char *msg1, const char *msg2, const void *menu_display, unsigned int value) {
+  (void)menu_display;
+  (void)value;
   snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s. %s", msg1, msg2);
   ux_flow_init(0, ux_flow_popup, NULL);
 };
@@ -205,6 +207,7 @@ void ui_menu_pinconfirm_predisplay() {
 }
 
 void ui_menu_pinconfirm_display(unsigned int value) {
+  (void)value;
   ux_flow_init(0, ux_flow_pinconfirm, NULL);
 }
 
@@ -337,6 +340,8 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
   unsigned     m_pinentry;
   char         digit;
 
+
+  (void)button_mask_counter;
   m_pinentry = 1;
 
   switch (button_mask) {
@@ -603,6 +608,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
   unsigned int         oid_len;
   err = NULL;
 
+  (void)value;
   memset(&attributes, 0, sizeof(attributes));
   switch (G_gpg_vstate.ux_type) {
   case 2048:
@@ -716,6 +722,7 @@ void ui_menu_seedmode_display(unsigned int value) {
 }
 
 void ui_menu_seed_action(unsigned int value) {
+  (void)value;
   if (G_gpg_vstate.seed_mode) {
     G_gpg_vstate.seed_mode = 0;
   } else {
@@ -970,6 +977,8 @@ void ui_menu_reset_display(unsigned int value) {
 
 void ui_menu_reset_action(unsigned int value) {
   unsigned char magic[4];
+
+  (void)value;
   magic[0] = 0;
   magic[1] = 0;
   magic[2] = 0;
@@ -995,6 +1004,7 @@ void ui_menu_reset_slot_display(unsigned int value) {
 }
 
 void ui_menu_reset_slot_action(unsigned int value) {
+  (void)value;
   gpg_install_slot(G_gpg_vstate.kslot);
   ui_menu_main_display(0);
 }
@@ -1134,6 +1144,7 @@ UX_STEP_CB(ux_menu_info_2_step,
 UX_FLOW(ux_flow_info, &ux_menu_info_1_step, &ux_menu_info_2_step);
 
 void ui_menu_info_display(unsigned int value) {
+  (void)value;
   ux_flow_init(0, ux_flow_info, NULL);
 }
 
