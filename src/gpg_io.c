@@ -61,7 +61,7 @@ void gpg_io_discard(int clear) {
 }
 
 void gpg_io_clear() {
-  os_memset(G_gpg_vstate.work.io_buffer, 0, GPG_IO_BUFFER_LENGTH);
+  memset(G_gpg_vstate.work.io_buffer, 0, GPG_IO_BUFFER_LENGTH);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -73,14 +73,14 @@ void gpg_io_hole(unsigned int sz) {
     THROW(ERROR_IO_FULL);
     return;
   }
-  os_memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + sz,
+  memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + sz,
              G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, G_gpg_vstate.io_length - G_gpg_vstate.io_offset);
   G_gpg_vstate.io_length += sz;
 }
 
 void gpg_io_insert(unsigned char const *buff, unsigned int len) {
   gpg_io_hole(len);
-  os_memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, buff, len);
+  memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, buff, len);
   G_gpg_vstate.io_offset += len;
 }
 
@@ -219,7 +219,7 @@ int gpg_io_fetch_nv(unsigned char *buffer, int len) {
 }
 int gpg_io_fetch(unsigned char *buffer, int len) {
   if (buffer) {
-    os_memmove(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+    memmove(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
   }
   G_gpg_vstate.io_offset += len;
   return len;
@@ -250,7 +250,7 @@ int gpg_io_do(unsigned int io_flags) {
       unsigned int tx, xx;
       // send chunk
       tx = MAX_OUT - 2;
-      os_memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, tx);
+      memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, tx);
       G_gpg_vstate.io_length -= tx;
       G_gpg_vstate.io_offset += tx;
       G_io_apdu_buffer[tx] = 0x61;
@@ -268,7 +268,7 @@ int gpg_io_do(unsigned int io_flags) {
         return 0;
       }
     }
-    os_memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, G_gpg_vstate.io_length);
+    memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, G_gpg_vstate.io_length);
 
     if (io_flags & IO_RETURN_AFTER_TX) {
       rx = gpg_io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
@@ -320,7 +320,7 @@ int gpg_io_do(unsigned int io_flags) {
   default:
   _default:
     G_gpg_vstate.io_lc = G_io_apdu_buffer[4];
-    os_memmove(G_gpg_vstate.work.io_buffer, G_io_apdu_buffer + 5, G_gpg_vstate.io_lc);
+    memmove(G_gpg_vstate.work.io_buffer, G_io_apdu_buffer + 5, G_gpg_vstate.io_lc);
     G_gpg_vstate.io_length = G_gpg_vstate.io_lc;
     break;
   }
@@ -345,7 +345,7 @@ int gpg_io_do(unsigned int io_flags) {
     if ((G_gpg_vstate.io_length + G_gpg_vstate.io_lc) > GPG_IO_BUFFER_LENGTH) {
       return 1;
     }
-    os_memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_length, G_io_apdu_buffer + 5, G_gpg_vstate.io_lc);
+    memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_length, G_io_apdu_buffer + 5, G_gpg_vstate.io_lc);
     G_gpg_vstate.io_length += G_gpg_vstate.io_lc;
   }
 

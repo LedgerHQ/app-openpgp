@@ -78,46 +78,46 @@ const unsigned char C_OID_cv25519[10] = {
 };
 
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
-  if ((len == sizeof(C_OID_SECP256R1)) && (os_memcmp(oid, C_OID_SECP256R1, len) == 0)) {
+  if ((len == sizeof(C_OID_SECP256R1)) && (memcmp(oid, C_OID_SECP256R1, len) == 0)) {
     return CX_CURVE_SECP256R1;
   }
   /*
-  if ( (len == sizeof(C_OID_SECP256K1)) && (os_memcmp(oid, C_OID_SECP256K1, len)==0) ) {
+  if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
     return CX_CURVE_SECP256K1;
   }
 
-  if ( (len == sizeof(C_OID_SECP384R1)) && (os_memcmp(oid, C_OID_SECP384R1, len)==0) ) {
+  if ( (len == sizeof(C_OID_SECP384R1)) && (memcmp(oid, C_OID_SECP384R1, len)==0) ) {
     return CX_CURVE_SECP384R1;
   }
-  if ( (len == sizeof(C_OID_SECP521R1)) && (os_memcmp(oid, C_OID_SECP521R1, len)==0) ) {
+  if ( (len == sizeof(C_OID_SECP521R1)) && (memcmp(oid, C_OID_SECP521R1, len)==0) ) {
     return CX_CURVE_SECP521R1;
   }
  */
 
   /*
-  if ( (len == sizeof(C_OID_BRAINPOOL256R1)) && (os_memcmp(oid, C_OID_BRAINPOOL256R1, len)==0) ) {
+  if ( (len == sizeof(C_OID_BRAINPOOL256R1)) && (memcmp(oid, C_OID_BRAINPOOL256R1, len)==0) ) {
     return CX_CURVE_BrainPoolP256R1;
   }
-  if ( (len == sizeof(C_OID_BRAINPOOL384R1)) && (os_memcmp(oid, C_OID_BRAINPOOL384R1, len)==0) ) {
+  if ( (len == sizeof(C_OID_BRAINPOOL384R1)) && (memcmp(oid, C_OID_BRAINPOOL384R1, len)==0) ) {
     return CX_CURVE_BrainPoolP384R1;
   }
-  if ( (len == sizeof(C_OID_BRAINPOOL512R1)) && (os_memcmp(oid, C_OID_BRAINPOOL512R1, len)==0) ) {
+  if ( (len == sizeof(C_OID_BRAINPOOL512R1)) && (memcmp(oid, C_OID_BRAINPOOL512R1, len)==0) ) {
     return CX_CURVE_BrainPoolP512R1;
   }
  */
-  if ((len == sizeof(C_OID_Ed25519)) && (os_memcmp(oid, C_OID_Ed25519, len) == 0)) {
+  if ((len == sizeof(C_OID_Ed25519)) && (memcmp(oid, C_OID_Ed25519, len) == 0)) {
     return CX_CURVE_Ed25519;
   }
 
-  if ((len == sizeof(C_OID_cv25519)) && (os_memcmp(oid, C_OID_cv25519, len) == 0)) {
+  if ((len == sizeof(C_OID_cv25519)) && (memcmp(oid, C_OID_cv25519, len) == 0)) {
     return CX_CURVE_Curve25519;
   }
 
   /*
-  if ( (len == sizeof(C_OID_SECP256K1)) && (os_memcmp(oid, C_OID_SECP256K1, len)==0) ) {
+  if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
     return CX_CURVE_256K1;
   }
-  if ( (len == sizeof(C_OID_BRAINPOOL256T1)) && (os_memcmp(oid, C_OID_BRAINPOOL256T1, len)==0) ) {
+  if ( (len == sizeof(C_OID_BRAINPOOL256T1)) && (memcmp(oid, C_OID_BRAINPOOL256T1, len)==0) ) {
     return CX_CURVE_BrainPoolP256T1;
   }
   */
@@ -297,12 +297,12 @@ const unsigned char C_sha256_PW2[] = {
 /* ----------------------------------------------------------------------- */
 
 void gpg_init() {
-  os_memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
+  memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
   // first init ?
-  if (os_memcmp((void *)(N_gpg_pstate->magic), (void *)C_MAGIC, sizeof(C_MAGIC)) != 0) {
+  if (memcmp((void *)(N_gpg_pstate->magic), (void *)C_MAGIC, sizeof(C_MAGIC)) != 0) {
     gpg_install(STATE_ACTIVATE);
     gpg_nvm_write((void *)(N_gpg_pstate->magic), (void *)C_MAGIC, sizeof(C_MAGIC));
-    os_memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
+    memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
   }
 
   // key conf
@@ -356,12 +356,12 @@ void gpg_install(unsigned char app_state) {
   gpg_nvm_write((void *)(N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
 
   // historical bytes
-  os_memmove(G_gpg_vstate.work.io_buffer, C_default_Histo, sizeof(C_default_Histo));
+  memmove(G_gpg_vstate.work.io_buffer, C_default_Histo, sizeof(C_default_Histo));
   G_gpg_vstate.work.io_buffer[7] = app_state;
   gpg_nvm_write((void *)(N_gpg_pstate->histo), G_gpg_vstate.work.io_buffer, sizeof(C_default_Histo));
 
   // AID
-  os_memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));
+  memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));
   gpg_nvm_write((void *)(N_gpg_pstate->AID), &G_gpg_vstate.work.io_buffer, sizeof(C_default_AID));
 
 
@@ -371,14 +371,14 @@ void gpg_install(unsigned char app_state) {
     gpg_nvm_write((void *)(&N_gpg_pstate->sex), G_gpg_vstate.work.io_buffer, 1);
 
     // default PW1/PW2: 1 2 3 4 5 6
-    os_memmove(pin.value, C_sha256_PW1, sizeof(C_sha256_PW1));
+    memmove(pin.value, C_sha256_PW1, sizeof(C_sha256_PW1));
     pin.length  = 6;
     pin.counter = 3;
     pin.ref     = PIN_ID_PW1;
     gpg_nvm_write((void *)(&N_gpg_pstate->PW1), &pin, sizeof(gpg_pin_t));
 
     // default PW3: 1 2 3 4 5 6 7 8
-    os_memmove(pin.value, C_sha256_PW2, sizeof(C_sha256_PW2));
+    memmove(pin.value, C_sha256_PW2, sizeof(C_sha256_PW2));
     pin.length  = 8;
     pin.counter = 3;
     pin.ref     = PIN_ID_PW3;

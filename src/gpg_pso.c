@@ -62,8 +62,8 @@ static int gpg_sign(gpg_key_t *sigkey) {
       THROW(SW_WRONG_LENGTH);
     }
     l = ksz - G_gpg_vstate.io_length;
-    os_memmove(G_gpg_vstate.work.io_buffer + l, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-    os_memset(G_gpg_vstate.work.io_buffer, 0xFF, l);
+    memmove(G_gpg_vstate.work.io_buffer + l, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+    memset(G_gpg_vstate.work.io_buffer, 0xFF, l);
     G_gpg_vstate.work.io_buffer[0]     = 0;
     G_gpg_vstate.work.io_buffer[1]     = 1;
     G_gpg_vstate.work.io_buffer[l - 1] = 0;

@@ -278,7 +278,7 @@ static const char C_pin_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', 
 
 void ui_menu_pinentry_display(unsigned int value) {
   if (value == 0) {
-    os_memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
+    memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
     G_gpg_vstate.ux_pinentry[0] = 1;
     G_gpg_vstate.ux_pinentry[1] = 5;
   }
@@ -437,7 +437,7 @@ static unsigned int validate_pin() {
       offset = 1 + G_gpg_vstate.work.io_buffer[0];
       len    = G_gpg_vstate.work.io_buffer[offset];
       if ((len != G_gpg_vstate.work.io_buffer[offset + 1 + len]) ||
-          (os_memcmp(G_gpg_vstate.work.io_buffer + offset + 1, G_gpg_vstate.work.io_buffer + offset + 1 + len + 1,
+          (memcmp(G_gpg_vstate.work.io_buffer + offset + 1, G_gpg_vstate.work.io_buffer + offset + 1 + len + 1,
                      len) != 0)) {
         gpg_io_discard(1);
         gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
@@ -603,7 +603,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
   unsigned int         oid_len;
   err = NULL;
 
-  os_memset(&attributes, 0, sizeof(attributes));
+  memset(&attributes, 0, sizeof(attributes));
   switch (G_gpg_vstate.ux_type) {
   case 2048:
   case 3072:
@@ -624,18 +624,18 @@ void ui_menu_tmpl_set_action(unsigned int value) {
       attributes.value[0] = 19; // ecdsa
     }
     oid = gpg_curve2oid(G_gpg_vstate.ux_type, &oid_len);
-    os_memmove(attributes.value + 1, oid, sizeof(oid_len));
+    memmove(attributes.value + 1, oid, sizeof(oid_len));
     attributes.length = 1 + oid_len;
     break;
 
   case CX_CURVE_Ed25519:
     if (G_gpg_vstate.ux_key == 2) {
       attributes.value[0] = 18; // ecdh
-      os_memmove(attributes.value + 1, C_OID_cv25519, sizeof(C_OID_cv25519));
+      memmove(attributes.value + 1, C_OID_cv25519, sizeof(C_OID_cv25519));
       attributes.length = 1 + sizeof(C_OID_cv25519);
     } else {
       attributes.value[0] = 22; // eddsa
-      os_memmove(attributes.value + 1, C_OID_Ed25519, sizeof(C_OID_Ed25519));
+      memmove(attributes.value + 1, C_OID_Ed25519, sizeof(C_OID_Ed25519));
       attributes.length = 1 + sizeof(C_OID_Ed25519);
     }
     break;
@@ -1172,10 +1172,10 @@ UX_FLOW(ux_flow_main,
         &ux_menu_main_5_step);
 
 void ui_menu_main_predisplay() {
-  os_memset(G_gpg_vstate.ux_buff1, 0, sizeof(G_gpg_vstate.ux_buff1));
-  os_memmove(G_gpg_vstate.ux_buff1, (void *)(N_gpg_pstate->name.value), 20);
+  memset(G_gpg_vstate.ux_buff1, 0, sizeof(G_gpg_vstate.ux_buff1));
+  memmove(G_gpg_vstate.ux_buff1, (void *)(N_gpg_pstate->name.value), 20);
   if (G_gpg_vstate.ux_buff1[0] == 0) {
-    os_memmove(G_gpg_vstate.ux_buff1, "<No Name>", 9);
+    memmove(G_gpg_vstate.ux_buff1, "<No Name>", 9);
   } else {
     for (int i = 0; i < 12; i++) {
       if (G_gpg_vstate.ux_buff1[i] == 0x3c) {
@@ -1187,7 +1187,7 @@ void ui_menu_main_predisplay() {
   unsigned int serial;
   serial = (G_gpg_vstate.kslot->serial[0] << 24) | (G_gpg_vstate.kslot->serial[1] << 16) |
            (G_gpg_vstate.kslot->serial[2] << 8) | (G_gpg_vstate.kslot->serial[3]);
-  os_memset(G_gpg_vstate.ux_buff2, 0, sizeof(G_gpg_vstate.ux_buff2));
+  memset(G_gpg_vstate.ux_buff2, 0, sizeof(G_gpg_vstate.ux_buff2));
 #if GPG_MULTISLOT
   snprintf(G_gpg_vstate.ux_buff2, sizeof(G_gpg_vstate.ux_buff2), "ID: %x / %d", serial, G_gpg_vstate.slot + 1);
 #else

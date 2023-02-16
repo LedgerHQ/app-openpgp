@@ -24,13 +24,13 @@ int gpg_apdu_select() {
   int sw;
 
   // MF
-  if ((G_gpg_vstate.io_length == 2) && (os_memcmp(G_gpg_vstate.work.io_buffer, C_MF, G_gpg_vstate.io_length) == 0)) {
+  if ((G_gpg_vstate.io_length == 2) && (memcmp(G_gpg_vstate.work.io_buffer, C_MF, G_gpg_vstate.io_length) == 0)) {
     gpg_io_discard(0);
     sw = SW_OK;
   }
   // AID APP
   else if ((G_gpg_vstate.io_length == 6) &&
-           (os_memcmp(G_gpg_vstate.work.io_buffer, N_gpg_pstate->AID, G_gpg_vstate.io_length) == 0)) {
+           (memcmp(G_gpg_vstate.work.io_buffer, N_gpg_pstate->AID, G_gpg_vstate.io_length) == 0)) {
     G_gpg_vstate.DO_current = 0;
     G_gpg_vstate.DO_reccord = 0;
     G_gpg_vstate.DO_offset  = 0;
