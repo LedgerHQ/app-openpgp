@@ -35,9 +35,7 @@ else
 $(error APPNAME ($(APPNAME)) is not set or unknown)
 endif
 
-ifeq ($(TARGET_NAME),TARGET_BLUE)
-ICONNAME = images/icon_monero_blue.gif
-else ifeq ($(TARGET_NAME),TARGET_NANOS)
+ifeq ($(TARGET_NAME),TARGET_NANOS)
 ICONNAME = images/icon_pgp.gif
 else
 ICONNAME = images/icon_pgp_nanox.gif
@@ -57,9 +55,7 @@ DEFINES   += SPEC_VERSION=$(SPECVERSION)
 DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT)
 #DEFINES   += GPG_LOG
 
-ifeq ($(TARGET_NAME),TARGET_BLUE)
-DEFINES   += UI_BLUE
-else ifeq ($(TARGET_NAME),TARGET_NANOS)
+ifeq ($(TARGET_NAME),TARGET_NANOS)
 DEFINES   += UI_NANO_S
 else
 DEFINES   += UI_NANO_X
