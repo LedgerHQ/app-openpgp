@@ -46,6 +46,22 @@
   */
 #pragma message "Override SDK source file :" __FILE__
 
+/* With https://github.com/LedgerHQ/ledger-secure-sdk/pull/188
+ * a new feature was implemented to allow HID communication with a
+ * manually passed destination buffer.
+ * This feature changed the API of HID communication and wasn't backported
+ * on all SDK version. It is only available on SDK from:
+ * - the unified SDK, so with API_LEVEL defined
+ * - API_LEVEL value either:
+ *   - equal to 0: master branch
+ *   - >= 9 which was the first API_LEVEL created after the merge of #188
+ */
+#ifdef API_LEVEL
+#if API_LEVEL == 0 || API_LEVEL >= 9
+#define HAVE_LOCAL_APDU_BUFFER_FEATURE
+#endif
+#endif
+
 #include "os.h"
 
 #include "os_io_usb.h"
@@ -896,8 +912,15 @@ uint8_t  USBD_HID_DataIn_impl (USBD_HandleTypeDef *pdev,
   return USBD_OK;
 }
 
+
+#ifdef HAVE_LOCAL_APDU_BUFFER_FEATURE
+uint8_t  USBD_HID_DataOut_impl (USBD_HandleTypeDef *pdev,
+                              uint8_t epnum, uint8_t* buffer,
+                              apdu_buffer_t * apdu_buf)
+#else
 uint8_t  USBD_HID_DataOut_impl (USBD_HandleTypeDef *pdev,
                               uint8_t epnum, uint8_t* buffer)
+#endif
 {
   // only the data hid endpoint will receive data
   switch (epnum) {
@@ -910,7 +933,11 @@ uint8_t  USBD_HID_DataOut_impl (USBD_HandleTypeDef *pdev,
     // avoid troubles when an apdu has not been replied yet
     if (G_io_app.apdu_media == IO_APDU_MEDIA_NONE) {
       // add to the hid transport
+#ifdef HAVE_LOCAL_APDU_BUFFER_FEATURE
+      switch(io_usb_hid_receive(io_usb_send_apdu_data, buffer, io_seproxyhal_get_ep_rx_size(HID_EPOUT_ADDR), apdu_buf)) {
+#else
       switch(io_usb_hid_receive(io_usb_send_apdu_data, buffer, io_seproxyhal_get_ep_rx_size(HID_EPOUT_ADDR))) {
+#endif
         default:
           break;
 
