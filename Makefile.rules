@@ -25,6 +25,9 @@ endif
 # adding the correct target header to sources
 SDK_SOURCE_PATH += target/$(TARGET)/include
 
+# Expose all SDK header files with their full relative path to the SDK root folder
+INCLUDES_PATH  += ${BOLOS_SDK}
+
 SOURCE_PATH   += $(dir $(foreach libdir, $(APP_SOURCE_PATH), $(dir $(shell find $(libdir) -name '*.[csS]')))) $(BOLOS_SDK)/src $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) -name '*.[csS]')))
 SOURCE_FILES  := $(foreach path, $(SOURCE_PATH),$(shell find $(path) -name '*.[csS]') ) $(GLYPH_DESTC)
 INCLUDES_PATH += $(dir $(foreach libdir, $(SDK_SOURCE_PATH), $(dir $(shell find $(BOLOS_SDK)/$(libdir) -name '*.h')))) include $(BOLOS_SDK)/include $(BOLOS_SDK)/include/arm $(dir $(shell find $(APP_SOURCE_PATH) -name '*.h')) $(GLYPH_SRC_DIR)
