@@ -49,18 +49,14 @@
 /* With https://github.com/LedgerHQ/ledger-secure-sdk/pull/188
  * a new feature was implemented to allow HID communication with a
  * manually passed destination buffer.
- * This feature changed the API of HID communication and wasn't backported
- * on all SDK version. It is only available on SDK from:
- * - the unified SDK, so with API_LEVEL defined
- * - API_LEVEL value either:
- *   - equal to 0: master branch
- *   - >= 9 which was the first API_LEVEL created after the merge of #188
+ * This feature changed the API of HID communication and was backported
+ * on all SDK version starting from:
+ * - nanos: v2.1.0-12
+ * - API_LEVEL_1: v1.9.0
+ * - API_LEVEL_5: v5.7.0
+ * - API_LEVEL >= 9 always been available
  */
-#ifdef API_LEVEL
-#if API_LEVEL == 0 || API_LEVEL >= 9
 #define HAVE_LOCAL_APDU_BUFFER_FEATURE
-#endif
-#endif
 
 #include "os.h"
 
