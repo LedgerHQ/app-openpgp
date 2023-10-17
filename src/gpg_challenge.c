@@ -13,10 +13,6 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
 #include "cx_errors.h"
 
@@ -49,22 +45,23 @@ int gpg_apdu_get_challenge() {
 
         cx_sha256_init(&G_gpg_vstate.work.md.sha256);
         CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sr, 32, NULL, 0));
-        CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, chain, 3, NULL, 0));
+        CX_CHECK(
+            cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, chain, 3, NULL, 0));
         CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
-                                CX_LAST,
-                                G_gpg_vstate.work.io_buffer,
-                                G_gpg_vstate.io_length,
-                                G_gpg_vstate.work.io_buffer,
-                                32));
+                                  CX_LAST,
+                                  G_gpg_vstate.work.io_buffer,
+                                  G_gpg_vstate.io_length,
+                                  G_gpg_vstate.work.io_buffer,
+                                  32));
         hlen = cx_hash_get_size((const cx_hash_t *) &G_gpg_vstate.work.md.sha256);
 
         CX_CHECK(cx_sha3_xof_init_no_throw(&G_gpg_vstate.work.md.sha3, 256, olen));
         CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha3,
-                         CX_LAST,
-                         G_gpg_vstate.work.io_buffer,
-                         hlen,
-                         G_gpg_vstate.work.io_buffer,
-                         olen));
+                                  CX_LAST,
+                                  G_gpg_vstate.work.io_buffer,
+                                  hlen,
+                                  G_gpg_vstate.work.io_buffer,
+                                  olen));
     } else {
         cx_rng(G_gpg_vstate.work.io_buffer, olen);
         error = CX_OK;

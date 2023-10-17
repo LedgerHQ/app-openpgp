@@ -13,10 +13,6 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
 
 /*
@@ -214,7 +210,7 @@ int gpg_io_fetch_tl(unsigned int *T, unsigned int *L) {
 }
 
 int gpg_io_fetch_nv(unsigned char *buffer, int len) {
-    gpg_nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+    nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
     G_gpg_vstate.io_offset += len;
     return len;
 }
@@ -242,8 +238,8 @@ int gpg_io_do(unsigned int io_flags) {
 
     if (io_flags & IO_ASYNCH_REPLY) {
         // if IO_ASYNCH_REPLY has been  set,
-        //  gpg_io_exchange will return when  IO_RETURN_AFTER_TX will set in ui
-        rx = gpg_io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
+        //  io_exchange will return when  IO_RETURN_AFTER_TX will set in ui
+        rx = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
     } else {
         // --- full out chaining ---
         G_gpg_vstate.io_offset = 0;
@@ -261,7 +257,7 @@ int gpg_io_do(unsigned int io_flags) {
                 xx = G_gpg_vstate.io_length - 2;
             }
             G_io_apdu_buffer[tx + 1] = xx;
-            gpg_io_exchange(CHANNEL_APDU, tx + 2);
+            io_exchange(CHANNEL_APDU, tx + 2);
             // check get response
             if ((G_io_apdu_buffer[0] != 0x00) || (G_io_apdu_buffer[1] != 0xc0) ||
                 (G_io_apdu_buffer[2] != 0x00) || (G_io_apdu_buffer[3] != 0x00)) {
@@ -274,7 +270,7 @@ int gpg_io_do(unsigned int io_flags) {
                 G_gpg_vstate.io_length);
 
         if (io_flags & IO_RETURN_AFTER_TX) {
-            gpg_io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
+            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
             return 0;
         }
         rx = io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
@@ -330,7 +326,7 @@ int gpg_io_do(unsigned int io_flags) {
     while (G_gpg_vstate.io_cla & 0x10) {
         G_io_apdu_buffer[0] = 0x90;
         G_io_apdu_buffer[1] = 0x00;
-        rx = gpg_io_exchange(CHANNEL_APDU, 2);
+        rx = io_exchange(CHANNEL_APDU, 2);
     in_chaining:
         if ((rx < 4) || ((G_io_apdu_buffer[0] & 0xEF) != (G_gpg_vstate.io_cla & 0xEF)) ||
             (G_io_apdu_buffer[1] != G_gpg_vstate.io_ins) ||

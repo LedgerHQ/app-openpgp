@@ -16,8 +16,7 @@
 #ifndef GPG_TYPES_H
 #define GPG_TYPES_H
 
-#include "os_io_seproxyhal.h"
-#include "ux.h"
+#include "lcx_sha3.h"
 
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
@@ -279,9 +278,6 @@ struct gpg_v_state_s {
 
 #ifdef GPG_LOG
     unsigned char log_buffer[32];
-#endif
-#ifdef GPG_DEBUG
-    unsigned char print;
 #endif
 };
 typedef struct gpg_v_state_s gpg_v_state_t;

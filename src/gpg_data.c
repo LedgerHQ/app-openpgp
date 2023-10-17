@@ -13,10 +13,6 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
 #include "cx_errors.h"
 
@@ -253,10 +249,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write(ptr_v,
-                          G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                          G_gpg_vstate.io_length);
-            gpg_nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            nvm_write(ptr_v,
+                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                      G_gpg_vstate.io_length);
+            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
             sw = SW_OK;
             break;
             /*  ----------------- Config key slot ----------------- */
@@ -271,9 +267,9 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_DATA);
                 return 0;
             }
-            gpg_nvm_write((void *) N_gpg_pstate->config_slot,
-                          G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                          3);
+            nvm_write((void *) N_gpg_pstate->config_slot,
+                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                      3);
             break;
 
         case 0x01F2:
@@ -513,12 +509,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write((void *) N_gpg_pstate->name.value,
-                          G_gpg_vstate.work.io_buffer,
-                          G_gpg_vstate.io_length);
-            gpg_nvm_write((void *) &N_gpg_pstate->name.length,
-                          &G_gpg_vstate.io_length,
-                          sizeof(unsigned int));
+            nvm_write((void *) N_gpg_pstate->name.value,
+                      G_gpg_vstate.work.io_buffer,
+                      G_gpg_vstate.io_length);
+            nvm_write((void *) &N_gpg_pstate->name.length,
+                      &G_gpg_vstate.io_length,
+                      sizeof(unsigned int));
             break;
             /* Login data */
         case 0x5E:
@@ -526,12 +522,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write((void *) N_gpg_pstate->login.value,
-                          G_gpg_vstate.work.io_buffer,
-                          G_gpg_vstate.io_length);
-            gpg_nvm_write((void *) &N_gpg_pstate->login.length,
-                          &G_gpg_vstate.io_length,
-                          sizeof(unsigned int));
+            nvm_write((void *) N_gpg_pstate->login.value,
+                      G_gpg_vstate.work.io_buffer,
+                      G_gpg_vstate.io_length);
+            nvm_write((void *) &N_gpg_pstate->login.length,
+                      &G_gpg_vstate.io_length,
+                      sizeof(unsigned int));
             break;
             /* Language preferences */
         case 0x5F2D:
@@ -539,12 +535,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write((void *) N_gpg_pstate->lang.value,
-                          G_gpg_vstate.work.io_buffer,
-                          G_gpg_vstate.io_length);
-            gpg_nvm_write((void *) &N_gpg_pstate->lang.length,
-                          &G_gpg_vstate.io_length,
-                          sizeof(unsigned int));
+            nvm_write((void *) N_gpg_pstate->lang.value,
+                      G_gpg_vstate.work.io_buffer,
+                      G_gpg_vstate.io_length);
+            nvm_write((void *) &N_gpg_pstate->lang.length,
+                      &G_gpg_vstate.io_length,
+                      sizeof(unsigned int));
             break;
             /* Sex */
         case 0x5F35:
@@ -552,9 +548,9 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write((void *) N_gpg_pstate->sex,
-                          G_gpg_vstate.work.io_buffer,
-                          G_gpg_vstate.io_length);
+            nvm_write((void *) N_gpg_pstate->sex,
+                      G_gpg_vstate.work.io_buffer,
+                      G_gpg_vstate.io_length);
             break;
             /* Uniform resource locator */
         case 0x5F50:
@@ -562,12 +558,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write((void *) N_gpg_pstate->url.value,
-                          G_gpg_vstate.work.io_buffer,
-                          G_gpg_vstate.io_length);
-            gpg_nvm_write((void *) &N_gpg_pstate->url.length,
-                          &G_gpg_vstate.io_length,
-                          sizeof(unsigned int));
+            nvm_write((void *) N_gpg_pstate->url.value,
+                      G_gpg_vstate.work.io_buffer,
+                      G_gpg_vstate.io_length);
+            nvm_write((void *) &N_gpg_pstate->url.length,
+                      &G_gpg_vstate.io_length,
+                      sizeof(unsigned int));
             break;
 
             /* ----------------- Cardholder certificate ----------------- */
@@ -594,8 +590,8 @@ int gpg_apdu_put_data(unsigned int ref) {
             if (G_gpg_vstate.io_length > GPG_EXT_CARD_HOLDER_CERT_LENTH) {
                 THROW(SW_WRONG_LENGTH);
             }
-            gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-            gpg_nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
             break;
 
             /* ----------------- Algorithm attributes ----------------- */
@@ -616,8 +612,8 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-            gpg_nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
             break;
 
             /* ----------------- PWS status ----------------- */
@@ -649,7 +645,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 20);
+            nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 20);
             break;
 
             /* ----------------- Generation date/time ----------------- */
@@ -667,7 +663,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 4);
+            nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 4);
             break;
 
             /* ----------------- AES key ----------------- */
@@ -687,7 +683,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                     CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer,
                                                       G_gpg_vstate.io_length,
                                                       &aes_key));
-                    gpg_nvm_write(pkey, &aes_key, sizeof(cx_aes_key_t));
+                    nvm_write(pkey, &aes_key, sizeof(cx_aes_key_t));
                     break;
 
                     /* AES key: one shot */
@@ -695,11 +691,11 @@ int gpg_apdu_put_data(unsigned int ref) {
                     CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer,
                                                       G_gpg_vstate.io_length,
                                                       &aes_key));
-                    gpg_nvm_write((void *) &N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
+                    nvm_write((void *) &N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
                     CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer + 16,
                                                       G_gpg_vstate.io_length,
                                                       &aes_key));
-                    gpg_nvm_write((void *) &N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
+                    nvm_write((void *) &N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
                     break;
             }
 
@@ -709,7 +705,7 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             pin = gpg_pin_get_pin(PIN_ID_RC);
             if (G_gpg_vstate.io_length == 0) {
-                gpg_nvm_write(pin, NULL, sizeof(gpg_pin_t));
+                nvm_write(pin, NULL, sizeof(gpg_pin_t));
 
             } else if ((G_gpg_vstate.io_length > GPG_MAX_PW_LENGTH) ||
                        (G_gpg_vstate.io_length < 8)) {
@@ -739,7 +735,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 THROW(SW_WRONG_LENGTH);
                 return 0;
             }
-            gpg_nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 2);
+            nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 2);
             break;
 
             /* ----------------- WAT ----------------- */
@@ -916,9 +912,9 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             if (len != sizeof(cx_rsa_4096_private_key_t)) {
                 THROW(SW_WRONG_DATA);
             }
-            gpg_nvm_write((unsigned char *) &keygpg->priv_key.rsa4096,
-                          G_gpg_vstate.work.io_buffer,
-                          len);
+            nvm_write((unsigned char *) &keygpg->priv_key.rsa4096,
+                      G_gpg_vstate.work.io_buffer,
+                      len);
             break;
 
         // ECC
@@ -952,9 +948,9 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 THROW(SW_WRONG_DATA);
                 return SW_WRONG_DATA;
             }
-            gpg_nvm_write((unsigned char *) &keygpg->priv_key.ecfp640,
-                          G_gpg_vstate.work.io_buffer,
-                          len);
+            nvm_write((unsigned char *) &keygpg->priv_key.ecfp640,
+                      G_gpg_vstate.work.io_buffer,
+                      len);
             break;
 
         default:

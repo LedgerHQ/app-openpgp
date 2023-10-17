@@ -13,11 +13,8 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
+
 const unsigned char C_MF[] = {0x3F, 0x00};
 
 int gpg_apdu_select() {

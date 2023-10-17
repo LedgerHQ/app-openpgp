@@ -1,32 +1,33 @@
-#*******************************************************************************
-#   Ledger App
-#   (c) 2016-2019 Ledger
+# ****************************************************************************
+#    Ledger App OpenPGP
+#    (c) 2016-2024 Ledger SAS.
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#       http://www.apache.org/licenses/LICENSE-2.0
 #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#*******************************************************************************
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+# ****************************************************************************
 
--include Makefile.env
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
+
 include $(BOLOS_SDK)/Makefile.defines
 
-APP_LOAD_PARAMS=--appFlags 0x240 --path "2152157255'" --curve secp256k1 $(COMMON_LOAD_PARAMS)
-
+########################################
+#        Mandatory configuration       #
+########################################
+# Application name
 ifeq ($(APPNAME),)
 APPNAME = OpenPGP
 endif
-
 ifeq ($(APPNAME),OpenPGP)
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 GPG_MULTISLOT:=0
@@ -35,30 +36,111 @@ GPG_MULTISLOT:=1
 endif
 else ifeq ($(APPNAME),OpenPGP.XL)
 GPG_MULTISLOT:=1
-APPNAME:=OpenPGP.XL
 else
 $(error APPNAME ($(APPNAME)) is not set or unknown)
 endif
 
+APPVERSION_M = 2
+APPVERSION_N = 0
+APPVERSION_P = 0
+APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
+
+SPECVERSION:="3.3.1"
+DEFINES   += SPEC_VERSION=$(SPECVERSION)
+
+# Application source files
+APP_SOURCE_PATH += src
+APP_SOURCE_FILES += $(BOLOS_SDK)/lib_cxng/src/cx_rsa.c
+APP_SOURCE_FILES += $(BOLOS_SDK)/lib_cxng/src/cx_pkcs1.c
+APP_SOURCE_FILES += $(BOLOS_SDK)/lib_cxng/src/cx_utils.c
+
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
+
+# Application icons following guidelines:
+# https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
+ICON_NANOS = icons/gpg_16px.gif
+ICON_NANOX = icons/gpg_14px.gif
+ICON_NANOSP = icons/gpg_14px.gif
+
+# Application allowed derivation curves.
+# Possibles curves are: secp256k1, secp256r1, ed25519 and bls12381g1
+# If your app needs it, you can specify multiple curves by using:
+# `CURVE_APP_LOAD_PARAMS = <curve1> <curve2>`
+CURVE_APP_LOAD_PARAMS = secp256k1
+
+# Application allowed derivation paths.
+# You should request a specific path for your app.
+# This serve as an isolation mechanism.
+# Most application will have to request a path according to the BIP-0044
+# and SLIP-0044 standards.
+# If your app needs it, you can specify multiple path by using:
+# `PATH_APP_LOAD_PARAMS = "44'/1'" "45'/1'"`
+PATH_APP_LOAD_PARAMS = "2152157255'"
+
+# Setting to allow building variant applications
+# - <VARIANT_PARAM> is the name of the parameter which should be set
+#   to specify the variant that should be build.
+# - <VARIANT_VALUES> a list of variant that can be build using this app code.
+#   * It must at least contains one value.
+#   * Values can be the app ticker or anything else but should be unique.
+VARIANT_PARAM = APPNAME
 ifeq ($(TARGET_NAME),TARGET_NANOS)
-ICONNAME = images/icon_pgp.gif
+VARIANT_VALUES = OpenPGP OpenPGP.XL
 else
-ICONNAME = images/icon_pgp_nanox.gif
+VARIANT_VALUES = OpenPGP
 endif
 
-APPVERSION_M:=1
-APPVERSION_N:=4
-APPVERSION_P:=4
-APPVERSION:=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
-SPECVERSION:="3.3.1"
+# Enabling DEBUG flag will enable PRINTF and disable optimizations
+#DEBUG = 1
 
-DEFINES   += $(OPENPGP_CONFIG)
-DEFINES   += OPENPGP_VERSION_MAJOR=$(APPVERSION_M) OPENPGP_VERSION_MINOR=$(APPVERSION_N) OPENPGP_VERSION_MICRO=$(APPVERSION_P)
-DEFINES   += OPENPGP_VERSION=$(APPVERSION)
-DEFINES   += OPENPGP_NAME=$(APPNAME)
-DEFINES   += SPEC_VERSION=$(SPECVERSION)
+########################################
+#     Application custom permissions   #
+########################################
+# See SDK `include/appflags.h` for the purpose of each permission
+#HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
+#HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
+#HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
+#HAVE_APPLICATION_FLAG_LIBRARY = 1
+
+########################################
+# Application communication interfaces #
+########################################
+#ENABLE_BLUETOOTH = 1
+#ENABLE_NFC = 1
+
+########################################
+#         NBGL custom features         #
+########################################
+#ENABLE_NBGL_QRCODE = 1
+#ENABLE_NBGL_KEYBOARD = 1
+#ENABLE_NBGL_KEYPAD = 1
+
+########################################
+#          Features disablers          #
+########################################
+# These advanced settings allow to disable some feature that are by
+# default enabled in the SDK `Makefile.standard_app`.
+DISABLE_STANDARD_APP_FILES = 1
+#DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1 # To allow custom size declaration
+#DISABLE_STANDARD_APP_DEFINES = 1 # Will set all the following disablers
+#DISABLE_STANDARD_SNPRINTF = 1
+#DISABLE_STANDARD_USB = 1
+DISABLE_STANDARD_WEBUSB = 1
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+DISABLE_STANDARD_BAGL_UX_FLOW = 1
+endif
+#DISABLE_DEBUG_LEDGER_ASSERT = 1
+#DISABLE_DEBUG_THROW = 1
+
+########################################
+#        Main app configuration        #
+########################################
+
 DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT)
-#DEFINES   += GPG_LOG
+DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
+DEFINES   += HAVE_LEGACY_PID
+DEFINES   += HAVE_USB_CLASS_CCID
+DEFINES   += HAVE_RSA
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 DEFINES   += UI_NANO_S
@@ -67,171 +149,7 @@ DEFINES   += UI_NANO_X
 DEFINES   += GPG_SHAKE256
 endif
 
+#########################
 
-
-################
-# Default rule #
-################
-
-.PHONY: allvariants listvariants
-
-all: default
-	mkdir -p release
-	cp -a bin/app.elf   release/$(APPNAME).elf
-	cp -a bin/app.hex   release/$(APPNAME).hex
-	cp -a debug/app.asm release/$(APPNAME).asm
-	cp -a debug/app.map release/$(APPNAME).map
-
-
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-VARIANTS = OpenPGP OpenPGP.XL
-else
-VARIANTS = OpenPGP
-endif
-
-listvariants:
-	@echo VARIANTS APPNAME $(VARIANTS)
-
-allvariants:
-	make  MULTISLOT=0 clean all
-	make  MULTISLOT=1 clean all
-
-############
-# Platform #
-############
-#SCRIPT_LD :=  script.ld
-
-ifneq ($(NO_CONSENT),)
-DEFINES   += NO_CONSENT
-endif
-
-DEFINES   += OS_IO_SEPROXYHAL
-DEFINES   += HAVE_BAGL HAVE_SPRINTF
-DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=4 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
-DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
-DEFINES   += HAVE_LEGACY_PID
-
-DEFINES   += USB_SEGMENT_SIZE=64
-DEFINES   += U2F_PROXY_MAGIC=\"MOON\"
-#DEFINES   += HAVE_IO_U2F HAVE_U2F
-
-#DEFINES   += UNUSED\(x\)=\(void\)x
-DEFINES   += APPVERSION=\"$(APPVERSION)\"
-
-DEFINES   += HAVE_USB_CLASS_CCID
-
-ifeq ($(NO_CXNG),)
-INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/include
-endif
-
-# RSA addition.
-DEFINES       += HAVE_RSA
-INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
-SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_rsa.c
-SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_pkcs1.c
-SOURCE_PATH   += $(BOLOS_SDK)/lib_cxng/src/cx_utils.c
-# RSA - End
-
-ifeq ($(TARGET_NAME),TARGET_NANOX)
-DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
-DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
-endif
-
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=128
-else
-DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=300
-DEFINES       += HAVE_GLO096
-DEFINES       += HAVE_BAGL BAGL_WIDTH=128 BAGL_HEIGHT=64
-DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
-DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
-DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
-DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-DEFINES       += HAVE_UX_FLOW
-endif
-
-# Enabling debug PRINTF
-DEBUG = 0
-ifneq ($(DEBUG),0)
-
-        ifeq ($(TARGET_NAME),TARGET_NANOS)
-                DEFINES   += HAVE_PRINTF PRINTF=screen_printf
-        else
-                DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
-        endif
-	DEFINES += PLINE="PRINTF(\"FILE:%s..LINE:%d\n\",__FILE__,__LINE__)"
-else
-        DEFINES   += PRINTF\(...\)=
-	DEFINES   += PLINE\(...\)=
-endif
-
-
-##############
-# Compiler #
-##############
-ifneq ($(BOLOS_ENV),)
-$(info BOLOS_ENV=$(BOLOS_ENV))
-CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
-GCCPATH := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
-else
-$(info BOLOS_ENV is not set: falling back to CLANGPATH and GCCPATH)
-endif
-ifeq ($(CLANGPATH),)
-$(info CLANGPATH is not set: clang will be used from PATH)
-endif
-ifeq ($(GCCPATH),)
-$(info GCCPATH is not set: arm-none-eabi-* will be used from PATH)
-endif
-CC       := $(CLANGPATH)clang
-
-#CFLAGS   += -O0 -gdwarf-2  -gstrict-dwarf
-CFLAGS   += -O3 -Os
-#CFLAGS   += -fno-jump-tables -fno-lookup-tables -fsave-optimization-record
-#$(info $(CFLAGS))
-
-AS     := $(GCCPATH)arm-none-eabi-gcc
-
-LD       := $(GCCPATH)arm-none-eabi-gcc
-#LDFLAGS  += -O0 -gdwarf-2  -gstrict-dwarf
-LDFLAGS  += -O3 -Os
-LDLIBS   += -lm -lgcc -lc
-
-# import rules to compile glyphs(/pone)
-include $(BOLOS_SDK)/Makefile.glyphs
-
-### variables processed by the common makefile.rules of the SDK to grab source files and include dirs
-APP_SOURCE_PATH  += src
-SDK_SOURCE_PATH  += lib_stusb lib_stusb_impl
-SDK_SOURCE_PATH  += lib_ux
-ifeq ($(TARGET_NAME),TARGET_NANOX)
-SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
-endif
-
-
-cformat:
-	clang-format -i src/*.c src/*.h
-
-load: all
-	cp -a release/$(APPNAME).elf bin/app.elf
-	cp -a release/$(APPNAME).hex bin/app.hex
-	cp -a release/$(APPNAME).asm debug/app.asm
-	cp -a release/$(APPNAME).map debug/app.map
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
-
-run:
-	python -m ledgerblue.runApp --appName $(APPNAME)
-
-exit:
-	echo -e "0020008206313233343536\n0002000000" |scriptor -r "Ledger Nano S [Nano S] (0001) 01 00"
-
-delete:
-	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
-
-
-
-# import generic rules from the user and SDK
--include Makefile.rules
-#include $(BOLOS_SDK)/Makefile.rules
-
-#add dependency on custom makefile filename
-dep/%.d: %.c Makefile
+# Import generic rules from the SDK
+include $(BOLOS_SDK)/Makefile.standard_app

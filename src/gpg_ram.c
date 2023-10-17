@@ -13,12 +13,7 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
-#include "os_io_seproxyhal.h"
 
 #ifndef TARGET_NANOS
 #include "ux.h"
@@ -28,12 +23,7 @@ bolos_ux_params_t G_ux_params;
 ux_state_t ux;
 #endif
 
-#ifndef GPG_DEBUG_MAIN
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-#else
-extern unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-int apdu_n;
-#endif
 
 gpg_v_state_t G_gpg_vstate;
 

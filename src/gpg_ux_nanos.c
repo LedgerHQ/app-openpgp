@@ -15,17 +15,9 @@
 
 #ifdef UI_NANO_S
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
-
 #include "gpg_ux_msg.h"
-#include "os_io_seproxyhal.h"
-#include "usbd_ccid_impl.h"
-#include "string.h"
-#include "glyphs.h"
+#include "usbd_ccid_if.h"
 
 /* ----------------------------------------------------------------------- */
 /* ---                        NanoS  UI layout                         --- */
@@ -585,7 +577,7 @@ const ux_menu_entry_t ui_menu_template[] = {
     {ui_menu_tmpl_key, NULL, -1, NULL, "Choose key...", NULL, 0, 0},
     {ui_menu_tmpl_type, NULL, -1, NULL, "Choose type...", NULL, 0, 0},
     {NULL, ui_menu_tmpl_set_action, -1, NULL, "Set template", NULL, 0, 0},
-    {ui_menu_settings, NULL, 0, &C_badge_back, "Back", NULL, 61, 40},
+    {ui_menu_settings, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 void ui_menu_template_display(unsigned int value) {
@@ -736,8 +728,8 @@ void ui_menu_tmpl_set_action(unsigned int value) {
             goto ERROR;
     }
 
-    gpg_nvm_write(dest, NULL, sizeof(gpg_key_t));
-    gpg_nvm_write(&dest->attributes, &attributes, sizeof(attributes));
+    nvm_write(dest, NULL, sizeof(gpg_key_t));
+    nvm_write(&dest->attributes, &attributes, sizeof(attributes));
     ui_info(OK, NULL, ui_menu_template_display, 0);
     return;
 
@@ -749,7 +741,7 @@ const ux_menu_entry_t ui_menu_tmpl_key[] = {
     {NULL, ui_menu_tmpl_key_action, 1, NULL, LABEL_SIG, NULL, 0, 0},
     {NULL, ui_menu_tmpl_key_action, 2, NULL, LABEL_DEC, NULL, 0, 0},
     {NULL, ui_menu_tmpl_key_action, 3, NULL, LABEL_AUT, NULL, 0, 0},
-    {ui_menu_template, NULL, 0, &C_badge_back, "Back", NULL, 61, 40},
+    {ui_menu_template, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 void ui_menu_tmpl_key_action(unsigned int value) {
@@ -771,7 +763,7 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
     //  CX_CURVE_BrainPoolP384R1, NULL,  LABEL_BPOOL384R1, NULL,  0,  0}, {NULL,
     //  ui_menu_tmpl_type_action,  CX_CURVE_BrainPoolP512R1, NULL,  LABEL_BPOOL512R1, NULL,  0,  0},
     {NULL, ui_menu_tmpl_type_action, CX_CURVE_Ed25519, NULL, LABEL_Ed25519, NULL, 0, 0},
-    {ui_menu_template, NULL, 0, &C_badge_back, "Back", NULL, 61, 40},
+    {ui_menu_template, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 void ui_menu_tmpl_type_action(unsigned int value) {
@@ -785,7 +777,7 @@ const ux_menu_entry_t ui_menu_seed[] = {
     {NULL, NULL, 0, NULL, "", NULL, 0, 0},
     {NULL, ui_menu_seed_action, 1, NULL, "Set on", NULL, 0, 0},
     {NULL, ui_menu_seed_action, 0, NULL, "Set off", NULL, 0, 0},
-    {ui_menu_settings, NULL, 0, &C_badge_back, "Back", NULL, 61, 40},
+    {ui_menu_settings, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 void ui_menu_seed_display(unsigned int value) {
@@ -825,7 +817,7 @@ const ux_menu_entry_t ui_menu_pinmode[] = {
     {NULL, ui_menu_pinmode_action, 0x8000 | PIN_MODE_CONFIRM, NULL, "Confirm only", NULL, 0, 0},
     {NULL, ui_menu_pinmode_action, 0x8000 | PIN_MODE_TRUST, NULL, "Trust", NULL, 0, 0},
     {NULL, ui_menu_pinmode_action, 128, NULL, "Set Default", NULL, 0, 0},
-    {ui_menu_settings, NULL, 0, &C_badge_back, "Back", NULL, 61, 40},
+    {ui_menu_settings, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 void ui_menu_pinmode_display(unsigned int value) {
@@ -862,15 +854,14 @@ void ui_menu_pinmode_action(unsigned int value) {
             }
             // set new mode
             s = G_gpg_vstate.pinmode;
-            gpg_nvm_write(&N_gpg_pstate->config_pin[0], &s, 1);
+            nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &s, 1);
             // disactivate pinpad if any
             if (G_gpg_vstate.pinmode == PIN_MODE_HOST) {
                 s = 0;
             } else {
                 s = 3;
             }
-            // #warning USBD_CCID_activate_pinpad commented
-            USBD_CCID_activate_pinpad(s);
+            gpg_activate_pinpad(s);
         }
     } else {
         switch (value) {
@@ -911,7 +902,7 @@ const ux_menu_entry_t ui_menu_uifmode[] = {
     {NULL, ui_menu_uifmode_action, 1, NULL, "Signature", NULL, 0, 0},
     {NULL, ui_menu_uifmode_action, 2, NULL, "Decryption", NULL, 0, 0},
     {NULL, ui_menu_uifmode_action, 3, NULL, "Authentication", NULL, 0, 0},
-    {ui_menu_settings, NULL, 0, &C_badge_back, "Back", NULL, 61, 40},
+    {ui_menu_settings, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 void ui_menu_uifmode_display(unsigned int value) {
@@ -967,10 +958,10 @@ void ui_menu_uifmode_action(unsigned int value) {
     }
     if (uif[0] == 0) {
         new_uif = 1;
-        gpg_nvm_write(&uif[0], &new_uif, 1);
+        nvm_write(&uif[0], &new_uif, 1);
     } else if (uif[0] == 1) {
         new_uif = 0;
-        gpg_nvm_write(&uif[0], &new_uif, 1);
+        nvm_write(&uif[0], &new_uif, 1);
     } else /*if (uif[0] == 2 )*/ {
         ui_info(UIF_LOCKED, NULL, ui_menu_uifmode_display, 0);
         return;
@@ -982,7 +973,7 @@ void ui_menu_uifmode_action(unsigned int value) {
 
 const ux_menu_entry_t ui_menu_reset[] = {
     {NULL, NULL, 0, NULL, "Really Reset ?", NULL, 0, 0},
-    {NULL, ui_menu_main_display, 0, &C_badge_back, "No", NULL, 61, 40},
+    {NULL, ui_menu_main_display, 0, &C_icon_back, "No", NULL, 61, 40},
     {NULL, ui_menu_reset_action, 0, NULL, "Yes", NULL, 0, 0},
     UX_MENU_END};
 
@@ -993,7 +984,7 @@ void ui_menu_reset_action(unsigned int value) {
     magic[1] = 0;
     magic[2] = 0;
     magic[3] = 0;
-    gpg_nvm_write(N_gpg_pstate->magic, magic, 4);
+    nvm_write((void *) (N_gpg_pstate->magic), magic, 4);
     gpg_init();
     ui_CCID_reset();
     ui_menu_main_display(0);
@@ -1004,7 +995,7 @@ void ui_menu_reset_slot_action(unsigned int value);
 
 const ux_menu_entry_t ui_menu_reset_slot[] = {
     {NULL, NULL, 0, NULL, "Really Reset ?", NULL, 0, 0},
-    {NULL, ui_menu_main_display, 0, &C_badge_back, "No", NULL, 61, 40},
+    {NULL, ui_menu_main_display, 0, &C_icon_back, "No", NULL, 61, 40},
     {NULL, ui_menu_reset_slot_action, 0, NULL, "Yes", NULL, 0, 0},
     UX_MENU_END};
 
@@ -1023,7 +1014,7 @@ const ux_menu_entry_t ui_menu_settings[] = {
     {NULL, ui_menu_uifmode_display, 0, NULL, "UIF mode", NULL, 0, 0},
     {ui_menu_reset, NULL, 0, NULL, "Reset App", NULL, 0, 0},
     {ui_menu_reset_slot, NULL, 0, NULL, "Reset Slot", NULL, 0, 0},
-    {NULL, ui_menu_main_display, 2, &C_badge_back, "Back", NULL, 61, 40},
+    {NULL, ui_menu_main_display, 2, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 /* --------------------------------- SLOT UX --------------------------------- */
@@ -1039,7 +1030,7 @@ const ux_menu_entry_t ui_menu_slot[] = {
     {NULL, ui_menu_slot_action, 2, NULL, "", NULL, 0, 0},
     {NULL, ui_menu_slot_action, 3, NULL, "", NULL, 0, 0},
     {NULL, ui_menu_slot_action, 128, NULL, "Set Default", NULL, 0, 0},
-    {NULL, ui_menu_main_display, 1, &C_badge_back, "Back", NULL, 61, 40},
+    {NULL, ui_menu_main_display, 1, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 void ui_menu_slot_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_slot, ui_menu_slot_preprocessor);
@@ -1071,7 +1062,7 @@ void ui_menu_slot_action(unsigned int value) {
 
     if (value == 128) {
         s = G_gpg_vstate.slot;
-        gpg_nvm_write(&N_gpg_pstate->config_slot[1], &s, 1);
+        nvm_write((void *) (&N_gpg_pstate->config_slot[1]), &s, 1);
         value = s + 1;
     } else {
         s = (unsigned char) (value - 1);
@@ -1096,8 +1087,8 @@ const ux_menu_entry_t ui_menu_info[] = {
     {NULL, NULL, -1, NULL, "OpenPGP Card", NULL, 0, 0},
     {NULL, NULL, -1, NULL, "(c) Ledger SAS", NULL, 0, 0},
     {NULL, NULL, -1, NULL, "Spec  " XSTR(SPEC_VERSION), NULL, 0, 0},
-    {NULL, NULL, -1, NULL, "App  " XSTR(OPENPGP_VERSION), NULL, 0, 0},
-    {NULL, ui_menu_main_display, 3, &C_badge_back, "Back", NULL, 61, 40},
+    {NULL, NULL, -1, NULL, "App  " XSTR(APPVERSION), NULL, 0, 0},
+    {NULL, ui_menu_main_display, 3, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
 #undef STR
@@ -1119,7 +1110,7 @@ const bagl_element_t *ui_menu_main_preprocessor(const ux_menu_entry_t *entry,
     if (entry == &ui_menu_main[0]) {
         if (element->component.userid == 0x21) {
             memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
-            memmove(G_gpg_vstate.menu, N_gpg_pstate->name.value, 12);
+            memmove(G_gpg_vstate.menu, (void *) (N_gpg_pstate->name.value), 12);
             if (G_gpg_vstate.menu[0] == 0) {
                 memmove(G_gpg_vstate.menu, "<No Name>", 9);
             } else {

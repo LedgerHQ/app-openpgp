@@ -13,11 +13,8 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
+#include "cx_ram.h"
 #include "cx_errors.h"
 
 /* @in slot     slot num [0 ; GPG_KEYS_SLOTS[
@@ -58,11 +55,11 @@ void gpg_pso_derive_key_seed(unsigned char *Sn,
     cx_sha256_init(&G_gpg_vstate.work.md.sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0));
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
-                     0,
-                     (unsigned char *) key_name,
-                     4,
-                     NULL,
-                     0));
+                              0,
+                              (unsigned char *) key_name,
+                              4,
+                              NULL,
+                              0));
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32));
 #ifdef GPG_SHAKE256
     CX_CHECK(cx_shake256_init_no_throw(&G_gpg_vstate.work.md.sha3, Ski_len));
@@ -70,7 +67,8 @@ void gpg_pso_derive_key_seed(unsigned char *Sn,
     CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
 #else
     CX_CHECK(cx_sha3_xof_init_no_throw(&G_gpg_vstate.work.md.sha3, 256, Ski_len));
-    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski, Ski_len));
+    CX_CHECK(
+        cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski, Ski_len));
 #endif
 end:
     if (error != CX_OK) {

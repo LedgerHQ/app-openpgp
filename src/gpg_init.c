@@ -13,11 +13,9 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
+#include "usbd_ccid_if.h"
+#include "ox_ec.h"
 
 #define SHORT(x) ((x) >> 8) & 0xFF, (x) &0xFF
 /* ----------------------*/
@@ -340,7 +338,7 @@ void gpg_init() {
     // first init ?
     if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC)) != 0) {
         gpg_install(STATE_ACTIVATE);
-        gpg_nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC));
+        nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC));
         memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
     }
 
@@ -366,78 +364,74 @@ void gpg_install_slot(gpg_key_slot_t *slot) {
     unsigned char tmp[4];
     unsigned int l;
 
-    gpg_nvm_write(slot, 0, sizeof(gpg_key_slot_t));
+    nvm_write(slot, 0, sizeof(gpg_key_slot_t));
 
     cx_rng(tmp, 4);
-    gpg_nvm_write((void *) (slot->serial), tmp, 4);
+    nvm_write((void *) (slot->serial), tmp, 4);
 
     l = sizeof(C_default_AlgoAttr_sig);
-    gpg_nvm_write((void *) (&slot->sig.attributes.value), (void *) C_default_AlgoAttr_sig, l);
-    gpg_nvm_write((void *) (&slot->sig.attributes.length), &l, sizeof(unsigned int));
-    gpg_nvm_write((void *) (&slot->aut.attributes.value), (void *) C_default_AlgoAttr_sig, l);
-    gpg_nvm_write((void *) (&slot->aut.attributes.length), &l, sizeof(unsigned int));
+    nvm_write((void *) (&slot->sig.attributes.value), (void *) C_default_AlgoAttr_sig, l);
+    nvm_write((void *) (&slot->sig.attributes.length), &l, sizeof(unsigned int));
+    nvm_write((void *) (&slot->aut.attributes.value), (void *) C_default_AlgoAttr_sig, l);
+    nvm_write((void *) (&slot->aut.attributes.length), &l, sizeof(unsigned int));
 
     l = sizeof(C_default_AlgoAttr_dec);
-    gpg_nvm_write((void *) (&slot->dec.attributes.value), (void *) C_default_AlgoAttr_dec, l);
-    gpg_nvm_write((void *) (&slot->dec.attributes.length), &l, sizeof(unsigned int));
+    nvm_write((void *) (&slot->dec.attributes.value), (void *) C_default_AlgoAttr_dec, l);
+    nvm_write((void *) (&slot->dec.attributes.length), &l, sizeof(unsigned int));
 
     tmp[0] = 0x00;
     tmp[1] = 0x20;
-    gpg_nvm_write((void *) (&slot->sig.UIF), &tmp, 2);
-    gpg_nvm_write((void *) (&slot->dec.UIF), &tmp, 2);
-    gpg_nvm_write((void *) (&slot->aut.UIF), &tmp, 2);
+    nvm_write((void *) (&slot->sig.UIF), &tmp, 2);
+    nvm_write((void *) (&slot->dec.UIF), &tmp, 2);
+    nvm_write((void *) (&slot->aut.UIF), &tmp, 2);
 }
 
 void gpg_install(unsigned char app_state) {
     gpg_pin_t pin;
 
     // full reset data
-    gpg_nvm_write((void *) (N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
+    nvm_write((void *) (N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
 
     // historical bytes
     memmove(G_gpg_vstate.work.io_buffer, C_default_Histo, sizeof(C_default_Histo));
     G_gpg_vstate.work.io_buffer[7] = app_state;
-    gpg_nvm_write((void *) (N_gpg_pstate->histo),
-                  G_gpg_vstate.work.io_buffer,
-                  sizeof(C_default_Histo));
+    nvm_write((void *) (N_gpg_pstate->histo), G_gpg_vstate.work.io_buffer, sizeof(C_default_Histo));
 
     // AID
     memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));
-    gpg_nvm_write((void *) (N_gpg_pstate->AID),
-                  &G_gpg_vstate.work.io_buffer,
-                  sizeof(C_default_AID));
+    nvm_write((void *) (N_gpg_pstate->AID), &G_gpg_vstate.work.io_buffer, sizeof(C_default_AID));
 
     if (app_state == STATE_ACTIVATE) {
         // default sex: none
         G_gpg_vstate.work.io_buffer[0] = 0x39;
-        gpg_nvm_write((void *) (&N_gpg_pstate->sex), G_gpg_vstate.work.io_buffer, 1);
+        nvm_write((void *) (&N_gpg_pstate->sex), G_gpg_vstate.work.io_buffer, 1);
 
         // default PW1/PW2: 1 2 3 4 5 6
         memmove(pin.value, C_sha256_PW1, sizeof(C_sha256_PW1));
         pin.length = 6;
         pin.counter = 3;
         pin.ref = PIN_ID_PW1;
-        gpg_nvm_write((void *) (&N_gpg_pstate->PW1), &pin, sizeof(gpg_pin_t));
+        nvm_write((void *) (&N_gpg_pstate->PW1), &pin, sizeof(gpg_pin_t));
 
         // default PW3: 1 2 3 4 5 6 7 8
         memmove(pin.value, C_sha256_PW2, sizeof(C_sha256_PW2));
         pin.length = 8;
         pin.counter = 3;
         pin.ref = PIN_ID_PW3;
-        gpg_nvm_write((void *) (&N_gpg_pstate->PW3), &pin, sizeof(gpg_pin_t));
+        nvm_write((void *) (&N_gpg_pstate->PW3), &pin, sizeof(gpg_pin_t));
 
         // PWs status
         G_gpg_vstate.work.io_buffer[0] = 1;
         G_gpg_vstate.work.io_buffer[1] = GPG_MAX_PW_LENGTH;
         G_gpg_vstate.work.io_buffer[2] = GPG_MAX_PW_LENGTH;
         G_gpg_vstate.work.io_buffer[3] = GPG_MAX_PW_LENGTH;
-        gpg_nvm_write((void *) (&N_gpg_pstate->PW_status), G_gpg_vstate.work.io_buffer, 4);
+        nvm_write((void *) (&N_gpg_pstate->PW_status), G_gpg_vstate.work.io_buffer, 4);
 
         // config slot
         G_gpg_vstate.work.io_buffer[0] = GPG_KEYS_SLOTS;
         G_gpg_vstate.work.io_buffer[1] = 0;
         G_gpg_vstate.work.io_buffer[2] = 3;  // 3: selection by APDU and screen
-        gpg_nvm_write((void *) (&N_gpg_pstate->config_slot), G_gpg_vstate.work.io_buffer, 3);
+        nvm_write((void *) (&N_gpg_pstate->config_slot), G_gpg_vstate.work.io_buffer, 3);
 
         // config rsa pub
         G_gpg_vstate.work.io_buffer[0] = (GPG_RSA_DEFAULT_PUB >> 24) & 0xFF;
@@ -448,8 +442,8 @@ void gpg_install(unsigned char app_state) {
 
         // config pin
         G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
-        gpg_nvm_write((void *) (&N_gpg_pstate->config_pin), G_gpg_vstate.work.io_buffer, 1);
-        USBD_CCID_activate_pinpad(3);
+        nvm_write((void *) (&N_gpg_pstate->config_pin), G_gpg_vstate.work.io_buffer, 1);
+        gpg_activate_pinpad(3);
 
         // default key template: RSA 2048)
         for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
@@ -458,16 +452,8 @@ void gpg_install(unsigned char app_state) {
     }
 }
 
-// TODO: Check if needed
-void USBD_CCID_activate_pinpad(int enabled) {
-#ifdef HAVE_USB_CLASS_CCID
-    //unsigned short length = 0;
-    //uint8_t *cfgDesc = NULL;
-    unsigned char e;
-    e = enabled ? 3 : 0;
-    //cfgDesc = USBD_GetCfgDesc_impl(&length);
-    //nvm_write(cfgDesc + (length - 16), &e, 1);
-#else
-    UNUSED(enabled);
-#endif
+void gpg_activate_pinpad(uint8_t enabled) {
+    uint8_t e = enabled ? 3 : 0;
+
+    io_usb_ccid_configure_pinpad(e);
 }

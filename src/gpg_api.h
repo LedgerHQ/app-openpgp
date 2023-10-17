@@ -16,7 +16,7 @@
 #ifndef GPG_API_H
 #define GPG_API_H
 
-void USBD_CCID_activate_pinpad(int enabled);
+void gpg_activate_pinpad(uint8_t enabled);
 
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len);
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len);
@@ -93,24 +93,5 @@ int gpg_io_fetch_nv(unsigned char *buffer, int len);
 int gpg_io_fetch(unsigned char *buffer, int len);
 
 int gpg_io_do(unsigned int io_flags);
-
-/* ----------------------------------------------------------------------- */
-/* ---                                 TMP                           ---- */
-/* ----------------------------------------------------------------------- */
-void io_usb_ccid_set_card_inserted(unsigned int inserted);
-
-/* ----------------------------------------------------------------------- */
-/* ---                                DEBUG                           ---- */
-/* ----------------------------------------------------------------------- */
-#ifdef GPG_DEBUG
-#error "UNSUPPORTDED: to be fixed"
-#include "gpg_debug.h"
-
-#else
-
-#define gpg_nvm_write   nvm_write
-#define gpg_io_exchange io_exchange
-
-#endif
 
 #endif

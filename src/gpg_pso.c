@@ -13,10 +13,6 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
 #include "gpg_ux_nanos.h"
 #include "cx_errors.h"

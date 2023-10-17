@@ -13,19 +13,9 @@
  * limitations under the License.
  */
 
-#ifndef GPG_DEBUG_MAIN
-
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
-
 #include "gpg_ux_nanos.h"
-
-#include "os_io_seproxyhal.h"
-#include "string.h"
-#include "glyphs.h"
+#include "usbd_ccid_if.h"
 
 /* ----------------------------------------------------------------------- */
 /* ---                            Application Entry                    --- */
@@ -188,5 +178,3 @@ __attribute__((section(".boot"))) int main(void) {
     }
     app_exit();
 }
-
-#endif

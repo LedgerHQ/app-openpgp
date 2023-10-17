@@ -15,17 +15,9 @@
 
 #ifdef UI_NANO_X
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
-
 #include "gpg_ux_msg.h"
-#include "os_io_seproxyhal.h"
-#include "usbd_ccid_impl.h"
-#include "string.h"
-#include "glyphs.h"
+#include "usbd_ccid_if.h"
 
 /* ----------------------------------------------------------------------- */
 /* ---                        NanoS  UI layout                         --- */
@@ -590,7 +582,7 @@ UX_STEP_CB(ux_menu_template_4_step,
            pb,
            ui_menu_settings_display(0),
            {
-               &C_icon_back,
+               &C_icon_back_x,
                "Back",
            });
 
@@ -709,8 +701,8 @@ void ui_menu_tmpl_set_action(unsigned int value) {
             goto ERROR;
     }
 
-    gpg_nvm_write(dest, NULL, sizeof(gpg_key_t));
-    gpg_nvm_write(&dest->attributes, &attributes, sizeof(attributes));
+    nvm_write(dest, NULL, sizeof(gpg_key_t));
+    nvm_write(&dest->attributes, &attributes, sizeof(attributes));
     ui_info(OK, NULL, ui_menu_template_display, 0);
     return;
 
@@ -749,7 +741,7 @@ UX_STEP_CB(ux_menu_seedmode_2_step,
            pb,
            ui_menu_settings_display(1),
            {
-               &C_icon_back,
+               &C_icon_back_x,
                "Back",
            });
 
@@ -821,7 +813,7 @@ UX_STEP_CB(ux_menu_pinmode_7_step,
            pb,
            ui_menu_settings_display(2),
            {
-               &C_icon_back,
+               &C_icon_back_x,
                "Back",
            });
 
@@ -876,15 +868,14 @@ void ui_menu_pinmode_action(unsigned int value) {
             }
             // set new mode
             s = G_gpg_vstate.pinmode;
-            gpg_nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &s, 1);
+            nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &s, 1);
             // disactivate pinpad if any
             if (G_gpg_vstate.pinmode == PIN_MODE_HOST) {
                 s = 0;
             } else {
                 s = 3;
             }
-            // #warning USBD_CCID_activate_pinpad commented
-            USBD_CCID_activate_pinpad(s);
+            gpg_activate_pinpad(s);
             value = G_gpg_vstate.pinmode;
         }
     } else {
@@ -961,7 +952,7 @@ UX_STEP_CB(ux_menu_uif_4_step,
            pb,
            ui_menu_settings_display(3),
            {
-               &C_icon_back,
+               &C_icon_back_x,
                "Back",
            });
 
@@ -1004,10 +995,10 @@ void ui_menu_uifmode_action(unsigned int value) {
     }
     if (uif[0] == 0) {
         new_uif = 1;
-        gpg_nvm_write(&uif[0], &new_uif, 1);
+        nvm_write(&uif[0], &new_uif, 1);
     } else if (uif[0] == 1) {
         new_uif = 0;
-        gpg_nvm_write(&uif[0], &new_uif, 1);
+        nvm_write(&uif[0], &new_uif, 1);
     } else /*if (uif[0] == 2 )*/ {
         ui_info(UIF_LOCKED, NULL, ui_menu_uifmode_display, 0);
         return;
@@ -1039,7 +1030,7 @@ void ui_menu_reset_action(unsigned int value) {
     magic[1] = 0;
     magic[2] = 0;
     magic[3] = 0;
-    gpg_nvm_write((void *) (N_gpg_pstate->magic), magic, 4);
+    nvm_write((void *) (N_gpg_pstate->magic), magic, 4);
     gpg_init();
     ui_CCID_reset();
     ui_menu_main_display(0);
@@ -1147,7 +1138,7 @@ UX_STEP_CB(ux_menu_slot_5_step,
            pn,
            ui_menu_main_display(1),
            {
-               &C_icon_back,
+               &C_icon_back_x,
                "Back",
            });
 
@@ -1189,7 +1180,7 @@ void ui_menu_slot_action(unsigned int value) {
 
     if (value == 128) {
         s = G_gpg_vstate.slot;
-        gpg_nvm_write((void *) &N_gpg_pstate->config_slot[1], &s, 1);
+        nvm_write((void *) &N_gpg_pstate->config_slot[1], &s, 1);
     } else {
         s = (unsigned char) (value - 1);
         if (s != G_gpg_vstate.slot) {
@@ -1214,14 +1205,14 @@ UX_STEP_NOCB(ux_menu_info_1_step,
                  "OpenPGP Card",
                  "(c) Ledger SAS",
                  "Spec  " XSTR(SPEC_VERSION),
-                 "App  " XSTR(OPENPGP_VERSION),
+                 "App  " XSTR(APPVERSION),
              });
 
 UX_STEP_CB(ux_menu_info_2_step,
            pb,
            ui_menu_main_display(0),
            {
-               &C_icon_back,
+               &C_icon_back_x,
                "Back",
            });
 
@@ -1242,7 +1233,7 @@ UX_STEP_NOCB_INIT(ux_menu_main_1_step,
                   pnn,
                   ui_menu_main_predisplay(),
                   {
-                      &C_icon_pgp,
+                      &C_gpg_16px,
                       G_gpg_vstate.ux_buff1,
                       G_gpg_vstate.ux_buff2,
                   });

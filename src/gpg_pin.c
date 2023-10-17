@@ -13,12 +13,7 @@
  * limitations under the License.
  */
 
-#include "os.h"
-#include "cx.h"
-#include "gpg_types.h"
-#include "gpg_api.h"
 #include "gpg_vars.h"
-
 #include "gpg_ux_nanos.h"
 
 gpg_pin_t *gpg_pin_get_pin(int pinref) {
@@ -57,7 +52,7 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pi
     }
 
     counter = pin->counter - 1;
-    gpg_nvm_write(&(pin->counter), &counter, sizeof(int));
+    nvm_write(&(pin->counter), &counter, sizeof(int));
     cx_sha256_init(&G_gpg_vstate.work.md.sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
                               CX_LAST,
@@ -70,7 +65,7 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pi
     }
 
     counter = 3;
-    gpg_nvm_write(&(pin->counter), &counter, sizeof(int));
+    nvm_write(&(pin->counter), &counter, sizeof(int));
     return SW_OK;
 end:
     if (error != CX_OK) {
@@ -111,7 +106,7 @@ void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     newpin.length = pin_len;
     newpin.counter = 3;
 
-    gpg_nvm_write(pin, &newpin, sizeof(gpg_pin_t));
+    nvm_write(pin, &newpin, sizeof(gpg_pin_t));
 end:
     if (error != CX_OK) {
         THROW(error);
