@@ -22,21 +22,21 @@
 
 #ifndef TARGET_NANOS
 #include "ux.h"
-ux_state_t        G_ux;
+ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 #else
-ux_state_t           ux;
+ux_state_t ux;
 #endif
 
 #ifndef GPG_DEBUG_MAIN
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 #else
 extern unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
-int                  apdu_n;
+int apdu_n;
 #endif
 
 gpg_v_state_t G_gpg_vstate;
 
 #ifdef HAVE_RSA
 union cx_u G_cx;
-#endif // HAVE_RSA
+#endif  // HAVE_RSA

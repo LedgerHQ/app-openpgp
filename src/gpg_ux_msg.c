@@ -13,24 +13,24 @@
  * limitations under the License.
  */
 
-const char *const C_TEMPLATE_TYPE     = "Key type";
-const char *const C_TEMPLATE_KEY      = "Key";
+const char *const C_TEMPLATE_TYPE = "Key type";
+const char *const C_TEMPLATE_KEY = "Key";
 const char *const C_INVALID_SELECTION = "Invalid selection";
 
-const char *const C_OK  = "OK";
+const char *const C_OK = "OK";
 const char *const C_NOK = "NOK";
 
-const char *const C_WRONG_PIN   = "PIN Incorrect";
-const char *const C_RIGHT_PIN   = "PIN Correct";
+const char *const C_WRONG_PIN = "PIN Incorrect";
+const char *const C_RIGHT_PIN = "PIN Correct";
 const char *const C_PIN_CHANGED = "PIN changed";
 const char *const C_PIN_DIFFERS = "2 PINs differs";
-const char *const C_PIN_USER    = "User PIN";
-const char *const C_PIN_ADMIN   = "Admin PIN";
+const char *const C_PIN_USER = "User PIN";
+const char *const C_PIN_ADMIN = "Admin PIN";
 
-const char *const C_VERIFIED     = "Verified";
+const char *const C_VERIFIED = "Verified";
 const char *const C_NOT_VERIFIED = "Not Verified";
-const char *const C_ALLOWED      = "Allowed";
-const char *const C_NOT_ALLOWED  = "Not Allowed ";
+const char *const C_ALLOWED = "Allowed";
+const char *const C_NOT_ALLOWED = "Not Allowed ";
 
 const char *const C_DEFAULT_MODE = "Default mode";
 

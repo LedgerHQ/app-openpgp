@@ -847,4 +847,3 @@ class GPGCard() :
             'e': tags[0x82],
             'd': tags[0x98],
             }
-

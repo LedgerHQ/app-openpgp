@@ -1,10 +1,32 @@
-# Glyphs auto-generated
-src/glyphs.*
+# Compilation files of the application
+build/
 
-# Build files
-dep
-obj
-release
-bin
-debug
-build
+# Legacy compilation output
+bin/
+debug/
+
+# Temporary directory with snapshots taken during test runs
+tests/snapshots-tmp/
+
+# Unit tests and code coverage
+unit-tests/build/
+unit-tests/coverage/
+unit-tests/coverage.info
+
+# Fuzzing
+fuzzing/build/
+
+# Python
+*.pyc[cod]
+*.egg
+__pycache__/
+*.egg-info/
+.eggs/
+.python-version
+
+# Doxygen
+doc/html
+doc/latex
+
+# Virtual env for sideload (macOS and Windows)
+ledger/

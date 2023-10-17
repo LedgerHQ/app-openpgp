@@ -35,7 +35,7 @@ OpenPGP Application manage four keys for cryptographic operation (PSO) plus two
 for secure channel.
 
 The first four keys are defined as follow:
-  - One asymmetric signature  private key (RSA or EC), named 'sig';
+  - One asymmetric signature private key (RSA or EC), named 'sig'
   - One asymmetric decryption private key (RSA or EC), named 'dec'
   - One asymmetric authentication private key (RSA or EC), named 'aut'
   - One symmetric decryption private key (AES), named 'sym0'
@@ -49,7 +49,7 @@ It's never possible to retrieve private key from the card.
 
 This add-on specification propose a solution to derive those keys from the
 master seed managed by the Ledger Token.
-This allow owner to restore a broken token without the needs to keep track of keys
+This allows owner to restore a broken token without the needs to keep track of keys
 outside the card.
 
 Moreover this add-on specification propose to manage multiple set of the
@@ -69,7 +69,7 @@ This add-on specification propose new type of random generation:
 Key Backup
 ~~~~~~~~~~
 
-A full keybackup mecanism is provided. 
+A full keybackup mechanism is provided.
 
 
 GPG-ledger
@@ -79,7 +79,7 @@ Definitions
 -----------
 
   - The application is named GPG-ledger
-  - A  keys set is named 'keys slot'
+  - A keys set is named 'keys slot'
 
 How
 ---
@@ -95,7 +95,7 @@ Deterministic key derivation maybe activated in:
 This activation remains effective until *set off* is selected or the application
 ends.
 
-The key management remains the same if seed mode is on or off, i.e. key are stored in memory key containers. So their is no perfomance inpact when using seeded keys.
+The key management remains the same if seed mode is on or off, i.e. key are stored in memory key containers. So there is no performance impact when using seeded keys.
 
 Seeded keys are generated as follow:
 
@@ -133,7 +133,7 @@ Generate RSA key pair as usual.
   - n = p*q
   - d = inv(e) mod (p-1)(q-1)
 
-*ECC key genration* :
+*ECC key generation* :
 
 Generate one seed Sd in step2 with :
   - i = 1
@@ -188,16 +188,18 @@ For a given length *L* and seed *S*:
 Key Backup & Restore
 ~~~~~~~~~~~~~~~~~~~~
 
-In order to backup/restore private key the commands `put_data` and 
-`get_data` accept the tag `B6` (signature key), `B8`(encryption key), 
-`A4` (authentication).
+In order to backup/restore private key the commands `put_data` and
+`get_data` accept the tags:
+  - `B6` (signature key)
+  - `B8`(encryption key)
+  - `A4` (authentication).
 
-put_data command accept the exact output of get_data. The get_data command
+`put_data` command accept the exact output of `get_data`. The `get_data` command
 return both the public and private key.
 
-For security and confidentiality private key is returned encryped in AES.
-The key used is derived according to previously described AES key derivation 
-with name 'key '.
+For security and confidentiality, private key is returned encrypted in AES.
+The key used is derived according to previously described AES key derivation
+with name 'key'.
 
 
 The data payload is formatted as follow:
@@ -227,7 +229,7 @@ APDU Modification
 Key Slot management
 ~~~~~~~~~~~~~~~~~~~~
 
-Key slots are managed by data object 01F1 and 01F2 witch are 
+Key slots are managed by data object *01F1* and *01F2* witch are
 manageable by PUT/GET DATA command as for others DO and organized as follow.
 
 On application reset, the *01F2* content is set to *Default Slot* value
@@ -255,8 +257,6 @@ Byte 3 is endoced as follow:
   | \- | \- | \- | \- | \- | \- | x  | \- | selection by screen     |
   +----+----+----+----+----+----+----+----+-------------------------+
 
- 
-  
 
 *01F2:*
 
@@ -302,7 +302,7 @@ P2 parameter of GENERATE ASYMMETRIC KEY PAIR is set to (hex value):
 Deterministic random number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-P1 parameter of GET CHALLENGE is a bits field encoded as follow:
+P1 parameter of GET CHALLENGE is a bit-field encoded as follow:
 
   +----+-----+----+----+----+----+----+----+-------------------------+
   | b8 |  b7 | b6 | b5 | b4 | b3 | b2 | b1 | Meaning                 |
@@ -320,7 +320,7 @@ the length of random bytes to generate.
 Other minor add-on
 ------------------
 
-GnuPG use both fingerprints and serial number to identfy key on card.
-So, the put data command is able to modify the AID file with '4F' tag.
-In that case the data field shall be four bytes length and shall contain 
+GnuPG use both fingerprints and serial number to identify key on card.
+So, the `put_data` command is able to modify the AID file with '4F' tag.
+In that case the data field shall be four bytes length and shall contain
 the new serial number. '4F' is protected by PW3 (admin) PIN.

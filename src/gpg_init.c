@@ -19,7 +19,7 @@
 #include "gpg_api.h"
 #include "gpg_vars.h"
 
-#define SHORT(x) ((x) >> 8) & 0xFF, (x)&0xFF
+#define SHORT(x) ((x) >> 8) & 0xFF, (x) &0xFF
 /* ----------------------*/
 /* -- A Kind of Magic -- */
 /* ----------------------*/
@@ -68,115 +68,132 @@ const unsigned char C_OID_BRAINPOOL512R1[9] = {
 
 // Ed25519/curve25519: 1.3.6.1.4.1.11591.15.1
 const unsigned char C_OID_Ed25519[9] = {
-    0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01,
+    0x2B,
+    0x06,
+    0x01,
+    0x04,
+    0x01,
+    0xDA,
+    0x47,
+    0x0F,
+    0x01,
 };
 
 // Ed25519/curve25519: 1.3.6.1.4.1.11591.15.1
 const unsigned char C_OID_cv25519[10] = {
-    0x2B, 0x06, 0x01, 0x04, 0x01, 0x97, 0x55, 0x01, 0x05, 0x01,
+    0x2B,
+    0x06,
+    0x01,
+    0x04,
+    0x01,
+    0x97,
+    0x55,
+    0x01,
+    0x05,
+    0x01,
 };
 
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
-  if ((len == sizeof(C_OID_SECP256R1)) && (memcmp(oid, C_OID_SECP256R1, len) == 0)) {
-    return CX_CURVE_SECP256R1;
-  }
-  /*
-  if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
-    return CX_CURVE_SECP256K1;
-  }
+    if ((len == sizeof(C_OID_SECP256R1)) && (memcmp(oid, C_OID_SECP256R1, len) == 0)) {
+        return CX_CURVE_SECP256R1;
+    }
+    /*
+    if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
+      return CX_CURVE_SECP256K1;
+    }
 
-  if ( (len == sizeof(C_OID_SECP384R1)) && (memcmp(oid, C_OID_SECP384R1, len)==0) ) {
-    return CX_CURVE_SECP384R1;
-  }
-  if ( (len == sizeof(C_OID_SECP521R1)) && (memcmp(oid, C_OID_SECP521R1, len)==0) ) {
-    return CX_CURVE_SECP521R1;
-  }
- */
+    if ( (len == sizeof(C_OID_SECP384R1)) && (memcmp(oid, C_OID_SECP384R1, len)==0) ) {
+      return CX_CURVE_SECP384R1;
+    }
+    if ( (len == sizeof(C_OID_SECP521R1)) && (memcmp(oid, C_OID_SECP521R1, len)==0) ) {
+      return CX_CURVE_SECP521R1;
+    }
+   */
 
-  /*
-  if ( (len == sizeof(C_OID_BRAINPOOL256R1)) && (memcmp(oid, C_OID_BRAINPOOL256R1, len)==0) ) {
-    return CX_CURVE_BrainPoolP256R1;
-  }
-  if ( (len == sizeof(C_OID_BRAINPOOL384R1)) && (memcmp(oid, C_OID_BRAINPOOL384R1, len)==0) ) {
-    return CX_CURVE_BrainPoolP384R1;
-  }
-  if ( (len == sizeof(C_OID_BRAINPOOL512R1)) && (memcmp(oid, C_OID_BRAINPOOL512R1, len)==0) ) {
-    return CX_CURVE_BrainPoolP512R1;
-  }
- */
-  if ((len == sizeof(C_OID_Ed25519)) && (memcmp(oid, C_OID_Ed25519, len) == 0)) {
-    return CX_CURVE_Ed25519;
-  }
+    /*
+    if ( (len == sizeof(C_OID_BRAINPOOL256R1)) && (memcmp(oid, C_OID_BRAINPOOL256R1, len)==0) ) {
+      return CX_CURVE_BrainPoolP256R1;
+    }
+    if ( (len == sizeof(C_OID_BRAINPOOL384R1)) && (memcmp(oid, C_OID_BRAINPOOL384R1, len)==0) ) {
+      return CX_CURVE_BrainPoolP384R1;
+    }
+    if ( (len == sizeof(C_OID_BRAINPOOL512R1)) && (memcmp(oid, C_OID_BRAINPOOL512R1, len)==0) ) {
+      return CX_CURVE_BrainPoolP512R1;
+    }
+   */
+    if ((len == sizeof(C_OID_Ed25519)) && (memcmp(oid, C_OID_Ed25519, len) == 0)) {
+        return CX_CURVE_Ed25519;
+    }
 
-  if ((len == sizeof(C_OID_cv25519)) && (memcmp(oid, C_OID_cv25519, len) == 0)) {
-    return CX_CURVE_Curve25519;
-  }
+    if ((len == sizeof(C_OID_cv25519)) && (memcmp(oid, C_OID_cv25519, len) == 0)) {
+        return CX_CURVE_Curve25519;
+    }
 
-  /*
-  if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
-    return CX_CURVE_256K1;
-  }
-  if ( (len == sizeof(C_OID_BRAINPOOL256T1)) && (memcmp(oid, C_OID_BRAINPOOL256T1, len)==0) ) {
-    return CX_CURVE_BrainPoolP256T1;
-  }
-  */
-  return CX_CURVE_NONE;
+    /*
+    if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
+      return CX_CURVE_256K1;
+    }
+    if ( (len == sizeof(C_OID_BRAINPOOL256T1)) && (memcmp(oid, C_OID_BRAINPOOL256T1, len)==0) ) {
+      return CX_CURVE_BrainPoolP256T1;
+    }
+    */
+    return CX_CURVE_NONE;
 }
 
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
-  switch (cv) {
-  case CX_CURVE_SECP256R1:
-    *len = sizeof(C_OID_SECP256R1);
-    return (unsigned char *)PIC(C_OID_SECP256R1);
+    switch (cv) {
+        case CX_CURVE_SECP256R1:
+            *len = sizeof(C_OID_SECP256R1);
+            return (unsigned char *) PIC(C_OID_SECP256R1);
 
-  /*
-  case CX_CURVE_SECP256K1:
-    *len = sizeof(C_OID_SECP256K1);
-    return   (unsigned char*)PIC(C_OID_SECP256K1);
+        /*
+        case CX_CURVE_SECP256K1:
+          *len = sizeof(C_OID_SECP256K1);
+          return   (unsigned char*)PIC(C_OID_SECP256K1);
 
-  case CX_CURVE_SECP384R1:
-    *len = sizeof(C_OID_SECP384R1);
-    return   (unsigned char*)PIC(C_OID_SECP384R1);
+        case CX_CURVE_SECP384R1:
+          *len = sizeof(C_OID_SECP384R1);
+          return   (unsigned char*)PIC(C_OID_SECP384R1);
 
-  case CX_CURVE_SECP521R1:
-    *len = sizeof(C_OID_SECP521R1);
-    return   (unsigned char*)PIC(C_OID_SECP521R1);
-  */
+        case CX_CURVE_SECP521R1:
+          *len = sizeof(C_OID_SECP521R1);
+          return   (unsigned char*)PIC(C_OID_SECP521R1);
+        */
 
-  /*
-  case CX_CURVE_BrainPoolP256R1:
-    *len = sizeof(C_OID_SECP256R1);
-    return   (unsigned char*)PIC(C_OID_SECP256R1);
+        /*
+        case CX_CURVE_BrainPoolP256R1:
+          *len = sizeof(C_OID_SECP256R1);
+          return   (unsigned char*)PIC(C_OID_SECP256R1);
 
-  case CX_CURVE_BrainPoolP384R1:
-    *len = sizeof(C_OID_SECP384R1);
-    return   (unsigned char*)PIC(C_OID_SECP384R1);
+        case CX_CURVE_BrainPoolP384R1:
+          *len = sizeof(C_OID_SECP384R1);
+          return   (unsigned char*)PIC(C_OID_SECP384R1);
 
-  case CX_CURVE_BrainPoolP512R1:
-    *len = sizeof(C_OID_SECP521R1);
-    return   (unsigned char*)PIC(C_OID_SECP521R1);
-  */
-  case CX_CURVE_Ed25519:
-    *len = sizeof(C_OID_Ed25519);
-    return (unsigned char *)PIC(C_OID_Ed25519);
+        case CX_CURVE_BrainPoolP512R1:
+          *len = sizeof(C_OID_SECP521R1);
+          return   (unsigned char*)PIC(C_OID_SECP521R1);
+        */
+        case CX_CURVE_Ed25519:
+            *len = sizeof(C_OID_Ed25519);
+            return (unsigned char *) PIC(C_OID_Ed25519);
 
-  case CX_CURVE_Curve25519:
-    *len = sizeof(C_OID_cv25519);
-    return (unsigned char *)PIC(C_OID_cv25519);
-  }
+        case CX_CURVE_Curve25519:
+            *len = sizeof(C_OID_cv25519);
+            return (unsigned char *) PIC(C_OID_cv25519);
+    }
 
-  *len = 0;
-  return NULL;
+    *len = 0;
+    return NULL;
 }
 
 unsigned int gpg_curve2domainlen(unsigned int cv) {
-  switch (cv) {
-  case CX_CURVE_SECP256R1:
-  case CX_CURVE_Ed25519:
-  case CX_CURVE_Curve25519:
-    return 32;
-  }
-  return 0;
+    switch (cv) {
+        case CX_CURVE_SECP256R1:
+        case CX_CURVE_Ed25519:
+        case CX_CURVE_Curve25519:
+            return 32;
+    }
+    return 0;
 }
 
 /* -------------------------------*/
@@ -201,30 +218,49 @@ const unsigned char C_ext_capabilities[10] = {
 
 };
 
-const unsigned char C_ext_length[8] = {0x02, 0x02, SHORT(GPG_APDU_LENGTH), 0x02, 0x02, SHORT(GPG_APDU_LENGTH)};
+const unsigned char C_ext_length[8] =
+    {0x02, 0x02, SHORT(GPG_APDU_LENGTH), 0x02, 0x02, SHORT(GPG_APDU_LENGTH)};
 
 /* ---------------------*/
 /* -- default values -- */
 /* ---------------------*/
 
-const unsigned char C_default_AID[] = {0xD2, 0x76, 0x00, 0x01, 0x24, 0x01,
-                                       // version
-                                       0x03, 0x03,
-                                       // manufacturer
-                                       0x2C, 0x97,
-                                       // serial
-                                       0x00, 0x00, 0x00, 0x00,
-                                       // RFU
-                                       0x00, 0x00};
+const unsigned char C_default_AID[] = {
+    // RID: Registered application provider Identifier
+    0xD2,
+    0x76,
+    0x00,
+    0x01,
+    0x24,
+    // PIX: Proprietary application identifier extension
+    // application
+    0x01,
+    // version
+    0x03,
+    0x03,
+    // manufacturer
+    0x2C,
+    0x97,
+    // serial
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    // RFU
+    0x00,
+    0x00};
 
-const unsigned char C_default_Histo[] = {0x00, 0x31,
-                                         0xC5, // select method: by DF/partialDF; IO-file:readbinary; RFU???
-                                         0x73,
-                                         0xC0, // select method: by DF/partialDF ,
-                                         0x01, // data coding style: ontime/byte
-                                         0x80, // chaining
-                                         0x7F, // zero state
-                                         0x90, 0x00};
+const unsigned char C_default_Histo[] = {
+    0x00,
+    0x31,
+    0xC5,  // select method: by DF/partialDF; IO-file:readbinary; RFU???
+    0x73,
+    0xC0,  // select method: by DF/partialDF ,
+    0x01,  // data coding style: ontime/byte
+    0x80,  // chaining
+    0x7F,  // zero state
+    0x90,
+    0x00};
 
 // Default template: RSA2048 010800002001 / 010800002001
 #if 1
@@ -232,18 +268,22 @@ const unsigned char C_default_AlgoAttr_sig[] = {
     // RSA
     0x01,
     // Modulus default length 2048
-    0x08, 0x00,
+    0x08,
+    0x00,
     // PubExp length  32
-    0x00, 0x20,
+    0x00,
+    0x20,
     // std: e,p,q with modulus (n)
     0x01};
 const unsigned char C_default_AlgoAttr_dec[] = {
     // RSA
     0x01,
     // Modulus default length 2048
-    0x08, 0x00,
+    0x08,
+    0x00,
     // PubExp length  32
-    0x00, 0x20,
+    0x00,
+    0x20,
     // std: e,p,q with modulus (n)
     0x01};
 #endif
@@ -296,135 +336,138 @@ const unsigned char C_sha256_PW2[] = {
 /* ----------------------------------------------------------------------- */
 
 void gpg_init() {
-  memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
-  // first init ?
-  if (memcmp((void *)(N_gpg_pstate->magic), (void *)C_MAGIC, sizeof(C_MAGIC)) != 0) {
-    gpg_install(STATE_ACTIVATE);
-    gpg_nvm_write((void *)(N_gpg_pstate->magic), (void *)C_MAGIC, sizeof(C_MAGIC));
     memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
-  }
+    // first init ?
+    if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC)) != 0) {
+        gpg_install(STATE_ACTIVATE);
+        gpg_nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC));
+        memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
+    }
 
-  // key conf
-  G_gpg_vstate.slot  = N_gpg_pstate->config_slot[1];
-  G_gpg_vstate.kslot = (gpg_key_slot_t *)&N_gpg_pstate->keys[G_gpg_vstate.slot];
-  gpg_mse_reset();
-  // pin conf
-  G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
-  // ux conf
-  gpg_init_ux();
+    // key conf
+    G_gpg_vstate.slot = N_gpg_pstate->config_slot[1];
+    G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
+    gpg_mse_reset();
+    // pin conf
+    G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
+    // ux conf
+    gpg_init_ux();
 }
 
 void gpg_init_ux() {
-  G_gpg_vstate.ux_type = -1;
-  G_gpg_vstate.ux_key  = -1;
+    G_gpg_vstate.ux_type = -1;
+    G_gpg_vstate.ux_key = -1;
 }
 
 /* ----------------------------------------------------------------------- */
 /* ---  Install/ReInstall GPGapp                                       --- */
 /* ----------------------------------------------------------------------- */
 void gpg_install_slot(gpg_key_slot_t *slot) {
-  unsigned char tmp[4];
-  unsigned int l;
+    unsigned char tmp[4];
+    unsigned int l;
 
-  gpg_nvm_write(slot, 0, sizeof(gpg_key_slot_t));
+    gpg_nvm_write(slot, 0, sizeof(gpg_key_slot_t));
 
-  cx_rng(tmp, 4);
-  gpg_nvm_write((void *)(slot->serial), tmp, 4);
+    cx_rng(tmp, 4);
+    gpg_nvm_write((void *) (slot->serial), tmp, 4);
 
-  l      = sizeof(C_default_AlgoAttr_sig);
-  gpg_nvm_write((void *)(&slot->sig.attributes.value), (void *)C_default_AlgoAttr_sig, l);
-  gpg_nvm_write((void *)(&slot->sig.attributes.length), &l, sizeof(unsigned int));
-  gpg_nvm_write((void *)(&slot->aut.attributes.value), (void *)C_default_AlgoAttr_sig, l);
-  gpg_nvm_write((void *)(&slot->aut.attributes.length), &l, sizeof(unsigned int));
+    l = sizeof(C_default_AlgoAttr_sig);
+    gpg_nvm_write((void *) (&slot->sig.attributes.value), (void *) C_default_AlgoAttr_sig, l);
+    gpg_nvm_write((void *) (&slot->sig.attributes.length), &l, sizeof(unsigned int));
+    gpg_nvm_write((void *) (&slot->aut.attributes.value), (void *) C_default_AlgoAttr_sig, l);
+    gpg_nvm_write((void *) (&slot->aut.attributes.length), &l, sizeof(unsigned int));
 
-  l = sizeof(C_default_AlgoAttr_dec);
-  gpg_nvm_write((void *)(&slot->dec.attributes.value), (void *)C_default_AlgoAttr_dec, l);
-  gpg_nvm_write((void *)(&slot->dec.attributes.length), &l, sizeof(unsigned int));
+    l = sizeof(C_default_AlgoAttr_dec);
+    gpg_nvm_write((void *) (&slot->dec.attributes.value), (void *) C_default_AlgoAttr_dec, l);
+    gpg_nvm_write((void *) (&slot->dec.attributes.length), &l, sizeof(unsigned int));
 
-  tmp[0] = 0x00;
-  tmp[1] = 0x20;
-  gpg_nvm_write((void *)(&slot->sig.UIF), &tmp, 2);
-  gpg_nvm_write((void *)(&slot->dec.UIF), &tmp, 2);
-  gpg_nvm_write((void *)(&slot->aut.UIF), &tmp, 2);
+    tmp[0] = 0x00;
+    tmp[1] = 0x20;
+    gpg_nvm_write((void *) (&slot->sig.UIF), &tmp, 2);
+    gpg_nvm_write((void *) (&slot->dec.UIF), &tmp, 2);
+    gpg_nvm_write((void *) (&slot->aut.UIF), &tmp, 2);
 }
 
 void gpg_install(unsigned char app_state) {
-  gpg_pin_t    pin;
+    gpg_pin_t pin;
 
-  // full reset data
-  gpg_nvm_write((void *)(N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
+    // full reset data
+    gpg_nvm_write((void *) (N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
 
-  // historical bytes
-  memmove(G_gpg_vstate.work.io_buffer, C_default_Histo, sizeof(C_default_Histo));
-  G_gpg_vstate.work.io_buffer[7] = app_state;
-  gpg_nvm_write((void *)(N_gpg_pstate->histo), G_gpg_vstate.work.io_buffer, sizeof(C_default_Histo));
+    // historical bytes
+    memmove(G_gpg_vstate.work.io_buffer, C_default_Histo, sizeof(C_default_Histo));
+    G_gpg_vstate.work.io_buffer[7] = app_state;
+    gpg_nvm_write((void *) (N_gpg_pstate->histo),
+                  G_gpg_vstate.work.io_buffer,
+                  sizeof(C_default_Histo));
 
-  // AID
-  memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));
-  gpg_nvm_write((void *)(N_gpg_pstate->AID), &G_gpg_vstate.work.io_buffer, sizeof(C_default_AID));
+    // AID
+    memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));
+    gpg_nvm_write((void *) (N_gpg_pstate->AID),
+                  &G_gpg_vstate.work.io_buffer,
+                  sizeof(C_default_AID));
 
+    if (app_state == STATE_ACTIVATE) {
+        // default sex: none
+        G_gpg_vstate.work.io_buffer[0] = 0x39;
+        gpg_nvm_write((void *) (&N_gpg_pstate->sex), G_gpg_vstate.work.io_buffer, 1);
 
-  if (app_state == STATE_ACTIVATE) {
-    // default sex: none
-    G_gpg_vstate.work.io_buffer[0] = 0x39;
-    gpg_nvm_write((void *)(&N_gpg_pstate->sex), G_gpg_vstate.work.io_buffer, 1);
+        // default PW1/PW2: 1 2 3 4 5 6
+        memmove(pin.value, C_sha256_PW1, sizeof(C_sha256_PW1));
+        pin.length = 6;
+        pin.counter = 3;
+        pin.ref = PIN_ID_PW1;
+        gpg_nvm_write((void *) (&N_gpg_pstate->PW1), &pin, sizeof(gpg_pin_t));
 
-    // default PW1/PW2: 1 2 3 4 5 6
-    memmove(pin.value, C_sha256_PW1, sizeof(C_sha256_PW1));
-    pin.length  = 6;
-    pin.counter = 3;
-    pin.ref     = PIN_ID_PW1;
-    gpg_nvm_write((void *)(&N_gpg_pstate->PW1), &pin, sizeof(gpg_pin_t));
+        // default PW3: 1 2 3 4 5 6 7 8
+        memmove(pin.value, C_sha256_PW2, sizeof(C_sha256_PW2));
+        pin.length = 8;
+        pin.counter = 3;
+        pin.ref = PIN_ID_PW3;
+        gpg_nvm_write((void *) (&N_gpg_pstate->PW3), &pin, sizeof(gpg_pin_t));
 
-    // default PW3: 1 2 3 4 5 6 7 8
-    memmove(pin.value, C_sha256_PW2, sizeof(C_sha256_PW2));
-    pin.length  = 8;
-    pin.counter = 3;
-    pin.ref     = PIN_ID_PW3;
-    gpg_nvm_write((void *)(&N_gpg_pstate->PW3), &pin, sizeof(gpg_pin_t));
+        // PWs status
+        G_gpg_vstate.work.io_buffer[0] = 1;
+        G_gpg_vstate.work.io_buffer[1] = GPG_MAX_PW_LENGTH;
+        G_gpg_vstate.work.io_buffer[2] = GPG_MAX_PW_LENGTH;
+        G_gpg_vstate.work.io_buffer[3] = GPG_MAX_PW_LENGTH;
+        gpg_nvm_write((void *) (&N_gpg_pstate->PW_status), G_gpg_vstate.work.io_buffer, 4);
 
-    // PWs status
-    G_gpg_vstate.work.io_buffer[0] = 1;
-    G_gpg_vstate.work.io_buffer[1] = GPG_MAX_PW_LENGTH;
-    G_gpg_vstate.work.io_buffer[2] = GPG_MAX_PW_LENGTH;
-    G_gpg_vstate.work.io_buffer[3] = GPG_MAX_PW_LENGTH;
-    gpg_nvm_write((void *)(&N_gpg_pstate->PW_status), G_gpg_vstate.work.io_buffer, 4);
+        // config slot
+        G_gpg_vstate.work.io_buffer[0] = GPG_KEYS_SLOTS;
+        G_gpg_vstate.work.io_buffer[1] = 0;
+        G_gpg_vstate.work.io_buffer[2] = 3;  // 3: selection by APDU and screen
+        gpg_nvm_write((void *) (&N_gpg_pstate->config_slot), G_gpg_vstate.work.io_buffer, 3);
 
-    // config slot
-    G_gpg_vstate.work.io_buffer[0] = GPG_KEYS_SLOTS;
-    G_gpg_vstate.work.io_buffer[1] = 0;
-    G_gpg_vstate.work.io_buffer[2] = 3; // 3: selection by APDU and screen
-    gpg_nvm_write((void *)(&N_gpg_pstate->config_slot), G_gpg_vstate.work.io_buffer, 3);
+        // config rsa pub
+        G_gpg_vstate.work.io_buffer[0] = (GPG_RSA_DEFAULT_PUB >> 24) & 0xFF;
+        G_gpg_vstate.work.io_buffer[1] = (GPG_RSA_DEFAULT_PUB >> 16) & 0xFF;
+        G_gpg_vstate.work.io_buffer[2] = (GPG_RSA_DEFAULT_PUB >> 8) & 0xFF;
+        G_gpg_vstate.work.io_buffer[3] = (GPG_RSA_DEFAULT_PUB >> 0) & 0xFF;
+        nvm_write((void *) (&N_gpg_pstate->default_RSA_exponent), G_gpg_vstate.work.io_buffer, 4);
 
-    // config rsa pub
-    G_gpg_vstate.work.io_buffer[0] = (GPG_RSA_DEFAULT_PUB >> 24) & 0xFF;
-    G_gpg_vstate.work.io_buffer[1] = (GPG_RSA_DEFAULT_PUB >> 16) & 0xFF;
-    G_gpg_vstate.work.io_buffer[2] = (GPG_RSA_DEFAULT_PUB >> 8) & 0xFF;
-    G_gpg_vstate.work.io_buffer[3] = (GPG_RSA_DEFAULT_PUB >> 0) & 0xFF;
-    nvm_write((void *)(&N_gpg_pstate->default_RSA_exponent), G_gpg_vstate.work.io_buffer, 4);
+        // config pin
+        G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
+        gpg_nvm_write((void *) (&N_gpg_pstate->config_pin), G_gpg_vstate.work.io_buffer, 1);
+        USBD_CCID_activate_pinpad(3);
 
-    // config pin
-    G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
-    gpg_nvm_write((void *)(&N_gpg_pstate->config_pin), G_gpg_vstate.work.io_buffer, 1);
-    USBD_CCID_activate_pinpad(3);
-
-    // default key template: RSA 2048)
-    for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
-      gpg_install_slot((gpg_key_slot_t *)&N_gpg_pstate->keys[s]);
+        // default key template: RSA 2048)
+        for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
+            gpg_install_slot((gpg_key_slot_t *) &N_gpg_pstate->keys[s]);
+        }
     }
-  }
 }
 
+// TODO: Check if needed
 void USBD_CCID_activate_pinpad(int enabled) {
 #ifdef HAVE_USB_CLASS_CCID
-  unsigned short length;
-  uint8_t *      cfgDesc;
-  unsigned char  e;
-  e       = enabled ? 3 : 0;
-  length  = 0;
-  cfgDesc = USBD_GetCfgDesc_impl(&length);
-  nvm_write(cfgDesc + (length - 16), &e, 1);
+    //unsigned short length = 0;
+    //uint8_t *cfgDesc = NULL;
+    unsigned char e;
+    e = enabled ? 3 : 0;
+    //cfgDesc = USBD_GetCfgDesc_impl(&length);
+    //nvm_write(cfgDesc + (length - 16), &e, 1);
 #else
-  UNUSED(enabled);
+    UNUSED(enabled);
 #endif
 }

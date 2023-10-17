@@ -18,17 +18,17 @@
 
 void USBD_CCID_activate_pinpad(int enabled);
 
-unsigned int   gpg_oid2curve(unsigned char *oid, unsigned int len);
+unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len);
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len);
-unsigned int   gpg_curve2domainlen(unsigned int cv);
+unsigned int gpg_curve2domainlen(unsigned int cv);
 
 void gpg_init(void);
 void gpg_init_ux(void);
 void gpg_install(unsigned char app_state);
 void gpg_install_slot(gpg_key_slot_t *slot);
-int  gpg_dispatch(void);
+int gpg_dispatch(void);
 
-int gpg_apdu_select_data(unsigned int ref, int reccord);
+int gpg_apdu_select_data(unsigned int ref, int record);
 int gpg_apdu_get_data(unsigned int ref);
 int gpg_apdu_get_next_data(unsigned int ref);
 int gpg_apdu_put_data(unsigned int ref);
@@ -38,13 +38,13 @@ int gpg_apdu_put_key_data(unsigned int ref);
 void gpg_pso_derive_slot_seed(int slot, unsigned char *seed);
 void gpg_pso_derive_key_seed(unsigned char *Sn,
                              unsigned char *key_name,
-                             unsigned int   idx,
+                             unsigned int idx,
                              unsigned char *Ski,
-                             unsigned int   Ski_len);
-int  gpg_apdu_pso(void);
-int  gpg_apdu_internal_authenticate(void);
-int  gpg_apdu_gen(void);
-int  gpg_apdu_get_challenge(void);
+                             unsigned int Ski_len);
+int gpg_apdu_pso(void);
+int gpg_apdu_internal_authenticate(void);
+int gpg_apdu_gen(void);
+int gpg_apdu_get_challenge(void);
 
 int gpg_apdu_select(void);
 
@@ -53,11 +53,11 @@ int gpg_apdu_change_ref_data(void);
 int gpg_apdu_reset_retry_counter(void);
 
 gpg_pin_t *gpg_pin_get_pin(int id);
-int        gpg_pin_is_blocked(gpg_pin_t *pin);
-int        gpg_pin_is_verified(int pinID);
-int        gpg_pin_set_verified(int pinID, int verified);
-int        gpg_pin_check(gpg_pin_t *pin, int pinID, unsigned char *pin_val, unsigned int pin_len);
-void       gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
+int gpg_pin_is_blocked(gpg_pin_t *pin);
+int gpg_pin_is_verified(int pinID);
+int gpg_pin_set_verified(int pinID, int verified);
+int gpg_pin_check(gpg_pin_t *pin, int pinID, unsigned char *pin_val, unsigned int pin_len);
+void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
 
 int gpg_mse_reset();
 int gpg_apdu_mse();
@@ -81,16 +81,16 @@ void gpg_io_insert_t(unsigned int T);
 void gpg_io_insert_tl(unsigned int T, unsigned int L);
 void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V);
 
-void         gpg_io_fetch_buffer(unsigned char *buffer, unsigned int len);
+void gpg_io_fetch_buffer(unsigned char *buffer, unsigned int len);
 unsigned int gpg_io_fetch_u32(void);
 unsigned int gpg_io_fetch_u24(void);
 unsigned int gpg_io_fetch_u16(void);
 unsigned int gpg_io_fetch_u8(void);
-int          gpg_io_fetch_t(unsigned int *T);
-int          gpg_io_fetch_l(unsigned int *L);
-int          gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
-int          gpg_io_fetch_nv(unsigned char *buffer, int len);
-int          gpg_io_fetch(unsigned char *buffer, int len);
+int gpg_io_fetch_t(unsigned int *T);
+int gpg_io_fetch_l(unsigned int *L);
+int gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
+int gpg_io_fetch_nv(unsigned char *buffer, int len);
+int gpg_io_fetch(unsigned char *buffer, int len);
 
 int gpg_io_do(unsigned int io_flags);
 
@@ -108,7 +108,7 @@ void io_usb_ccid_set_card_inserted(unsigned int inserted);
 
 #else
 
-#define gpg_nvm_write nvm_write
+#define gpg_nvm_write   nvm_write
 #define gpg_io_exchange io_exchange
 
 #endif

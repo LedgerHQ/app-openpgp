@@ -3,7 +3,7 @@
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
-   http://www.apache.org/licenses/LICENSE-2.0 
+   http://www.apache.org/licenses/LICENSE-2.0
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -53,9 +53,9 @@ The application supports:
    - RSA with key up to 4096 bits
    - ECDSA with secp256k1, secp256r1, brainpool 256r1 and brainpool 256t1 curves
    - EDDSA with Ed25519 curve
-   - ECDH with secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and 
+   - ECDH with secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and
      curve25519 curves
-   
+
 This release has known missing parts (see also [GPGADD]) :
 
    - Ledger Blue support
@@ -78,14 +78,14 @@ Use the "Ledger Manager" Chrome App. See https://www.ledgerwallet.com/apps/manag
 
 As the "OpenPGP card" application is not fully compliant with UI and documentation guidelines, the application is in developer section: click on "Show developers items" on the bottom right corner to see it.
 
-   - Launch the Ledger Manager. See `Ledger Manager <https://www.ledgerwallet.com/apps/manager>`_  
-     and  ` <https://ledger.groovehq.com/knowledge_base/topics/ledger-manager>`_ 
+   - Launch the Ledger Manager. See `Ledger Manager <https://www.ledgerwallet.com/apps/manager>`_
+     and  ` <https://ledger.groovehq.com/knowledge_base/topics/ledger-manager>`_
      for details about installing and using  the manager;
-   - Connect your Nano S or your Blue, enter your PIN, and stay on the 
+   - Connect your Nano S or your Blue, enter your PIN, and stay on the
      dashboard;
    - Click on *show developer items* on the bottom right corner;
    - Click on the green bottom arrow icon near the Ledger *Open PGP* logo;
-   - Confirm the installation when required on your device by pressing the 
+   - Confirm the installation when required on your device by pressing the
      right button above the check mark;
    - Quit the Ledger Manager
 
@@ -118,7 +118,7 @@ If you are using an old version of CCID, you have to have to add the NanoS to /e
    - In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
    - In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
    - In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
-  
+
 These 3 entries must be added at the end of each list.
 
 For the NanoX :
@@ -138,7 +138,7 @@ MAC
        - In  <key>ifdVendorID</key>      add the entry  <string>0x2C97</string>
        - In  <key>ifdProductID</key>     add the entry  <string>0x0001</string>
        - In  <key>ifdFriendlyName</key>  add the entry  <string>Ledger Token</string>
-  
+
 This 3 entries must be added at the end of each list.
 
 3. [Enable SIP](https://developer.apple.com/library/content/documentation/Security/Conceptual/System_Integrity_Protection_Guide/ConfiguringSystemIntegrityProtection/ConfiguringSystemIntegrityProtection.html)
@@ -191,13 +191,13 @@ The full menu layout is :
 |             Confirm only #+
 |             Trust
 |       Reset
-| About 
+| About
 |      \ *OpenPGP Card*
 |      \ *(c) Ledger SAS*
 |      \ *Spec 3.0*
 |      \ *App 1.0.1*
 
-| Emphasis entries are not selectable and just provide information. 
+| Emphasis entries are not selectable and just provide information.
 | A "**#**" after the entry label means default value on reset.
 | A "**+**" after the entry label means current value.
 
@@ -224,13 +224,13 @@ Select Slot
 This menu is only available on ``XL`` version
 
 A Slot is a set of
-three key pairs *Signature, Decryption, Authentication* as defined by gnupg 
+three key pairs *Signature, Decryption, Authentication* as defined by gnupg
 specification.
 
 Usually a GPG card application only manages a single set. Ledger version enhances
-this and allows you to manage three key sets.  
+this and allows you to manage three key sets.
 
-The *Select Slot* menu allows you to select the slot you want to play with,  and 
+The *Select Slot* menu allows you to select the slot you want to play with,  and
 to set the default slot when the application start.
 
 To change the current slot, display the slot you want and  select it
@@ -245,8 +245,8 @@ Settings
 Key Template
 ~~~~~~~~~~~~
 
-A key template is defined by the OpenGPG card application specification. It 
-describes the key to be generated with the ``generate`` command in 
+A key template is defined by the OpenGPG card application specification. It
+describes the key to be generated with the ``generate`` command in
 ``gpg --card-edit``
 
 To set up a new ECC template you have three choices: the ``gpg --edit-card``
@@ -303,10 +303,10 @@ To show the current template use the  ``gpg --card-status`` command.
 
 **gpg-connect-agent**
 
-This method suppose you have correctly configured your GnuPG tool. 
+This method suppose you have correctly configured your GnuPG tool.
 See the dedicated section for that.
 
-In a terminal launch : 
+In a terminal launch :
 
  | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 1 <tag> <curvename>" /bye``
  | ``gpg-connect-agent "SCD SETATTR KEY-ATTR --force 2 18    <curvename>" /bye``
@@ -327,7 +327,7 @@ To show the current template use the  ``gpg --card-status`` command.
 **NanoS menu**
 
 First under *Choose Key* menu, select the one of three keys for which you want to modify
-the template. Then under "Choose Type", select the desired key template. 
+the template. Then under "Choose Type", select the desired key template.
 Finally select "Set Template" entry to set it.
 
 To show the current template use the  ``gpg --card-status`` command.
@@ -349,13 +349,13 @@ When the application starts, the seeded mode is always set to *OFF*
 PIN mode
 ~~~~~~~~
 
-Some operations require the user to enter his PIN code. 
+Some operations require the user to enter his PIN code.
 The default PIN values are:
 
     - user: ``123456``
     - admin: ``12345678``
 
-The PIN entry can be done using four methods, named 
+The PIN entry can be done using four methods, named
 "*Host*", "*On Screen*", "*Confirm only*", "*Trust*".
 
 After each mode a *+* or *#* symbol may appear to tell which mode is the current one
@@ -363,14 +363,14 @@ and which one is the default when the application starts.
 The default mode can be changed by first selecting the desired mode and then
 selecting the *Set default" menu. Note that *Trust*  can not be set as default mode.
 
-Before you can change the PIN mode, you need to verify the PIN on the client. To do this, 
+Before you can change the PIN mode, you need to verify the PIN on the client. To do this,
 run ``gpg --card-edit``, then  ``admin`` and finally ``verify`` on you PC. You will then
 be asked to enter the current PIN. After doing so, you can change the PIN mode on your
 device.
 
 
-Note that *On Screen*", "*Confirm only*" and "*Trust*" may not work if the 
-client application does not support it. In that case the "*Host*" should be 
+Note that *On Screen*", "*Confirm only*" and "*Trust*" may not work if the
+client application does not support it. In that case the "*Host*" should be
 automatically used by the client in a transparent way.
 
 **Host**
@@ -393,36 +393,36 @@ letter
 
 .. image:: pin_validate.png
     :align: middle
- 
+
 
 If you want to change the previous digit select the **'C'** (Cancel) letter.
 
 .. image:: pin_cancel.png
     :align: middle
-  
+
 
 Finally if you want to abort the PIN entry, select the **'A'** (Abort) letter.
 
 .. image:: pin_abort.png
     :align: middle
-  
+
 
 **Confirm only**
 
-The user is requested, on the NanoS or Blue screen, to confirm 
+The user is requested, on the NanoS or Blue screen, to confirm
 the PIN validation. The PIN value is not required, the user just has
-to push the *REJECT* or *OK*  button on the device. 
+to push the *REJECT* or *OK*  button on the device.
 
-This is the default mode after application installation. 
+This is the default mode after application installation.
 
 .. image:: pin_confirm.png
     :align: middle
-  
+
 
 **Trust**
 
 Act as if the PIN is always validated. This is a dangerous mode which should only be
-used in a highly secure environment.  
+used in a highly secure environment.
 
 UIF mode
 ~~~~~~~~
@@ -438,9 +438,9 @@ When activated, a '+' symbol appears after the operation name.
 Reset
 ~~~~~
 
-Selecting the menu will erase all OpenPGP Card Application data and will 
+Selecting the menu will erase all OpenPGP Card Application data and will
 reset the application in its '*just installed*' state.
- 
+
 
 
 Nano S OpenPGP Card application usage
@@ -460,8 +460,8 @@ keyring before starting, except if your are sure about what you do.
 Configuration
 ~~~~~~~~~~~~~
 
-In order to use a Ledger device with gpg it is needed to explicitly setup 
-the reader and the delegated PIN support. 
+In order to use a Ledger device with gpg it is needed to explicitly setup
+the reader and the delegated PIN support.
 Edit the file ~/.gnupg/scdaemon.conf and add the following lines:
 
  | ``reader-port "Ledger Token [Nano S] (0001) 01 00"``
@@ -519,7 +519,7 @@ installation it should look like this:
  | ``Authentication key: [none]``
  | ``General key info..: [none]``
 
-You can set the user information with the ``gpg --card-edit`` command and 
+You can set the user information with the ``gpg --card-edit`` command and
 ``name``, ``url``, ``login``, ``lang``, ``sex`` subcommands. For example if you
 want to set up your name:
 
@@ -558,9 +558,9 @@ want to set up your name:
 
 
 Notes:
-  
+
   * Modifying the user information will prompt you to enter ``User PIN``.
-  * Setting user information is not required  for using gpg client. 
+  * Setting user information is not required  for using gpg client.
 
 
 Generate new key pair
@@ -570,7 +570,7 @@ For generating a new key pair follow those steps:
 
     - Select the desired NanoS OpenPGP Card application slot
     - Setup the desired key template for this slot
-    - Generate the new key set 
+    - Generate the new key set
 
 
 **Step 1**
@@ -586,23 +586,23 @@ Starting from main menu:
 
 **Step 2**
 
-The default template for each three keys (*signature*, *decryption*, 
+The default template for each three keys (*signature*, *decryption*,
 *authentication*) is ``RSA 2048``. If you want another kind of key
 you have to set the template before generating keys.
 
-!WARNING!: changing the current template of a key automatically erases 
+!WARNING!: changing the current template of a key automatically erases
 the associated key.
 
 Starting from main menu:
 
     - Select *Settings* menu
-    - Select *Key template* menu 
+    - Select *Key template* menu
     - Select *Choose Key...* menu (a)
     - Scroll and select which key you want to set the new template for
     - Select *Choose type...* menu
     - Scroll and select among the supported key types and sizes
     - Select *Set template*
-    - Repeat this process from (a) if you want to modify another key 
+    - Repeat this process from (a) if you want to modify another key
       template
     - Select *Back* to return to main menu.
 
@@ -610,7 +610,7 @@ Starting from main menu:
 **Step 3**
 
 Once the template has been set, it's possible to generate new key pairs
-with ``gpg``. 
+with ``gpg``.
 
 !WARNING!: gpg will generate the three key pairs and
 will overwrite any key already present in the selected slot.
@@ -650,18 +650,18 @@ the three key templates are ``NIST P256``.
 **Request new key generation without backup**
 
  | ``gpg/card>`` *generate*
- | ``Make off-card backup of encryption key? (Y/n)`` **n**               
+ | ``Make off-card backup of encryption key? (Y/n)`` **n**
 
 **Unlock user level ``81``**
 
- | ``Please unlock the card``  
+ | ``Please unlock the card``
  | ````
  | ``Number: 2C97 AFB1142B``
  | ``Holder: Cedric Mesnil``
  | ````
  | ``Use the reader's pinpad for input.``
  | ``  OK``
- | ``Press any key to continue.  ``                                      
+ | ``Press any key to continue.  ``
 
 **Set key validity**
 
@@ -676,12 +676,12 @@ the three key templates are ``NIST P256``.
  | ``Is this correct? (y/N)``*y*
 
 **Set user ID**
-                     
+
  | ``GnuPG needs to construct a user ID to identify your key.``
  | ````
  | ``Real name: Cedric Mesnil``
  | ``Email address: cedric@ledger.fr``
- | ``Comment:     ``                  
+ | ``Comment:     ``
  | ``You selected this USER-ID:``
  | ``    "Cedric Mesnil <cedric@ledger.fr>"``
  | ````
@@ -692,7 +692,7 @@ the three key templates are ``NIST P256``.
 
 **Unlock admin level ``83``**
 
- | ``Please enter the Admin PIN  ``                         
+ | ``Please enter the Admin PIN  ``
  | ````
  | ``Number: 2C97 AFB1142B``
  | ``Holder: Cedric Mesnil``
@@ -748,9 +748,9 @@ the three key templates are ``NIST P256``.
  | ``General key info..: pub  nistp256/F8A4A3533CBFCAA5 2017-08-22 cedric mesnilCedric Mesnil <cedric@ledger>``
  | ``sec>  nistp256/F8A4A3533CBFCAA5  created: 2017-08-22  expires: never     ``
  | ``                                 card-no: 2C97 AFB1142B``
- | ``ssb>  nistp256/2345A677CE9D8223  created: 2017-08-22  expires: never   ``  
+ | ``ssb>  nistp256/2345A677CE9D8223  created: 2017-08-22  expires: never   ``
  | ``                                 card-no: 2C97 AFB1142B``
- | ``ssb>  nistp256/E13728E913B877E1  created: 2017-08-22  expires: never  ``   
+ | ``ssb>  nistp256/E13728E913B877E1  created: 2017-08-22  expires: never  ``
  | ``                                 card-no: 2C97 AFB1142B``
 
 **Say goodbye
@@ -789,7 +789,7 @@ The key to transfer here is a RSA 4096 bits key:
 
 In case of transfer it is not necessary to previously set the template.
 It will be automatically changed.
-When generating a new key, the three keys (*signature*, *decryption*, 
+When generating a new key, the three keys (*signature*, *decryption*,
 *authentication*)) are automatically generated.
 When transferring existing ones, it is possible to choose which one will be
 moved.
@@ -804,7 +804,7 @@ moved.
  | ``Secret key is available.``
  | ````
  | ``sec  rsa4096/9B93CB47F954FB53``
- | ``     created: 2017-04-26  expires: never       usage: SC `` 
+ | ``     created: 2017-04-26  expires: never       usage: SC ``
  | ``     trust: ultimate      validity: ultimate``
  | ``ssb  rsa4096/49EE12B0F5CBDF26``
  | ``     created: 2017-04-26  expires: never       usage: E   ``
@@ -821,7 +821,7 @@ moved.
  | ``     created: 2017-04-26  expires: never       usage: E   ``
  | ``[ultimate] (1). RSA 4096``
 
-**Move** 
+**Move**
 
  | ``gpg> `` **keytocard**
  | ``Please select where to store the key:``
@@ -890,8 +890,8 @@ Decrypting and Signing
 
 
 Decrypting and Signing will act exactly the same way as if keys were not on
-the card. The only difference is ``gpg`` will request the PIN code instead 
-of the passphrase. 
+the card. The only difference is ``gpg`` will request the PIN code instead
+of the passphrase.
 
 
 SSH
@@ -902,7 +902,7 @@ Overview
 ~~~~~~~~
 
 In order to use gpg for SSH authentication, an "authentication" is needed.
-There are two solutions for that, either generate one on the device 
+There are two solutions for that, either generate one on the device
 or add an authentication sub-key to your existing master gpg key.
 
 Once done, it is necessary to configure ssh to point to the right key and
@@ -914,7 +914,7 @@ Generate new key on device
 
 The important thing to keep in mind here is there is no way to tell gpg to
 only generate the authentication key. So generating this key will also
-generate the two other under a new identity and will erase existing keys 
+generate the two other under a new identity and will erase existing keys
 on the current slot on the device.
 
 Nevertheless, if you want to use a different identity for ssh login, you can use
@@ -1021,7 +1021,7 @@ Add sub-key
  | ``generator a better chance to gain enough entropy.``
 
  | ``sec  rsa2048/831415DA94A9A15C``
- | ``     created: 2017-08-25  expires: never       usage: SC `` 
+ | ``     created: 2017-08-25  expires: never       usage: SC ``
  | ``     trust: ultimate      validity: ultimate``
  | ``ssb  rsa2048/8E95F2999EEC38C4``
  | ``     created: 2017-08-25  expires: never       usage: E   ``
@@ -1053,7 +1053,7 @@ Add sub-key
  | ``ssb  rsa2048/8E95F2999EEC38C4``
  | ``     created: 2017-08-25  expires: never       usage: E   ``
  | ``ssb* rsa2048/C20B90E12F68F035``
- | ``     created: 2017-08-28  expires: never       usage: A ``  
+ | ``     created: 2017-08-28  expires: never       usage: A ``
  | ``[ultimate] (1). cedric``
 
 
@@ -1074,7 +1074,7 @@ to your .gpg-agent.conf:
 
    ``enable-ssh-support``
 
-Starting with gpg2 it necessary to add some configuration options to make the *pinentry* 
+Starting with gpg2 it necessary to add some configuration options to make the *pinentry*
 work properly. Add the following line to ~/.bashrc file:
 
  | ``export SSH_AUTH_SOCK=`gpgconf --list-dirs agent-ssh-socket` ``
@@ -1093,7 +1093,7 @@ And add the following line to your ~/.gnupg/gpg.conf:
     ``pinentry-mode loopback``
 
 
-Then export your authentication public key. First execute the 
+Then export your authentication public key. First execute the
 ``gpg -k --with-subkey-fingerprint --with-keygrip cedric`` command.
 
 
@@ -1113,7 +1113,7 @@ to .gnupg/sshcontrol file:
 
  | ``$ echo 6D60CB58D9D66EE09804E7FE460E865A91F5E41A > .gnupg/sshcontrol``
 
-Export your authentication key, identifier by its fingerprint, in a SSH compliant format. 
+Export your authentication key, identifier by its fingerprint, in a SSH compliant format.
 
  | ``$ gpg --export-ssh-key 2D0E4FFFAA448AA2770C7F02C20B90E12F68F035``
  | ``ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDCIARKh0IZTHld+I6oA8nwrgnCUQE8f``
@@ -1122,8 +1122,8 @@ Export your authentication key, identifier by its fingerprint, in a SSH complian
  | ``3uEBsaY5PR1Tuko/GwywLyZu0SwfEobl/RPjL7P8rUSc7DTHpQMw8fjJFb4BNvIHAlaVC``
  | ``5FwZwkuogygaJdN/44MayHFmOZmzx9CAgYgLpTzen35+CcyhlqCqi+HjNlnHL2DDWd4iR``
  | ``d3Y6pY8LjS3xQkECc3Bhedptp17D+H9AVJt openpgp:0x2F68F035``
- 
-Finally copy the above export (``ssh-rsa AAAAB...Jt openpgp:0x2F68F035``) into the 
+
+Finally copy the above export (``ssh-rsa AAAAB...Jt openpgp:0x2F68F035``) into the
 ~/.ssh/authorized_keys file on your remote server.
 
 
@@ -1143,11 +1143,11 @@ Backup and Restore
 Introduction
 ~~~~~~~~~~~~
 
-"The OpenPGP card" specification does not provide any mechanism for backuping you key. 
+"The OpenPGP card" specification does not provide any mechanism for backuping you key.
 Thus if you generate your keys on device and loose it, you definitively loose you private key.
 
 In order to avoid such extreme panic situation, a backup/restore mechanism is provided.
-At any time you can backup a snapshot of your device data, including your private keys. 
+At any time you can backup a snapshot of your device data, including your private keys.
 All public data are retrieve in clear form. The private key are stored
 encrypted with a key derived from your seed, i.e. from your 24 BIP words.
 
@@ -1161,13 +1161,13 @@ The backup/restore tool is located in ``pytools`` directory:
  | ``optional arguments:``
  | ``  -h, --help            show this help message and exit``
  | ``  --adm-pin PIN         Administrative PIN, if pinpad not used``
- | ``  --backup              Perfom a full backup except the key``
- | ``  --backup-keys         Perfom keys encrypted backup``
+ | ``  --backup              Perform a full backup except the key``
+ | ``  --backup-keys         Perform keys encrypted backup``
  | ``  --file FILE           basckup/restore file``
  | ``  --pinpad              PIN validation will be deledated to pinpad``
  | ``  --reader READER       PCSC reader``
  | ``  --reset               Reset the application. All data are erased``
- | ``  --restore             Perfom a full restore except the key``
+ | ``  --restore             Perform a full restore except the key``
  | ``  --set-serial SERIAL   set the four serial bytes``
  | ``  --set-fp SIG:DEC:AUT  sig:dec:aut fingerprints, 20 bytes each in hexa``
  | ``  --seed-key            Regenerate all keys, based on seed mode``
@@ -1175,20 +1175,20 @@ The backup/restore tool is located in ``pytools`` directory:
  | ``  --user-pin PIN        User PIN, if pinpad not used``
 
 
-First you must either provide your pin codes or use the pinpad (onscreen pin). This is 
+First you must either provide your pin codes or use the pinpad (onscreen pin). This is
 done by giving either ``--adm-pin`` AND ``--user-pin`` or ``--pinpad``. Note that
 using ``--xx-pin`` may compromise your pin codes.
 
 Then you must precise if you want a backup or a restore with ``--backup`` or ``--restore``
 
 By default backup is performed without saving keys, assuming you use the seed mode.
-If you also want to backup keys you have to pass the ``--backup-keys`` option. 
+If you also want to backup keys you have to pass the ``--backup-keys`` option.
 In a general manner it is better to also save your keys with ``--backup-keys`` option.
 
 Note that backup and restore works on current slot, so you have to perform a backup per slot
 even if some data are shared. You can precise the slot/backup to restore with ``--slot``
 
-If you encounter an error when performing the backup/restore, reload your scdaemon with 
+If you encounter an error when performing the backup/restore, reload your scdaemon with
 ``gpgconf --reload scdaemon``
 
 
@@ -1198,7 +1198,7 @@ Backup and Restore example
 First you must have the path of the `ledger-app-openpgp-card/pytools` in your PYTHONPATH.
 
 full backup command:
-  
+
  | ``python3 -m gpgcard.gpgcli --backup --pinpad --backup-keys --file my_bck_file_name.pickle``
 
 backup command without private keys:
@@ -1207,20 +1207,20 @@ backup command without private keys:
 
 
 full restore command:
-  
+
  | ``python3 -m gpgcard.gpgcli --restore --pinpad --file my_bck_file_name.pickle``
 
 
 full restore command with seed key generation:
-  
+
  | ``python3 -m gpgcard.gpgcli --restore --pinpad --seed-key --file my_bck_file_name.pickle``
 
 
 Restore without backup
 ~~~~~~~~~~~~~~~~~~~~~~
 
-If you have seeded key but do not have done a backup and still have your keyring, there is a 
-solution to restore at least the key and their related information: serial and fingerprints. 
+If you have seeded key but do not have done a backup and still have your keyring, there is a
+solution to restore at least the key and their related information: serial and fingerprints.
 All other information such as name, url, ... shall be set manually with ``gpg --card-edit``.
 
 
@@ -1251,7 +1251,7 @@ Run the command ``gpg --edit-key John``, replace John by your own key id.
  |
  |  ``gpg> ``
  |
- 
+
 
 The ``usage`` field tells you each key purpose: ``SC`` or ``S`` for signature, ``A`` for authentication, ``E`` for encryption.
 
@@ -1261,7 +1261,7 @@ You should have three or less keys with the same serial. These are the keys we w
 For each key you also have the key template (rsa2048, rsa3072, rsa4096, ed2559, cv25519) followed by the
 short fingerprint, e.g. ``ed25519/8451AAF7D43D1095``
 
-Note the serial and the three key template names: ``FD6C11BE`` , ``ed25519:cv25519:ed25519``. 
+Note the serial and the three key template names: ``FD6C11BE`` , ``ed25519:cv25519:ed25519``.
 Take care of the order: ``SC:E:A``.
 
 Now type the ``quit`` command.
@@ -1281,8 +1281,8 @@ To get the full fingerprint of each key, run (yes twice ``--fingerprint``):
  |  ``sub   cv25519 2018-10-10 [E]``
  |  ``      DF15 7BD4 AC3B D1EE 9910  99C8 0953 D871 FC4B 9EA4``
 
-Assemble the three full fingerprint, corresponding to the one identified previously, 
-in the the following order ``SC:E:A`` : 
+Assemble the three full fingerprint, corresponding to the one identified previously,
+in the the following order ``SC:E:A`` :
 
 ``2C688345BDDA0EDFB24DB4FB8451AAF7D43D1095:DF157BD4AC3BD1EE991099C80953D871FC4B9EA4:
 CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB``.
@@ -1294,7 +1294,7 @@ If you only have one key to restore you can omit the others, for example to only
 
 **Step 1: restore**
 
-Plug you Nano S and run the OpenPGP application. 
+Plug you Nano S and run the OpenPGP application.
 
 Finally run the following command :
 
@@ -1323,19 +1323,19 @@ logout/login
 
 **Q:** It does not work at all, HELP ME!!!
 
-**R**  Please keep calm and do not cry. 
+**R**  Please keep calm and do not cry.
 Add the following option to ~/.gnupg/gpg-agent.conf
- 
+
  | ``debug-level guru``
  | ``log-file /tmp/gpgagent.log``
 
 Add the following option to ~/.gnupg/scdaemon.conf
- 
+
  | ``log-file /tmp/scd.log``
  | ``debug-level guru``
  | ``debug-all``
 
-Make a nice issue report under github providing log and and command line you run.  
+Make a nice issue report under github providing log and and command line you run.
 
 **!*WARNING*!** : this may reveal confidential information such as key values. Do your log with a test key.
 

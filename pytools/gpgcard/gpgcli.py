@@ -80,7 +80,7 @@ try:
     gpgcard.connect(args.reader)
     print("OK")
 
-    print("Verfify PINs...", end='', flush=True)
+    print("Verify PINs...", end='', flush=True)
     if args.pinpad:
         if not gpgcard.verify_pin(0x82, "", True) or not gpgcard.verify_pin(0x83, "", True):
            error("PIN not verified")
@@ -122,7 +122,7 @@ try:
           'rsa3072'  : "010C00002001",
           'rsa4096'  : "011000002001",
           'nistp256' : "132A8648CE3D030107",
-          'ed255519' : "162B06010401DA470F01",
+          'ed25519' : "162B06010401DA470F01",
           'cv25519'  : "122B060104019755010501"
           }
         sig,dec,aut = args.set_templates.split(":")
