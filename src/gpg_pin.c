@@ -50,6 +50,7 @@ static int gpg_pin_get_state_index(unsigned int pinref) {
 
 static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pin_len) {
     unsigned int counter;
+    cx_err_t error = CX_INTERNAL_ERROR;
 
     if (pin->counter == 0) {
         return SW_PIN_BLOCKED;
@@ -58,12 +59,12 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pi
     counter = pin->counter - 1;
     gpg_nvm_write(&(pin->counter), &counter, sizeof(int));
     cx_sha256_init(&G_gpg_vstate.work.md.sha256);
-    cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
-            CX_LAST,
-            pin_val,
-            pin_len,
-            G_gpg_vstate.work.md.H,
-            sizeof(G_gpg_vstate.work.md.H));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
+                              CX_LAST,
+                              pin_val,
+                              pin_len,
+                              G_gpg_vstate.work.md.H,
+                              sizeof(G_gpg_vstate.work.md.H)));
     if (memcmp(G_gpg_vstate.work.md.H, pin->value, 32)) {
         return SW_SECURITY_STATUS_NOT_SATISFIED;
     }
@@ -71,6 +72,11 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, unsigned char *pin_val, int pi
     counter = 3;
     gpg_nvm_write(&(pin->counter), &counter, sizeof(int));
     return SW_OK;
+end:
+    if (error != CX_OK) {
+        THROW(error);
+    }
+    return SW_UNKNOWN;
 }
 
 static void gpg_pin_check_throw(gpg_pin_t *pin, int pinID, unsigned char *pin_val, int pin_len) {
@@ -97,15 +103,19 @@ int gpg_pin_check(gpg_pin_t *pin, int pinID, unsigned char *pin_val, unsigned in
 
 void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     cx_sha256_t sha256;
-
+    cx_err_t error = CX_INTERNAL_ERROR;
     gpg_pin_t newpin;
 
     cx_sha256_init(&sha256);
-    cx_hash((cx_hash_t *) &sha256, CX_LAST, pin_val, pin_len, newpin.value, 32);
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &sha256, CX_LAST, pin_val, pin_len, newpin.value, 32));
     newpin.length = pin_len;
     newpin.counter = 3;
 
     gpg_nvm_write(pin, &newpin, sizeof(gpg_pin_t));
+end:
+    if (error != CX_OK) {
+        THROW(error);
+    }
 }
 
 int gpg_pin_set_verified(int pinID, int verified) {

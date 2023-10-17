@@ -19,6 +19,7 @@
 #include "gpg_api.h"
 #include "gpg_vars.h"
 #include "gpg_ux_nanos.h"
+#include "cx_errors.h"
 
 const unsigned char gpg_oid_sha256[] = {0x30,
                                         0x31,
@@ -67,6 +68,7 @@ static void gpg_pso_reset_PW1() {
 
 static int gpg_sign(gpg_key_t *sigkey) {
     // --- RSA
+    cx_err_t error = CX_INTERNAL_ERROR;
     if (sigkey->attributes.value[0] == 1) {
         cx_rsa_private_key_t *key;
         unsigned int ksz, l;
@@ -106,13 +108,13 @@ static int gpg_sign(gpg_key_t *sigkey) {
         G_gpg_vstate.work.io_buffer[0] = 0;
         G_gpg_vstate.work.io_buffer[1] = 1;
         G_gpg_vstate.work.io_buffer[l - 1] = 0;
-        ksz = cx_rsa_decrypt(key,
-                             CX_PAD_NONE,
-                             CX_NONE,
-                             G_gpg_vstate.work.io_buffer,
-                             ksz,
-                             G_gpg_vstate.work.io_buffer,
-                             ksz);
+        CX_CHECK(cx_rsa_decrypt_no_throw(key,
+                                         CX_PAD_NONE,
+                                         CX_NONE,
+                                         G_gpg_vstate.work.io_buffer,
+                                         ksz,
+                                         G_gpg_vstate.work.io_buffer,
+                                         &ksz));
         // send
         gpg_io_discard(0);
         gpg_io_inserted(ksz);
@@ -122,7 +124,8 @@ static int gpg_sign(gpg_key_t *sigkey) {
     // --- ECDSA/EdDSA
     if ((sigkey->attributes.value[0] == 19) || (sigkey->attributes.value[0] == 22)) {
         cx_ecfp_private_key_t *key;
-        unsigned int sz, i, rs_len, info;
+        size_t sz;
+        unsigned int s_len, i, rs_len, info;
         unsigned char *rs;
 
         key = &sigkey->priv_key.ecfp;
@@ -135,15 +138,16 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 THROW(SW_CONDITIONS_NOT_SATISFIED);
                 return SW_CONDITIONS_NOT_SATISFIED;
             }
-            sz = cx_ecdsa_sign(key,
-                               CX_RND_TRNG,
-                               CX_NONE,
-                               G_gpg_vstate.work.io_buffer,
-                               sz,
-                               RS,
-                               256,
-                               &info);
-            // reencode r,s in MPI format
+            s_len = 256;
+            CX_CHECK(cx_ecdsa_sign_no_throw(key,
+                                            CX_RND_TRNG,
+                                            CX_NONE,
+                                            G_gpg_vstate.work.io_buffer,
+                                            sz,
+                                            RS,
+                                            &s_len,
+                                            &info));
+            // re-encode r,s in MPI format
             gpg_io_discard(0);
 
             rs_len = RS[3];
@@ -161,16 +165,15 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 rs += 2;
             }
         } else {
-            sz = cx_eddsa_sign(key,
-                               CX_NONE,
-                               CX_SHA512,
-                               G_gpg_vstate.work.io_buffer,
-                               G_gpg_vstate.io_length,
-                               NULL,
-                               0,
-                               RS,
-                               256,
-                               NULL);
+            sz = 256;
+            CX_CHECK(cx_eddsa_sign_no_throw(key,
+                                            CX_SHA512,
+                                            G_gpg_vstate.work.io_buffer,
+                                            G_gpg_vstate.io_length,
+                                            RS,
+                                            sz));
+            CX_CHECK(cx_ecdomain_parameters_length(key->curve, &sz));
+            sz *= 2;
             gpg_io_discard(0);
             gpg_io_insert(RS, sz);
         }
@@ -183,6 +186,8 @@ static int gpg_sign(gpg_key_t *sigkey) {
     // --- PSO:CDS NOT SUPPORTED
     THROW(SW_REFERENCED_DATA_NOT_FOUND);
     return SW_REFERENCED_DATA_NOT_FOUND;
+end:
+    THROW(error);
 }
 
 int gpg_apdu_pso() {
@@ -190,6 +195,7 @@ int gpg_apdu_pso() {
 
     unsigned int pso;
     unsigned int sz;
+    cx_err_t error = CX_INTERNAL_ERROR;
 
     pso = (G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2;
 
@@ -239,12 +245,13 @@ int gpg_apdu_pso() {
                 return SW_CONDITIONS_NOT_SATISFIED;
             }
             msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
-            sz = cx_aes(key,
-                        CX_ENCRYPT | CX_CHAIN_CBC | CX_LAST,
-                        G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                        msg_len,
-                        G_gpg_vstate.work.io_buffer + 1,
-                        GPG_IO_BUFFER_LENGTH - 1);
+            sz = GPG_IO_BUFFER_LENGTH - 1;
+            CX_CHECK(cx_aes_no_throw(key,
+                                     CX_ENCRYPT | CX_CHAIN_CBC | CX_LAST,
+                                     G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                     msg_len,
+                                     G_gpg_vstate.work.io_buffer + 1,
+                                     &sz));
             // send
             gpg_io_discard(0);
             G_gpg_vstate.work.io_buffer[0] = 0x02;
@@ -290,13 +297,15 @@ int gpg_apdu_pso() {
                         return SW_CONDITIONS_NOT_SATISFIED;
                     }
                     msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
-                    sz = cx_rsa_decrypt(key,
-                                        CX_PAD_PKCS1_1o5,
-                                        CX_NONE,
-                                        G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                                        msg_len,
-                                        G_gpg_vstate.work.io_buffer,
-                                        ksz);
+                    sz = ksz;
+                    CX_CHECK(cx_rsa_decrypt_no_throw(
+                        key,
+                        CX_PAD_PKCS1_1o5,
+                        CX_NONE,
+                        G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                        msg_len,
+                        G_gpg_vstate.work.io_buffer,
+                        &sz));
                     // send
                     gpg_io_discard(0);
                     gpg_io_inserted(sz);
@@ -312,12 +321,13 @@ int gpg_apdu_pso() {
                         return SW_CONDITIONS_NOT_SATISFIED;
                     }
                     msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
-                    sz = cx_aes(key,
-                                CX_DECRYPT | CX_CHAIN_CBC | CX_LAST,
-                                G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                                msg_len,
-                                G_gpg_vstate.work.io_buffer,
-                                GPG_IO_BUFFER_LENGTH);
+                    sz = GPG_IO_BUFFER_LENGTH;
+                    CX_CHECK(cx_aes_no_throw(key,
+                                             CX_DECRYPT | CX_CHAIN_CBC | CX_LAST,
+                                             G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                             msg_len,
+                                             G_gpg_vstate.work.io_buffer,
+                                             &sz));
                     // send
                     gpg_io_discard(0);
                     gpg_io_inserted(sz);
@@ -360,24 +370,28 @@ int gpg_apdu_pso() {
                                 (G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset)[31 - i];
                         }
                         G_gpg_vstate.work.io_buffer[511] = 0x02;
-                        sz = cx_ecdh(key,
-                                     CX_ECDH_X,
-                                     G_gpg_vstate.work.io_buffer + 511,
-                                     65,
-                                     G_gpg_vstate.work.io_buffer + 256,
-                                     160);
+                        CX_CHECK(cx_ecdh_no_throw(key,
+                                                  CX_ECDH_X,
+                                                  G_gpg_vstate.work.io_buffer + 511,
+                                                  65,
+                                                  G_gpg_vstate.work.io_buffer + 256,
+                                                  160));
+                        CX_CHECK(cx_ecdomain_parameters_length(key->curve, &sz));
+
                         for (i = 0; i <= 31; i++) {
                             G_gpg_vstate.work.io_buffer[128 + i] =
                                 G_gpg_vstate.work.io_buffer[287 - i];
                         }
                         sz = 32;
                     } else {
-                        sz = cx_ecdh(key,
-                                     CX_ECDH_X,
-                                     G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                                     65,
-                                     G_gpg_vstate.work.io_buffer + 128,
-                                     160);
+                        CX_CHECK(
+                            cx_ecdh_no_throw(key,
+                                             CX_ECDH_X,
+                                             G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                             65,
+                                             G_gpg_vstate.work.io_buffer + 128,
+                                             160));
+                        CX_CHECK(cx_ecdomain_parameters_length(key->curve, &sz));
                     }
                     // send
                     gpg_io_discard(0);
@@ -399,6 +413,8 @@ int gpg_apdu_pso() {
     }
     THROW(SW_REFERENCED_DATA_NOT_FOUND);
     return SW_REFERENCED_DATA_NOT_FOUND;
+end:
+    THROW(error);
 }
 
 int gpg_apdu_internal_authenticate() {

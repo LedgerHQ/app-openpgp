@@ -18,9 +18,11 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
+#include "cx_errors.h"
 
 int gpg_apdu_get_challenge() {
     unsigned int olen, hlen;
+    cx_err_t error = CX_INTERNAL_ERROR;
 
     if ((G_gpg_vstate.io_p1 & 0x80) == 0x80) {
         olen = G_gpg_vstate.io_p2;
@@ -35,39 +37,46 @@ int gpg_apdu_get_challenge() {
     if ((G_gpg_vstate.io_p1 & 0x82) == 0x82) {
         unsigned int path[2];
         unsigned char chain[32];
-        unsigned char Sr[32];
+        unsigned char Sr[64];
 
         memset(chain, 0, 32);
         path[0] = 0x80475047;
         path[1] = 0x0F0F0F0F;
-        os_perso_derive_node_bip32(CX_CURVE_SECP256K1, path, 2, Sr, chain);
+        CX_CHECK(os_derive_bip32_no_throw(CX_CURVE_SECP256K1, path, 2, Sr, chain));
         chain[0] = 'r';
         chain[1] = 'n';
         chain[2] = 'd';
 
         cx_sha256_init(&G_gpg_vstate.work.md.sha256);
-        cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sr, 32, NULL, 0);
-        cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, chain, 3, NULL, 0);
-        hlen = cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
-                       CX_LAST,
-                       G_gpg_vstate.work.io_buffer,
-                       G_gpg_vstate.io_length,
-                       G_gpg_vstate.work.io_buffer,
-                       32);
+        CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sr, 32, NULL, 0));
+        CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, chain, 3, NULL, 0));
+        CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
+                                CX_LAST,
+                                G_gpg_vstate.work.io_buffer,
+                                G_gpg_vstate.io_length,
+                                G_gpg_vstate.work.io_buffer,
+                                32));
+        hlen = cx_hash_get_size((const cx_hash_t *) &G_gpg_vstate.work.md.sha256);
 
-        cx_sha3_xof_init(&G_gpg_vstate.work.md.sha3, 256, olen);
-        cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha3,
-                CX_LAST,
-                G_gpg_vstate.work.io_buffer,
-                hlen,
-                G_gpg_vstate.work.io_buffer,
-                olen);
+        CX_CHECK(cx_sha3_xof_init_no_throw(&G_gpg_vstate.work.md.sha3, 256, olen));
+        CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha3,
+                         CX_LAST,
+                         G_gpg_vstate.work.io_buffer,
+                         hlen,
+                         G_gpg_vstate.work.io_buffer,
+                         olen));
     } else {
         cx_rng(G_gpg_vstate.work.io_buffer, olen);
+        error = CX_OK;
     }
 
     if ((G_gpg_vstate.io_p1 & 0x81) == 0x81) {
-        cx_math_next_prime(G_gpg_vstate.work.io_buffer, olen);
+        CX_CHECK(cx_math_next_prime_no_throw(G_gpg_vstate.work.io_buffer, olen));
+    }
+
+end:
+    if (error != CX_OK) {
+        THROW(error);
     }
     gpg_io_discard(0);
     gpg_io_inserted(olen);

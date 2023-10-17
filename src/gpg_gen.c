@@ -18,6 +18,7 @@
 #include "gpg_types.h"
 #include "gpg_api.h"
 #include "gpg_vars.h"
+#include "cx_errors.h"
 
 /* @in slot     slot num [0 ; GPG_KEYS_SLOTS[
  * @out seed    32 bytes master seed for given slot
@@ -25,11 +26,17 @@
 void gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
     unsigned int path[2];
     unsigned char chain[32];
+    cx_err_t error = CX_INTERNAL_ERROR;
 
     memset(chain, 0, 32);
     path[0] = 0x80475047;
     path[1] = slot + 1;
-    os_perso_derive_node_bip32(CX_CURVE_SECP256K1, path, 2, seed, chain);
+    CX_CHECK(os_derive_bip32_no_throw(CX_CURVE_SECP256K1, path, 2, seed, chain));
+
+end:
+    if (error != CX_OK) {
+        THROW(error);
+    }
 }
 
 /* @in  Sn         master seed slot number
@@ -44,21 +51,31 @@ void gpg_pso_derive_key_seed(unsigned char *Sn,
                              unsigned char *Ski,
                              unsigned int Ski_len) {
     unsigned char h[32];
+    cx_err_t error = CX_INTERNAL_ERROR;
     h[0] = idx >> 8;
     h[1] = idx;
 
     cx_sha256_init(&G_gpg_vstate.work.md.sha256);
-    cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0);
-    cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, (unsigned char *) key_name, 4, NULL, 0);
-    cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32);
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
+                     0,
+                     (unsigned char *) key_name,
+                     4,
+                     NULL,
+                     0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32));
 #ifdef GPG_SHAKE256
-    cx_shake256_init(&G_gpg_vstate.work.md.sha3, Ski_len);
-    cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, 32);
-    cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski);
+    CX_CHECK(cx_shake256_init_no_throw(&G_gpg_vstate.work.md.sha3, Ski_len));
+    CX_CHECK(cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, 32));
+    CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
 #else
-    cx_sha3_xof_init(&G_gpg_vstate.work.md.sha3, 256, Ski_len);
-    cx_hash((cx_hash_t *) &G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski, Ski_len);
+    CX_CHECK(cx_sha3_xof_init_no_throw(&G_gpg_vstate.work.md.sha3, 256, Ski_len));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha3, CX_LAST, h, 32, Ski, Ski_len));
 #endif
+end:
+    if (error != CX_OK) {
+        THROW(error);
+    }
 }
 
 /* assume command is fully received */
@@ -67,6 +84,7 @@ int gpg_apdu_gen() {
     gpg_key_t *keygpg;
     unsigned char seed[66];
     unsigned char *name;
+    cx_err_t error = CX_INTERNAL_ERROR;
 
     switch ((G_gpg_vstate.io_p1 << 8) | G_gpg_vstate.io_p2) {
         case 0x8000:
@@ -147,16 +165,17 @@ int gpg_apdu_gen() {
                     gpg_pso_derive_key_seed(seed, name, 2, pq + size, size);
                     *pq |= 0x80;
                     *(pq + size) |= 0x80;
-                    cx_math_next_prime(pq, size);
-                    cx_math_next_prime(pq + size, size);
+                    CX_CHECK(cx_math_next_prime_no_throw(pq, size));
+                    CX_CHECK(cx_math_next_prime_no_throw(pq + size, size));
                 }
 
-                cx_rsa_generate_pair(ksz,
-                                     rsa_pub,
-                                     rsa_priv,
-                                     (const unsigned char *) N_gpg_pstate->default_RSA_exponent,
-                                     4,
-                                     pq);
+                CX_CHECK(cx_rsa_generate_pair_no_throw(
+                    ksz,
+                    rsa_pub,
+                    rsa_priv,
+                    (const unsigned char *) N_gpg_pstate->default_RSA_exponent,
+                    4,
+                    pq));
 
                 nvm_write(pkey, rsa_priv, pkey_size);
                 nvm_write(&keygpg->pub_key.rsa[0], rsa_pub->e, 4);
@@ -182,14 +201,17 @@ int gpg_apdu_gen() {
                     ksz = gpg_curve2domainlen(curve);
                     gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
                     gpg_pso_derive_key_seed(seed, name, 1, seed, ksz);
-                    cx_ecfp_init_private_key(curve, seed, ksz, &G_gpg_vstate.work.ecfp.private);
+                    CX_CHECK(cx_ecfp_init_private_key_no_throw(curve,
+                                                               seed,
+                                                               ksz,
+                                                               &G_gpg_vstate.work.ecfp.private));
                     keepprivate = 1;
                 }
 
-                cx_ecfp_generate_pair(curve,
-                                      &G_gpg_vstate.work.ecfp.public,
-                                      &G_gpg_vstate.work.ecfp.private,
-                                      keepprivate);
+                CX_CHECK(cx_ecfp_generate_pair_no_throw(curve,
+                                                        &G_gpg_vstate.work.ecfp.public,
+                                                        &G_gpg_vstate.work.ecfp.private,
+                                                        keepprivate));
                 nvm_write(&keygpg->priv_key.ecfp,
                           &G_gpg_vstate.work.ecfp.private,
                           sizeof(cx_ecfp_private_key_t));
@@ -272,9 +294,9 @@ int gpg_apdu_gen() {
                     memmove(G_gpg_vstate.work.io_buffer + 128,
                             keygpg->pub_key.ecfp256.W,
                             keygpg->pub_key.ecfp256.W_len);
-                    cx_edward_compress_point(CX_CURVE_Ed25519,
-                                             G_gpg_vstate.work.io_buffer + 128,
-                                             65);
+                    CX_CHECK(cx_edwards_compress_point_no_throw(CX_CURVE_Ed25519,
+                                                                G_gpg_vstate.work.io_buffer + 128,
+                                                                65));
                     gpg_io_insert_tlv(0x86,
                                       32,
                                       G_gpg_vstate.work.io_buffer + 129);  // 129: discard 02
@@ -301,4 +323,6 @@ int gpg_apdu_gen() {
 
     THROW(SW_WRONG_DATA);
     return SW_WRONG_DATA;
+end:
+    THROW(error);
 }
