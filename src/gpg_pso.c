@@ -85,6 +85,9 @@ static int gpg_sign(gpg_key_t *sigkey) {
             case 4096 / 8:
                 key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa4096;
                 break;
+            default:
+                THROW(SW_DATA_INVALID);
+                return 0;
         }
         if (key->size != ksz) {
             THROW(SW_CONDITIONS_NOT_SATISFIED);

@@ -409,11 +409,13 @@ int gpg_apdu_put_data(unsigned int ref) {
                         pkey_size = sizeof(cx_rsa_4096_private_key_t);
                         pq = G_gpg_vstate.work.rsa.public4096.n;
                         break;
+                    default:
+                        THROW(SW_WRONG_DATA);
+                        return 0;
                 }
                 ksz = ksz >> 1;
 
                 // fetch e
-                e = 0;
                 switch (len_e) {
                     case 4:
                         e = gpg_io_fetch_u32();
@@ -465,7 +467,6 @@ int gpg_apdu_put_data(unsigned int ref) {
                      (keygpg->attributes.value[0] == 22)) {
                 unsigned int curve;
 
-                ksz = 0;
                 curve = gpg_oid2curve(&keygpg->attributes.value[1], keygpg->attributes.length - 1);
                 if (curve == 0) {
                     THROW(SW_WRONG_DATA);

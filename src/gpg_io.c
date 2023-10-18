@@ -261,7 +261,7 @@ int gpg_io_do(unsigned int io_flags) {
                 xx = G_gpg_vstate.io_length - 2;
             }
             G_io_apdu_buffer[tx + 1] = xx;
-            rx = gpg_io_exchange(CHANNEL_APDU, tx + 2);
+            gpg_io_exchange(CHANNEL_APDU, tx + 2);
             // check get response
             if ((G_io_apdu_buffer[0] != 0x00) || (G_io_apdu_buffer[1] != 0xc0) ||
                 (G_io_apdu_buffer[2] != 0x00) || (G_io_apdu_buffer[3] != 0x00)) {
@@ -274,11 +274,10 @@ int gpg_io_do(unsigned int io_flags) {
                 G_gpg_vstate.io_length);
 
         if (io_flags & IO_RETURN_AFTER_TX) {
-            rx = gpg_io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
+            gpg_io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
             return 0;
-        } else {
-            rx = gpg_io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
         }
+        rx = io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
     }
 
     //--- full in chaining ---
@@ -288,7 +287,6 @@ int gpg_io_do(unsigned int io_flags) {
     }
     if (rx == 4) {
         G_io_apdu_buffer[4] = 0;
-        rx = 4;
     }
     G_gpg_vstate.io_offset = 0;
     G_gpg_vstate.io_length = 0;
@@ -343,7 +341,6 @@ int gpg_io_do(unsigned int io_flags) {
         }
         if (rx == 4) {
             G_io_apdu_buffer[4] = 0;
-            rx = 4;
         }
         G_gpg_vstate.io_cla = G_io_apdu_buffer[0];
         G_gpg_vstate.io_lc = G_io_apdu_buffer[4];

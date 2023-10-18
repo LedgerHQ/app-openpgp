@@ -171,7 +171,6 @@ unsigned int ui_uifconfirm_action(unsigned int value) {
         gpg_io_insert_u16(sw);
         gpg_io_do(IO_RETURN_AFTER_TX);
         ui_menu_main_display(0);
-        sw = 0x6985;
     }
     return 0;
 }
@@ -228,7 +227,6 @@ void ui_menu_pinconfirm_display(unsigned int value) {
 unsigned int ui_pinconfirm_action(unsigned int value) {
     unsigned int sw;
 
-    sw = 0x6985;
     if (value == 1) {
         gpg_pin_set_verified(G_gpg_vstate.io_p2, 1);
         sw = 0x9000;
