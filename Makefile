@@ -52,7 +52,7 @@ DEFINES   += SPEC_VERSION=$(SPECVERSION)
 APP_SOURCE_PATH += src
 APP_SOURCE_FILES += $(BOLOS_SDK)/lib_cxng/src/cx_rsa.c
 APP_SOURCE_FILES += $(BOLOS_SDK)/lib_cxng/src/cx_pkcs1.c
-APP_SOURCE_FILES += $(BOLOS_SDK)/lib_cxng/src/cx_utils.c
+APP_SOURCE_FILES += ${BOLOS_SDK}/lib_cxng/src/cx_ram.c
 
 INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
@@ -120,15 +120,13 @@ endif
 ########################################
 # These advanced settings allow to disable some feature that are by
 # default enabled in the SDK `Makefile.standard_app`.
-DISABLE_STANDARD_APP_FILES = 1
+#DISABLE_STANDARD_APP_FILES = 1
 #DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1 # To allow custom size declaration
 #DISABLE_STANDARD_APP_DEFINES = 1 # Will set all the following disablers
 #DISABLE_STANDARD_SNPRINTF = 1
 #DISABLE_STANDARD_USB = 1
 DISABLE_STANDARD_WEBUSB = 1
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DISABLE_STANDARD_BAGL_UX_FLOW = 1
-endif
+#DISABLE_STANDARD_BAGL_UX_FLOW = 1
 #DISABLE_DEBUG_LEDGER_ASSERT = 1
 #DISABLE_DEBUG_THROW = 1
 
@@ -138,12 +136,12 @@ endif
 
 DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT)
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
-DEFINES   += HAVE_LEGACY_PID
 DEFINES   += HAVE_USB_CLASS_CCID
 DEFINES   += HAVE_RSA
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 DEFINES   += UI_NANO_S
+DEFINES   += HAVE_UX_LEGACY
 else
 DEFINES   += UI_NANO_X
 DEFINES   += GPG_SHAKE256

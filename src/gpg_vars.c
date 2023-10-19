@@ -15,8 +15,7 @@
 
 #include "gpg_vars.h"
 
-#ifndef TARGET_NANOS
+gpg_v_state_t G_gpg_vstate;
+
 const gpg_nv_state_t N_state_pic;
-#else
-gpg_nv_state_t N_state_pic;
-#endif
+

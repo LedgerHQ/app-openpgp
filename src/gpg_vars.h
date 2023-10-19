@@ -33,18 +33,7 @@ extern const unsigned char C_OID_cv25519[10];
 
 extern gpg_v_state_t G_gpg_vstate;
 
-#ifndef TARGET_NANOS
 extern const gpg_nv_state_t N_state_pic;
 #define N_gpg_pstate ((volatile gpg_nv_state_t *) PIC(&N_state_pic))
-#else
-extern gpg_nv_state_t N_state_pic;
-#define N_gpg_pstate ((WIDE gpg_nv_state_t *) PIC(&N_state_pic))
-#endif
 
-extern ux_state_t ux;
-
-#ifdef HAVE_RSA
-#include "cx_ram.h"
-extern union cx_u G_cx;
-#endif  // HAVE_RSA
 #endif
