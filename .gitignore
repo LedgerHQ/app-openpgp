@@ -23,6 +23,8 @@ __pycache__/
 *.egg-info/
 .eggs/
 .python-version
+venv/
+gpg_backup
 
 # Doxygen
 doc/html
