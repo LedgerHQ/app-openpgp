@@ -1,17 +1,19 @@
-/* Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
+/*****************************************************************************
+ *   Ledger App OpenPGP.
+ *   (c) 2024 Ledger SAS.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
 
 #include "gpg_vars.h"
 #include "usbd_ccid_if.h"
@@ -219,6 +221,17 @@ const unsigned char C_ext_capabilities[10] = {
 const unsigned char C_ext_length[8] =
     {0x02, 0x02, SHORT(GPG_APDU_LENGTH), 0x02, 0x02, SHORT(GPG_APDU_LENGTH)};
 
+// General feature management
+//  - b8: Display (defined by ISO/IEC 7816-4)
+//  - b7: Biometric input sensor (defined by ISO/IEC 7816-4)
+//  - b6: Button
+//  - b5: Keypad
+//  - b4: LED
+//  - b3: Loudspeaker
+//  - b2: Microphone
+//  - b1: Touchscreen
+const unsigned char C_gen_feature = 0x20;
+
 /* ---------------------*/
 /* -- default values -- */
 /* ---------------------*/
@@ -380,7 +393,7 @@ void gpg_install_slot(gpg_key_slot_t *slot) {
     nvm_write((void *) (&slot->dec.attributes.length), &l, sizeof(unsigned int));
 
     tmp[0] = 0x00;
-    tmp[1] = 0x20;
+    tmp[1] = C_gen_feature;
     nvm_write((void *) (&slot->sig.UIF), &tmp, 2);
     nvm_write((void *) (&slot->dec.UIF), &tmp, 2);
     nvm_write((void *) (&slot->aut.UIF), &tmp, 2);
@@ -402,20 +415,20 @@ void gpg_install(unsigned char app_state) {
     nvm_write((void *) (N_gpg_pstate->AID), &G_gpg_vstate.work.io_buffer, sizeof(C_default_AID));
 
     if (app_state == STATE_ACTIVATE) {
-        // default sex: none
+        // default salutation: none
         G_gpg_vstate.work.io_buffer[0] = 0x39;
-        nvm_write((void *) (&N_gpg_pstate->sex), G_gpg_vstate.work.io_buffer, 1);
+        nvm_write((void *) (&N_gpg_pstate->salutation), G_gpg_vstate.work.io_buffer, 1);
 
         // default PW1/PW2: 1 2 3 4 5 6
         memmove(pin.value, C_sha256_PW1, sizeof(C_sha256_PW1));
-        pin.length = 6;
+        pin.length = GPG_MIN_PW1_LENGTH;
         pin.counter = 3;
         pin.ref = PIN_ID_PW1;
         nvm_write((void *) (&N_gpg_pstate->PW1), &pin, sizeof(gpg_pin_t));
 
         // default PW3: 1 2 3 4 5 6 7 8
         memmove(pin.value, C_sha256_PW2, sizeof(C_sha256_PW2));
-        pin.length = 8;
+        pin.length = GPG_MIN_PW3_LENGTH;
         pin.counter = 3;
         pin.ref = PIN_ID_PW3;
         nvm_write((void *) (&N_gpg_pstate->PW3), &pin, sizeof(gpg_pin_t));
@@ -434,10 +447,7 @@ void gpg_install(unsigned char app_state) {
         nvm_write((void *) (&N_gpg_pstate->config_slot), G_gpg_vstate.work.io_buffer, 3);
 
         // config rsa pub
-        G_gpg_vstate.work.io_buffer[0] = (GPG_RSA_DEFAULT_PUB >> 24) & 0xFF;
-        G_gpg_vstate.work.io_buffer[1] = (GPG_RSA_DEFAULT_PUB >> 16) & 0xFF;
-        G_gpg_vstate.work.io_buffer[2] = (GPG_RSA_DEFAULT_PUB >> 8) & 0xFF;
-        G_gpg_vstate.work.io_buffer[3] = (GPG_RSA_DEFAULT_PUB >> 0) & 0xFF;
+        U4BE_ENCODE(G_gpg_vstate.work.io_buffer, 0, GPG_RSA_DEFAULT_PUB);
         nvm_write((void *) (&N_gpg_pstate->default_RSA_exponent), G_gpg_vstate.work.io_buffer, 4);
 
         // config pin

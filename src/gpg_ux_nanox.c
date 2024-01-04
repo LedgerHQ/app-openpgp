@@ -1,70 +1,52 @@
-/* Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
+/*****************************************************************************
+ *   Ledger App OpenPGP.
+ *   (c) 2024 Ledger SAS.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
 
-#ifdef UI_NANO_X
+#include "bolos_target.h"
+#if defined(HAVE_BAGL) && (defined(TARGET_NANOX) || defined(TARGET_NANOS2))
 
 #include "gpg_vars.h"
 #include "gpg_ux_msg.h"
+#include "gpg_ux.h"
 #include "usbd_ccid_if.h"
 
 /* ----------------------------------------------------------------------- */
-/* ---                        NanoS  UI layout                         --- */
+/* ---                        NanoX  UI layout                         --- */
 /* ----------------------------------------------------------------------- */
-void ui_menu_settings_display(unsigned int value);
-
-void ui_menu_template_display(unsigned int value);
 void ui_menu_tmpl_set_action(unsigned int value);
 void ui_menu_tmpl_key_action(unsigned int value);
 void ui_menu_tmpl_type_action(unsigned int value);
-
-void ui_menu_seed_display(unsigned int value);
-void ui_menu_seed_action(unsigned int value);
-
+void ui_menu_seedmode_action(unsigned int value);
 void ui_menu_reset_action(unsigned int value);
 
 #if GPG_MULTISLOT
-void ui_menu_slot_display(unsigned int value);
 void ui_menu_slot_action(unsigned int value);
 #endif
 
+void ui_menu_settings_display(unsigned int value);
 void ui_menu_main_display(unsigned int value);
-
-void ui_menu_pinconfirm_action(unsigned int value);
-unsigned int ui_pinconfirm_nanos_button(unsigned int button_mask, unsigned int button_mask_counter);
-unsigned int ui_pinconfirm_prepro(const bagl_element_t *element);
-
-const bagl_element_t ui_pinentry_nanos[];
-void ui_menu_pinentry_display(unsigned int value);
-void ui_menu_pinentry_action(unsigned int value);
-unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int button_mask_counter);
-unsigned int ui_pinentry_prepro(const bagl_element_t *element);
-static unsigned int validate_pin();
+unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int button_mask_counter);
 
 /* ------------------------------- Helpers  UX ------------------------------- */
+
 #define ui_flow_display(f, i)     \
     if ((i) < ARRAYLEN(f))        \
         ux_flow_init(0, f, f[i]); \
     else                          \
         ux_flow_init(0, f, NULL)
-
-void ui_CCID_reset(void) {
-#ifdef HAVE_USB_CLASS_CCID
-    io_usb_ccid_set_card_inserted(0);
-    io_usb_ccid_set_card_inserted(1);
-#endif
-}
 
 UX_STEP_CB(ux_menu_popup_1_step,
            bnnn_paging,
@@ -100,23 +82,30 @@ UX_FLOW(ux_flow_uifconfirm,
         &ux_menu_uifconfirm_2_step);
 
 void ui_menu_uifconfirm_predisplay() {
-    unsigned int uif_case =
-        (G_gpg_vstate.io_ins << 16) | (G_gpg_vstate.io_p1 << 8) | (G_gpg_vstate.io_p2);
-    switch (uif_case) {
-        case 0x002A9E9A:
-            snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Signature");
-            break;
-        case 0x002A8680:
-            snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Encryption");
-            break;
-        case 0x002A8086:
-            snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
-            break;
-        case 0x00880000:
+    switch (G_gpg_vstate.io_ins) {
+        case INS_INTERNAL_AUTHENTICATE:
             snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
             break;
+        case INS_PSO:
+            switch (G_gpg_vstate.io_p1p2) {
+                case PSO_CDS:
+                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Signature");
+                    break;
+                case PSO_ENC:
+                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Encryption");
+                    break;
+                case PSO_DEC:
+                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                    break;
+                default:
+                    break;
+            }
+            break;
         default:
-            snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Please Cancel");
+            break;
+    }
+    if (G_gpg_vstate.menu[0] == 0) {
+        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Please Cancel");
     }
 }
 
@@ -125,52 +114,36 @@ void ui_menu_uifconfirm_display(unsigned int value) {
 }
 
 unsigned int ui_uifconfirm_action(unsigned int value) {
-    unsigned int sw;
+    unsigned int sw = SW_SECURITY_UIF_ISSUE;
 
-    sw = 0x6985;
     if (value == 1) {
-        BEGIN_TRY {
-            TRY {
-                G_gpg_vstate.UIF_flags = 1;
-                if (G_gpg_vstate.io_ins == INS_PSO) {
-                    sw = gpg_apdu_pso();
-                } else if (G_gpg_vstate.io_ins == INS_INTERNAL_AUTHENTICATE) {
-                    sw = gpg_apdu_internal_authenticate();
-                } else {
-                    gpg_io_discard(1);
-                    sw = 0x6985;
-                }
-            }
-            CATCH_OTHER(e) {
+        G_gpg_vstate.UIF_flags = 1;
+        switch (G_gpg_vstate.io_ins) {
+            case INS_PSO:
+                sw = gpg_apdu_pso();
+                break;
+            case INS_INTERNAL_AUTHENTICATE:
+                sw = gpg_apdu_internal_authenticate();
+                break;
+            default:
                 gpg_io_discard(1);
-                if ((e & 0xFFFF0000) || (((e & 0xF000) != 0x6000) && ((e & 0xF000) != 0x9000))) {
-                    gpg_io_insert_u32(e);
-                    sw = 0x6f42;
-                } else {
-                    sw = e;
-                }
-            }
-            FINALLY {
-                G_gpg_vstate.UIF_flags = 0;
-                gpg_io_insert_u16(sw);
-                gpg_io_do(IO_RETURN_AFTER_TX);
-                ui_menu_main_display(0);
-            }
+                sw = SW_CONDITIONS_NOT_SATISFIED;
+                break;
         }
-        END_TRY;
+        G_gpg_vstate.UIF_flags = 0;
     } else {
         gpg_io_discard(1);
-        gpg_io_insert_u16(sw);
-        gpg_io_do(IO_RETURN_AFTER_TX);
-        ui_menu_main_display(0);
     }
+    gpg_io_insert_u16(sw);
+    gpg_io_do(IO_RETURN_AFTER_TX);
+    ui_menu_main_display(0);
     return 0;
 }
 
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
+
 unsigned int ui_pinconfirm_action(unsigned int value);
 void ui_menu_pinconfirm_predisplay(void);
-void ui_menu_pinconfirm_display(unsigned int value);
 
 UX_STEP_NOCB_INIT(ux_menu_pinconfirm_1_step,
                   nnn,
@@ -199,12 +172,12 @@ UX_FLOW(ux_flow_pinconfirm,
         &ux_menu_pinconfirm_3_step);
 
 void ui_menu_pinconfirm_predisplay() {
-    if ((G_gpg_vstate.io_p2 == 0x81) || (G_gpg_vstate.io_p2 == 0x82) ||
-        (G_gpg_vstate.io_p2 == 0x83)) {
+    if ((G_gpg_vstate.io_p2 == PIN_ID_PW1) || (G_gpg_vstate.io_p2 == PIN_ID_PW2) ||
+        (G_gpg_vstate.io_p2 == PIN_ID_PW3)) {
         snprintf(G_gpg_vstate.menu,
                  sizeof(G_gpg_vstate.menu),
                  "%s %x",
-                 G_gpg_vstate.io_p2 == 0x83 ? "Admin" : "User",
+                 G_gpg_vstate.io_p2 == PIN_ID_PW3 ? "Admin" : "User",
                  G_gpg_vstate.io_p2);
     } else {
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Please Cancel");
@@ -217,14 +190,14 @@ void ui_menu_pinconfirm_display(unsigned int value) {
 }
 
 unsigned int ui_pinconfirm_action(unsigned int value) {
-    unsigned int sw;
+    unsigned int sw = SW_UNKNOWN;
 
     if (value == 1) {
         gpg_pin_set_verified(G_gpg_vstate.io_p2, 1);
-        sw = 0x9000;
+        sw = SW_OK;
     } else {
         gpg_pin_set_verified(G_gpg_vstate.io_p2, 0);
-        sw = 0x6985;
+        sw = SW_CONDITIONS_NOT_SATISFIED;
     }
     gpg_io_discard(0);
     gpg_io_insert_u16(sw);
@@ -235,12 +208,13 @@ unsigned int ui_pinconfirm_action(unsigned int value) {
 
 /* ------------------------------- PIN ENTRY UX ------------------------------ */
 
-const bagl_element_t ui_pinentry_nanos[] = {
+const bagl_element_t ui_pinentry_action[] = {
     // type             userid    x    y    w    h    str   rad  fill              fg        bg
     // font_id icon_id
 
     // clear screen
-    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, 64, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0}, NULL},
+    {{BAGL_RECTANGLE, 0x00, 0, 0, 128, BAGL_HEIGHT, 0, 0, BAGL_FILL, 0x000000, 0xFFFFFF, 0, 0},
+     NULL},
 
     // left/rights icons
     {{BAGL_ICON, 0x00, 0, 30, 7, 4, 0, 0, 0, 0xFFFFFF, 0x000000, 0, 0},
@@ -279,66 +253,52 @@ const bagl_element_t ui_pinentry_nanos[] = {
       BAGL_FONT_OPEN_SANS_LIGHT_16px | BAGL_FONT_ALIGNMENT_CENTER,
       0},
      G_gpg_vstate.menu}};
+
 static const char C_pin_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '<', 'A', 'V'};
 
-void ui_menu_pinentry_display(unsigned int value) {
-    if (value == 0) {
-        memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
-        G_gpg_vstate.ux_pinentry[0] = 1;
-        G_gpg_vstate.ux_pinentry[1] = 5;
-    }
-    UX_DISPLAY(ui_pinentry_nanos, (void *) ui_pinentry_prepro);
-}
-
-unsigned int ui_pinentry_prepro(const bagl_element_t *element) {
+unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
     if (element->component.userid == 1) {
-        if (G_gpg_vstate.io_ins == 0x24) {
+        if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
             switch (G_gpg_vstate.io_p1) {
                 case 0:
                     snprintf(G_gpg_vstate.menu,
                              sizeof(G_gpg_vstate.menu),
                              "Current %s PIN",
-                             (G_gpg_vstate.io_p2 == 0x83) ? "Admin" : "User");
+                             (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "Admin" : "User");
                     break;
                 case 1:
                     snprintf(G_gpg_vstate.menu,
                              sizeof(G_gpg_vstate.menu),
                              "New %s PIN",
-                             (G_gpg_vstate.io_p2 == 0x83) ? "Admin" : "User");
+                             (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "Admin" : "User");
                     break;
                 case 2:
                     snprintf(G_gpg_vstate.menu,
                              sizeof(G_gpg_vstate.menu),
                              "Confirm %s PIN",
-                             (G_gpg_vstate.io_p2 == 0x83) ? "Admin" : "User");
+                             (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "Admin" : "User");
                     break;
                 default:
                     snprintf(G_gpg_vstate.menu,
                              sizeof(G_gpg_vstate.menu),
                              "WAT %s PIN",
-                             (G_gpg_vstate.io_p2 == 0x83) ? "Admin" : "User");
+                             (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "Admin" : "User");
                     break;
             }
         } else {
             snprintf(G_gpg_vstate.menu,
                      sizeof(G_gpg_vstate.menu),
                      "%s PIN",
-                     (G_gpg_vstate.io_p2 == 0x83) ? "Admin" : "User");
+                     (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "Admin" : "User");
         }
     } else if (element->component.userid == 2) {
         unsigned int i;
         G_gpg_vstate.menu[0] = ' ';
-#if 0
-    for (i = 1; i <= G_gpg_vstate.ux_pinentry[0]; i++) {
-      G_gpg_vstate.menu[i] = C_pin_digit[G_gpg_vstate.ux_pinentry[i]];
-    }
-#else
         for (i = 1; i < G_gpg_vstate.ux_pinentry[0]; i++) {
             G_gpg_vstate.menu[i] = '*';
         }
         G_gpg_vstate.menu[i] = C_pin_digit[G_gpg_vstate.ux_pinentry[i]];
         i++;
-#endif
         for (; i <= GPG_MAX_PW_LENGTH; i++) {
             G_gpg_vstate.menu[i] = '-';
         }
@@ -348,11 +308,94 @@ unsigned int ui_pinentry_prepro(const bagl_element_t *element) {
     return 1;
 }
 
-unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int button_mask_counter) {
+void ui_menu_pinentry_display(unsigned int value) {
+    if (value == 0) {
+        memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
+        G_gpg_vstate.ux_pinentry[0] = 1;
+        G_gpg_vstate.ux_pinentry[1] = 5;
+    }
+    UX_DISPLAY(ui_pinentry_action, (void *) ui_pinentry_predisplay);
+}
+
+static void validate_pin() {
+    unsigned int offset, len, sw = SW_UNKNOWN;
+    gpg_pin_t *pin;
+
+    for (offset = 1; offset <= G_gpg_vstate.ux_pinentry[0]; offset++) {
+        G_gpg_vstate.menu[offset] = C_pin_digit[G_gpg_vstate.ux_pinentry[offset]];
+    }
+
+    if (G_gpg_vstate.io_ins == INS_VERIFY) {
+        pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
+        sw = gpg_pin_check(pin,
+                           G_gpg_vstate.io_p2,
+                           (unsigned char *) (G_gpg_vstate.menu + 1),
+                           G_gpg_vstate.ux_pinentry[0]);
+        gpg_io_discard(1);
+        gpg_io_insert_u16(sw);
+        gpg_io_do(IO_RETURN_AFTER_TX);
+        if (sw != SW_OK) {
+            snprintf(G_gpg_vstate.menu,
+                     sizeof(G_gpg_vstate.menu),
+                     " %d tries remaining",
+                     pin->counter);
+            ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
+        } else {
+            ui_menu_main_display(0);
+        }
+    }
+
+    if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
+        if (G_gpg_vstate.io_p1 <= 2) {
+            gpg_io_insert_u8(G_gpg_vstate.ux_pinentry[0]);
+            gpg_io_insert((unsigned char *) (G_gpg_vstate.menu + 1), G_gpg_vstate.ux_pinentry[0]);
+            G_gpg_vstate.io_p1++;
+        }
+        if (G_gpg_vstate.io_p1 == 3) {
+            pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
+            if (gpg_pin_check(pin,
+                              G_gpg_vstate.io_p2,
+                              G_gpg_vstate.work.io_buffer + 1,
+                              G_gpg_vstate.work.io_buffer[0]) != SW_OK) {
+                gpg_io_discard(1);
+                gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
+                gpg_io_do(IO_RETURN_AFTER_TX);
+                snprintf(G_gpg_vstate.menu,
+                         sizeof(G_gpg_vstate.menu),
+                         " %d tries remaining",
+                         pin->counter);
+                ui_info(WRONG_PIN, NULL, ui_menu_main_display, 0);
+                return;
+            }
+            offset = 1 + G_gpg_vstate.work.io_buffer[0];
+            len = G_gpg_vstate.work.io_buffer[offset];
+            if ((len != G_gpg_vstate.work.io_buffer[offset + 1 + len]) ||
+                (memcmp(G_gpg_vstate.work.io_buffer + offset + 1,
+                        G_gpg_vstate.work.io_buffer + offset + 1 + len + 1,
+                        len) != 0)) {
+                gpg_io_discard(1);
+                gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
+                gpg_io_do(IO_RETURN_AFTER_TX);
+                ui_info(PIN_DIFFERS, NULL, ui_menu_main_display, 0);
+            } else {
+                sw = gpg_pin_set(gpg_pin_get_pin(G_gpg_vstate.io_p2),
+                                 G_gpg_vstate.work.io_buffer + offset + 1,
+                                 len);
+                gpg_io_discard(1);
+                gpg_io_insert_u16(sw);
+                gpg_io_do(IO_RETURN_AFTER_TX);
+                ui_menu_main_display(0);
+            }
+        } else {
+            ui_menu_pinentry_display(0);
+        }
+    }
+}
+
+unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int button_mask_counter) {
+    UNUSED(button_mask_counter);
     unsigned int offset = G_gpg_vstate.ux_pinentry[0];
     char digit;
-
-    UNUSED(button_mask_counter);
 
     switch (button_mask) {
         case BUTTON_EVT_RELEASED | BUTTON_LEFT:  // Down
@@ -409,95 +452,10 @@ unsigned int ui_pinentry_nanos_button(unsigned int button_mask, unsigned int but
     }
     return 0;
 }
-// >= 0
-static unsigned int validate_pin() {
-    unsigned int offset, len, sw;
-    gpg_pin_t *pin;
-
-    for (offset = 1; offset <= G_gpg_vstate.ux_pinentry[0]; offset++) {
-        G_gpg_vstate.menu[offset] = C_pin_digit[G_gpg_vstate.ux_pinentry[offset]];
-    }
-
-    if (G_gpg_vstate.io_ins == 0x20) {
-        pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
-        sw = gpg_pin_check(pin,
-                           G_gpg_vstate.io_p2,
-                           (unsigned char *) (G_gpg_vstate.menu + 1),
-                           G_gpg_vstate.ux_pinentry[0]);
-        gpg_io_discard(1);
-        gpg_io_insert_u16(sw);
-        gpg_io_do(IO_RETURN_AFTER_TX);
-        if (sw != SW_OK) {
-            snprintf(G_gpg_vstate.menu,
-                     sizeof(G_gpg_vstate.menu),
-                     " %d tries remaining",
-                     pin->counter);
-            ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
-        } else {
-            ui_menu_main_display(0);
-        }
-    }
-
-    if (G_gpg_vstate.io_ins == 0x24) {
-        if (G_gpg_vstate.io_p1 <= 2) {
-            gpg_io_insert_u8(G_gpg_vstate.ux_pinentry[0]);
-            gpg_io_insert((unsigned char *) (G_gpg_vstate.menu + 1), G_gpg_vstate.ux_pinentry[0]);
-            G_gpg_vstate.io_p1++;
-        }
-        if (G_gpg_vstate.io_p1 == 3) {
-            pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
-            if (gpg_pin_check(pin,
-                              G_gpg_vstate.io_p2,
-                              G_gpg_vstate.work.io_buffer + 1,
-                              G_gpg_vstate.work.io_buffer[0]) != SW_OK) {
-                gpg_io_discard(1);
-                gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
-                gpg_io_do(IO_RETURN_AFTER_TX);
-                snprintf(G_gpg_vstate.menu,
-                         sizeof(G_gpg_vstate.menu),
-                         " %d tries remaining",
-                         pin->counter);
-                ui_info(WRONG_PIN, NULL, ui_menu_main_display, 0);
-                return 0;
-            }
-            offset = 1 + G_gpg_vstate.work.io_buffer[0];
-            len = G_gpg_vstate.work.io_buffer[offset];
-            if ((len != G_gpg_vstate.work.io_buffer[offset + 1 + len]) ||
-                (memcmp(G_gpg_vstate.work.io_buffer + offset + 1,
-                        G_gpg_vstate.work.io_buffer + offset + 1 + len + 1,
-                        len) != 0)) {
-                gpg_io_discard(1);
-                gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
-                gpg_io_do(IO_RETURN_AFTER_TX);
-                ui_info(PIN_DIFFERS, NULL, ui_menu_main_display, 0);
-            } else {
-                gpg_pin_set(gpg_pin_get_pin(G_gpg_vstate.io_p2),
-                            G_gpg_vstate.work.io_buffer + offset + 1,
-                            len);
-                gpg_io_discard(1);
-                gpg_io_insert_u16(SW_OK);
-                gpg_io_do(IO_RETURN_AFTER_TX);
-                // ui_info(PIN_CHANGED, NULL, ui_menu_main_display, 0);
-                ui_menu_main_display(0);
-            }
-            return 0;
-        } else {
-            ui_menu_pinentry_display(0);
-        }
-    }
-    return 0;
-}
 
 /* ------------------------------- template UX ------------------------------- */
-#define LABEL_SIG "Signature"
-#define LABEL_AUT "Authentication"
-#define LABEL_DEC "Decryption"
 
-#define LABEL_RSA2048   "RSA 2048"
-#define LABEL_RSA3072   "RSA 3072"
-#define LABEL_RSA4096   "RSA 4096"
-#define LABEL_SECP256K1 "SECP 256K1"
-#define LABEL_Ed25519   "Ed25519"
+void ui_menu_template_display(unsigned int value);
 
 const char *const tmpl_key_getter_values[] = {LABEL_SIG, LABEL_DEC, LABEL_AUT};
 
@@ -635,22 +593,19 @@ void ui_menu_template_display(unsigned int value) {
 }
 
 void ui_menu_tmpl_set_action(unsigned int value) {
+    UNUSED(value);
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
-    gpg_key_t *dest;
-    const char *err;
+    gpg_key_t *dest = NULL;
     const unsigned char *oid;
     unsigned int oid_len;
-    err = NULL;
 
-    UNUSED(value);
     memset(&attributes, 0, sizeof(attributes));
     switch (G_gpg_vstate.ux_type) {
         case 2048:
         case 3072:
         case 4096:
-            attributes.value[0] = 0x01;
-            attributes.value[1] = (G_gpg_vstate.ux_type >> 8) & 0xFF;
-            attributes.value[2] = G_gpg_vstate.ux_type & 0xFF;
+            attributes.value[0] = KEY_ID_RSA;
+            U2BE_ENCODE(attributes.value, 1, G_gpg_vstate.ux_type);
             attributes.value[3] = 0x00;
             attributes.value[4] = 0x20;
             attributes.value[5] = 0x01;
@@ -659,9 +614,9 @@ void ui_menu_tmpl_set_action(unsigned int value) {
 
         case CX_CURVE_SECP256R1:
             if (G_gpg_vstate.ux_key == 2) {
-                attributes.value[0] = 18;  // ecdh
+                attributes.value[0] = KEY_ID_ECDH;
             } else {
-                attributes.value[0] = 19;  // ecdsa
+                attributes.value[0] = KEY_ID_ECDSA;
             }
             oid = gpg_curve2oid(G_gpg_vstate.ux_type, &oid_len);
             memmove(attributes.value + 1, oid, sizeof(oid_len));
@@ -670,22 +625,24 @@ void ui_menu_tmpl_set_action(unsigned int value) {
 
         case CX_CURVE_Ed25519:
             if (G_gpg_vstate.ux_key == 2) {
-                attributes.value[0] = 18;  // ecdh
+                attributes.value[0] = KEY_ID_ECDH;
                 memmove(attributes.value + 1, C_OID_cv25519, sizeof(C_OID_cv25519));
                 attributes.length = 1 + sizeof(C_OID_cv25519);
             } else {
-                attributes.value[0] = 22;  // eddsa
+                attributes.value[0] = KEY_ID_EDDSA;
                 memmove(attributes.value + 1, C_OID_Ed25519, sizeof(C_OID_Ed25519));
                 attributes.length = 1 + sizeof(C_OID_Ed25519);
             }
             break;
 
         default:
-            err = TEMPLATE_TYPE;
-            goto ERROR;
+            break;
+    }
+    if (attributes.value[0] == 0) {
+        ui_info(INVALID_SELECTION, TEMPLATE_TYPE);
+        return;
     }
 
-    dest = NULL;
     switch (G_gpg_vstate.ux_key) {
         case 1:
             dest = &G_gpg_vstate.kslot->sig;
@@ -697,44 +654,29 @@ void ui_menu_tmpl_set_action(unsigned int value) {
             dest = &G_gpg_vstate.kslot->aut;
             break;
         default:
-            err = TEMPLATE_KEY;
-            goto ERROR;
+            break;
     }
 
-    nvm_write(dest, NULL, sizeof(gpg_key_t));
-    nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-    ui_info(OK, NULL, ui_menu_template_display, 0);
-    return;
-
-ERROR:
-    ui_info(INVALID_SELECTION, err, ui_menu_template_display, 0);
+    if (dest != NULL) {
+        nvm_write(dest, NULL, sizeof(gpg_key_t));
+        nvm_write(&dest->attributes, &attributes, sizeof(attributes));
+        ui_menu_template_display(1);
+    } else {
+        ui_info(INVALID_SELECTION, TEMPLATE_KEY);
+    }
 }
 
-#undef KEY_KEY
-#undef KEY_TYPE
-
-#undef LABEL_SIG
-#undef LABEL_AUT
-#undef LABEL_DEC
-
-#undef LABEL_RSA2048
-#undef LABEL_RSA3072
-#undef LABEL_RSA4096
-#undef LABEL_NISTP256
-#undef LABEL_SECP256K1
-#undef LABEL_Ed25519
-
 /* --------------------------------- SEED UX --------------------------------- */
+
 #define CUR_SEED_MODE G_gpg_vstate.ux_buff1
 
-void ui_menu_seed_action(unsigned int);
-void ui_menu_seedmode_display(unsigned int);
+void ui_menu_seedmode_action(unsigned int);
 void ui_menu_seedmode_predisplay(void);
 
 UX_STEP_CB_INIT(ux_menu_seedmode_1_step,
                 bn,
                 ui_menu_seedmode_predisplay(),
-                ui_menu_seed_action(0),
+                ui_menu_seedmode_action(0),
                 {"Toggle seed mode", CUR_SEED_MODE});
 
 UX_STEP_CB(ux_menu_seedmode_2_step,
@@ -755,7 +697,7 @@ void ui_menu_seedmode_display(unsigned int value) {
     ui_flow_display(ux_flow_seedmode, value);
 }
 
-void ui_menu_seed_action(unsigned int value) {
+void ui_menu_seedmode_action(unsigned int value) {
     UNUSED(value);
     if (G_gpg_vstate.seed_mode) {
         G_gpg_vstate.seed_mode = 0;
@@ -765,11 +707,9 @@ void ui_menu_seed_action(unsigned int value) {
     ui_menu_seedmode_display(0);
 }
 
-#undef CUR_SEED_MODE
-
 /* ------------------------------- PIN MODE UX ------------------------------ */
+
 void ui_menu_pinmode_action(unsigned int value);
-void ui_menu_pinmode_display(unsigned int value);
 void ui_menu_pinmode_predisplay(void);
 
 #define ONHST_BUFF G_gpg_vstate.ux_buff1
@@ -853,13 +793,9 @@ void ui_menu_pinmode_display(unsigned int value) {
     ui_flow_display(ux_flow_pinmode, value);
 }
 
-#undef ONHST_BUFF
-#undef ONSCR_BUFF
-#undef CONFI_BUFF
-#undef TRUST_BUFF
-
 void ui_menu_pinmode_action(unsigned int value) {
     unsigned char s;
+    value = value & 0x7FFF;
     if (value == 128) {
         if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
             if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
@@ -884,7 +820,7 @@ void ui_menu_pinmode_action(unsigned int value) {
             case PIN_MODE_SCREEN:
             case PIN_MODE_CONFIRM:
                 if (!gpg_pin_is_verified(PIN_ID_PW2)) {
-                    ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+                    ui_info(PIN_USER_82, NOT_VERIFIED);
                     return;
                 }
                 break;
@@ -972,10 +908,6 @@ void ui_menu_uifmode_display(unsigned int value) {
     ui_flow_display(ux_flow_uif, value);
 }
 
-#undef SIG_BUFF
-#undef DEC_BUFF
-#undef AUT_BUFF
-
 void ui_menu_uifmode_action(unsigned int value) {
     unsigned char *uif;
     unsigned char new_uif;
@@ -1036,7 +968,7 @@ void ui_menu_reset_action(unsigned int value) {
     ui_menu_main_display(0);
 }
 
-/* ------------------------------ RESET SLOT UX ------------------------------ */
+/* ------------------------------ RESET KEY SLOT ----------------------------- */
 
 void ui_menu_reset_slot_action(unsigned int value);
 
@@ -1093,6 +1025,7 @@ void settings_selector(unsigned int idx) {
             break;
     }
 }
+
 void ui_menu_settings_display(unsigned int value) {
     ux_menulist_init_select(G_ux.stack_count - 1, settings_getter, settings_selector, value);
 }
@@ -1100,9 +1033,6 @@ void ui_menu_settings_display(unsigned int value) {
 /* --------------------------------- SLOT UX --------------------------------- */
 
 #if GPG_MULTISLOT
-#if GPG_KEYS_SLOTS != 3
-#error menu definition not correct for current value of GPG_KEYS_SLOTS
-#endif
 
 void ui_menu_slot_action(unsigned int value);
 void ui_menu_slot_predisplay(void);
@@ -1171,16 +1101,12 @@ void ui_menu_slot_display(unsigned int value) {
     ui_flow_display(ux_flow_slot, value);
 }
 
-#undef SLOT1
-#undef SLOT2
-#undef SLOT3
-
 void ui_menu_slot_action(unsigned int value) {
     unsigned char s;
 
     if (value == 128) {
         s = G_gpg_vstate.slot;
-        nvm_write((void *) &N_gpg_pstate->config_slot[1], &s, 1);
+        nvm_write((void *) (&N_gpg_pstate->config_slot[1]), &s, 1);
     } else {
         s = (unsigned char) (value - 1);
         if (s != G_gpg_vstate.slot) {
@@ -1196,16 +1122,17 @@ void ui_menu_slot_action(unsigned int value) {
 
 /* --------------------------------- INFO UX --------------------------------- */
 
-#define STR(x)  #x
-#define XSTR(x) STR(x)
-
 UX_STEP_NOCB(ux_menu_info_1_step,
              bnnn,
              {
                  "OpenPGP Card",
                  "(c) Ledger SAS",
                  "Spec  " XSTR(SPEC_VERSION),
+#ifdef HAVE_PRINTF
+                 "[DBG] App  " XSTR(APPVERSION),
+#else
                  "App  " XSTR(APPVERSION),
+#endif
              });
 
 UX_STEP_CB(ux_menu_info_2_step,
@@ -1223,10 +1150,8 @@ void ui_menu_info_display(unsigned int value) {
     ux_flow_init(0, ux_flow_info, NULL);
 }
 
-#undef STR
-#undef XSTR
-
 /* --------------------------------- MAIN UX --------------------------------- */
+
 void ui_menu_main_predisplay(void);
 
 UX_STEP_NOCB_INIT(ux_menu_main_1_step,
@@ -1264,15 +1189,13 @@ void ui_menu_main_predisplay() {
         memmove(G_gpg_vstate.ux_buff1, "<No Name>", 9);
     } else {
         for (int i = 0; i < 12; i++) {
-            if (G_gpg_vstate.ux_buff1[i] == 0x3c) {
+            if (G_gpg_vstate.ux_buff1[i] == '<') {
                 G_gpg_vstate.ux_buff1[i] = ' ';
             }
         }
     }
 
-    unsigned int serial;
-    serial = (G_gpg_vstate.kslot->serial[0] << 24) | (G_gpg_vstate.kslot->serial[1] << 16) |
-             (G_gpg_vstate.kslot->serial[2] << 8) | (G_gpg_vstate.kslot->serial[3]);
+    unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
     memset(G_gpg_vstate.ux_buff2, 0, sizeof(G_gpg_vstate.ux_buff2));
 #if GPG_MULTISLOT
     snprintf(G_gpg_vstate.ux_buff2,
@@ -1293,6 +1216,7 @@ void ui_menu_main_display(unsigned int value) {
 
     ui_flow_display(ux_flow_main, value);
 }
+
 /* --- INIT --- */
 
 void ui_init(void) {
@@ -1303,6 +1227,4 @@ void io_seproxyhal_display(const bagl_element_t *element) {
     io_seproxyhal_display_default((bagl_element_t *) element);
 }
 
-///-----
-
-#endif  // UI_NANOX
+#endif  // defined(HAVE_BAGL) && (defined(TARGET_NANOX) || defined(TARGET_NANOS2))

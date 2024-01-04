@@ -1,28 +1,37 @@
-/* Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
+/*****************************************************************************
+ *   Ledger App OpenPGP.
+ *   (c) 2024 Ledger SAS.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
 
 #include "gpg_vars.h"
 
 const unsigned char C_MF[] = {0x3F, 0x00};
+const unsigned char C_ATR[] = {0x2F, 0x02};
 
 int gpg_apdu_select() {
-    int sw;
+    int sw = SW_UNKNOWN;
 
     // MF
-    if ((G_gpg_vstate.io_length == 2) &&
+    if ((G_gpg_vstate.io_length == sizeof(C_MF)) &&
         (memcmp(G_gpg_vstate.work.io_buffer, C_MF, G_gpg_vstate.io_length) == 0)) {
+        gpg_io_discard(0);
+        sw = SW_OK;
+    }
+    // EF.ATR
+    else if ((G_gpg_vstate.io_length == sizeof(C_ATR)) &&
+             (memcmp(G_gpg_vstate.work.io_buffer, C_ATR, G_gpg_vstate.io_length) == 0)) {
         gpg_io_discard(0);
         sw = SW_OK;
     }
@@ -43,14 +52,14 @@ int gpg_apdu_select() {
 
         gpg_io_discard(0);
         if (N_gpg_pstate->histo[7] != STATE_ACTIVATE) {
-            THROW(SW_STATE_TERMINATED);
+            sw = SW_STATE_TERMINATED;
+        } else {
+            sw = SW_OK;
         }
-        sw = SW_OK;
     }
     // NOT FOUND
     else {
-        THROW(SW_FILE_NOT_FOUND);
-        return SW_FILE_NOT_FOUND;
+        sw = SW_FILE_NOT_FOUND;
     }
     return sw;
 }

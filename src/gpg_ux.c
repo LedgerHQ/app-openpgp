@@ -1,3 +1,4 @@
+
 /*****************************************************************************
  *   Ledger App OpenPGP.
  *   (c) 2024 Ledger SAS.
@@ -15,8 +16,9 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include "gpg_vars.h"
+#include "usbd_ccid_if.h"
 
-gpg_v_state_t G_gpg_vstate;
-
-const gpg_nv_state_t N_state_pic;
+void ui_CCID_reset(void) {
+    io_usb_ccid_set_card_inserted(0);
+    io_usb_ccid_set_card_inserted(1);
+}

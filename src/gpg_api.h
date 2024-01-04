@@ -1,17 +1,19 @@
-/* Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
+/*****************************************************************************
+ *   Ledger App OpenPGP.
+ *   (c) 2024 Ledger SAS.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
 
 #ifndef GPG_API_H
 #define GPG_API_H
@@ -28,19 +30,19 @@ void gpg_install(unsigned char app_state);
 void gpg_install_slot(gpg_key_slot_t *slot);
 int gpg_dispatch(void);
 
-int gpg_apdu_select_data(unsigned int ref, int record);
+void gpg_apdu_select_data(unsigned int ref, int record);
 int gpg_apdu_get_data(unsigned int ref);
 int gpg_apdu_get_next_data(unsigned int ref);
 int gpg_apdu_put_data(unsigned int ref);
 int gpg_apdu_get_key_data(unsigned int ref);
 int gpg_apdu_put_key_data(unsigned int ref);
 
-void gpg_pso_derive_slot_seed(int slot, unsigned char *seed);
-void gpg_pso_derive_key_seed(unsigned char *Sn,
-                             unsigned char *key_name,
-                             unsigned int idx,
-                             unsigned char *Ski,
-                             unsigned int Ski_len);
+int gpg_pso_derive_slot_seed(int slot, unsigned char *seed);
+int gpg_pso_derive_key_seed(unsigned char *Sn,
+                            unsigned char *key_name,
+                            unsigned int idx,
+                            unsigned char *Ski,
+                            unsigned int Ski_len);
 int gpg_apdu_pso(void);
 int gpg_apdu_internal_authenticate(void);
 int gpg_apdu_gen(void);
@@ -55,11 +57,11 @@ int gpg_apdu_reset_retry_counter(void);
 gpg_pin_t *gpg_pin_get_pin(int id);
 int gpg_pin_is_blocked(gpg_pin_t *pin);
 int gpg_pin_is_verified(int pinID);
-int gpg_pin_set_verified(int pinID, int verified);
-int gpg_pin_check(gpg_pin_t *pin, int pinID, unsigned char *pin_val, unsigned int pin_len);
-void gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
+void gpg_pin_set_verified(int pinID, int verified);
+int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len);
+int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
 
-int gpg_mse_reset();
+void gpg_mse_reset();
 int gpg_apdu_mse();
 
 /* ----------------------------------------------------------------------- */
@@ -70,7 +72,6 @@ void gpg_io_clear(void);
 void gpg_io_set_offset(unsigned int offset);
 void gpg_io_mark(void);
 void gpg_io_rewind(void);
-void gpg_io_hole(unsigned int sz);
 void gpg_io_inserted(unsigned int len);
 void gpg_io_insert(unsigned char const *buffer, unsigned int len);
 void gpg_io_insert_u32(unsigned int v32);
@@ -86,12 +87,12 @@ unsigned int gpg_io_fetch_u32(void);
 unsigned int gpg_io_fetch_u24(void);
 unsigned int gpg_io_fetch_u16(void);
 unsigned int gpg_io_fetch_u8(void);
-int gpg_io_fetch_t(unsigned int *T);
-int gpg_io_fetch_l(unsigned int *L);
-int gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
-int gpg_io_fetch_nv(unsigned char *buffer, int len);
+void gpg_io_fetch_t(unsigned int *T);
+void gpg_io_fetch_l(unsigned int *L);
+void gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
+void gpg_io_fetch_nv(unsigned char *buffer, int len);
 int gpg_io_fetch(unsigned char *buffer, int len);
 
-int gpg_io_do(unsigned int io_flags);
+void gpg_io_do(unsigned int io_flags);
 
 #endif

@@ -1,6 +1,6 @@
 # ****************************************************************************
 #    Ledger App OpenPGP
-#    (c) 2016-2024 Ledger SAS.
+#    (c) 2024 Ledger SAS.
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ else
 $(error APPNAME ($(APPNAME)) is not set or unknown)
 endif
 
+# Application version
 APPVERSION_M = 2
 APPVERSION_N = 0
 APPVERSION_P = 0
@@ -140,11 +141,7 @@ DEFINES   += HAVE_USB_CLASS_CCID
 DEFINES   += HAVE_RSA
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES   += UI_NANO_S
 DEFINES   += HAVE_UX_LEGACY
-else
-DEFINES   += UI_NANO_X
-DEFINES   += GPG_SHAKE256
 endif
 
 #########################

@@ -1,22 +1,25 @@
-/* Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
+/*****************************************************************************
+ *   Ledger App OpenPGP.
+ *   (c) 2024 Ledger SAS.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
 
 #ifndef GPG_TYPES_H
 #define GPG_TYPES_H
 
 #include "lcx_sha3.h"
+#include "usbd_ccid_if.h"
 
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
@@ -30,7 +33,9 @@
 /* random choice */
 #define GPG_EXT_CHALLENGE_LENTH 254
 /* accept long PW, but less than one sha256 block */
-#define GPG_MAX_PW_LENGTH 12
+#define GPG_MAX_PW_LENGTH  12
+#define GPG_MIN_PW1_LENGTH 6
+#define GPG_MIN_PW3_LENGTH 8
 
 #if GPG_MULTISLOT
 #define GPG_KEYS_SLOTS 3
@@ -41,6 +46,13 @@
 #define GPG_KEY_ATTRIBUTES_LENGTH 12
 
 #define GPG_RSA_DEFAULT_PUB 0x00010001U
+
+/* ---  Keys IDs  --- */
+// https://www.rfc-editor.org/rfc/rfc4880#section-9.1
+#define KEY_ID_RSA   1   // RSA (Encrypt or Sign)
+#define KEY_ID_ECDH  18  // Elliptic Curve Diffie-Hellman
+#define KEY_ID_ECDSA 19  // Elliptic Curve Digital Signature Algorithm
+#define KEY_ID_EDDSA 22  // Edwards-curve Digital Signature Algorithm
 
 struct gpg_pin_s {
     unsigned int ref;
@@ -57,11 +69,6 @@ typedef struct gpg_pin_s gpg_pin_t;
         unsigned int length;         \
         unsigned char value[maxlen]; \
     } name
-
-typedef struct gpg_lv_s {
-    unsigned int length;
-    unsigned char value[];
-} gpg_lv_t;
 
 typedef struct gpg_key_s {
     /*  C1 C2 C3 */
@@ -146,17 +153,13 @@ struct gpg_nv_state_s {
     /*  5F2D */
     LV(lang, 8);
     /*  5F35 */
-    unsigned char sex[1];
+    unsigned char salutation[1];
 
     /* -- Application  Related Data -- */
     /*  4F */
     unsigned char AID[16];
     /*  5F52 */
     unsigned char histo[15];
-    /*  7f66 */
-    // unsigned char ext_length_info[8];
-    /*  C0   */
-    // unsigned char ext_capabilities[10];
 
     /*  C4 */
     unsigned char PW_status[4];
@@ -202,6 +205,7 @@ struct gpg_v_state_s {
     unsigned short io_length;
     unsigned short io_offset;
     unsigned short io_mark;
+    unsigned short io_p1p2;
     union {
         unsigned char io_buffer[GPG_IO_BUFFER_LENGTH];
         struct {
@@ -264,11 +268,11 @@ struct gpg_v_state_s {
     unsigned int ux_key;
     unsigned int ux_type;
 
-#ifdef UI_NANO_S
+#ifdef TARGET_NANOS
     ux_menu_entry_t ui_dogsays[2];
 #endif
 
-#ifdef UI_NANO_X
+#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
     char ux_buff1[32];
     char ux_buff2[32];
     char ux_buff3[32];
@@ -282,18 +286,7 @@ struct gpg_v_state_s {
 };
 typedef struct gpg_v_state_s gpg_v_state_t;
 
-/* ---  Errors  --- */
-
-#define ERROR(x) ((x) << 16)
-
-#define ERROR_IO_OFFSET ERROR(1)
-#define ERROR_IO_FULL   ERROR(2)
-
-/* ---  IDentifiers  --- */
-
-#define ID_AUTH 1
-#define ID_DEC  2
-#define ID_SIG  3
+/* ---  Identifiers  --- */
 
 #define STATE_ACTIVATE  0x07
 #define STATE_TERMINATE 0x03
@@ -311,83 +304,83 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define PIN_MODE_CONFIRM 3
 #define PIN_MODE_TRUST   4
 
+/* ---  CLA  --- */
+#define CLA_APP_DEF      0x00
+#define CLA_APP_SM       0x0C
+#define CLA_APP_CHAIN    0x10
+#define CLA_APP_CHAIN_SM 0x1C
+#define CLA_APP_APDU_PIN PIN_OPR_APDU_CLA
+
 /* ---  INS  --- */
-#define INS_EXIT 0x02
 #ifdef GPG_LOG
 #define INS_GET_LOG 0x04
 #endif
-
-#define INS_SELECT        0xa4
-#define INS_TERMINATE_DF  0xe6
-#define INS_ACTIVATE_FILE 0x44
-
-#define INS_SELECT_DATA   0xa5
-#define INS_GET_DATA      0xca
-#define INS_GET_NEXT_DATA 0xcc
-#define INS_PUT_DATA      0xda
-#define INS_PUT_DATA_ODD  0xdb
-
+#define INS_EXIT                  0x02
 #define INS_VERIFY                0x20
 #define INS_MSE                   0x22
 #define INS_CHANGE_REFERENCE_DATA 0x24
+#define INS_PSO                   0x2a
 #define INS_RESET_RETRY_COUNTER   0x2c
-
-#define INS_GEN_ASYM_KEYPAIR 0x47
-#define INS_PSO              0x2a
-// #define  INS_COMPUTEDIGSIG                0x2a
-// #define  INS_DECIPHER                     0x2a
+#define INS_ACTIVATE_FILE         0x44
+#define INS_GEN_ASYM_KEYPAIR      0x47
+#define INS_GET_CHALLENGE         0x84
 #define INS_INTERNAL_AUTHENTICATE 0x88
+#define INS_SELECT                0xa4
+#define INS_SELECT_DATA           0xa5
+#define INS_GET_RESPONSE          0xc0
+#define INS_GET_DATA              0xca
+#define INS_GET_NEXT_DATA         0xcc
+#define INS_PUT_DATA              0xda
+#define INS_PUT_DATA_ODD          0xdb
+#define INS_TERMINATE_DF          0xe6
 
-#define INS_GET_CHALLENGE 0x84
-#define INS_GET_RESPONSE  0xc0
-
-/* ---  IO constants  --- */
-#define OFFSET_CLA       0
-#define OFFSET_INS       1
-#define OFFSET_P1        2
-#define OFFSET_P2        3
-#define OFFSET_P3        4
-#define OFFSET_CDATA     5
-#define OFFSET_EXT_CDATA 7
-
-#define SW_OK                    0x9000
-#define SW_ALGORITHM_UNSUPPORTED 0x9484
-
-#define SW_BYTES_REMAINING_00 0x6100
-
-#define SW_WARNING_STATE_UNCHANGED 0x6200
-#define SW_STATE_TERMINATED        0x6285
-
-#define SW_MORE_DATA_AVAILABLE 0x6310
-
-#define SW_WRONG_LENGTH 0x6700
-
-#define SW_LOGICAL_CHANNEL_NOT_SUPPORTED  0x6881
-#define SW_SECURE_MESSAGING_NOT_SUPPORTED 0x6882
-#define SW_LAST_COMMAND_EXPECTED          0x6883
-#define SW_COMMAND_CHAINING_NOT_SUPPORTED 0x6884
-
+/* ---  Error constants  --- */
+// #define SW_LOGICAL_CHANNEL_NOT_SUPPORTED  0x6881
+// #define SW_SECURE_MESSAGING_NOT_SUPPORTED 0x6882
+// #define SW_COMMAND_CHAINING_NOT_SUPPORTED 0x6884
+// #define SW_SM_DATA_MISSING                0x6987
+// #define SW_SM_DATA_INCORRECT              0x6988
+#define SW_STATE_TERMINATED              0x6285
+#define SW_PWD_NOT_CHECKED               0x63c0
+#define SW_MEMORY_FAILURE                0x6581
+#define SW_SECURITY_UIF_ISSUE            0x6600
+#define SW_WRONG_LENGTH                  0x6700
+#define SW_LAST_COMMAND_CHAIN_EXPECTED   0x6883
 #define SW_SECURITY_STATUS_NOT_SATISFIED 0x6982
-#define SW_FILE_INVALID                  0x6983
 #define SW_PIN_BLOCKED                   0x6983
-#define SW_DATA_INVALID                  0x6984
 #define SW_CONDITIONS_NOT_SATISFIED      0x6985
-#define SW_COMMAND_NOT_ALLOWED           0x6986
-#define SW_APPLET_SELECT_FAILED          0x6999
+#define SW_WRONG_DATA                    0x6a80
+#define SW_FILE_NOT_FOUND                0x6a82
+#define SW_REFERENCED_DATA_NOT_FOUND     0x6a88
+#define SW_WRONG_P1P2                    0x6b00
+#define SW_INS_NOT_SUPPORTED             0x6d00
+#define SW_CLA_NOT_SUPPORTED             0x6e00
+#define SW_UNKNOWN                       0x6f00
+#define SW_OK                            0x9000
 
-#define SW_WRONG_DATA                0x6a80
-#define SW_FUNC_NOT_SUPPORTED        0x6a81
-#define SW_FILE_NOT_FOUND            0x6a82
-#define SW_RECORD_NOT_FOUND          0x6a83
-#define SW_FILE_FULL                 0x6a84
-#define SW_INCORRECT_P1P2            0x6a86
-#define SW_REFERENCED_DATA_NOT_FOUND 0x6a88
+/* ---  P1/P2 constants  --- */
+#define GEN_ASYM_KEY          0x8000
+#define SEEDED_MODE           0x01
+#define GEN_ASYM_KEY_SEED     (GEN_ASYM_KEY | SEEDED_MODE)
+#define READ_ASYM_KEY         0x8100
+#define PSO_CDS               0x9e9a
+#define PSO_DEC               0x8086
+#define PSO_ENC               0x8680
+#define MSE_SET               0x41
+#define GET_RESPONSE          0x00
+#define PIN_NOT_VERIFIED      0xFF
+#define PIN_VERIFY            0x00
+#define SELECT_MAX_INSTANCE   0x02
+#define SELECT_SKIP           0x04
+#define RESET_RETRY_WITH_PW3  0x02
+#define RESET_RETRY_WITH_CODE 0x00
+#define PRIME_MODE            0x02
+#define CHALLENGE_NOMINAL     0x00
 
-#define SW_WRONG_P1P2        0x6b00
-#define SW_CORRECT_LENGTH_00 0x6c00
-#define SW_INS_NOT_SUPPORTED 0x6d00
-#define SW_CLA_NOT_SUPPORTED 0x6e00
-
-#define SW_UNKNOWN 0x6f00
+/* ---  Keys constants  --- */
+#define KEY_SIG 0xb6
+#define KEY_DEC 0xb8
+#define KEY_AUT 0xa4
+#define KEY_NB  3
 
 #endif

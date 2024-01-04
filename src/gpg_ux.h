@@ -1,3 +1,4 @@
+
 /*****************************************************************************
  *   Ledger App OpenPGP.
  *   (c) 2024 Ledger SAS.
@@ -15,8 +16,33 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include "gpg_vars.h"
+#ifndef GPG_UX_H
+#define GPG_UX_H
 
-gpg_v_state_t G_gpg_vstate;
+#if GPG_MULTISLOT
+#if GPG_KEYS_SLOTS != 3
+#error menu definition not correct for current value of GPG_KEYS_SLOTS
+#endif
+#endif
 
-const gpg_nv_state_t N_state_pic;
+#define STR(x)  #x
+#define XSTR(x) STR(x)
+
+#define LABEL_SIG "Signature"
+#define LABEL_AUT "Authentication"
+#define LABEL_DEC "Decryption"
+
+#define LABEL_RSA2048   "RSA 2048"
+#define LABEL_RSA3072   "RSA 3072"
+#define LABEL_RSA4096   "RSA 4096"
+#define LABEL_NISTP256  "NIST P256"
+#define LABEL_SECP256K1 "SECP 256K1"
+#define LABEL_Ed25519   "Ed25519"
+
+void ui_CCID_reset(void);
+void ui_init(void);
+void ui_menu_pinconfirm_display(unsigned int value);
+void ui_menu_pinentry_display(unsigned int value);
+void ui_menu_uifconfirm_display(unsigned int value);
+
+#endif  // GPG_UX_H

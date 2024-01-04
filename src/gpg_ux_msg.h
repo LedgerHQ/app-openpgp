@@ -1,17 +1,19 @@
-/* Copyright 2017 Cedric Mesnil <cslashm@gmail.com>, Ledger SAS
+/*****************************************************************************
+ *   Ledger App OpenPGP.
+ *   (c) 2024 Ledger SAS.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *****************************************************************************/
 
 #ifndef GPG_UX_MSG_H
 #define GPG_UX_MSG_H
@@ -26,8 +28,10 @@ extern const char *const C_NOK;
 extern const char *const C_WRONG_PIN;
 extern const char *const C_RIGHT_PIN;
 extern const char *const C_PIN_CHANGED;
+extern const char *const C_PIN_LOCKED;
 extern const char *const C_PIN_DIFFERS;
-extern const char *const C_PIN_USER;
+extern const char *const C_PIN_USER_81;
+extern const char *const C_PIN_USER_82;
 extern const char *const C_PIN_ADMIN;
 
 extern const char *const C_VERIFIED;
@@ -49,8 +53,10 @@ extern const char *const C_UIF_INVALID;
 #define WRONG_PIN         PICSTR(C_WRONG_PIN)
 #define RIGHT_PIN         PICSTR(C_RIGHT_PIN)
 #define PIN_CHANGED       PICSTR(C_PIN_CHANGED)
+#define PIN_LOCKED        PICSTR(C_PIN_LOCKED)
 #define PIN_DIFFERS       PICSTR(C_PIN_DIFFERS)
-#define PIN_USER          PICSTR(C_PIN_USER)
+#define PIN_USER_81       PICSTR(C_PIN_USER_81)
+#define PIN_USER_82       PICSTR(C_PIN_USER_82)
 #define PIN_ADMIN         PICSTR(C_PIN_ADMIN)
 #define VERIFIED          PICSTR(C_VERIFIED)
 #define NOT_VERIFIED      PICSTR(C_NOT_VERIFIED)
