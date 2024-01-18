@@ -429,7 +429,7 @@ static void validate_pin() {
                          sizeof(G_gpg_vstate.menu),
                          " %d tries remaining",
                          pin->counter);
-                ui_info(WRONG_PIN, NULL, ui_menu_main_display, 0);
+                ui_info(WRONG_PIN, EMPTY, ui_menu_main_display, 0);
                 return;
             }
             offset = 1 + G_gpg_vstate.work.io_buffer[0];
@@ -441,7 +441,7 @@ static void validate_pin() {
                 gpg_io_discard(1);
                 gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
                 gpg_io_do(IO_RETURN_AFTER_TX);
-                ui_info(PIN_DIFFERS, NULL, ui_menu_main_display, 0);
+                ui_info(PIN_DIFFERS, EMPTY, ui_menu_main_display, 0);
             } else {
                 sw = gpg_pin_set(gpg_pin_get_pin(G_gpg_vstate.io_p2),
                                  G_gpg_vstate.work.io_buffer + offset + 1,
@@ -666,7 +666,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     if (dest != NULL) {
         nvm_write(dest, NULL, sizeof(gpg_key_t));
         nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-        ui_info(OK, NULL, ui_menu_template_display, 0);
+        ui_info(OK, EMPTY, ui_menu_template_display, 0);
     } else {
         ui_info(INVALID_SELECTION, TEMPLATE_KEY, ui_menu_template_display, 0);
     }
@@ -791,7 +791,7 @@ void ui_menu_pinmode_action(unsigned int value) {
                 }
                 break;
             default:
-                ui_info(INVALID_SELECTION, NULL, ui_menu_pinmode_display, 0);
+                ui_info(INVALID_SELECTION, EMPTY, ui_menu_pinmode_display, 0);
                 return;
         }
         G_gpg_vstate.pinmode = value;
@@ -862,7 +862,7 @@ void ui_menu_uifmode_action(unsigned int value) {
             uif = &G_gpg_vstate.kslot->aut.UIF[0];
             break;
         default:
-            ui_info(INVALID_SELECTION, NULL, ui_menu_uifmode_display, 0);
+            ui_info(INVALID_SELECTION, EMPTY, ui_menu_uifmode_display, 0);
             return;
     }
     if (uif[0] == 0) {
@@ -872,7 +872,7 @@ void ui_menu_uifmode_action(unsigned int value) {
         new_uif = 0;
         nvm_write(&uif[0], &new_uif, 1);
     } else /*if (uif[0] == 2 )*/ {
-        ui_info(UIF_LOCKED, NULL, ui_menu_uifmode_display, 0);
+        ui_info(UIF_LOCKED, EMPTY, ui_menu_uifmode_display, 0);
         return;
     }
     ui_menu_uifmode_display(value);
@@ -1016,8 +1016,8 @@ const ux_menu_entry_t ui_menu_main[] = {
 const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
                                               bagl_element_t *element) {
     if (entry == &ui_menu_main[0]) {
+        memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
         if (element->component.userid == 0x21) {
-            memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
             memmove(G_gpg_vstate.menu, (void *) (N_gpg_pstate->name.value), 12);
             if (G_gpg_vstate.menu[0] == 0) {
                 memmove(G_gpg_vstate.menu, "<No Name>", 9);
@@ -1042,7 +1042,9 @@ const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
             snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "ID: %x", serial);
 #endif
         }
-        element->text = G_gpg_vstate.menu;
+        if (G_gpg_vstate.menu[0] != 0) {
+            element->text = G_gpg_vstate.menu;
+        }
     }
     return element;
 }

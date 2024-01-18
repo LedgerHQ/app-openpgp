@@ -408,7 +408,7 @@ int gpg_dispatch() {
 
             /* --- MSE --- */
         case INS_MSE:
-            sw = gpg_apdu_mse(tag);
+            sw = gpg_apdu_mse();
             break;
 
             /* --- PSO --- */

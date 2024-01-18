@@ -16,6 +16,7 @@
  *****************************************************************************/
 
 #include "gpg_vars.h"
+#include "gpg_ux.h"
 #include "cx_errors.h"
 
 void gpg_apdu_select_data(unsigned int ref, int record) {
@@ -281,7 +282,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
 
         case 0x01F2:
-            if ((N_gpg_pstate->config_slot[2] & 2) == 0) {
+            if ((N_gpg_pstate->config_slot[2] & 1) == 0) {
                 sw = SW_CONDITIONS_NOT_SATISFIED;
                 break;
             }
@@ -291,6 +292,9 @@ int gpg_apdu_put_data(unsigned int ref) {
                 break;
             }
             G_gpg_vstate.slot = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
+            G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
+            gpg_mse_reset();
+            ui_CCID_reset();
             sw = SW_OK;
             break;
 

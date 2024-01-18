@@ -21,8 +21,8 @@
 #include "os_utils.h"
 
 /*
- * io_buff: contains current message part
- * io_off: offset in current message part
+ * io_buffer: contains current message part
+ * io_offset: offset in current message part
  * io_length: length of current message part
  */
 
@@ -40,7 +40,7 @@ void gpg_io_set_offset(unsigned int offset) {
             break;
         default:
             LEDGER_ASSERT(offset < G_gpg_vstate.io_length, "Bad offset!");
-            G_gpg_vstate.io_offset = G_gpg_vstate.io_length;
+            G_gpg_vstate.io_offset = offset;
             break;
     }
 }

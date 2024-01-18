@@ -60,7 +60,7 @@ int gpg_apdu_mse() {
         return SW_WRONG_DATA;
     }
 
-    gpg_mse_set(crt, ref);
+    gpg_mse_set(G_gpg_vstate.io_p2, ref);
     gpg_io_discard(1);
     return SW_OK;
 }

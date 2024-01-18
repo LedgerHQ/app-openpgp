@@ -43,6 +43,8 @@ extern const char *const C_DEFAULT_MODE;
 extern const char *const C_UIF_LOCKED;
 extern const char *const C_UIF_INVALID;
 
+extern const char *const C_EMPTY;
+
 #define PICSTR(x) ((char *) PIC(x))
 
 #define TEMPLATE_TYPE     PICSTR(C_TEMPLATE_TYPE)
@@ -65,5 +67,6 @@ extern const char *const C_UIF_INVALID;
 #define DEFAULT_MODE      PICSTR(C_DEFAULT_MODE)
 #define UIF_LOCKED        PICSTR(C_UIF_LOCKED)
 #define UIF_INVALID       PICSTR(C_UIF_INVALID)
+#define EMPTY             PICSTR(C_EMPTY)
 
 #endif

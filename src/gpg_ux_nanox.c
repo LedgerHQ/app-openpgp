@@ -55,9 +55,7 @@ UX_STEP_CB(ux_menu_popup_1_step,
 
 UX_FLOW(ux_flow_popup, &ux_menu_popup_1_step);
 
-void ui_info(const char *msg1, const char *msg2, const void *menu_display, unsigned int value) {
-    UNUSED(menu_display);
-    UNUSED(value);
+void ui_info(const char *msg1, const char *msg2) {
     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s. %s", msg1, msg2);
     ux_flow_init(0, ux_flow_popup, NULL);
 };
@@ -339,7 +337,7 @@ static void validate_pin() {
                      sizeof(G_gpg_vstate.menu),
                      " %d tries remaining",
                      pin->counter);
-            ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
+            ui_info(WRONG_PIN, G_gpg_vstate.menu);
         } else {
             ui_menu_main_display(0);
         }
@@ -364,7 +362,7 @@ static void validate_pin() {
                          sizeof(G_gpg_vstate.menu),
                          " %d tries remaining",
                          pin->counter);
-                ui_info(WRONG_PIN, NULL, ui_menu_main_display, 0);
+                ui_info(WRONG_PIN, EMPTY);
                 return;
             }
             offset = 1 + G_gpg_vstate.work.io_buffer[0];
@@ -376,7 +374,7 @@ static void validate_pin() {
                 gpg_io_discard(1);
                 gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
                 gpg_io_do(IO_RETURN_AFTER_TX);
-                ui_info(PIN_DIFFERS, NULL, ui_menu_main_display, 0);
+                ui_info(PIN_DIFFERS, EMPTY);
             } else {
                 sw = gpg_pin_set(gpg_pin_get_pin(G_gpg_vstate.io_p2),
                                  G_gpg_vstate.work.io_buffer + offset + 1,
@@ -799,7 +797,7 @@ void ui_menu_pinmode_action(unsigned int value) {
     if (value == 128) {
         if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
             if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
-                ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_menu_pinmode_display, 0);
+                ui_info(DEFAULT_MODE, NOT_ALLOWED);
                 return;
             }
             // set new mode
@@ -827,12 +825,12 @@ void ui_menu_pinmode_action(unsigned int value) {
 
             case PIN_MODE_TRUST:
                 if (!gpg_pin_is_verified(PIN_ID_PW3)) {
-                    ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+                    ui_info(PIN_ADMIN, NOT_VERIFIED);
                     return;
                 }
                 break;
             default:
-                ui_info(INVALID_SELECTION, NULL, ui_menu_pinmode_display, 0);
+                ui_info(INVALID_SELECTION, EMPTY);
                 return;
         }
         G_gpg_vstate.pinmode = value;
@@ -922,7 +920,7 @@ void ui_menu_uifmode_action(unsigned int value) {
             uif = &G_gpg_vstate.kslot->aut.UIF[0];
             break;
         default:
-            ui_info(INVALID_SELECTION, NULL, ui_menu_uifmode_display, 0);
+            ui_info(INVALID_SELECTION, EMPTY);
             return;
     }
     if (uif[0] == 0) {
@@ -932,7 +930,7 @@ void ui_menu_uifmode_action(unsigned int value) {
         new_uif = 0;
         nvm_write(&uif[0], &new_uif, 1);
     } else /*if (uif[0] == 2 )*/ {
-        ui_info(UIF_LOCKED, NULL, ui_menu_uifmode_display, 0);
+        ui_info(UIF_LOCKED, EMPTY);
         return;
     }
     ui_menu_uifmode_display(value);
