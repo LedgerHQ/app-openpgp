@@ -823,6 +823,7 @@ enum {
 
 static void ui_menu_pinentry_cb(void);
 
+#ifdef WAIT_NEXT_SDK
 static void setPinCodeText(bool add) {
     bool enableValidate, enableBackspace, enableDigits;
     bool redrawKeypad = false;
@@ -1091,6 +1092,165 @@ static void ui_menu_pinentry_cb(void) {
     }
     ui_menu_pinentry_display(value);
 }
+#else
+static void validate_pin(const uint8_t* pinentry, uint8_t length) {
+    unsigned int sw = SW_UNKNOWN;
+    unsigned int len1 = 0;
+    unsigned char* pin1 = NULL;
+    gpg_pin_t* pin = NULL;
+
+    switch (G_gpg_vstate.io_ins) {
+        case INS_VERIFY:
+            pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
+            sw = gpg_pin_check(pin, G_gpg_vstate.io_p2, pinentry, length);
+            gpg_io_discard(1);
+            if (sw == SW_PIN_BLOCKED) {
+                gpg_io_insert_u16(sw);
+                gpg_io_do(IO_RETURN_AFTER_TX);
+                ui_info(PIN_LOCKED, EMPTY, ui_init, false);
+                break;
+            } else if (sw != SW_OK) {
+                snprintf(G_gpg_vstate.line,
+                         sizeof(G_gpg_vstate.line),
+                         "%d tries remaining",
+                         pin->counter);
+                ui_info(WRONG_PIN, G_gpg_vstate.line, ui_menu_pinentry_cb, false);
+                break;
+            }
+            gpg_io_insert_u16(sw);
+            gpg_io_do(IO_RETURN_AFTER_TX);
+            snprintf(G_gpg_vstate.line,
+                     sizeof(G_gpg_vstate.line),
+                     "%s PIN",
+                     (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "ADMIN" : "USER");
+            ui_info(G_gpg_vstate.line, "VERIFIED", ui_init, true);
+            break;
+
+        case INS_CHANGE_REFERENCE_DATA:
+            switch (G_gpg_vstate.ux_step) {
+                case 0:
+                    // Check Current pin code
+                    pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
+                    sw = gpg_pin_check(pin, G_gpg_vstate.io_p2, pinentry, length);
+                    gpg_io_discard(1);
+                    if (sw == SW_PIN_BLOCKED) {
+                        gpg_io_insert_u16(sw);
+                        gpg_io_do(IO_RETURN_AFTER_TX);
+                        ui_info(PIN_LOCKED, EMPTY, ui_init, false);
+                        break;
+                    } else if (sw != SW_OK) {
+                        snprintf(G_gpg_vstate.line,
+                                 sizeof(G_gpg_vstate.line),
+                                 " %d tries remaining",
+                                 pin->counter);
+                        ui_info(WRONG_PIN, G_gpg_vstate.line, ui_menu_pinentry_cb, false);
+                        break;
+                    }
+                    ui_menu_pinentry_display(++G_gpg_vstate.ux_step);
+                    break;
+                case 1:
+                    // Store the New pin codes
+                    gpg_io_insert_u8(length);
+                    gpg_io_insert(pinentry, length);
+                    ui_menu_pinentry_display(++G_gpg_vstate.ux_step);
+                    break;
+                case 2:
+                    // Compare the 2 pin codes (New + Confirm)
+                    len1 = G_gpg_vstate.work.io_buffer[0];
+                    pin1 = G_gpg_vstate.work.io_buffer + 1;
+                    if ((len1 != length) || (memcmp(pin1, pinentry, length) != 0)) {
+                        gpg_io_discard(1);
+                        ui_info(PIN_DIFFERS, EMPTY, ui_menu_pinentry_cb, false);
+                    } else {
+                        pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
+                        sw = gpg_pin_set(pin, G_gpg_vstate.work.io_buffer + 1, length);
+                        gpg_io_discard(1);
+                        gpg_io_insert_u16(sw);
+                        gpg_io_do(IO_RETURN_AFTER_TX);
+                        if (sw != SW_OK) {
+                            ui_info("Process Error", EMPTY, ui_init, false);
+                        } else {
+                            snprintf(G_gpg_vstate.line,
+                                     sizeof(G_gpg_vstate.line),
+                                     "%s PIN",
+                                     (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "ADMIN" : "USER");
+                            ui_info(G_gpg_vstate.line, "CHANGED", ui_init, true);
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
+static void pinentry_cb(int token, uint8_t index) {
+    UNUSED(index);
+    if (token == TOKEN_PIN_ENTRY_BACK) {
+        gpg_io_discard(0);
+        gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
+        gpg_io_do(IO_RETURN_AFTER_TX);
+        ui_init();
+    }
+}
+
+void ui_menu_pinentry_display(unsigned int value) {
+    uint8_t minLen;
+    char line[10];
+
+    // Init the page title
+    memset(G_gpg_vstate.line, 0, sizeof(G_gpg_vstate.line));
+    if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
+        switch (value) {
+            case 0:
+                // Default or initial case
+                snprintf(line, sizeof(line), "Current");
+                break;
+            case 1:
+                snprintf(line, sizeof(line), "New");
+                break;
+            case 2:
+                snprintf(line, sizeof(line), "Confirm");
+                break;
+            default:
+                break;
+        }
+        G_gpg_vstate.ux_step = value;
+    } else {
+        snprintf(line, sizeof(line), "Enter");
+    }
+    snprintf(G_gpg_vstate.menu,
+             sizeof(G_gpg_vstate.menu),
+             "%s %s PIN",
+             line,
+             (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "Admin" : "User");
+
+    minLen = (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? GPG_MIN_PW3_LENGTH : GPG_MIN_PW1_LENGTH;
+    // Draw the keypad
+    nbgl_useCaseKeypad(G_gpg_vstate.menu,
+                       minLen,
+                       GPG_MAX_PW_LENGTH,
+                       TOKEN_PIN_ENTRY_BACK,
+                       false,
+                       TUNE_TAP_CASUAL,
+                       validate_pin,
+                       pinentry_cb);
+}
+
+static void ui_menu_pinentry_cb(void) {
+    unsigned int value = 0;
+
+    if ((G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) && (G_gpg_vstate.ux_step == 2)) {
+        // Current step is Change Password with PINs differ
+        value = 1;
+    }
+    ui_menu_pinentry_display(value);
+}
+#endif
 
 /* ------------------------------ UIF CONFIRM UX ----------------------------- */
 void uif_confirm_cb(bool confirm) {
