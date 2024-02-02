@@ -21,6 +21,9 @@
 #include "lcx_sha3.h"
 #include "usbd_ccid_if.h"
 #include "bolos_target.h"
+#ifdef HAVE_NBGL
+#include "nbgl_layout.h"
+#endif
 
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
@@ -256,6 +259,7 @@ struct gpg_v_state_s {
     /* PINs state */
     unsigned char verified_pin[5];
     unsigned char pinmode;
+    unsigned char pinmode_req;
 
     /* ux menus */
     char menu[112];
@@ -271,6 +275,15 @@ struct gpg_v_state_s {
     char ux_buff1[32];
     char ux_buff2[32];
     char ux_buff3[32];
+#endif
+
+#ifdef HAVE_NBGL
+    char line[112];
+    unsigned int ux_step;
+    unsigned int keypadIndex;
+    unsigned int hiddenDigitsIndex;
+    unsigned char pinLen;
+    nbgl_layout_t *layoutCtx;
 #endif
 
 #ifdef GPG_LOG

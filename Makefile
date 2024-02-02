@@ -49,6 +49,7 @@ INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 ICON_NANOS = icons/gpg_16px.gif
 ICON_NANOX = icons/gpg_14px.gif
 ICON_NANOSP = icons/gpg_14px.gif
+ICON_STAX = icons/gpg_32px.gif
 
 # Application allowed derivation curves.
 # Possibles curves are: secp256k1, secp256r1, ed25519 and bls12381g1
@@ -97,7 +98,7 @@ VARIANT_VALUES = OpenPGP
 ########################################
 #ENABLE_NBGL_QRCODE = 1
 #ENABLE_NBGL_KEYBOARD = 1
-#ENABLE_NBGL_KEYPAD = 1
+ENABLE_NBGL_KEYPAD = 1
 
 ########################################
 #          Features disablers          #
