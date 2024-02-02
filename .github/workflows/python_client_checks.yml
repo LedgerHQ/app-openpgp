@@ -1,0 +1,43 @@
+name: Checks on the Python client
+
+# This workflow performs some checks on the Python client used by the Application tests
+# It is there to help us maintain a level of quality in our codebase and does not have to be kept on forked
+# applications.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  lint:
+    name: Client linting
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone
+      uses: actions/checkout@v4
+    - name: Installing PIP dependencies
+      run: |
+        pip install pylint
+        pip install -r tests/requirements.txt
+    - name: Lint Python code
+      run: |
+        pylint --rc tests/setup.cfg tests/application_client/
+
+  mypy:
+    name: Type checking
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone
+      uses: actions/checkout@v4
+    - name: Installing PIP dependencies
+      run: |
+        pip install mypy
+        pip install -r tests/requirements.txt
+    - name: Mypy type checking
+      run: |
+        mypy tests/application_client/
