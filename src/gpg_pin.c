@@ -214,12 +214,10 @@ int gpg_apdu_change_ref_data() {
     }
     // avoid any-overflow without giving info
     if (G_gpg_vstate.io_length == 0) {
-        if (G_gpg_vstate.pinmode != PIN_MODE_HOST) {
-            // Delegate pin change to ui
-            gpg_io_discard(1);
-            ui_menu_pinentry_display(0);
-            return 0;
-        }
+        // Delegate pin change to ui
+        gpg_io_discard(1);
+        ui_menu_pinentry_display(0);
+        return 0;
     }
 
     len = MIN(G_gpg_vstate.io_length, pin->length);

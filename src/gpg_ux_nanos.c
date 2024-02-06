@@ -718,7 +718,6 @@ const bagl_element_t *ui_menu_pinmode_predisplay(const ux_menu_entry_t *entry,
 
 const ux_menu_entry_t ui_menu_pinmode[] = {
     {NULL, NULL, -1, NULL, "Choose:", NULL, 0, 0},
-    {NULL, ui_menu_pinmode_action, 0x8000 | PIN_MODE_HOST, NULL, "Host", NULL, 0, 0},
     {NULL, ui_menu_pinmode_action, 0x8000 | PIN_MODE_SCREEN, NULL, "On Screen", NULL, 0, 0},
     {NULL, ui_menu_pinmode_action, 0x8000 | PIN_MODE_CONFIRM, NULL, "Confirm only", NULL, 0, 0},
     {NULL, ui_menu_pinmode_action, 0x8000 | PIN_MODE_TRUST, NULL, "Trust", NULL, 0, 0},
@@ -733,7 +732,7 @@ void ui_menu_pinmode_display(unsigned int value) {
 const bagl_element_t *ui_menu_pinmode_predisplay(const ux_menu_entry_t *entry,
                                                  bagl_element_t *element) {
     if (element->component.userid == 0x20) {
-        if ((entry->userid >= (0x8000 | PIN_MODE_HOST)) &&
+        if ((entry->userid >= (0x8000 | PIN_MODE_SCREEN)) &&
             (entry->userid <= (0x8000 | PIN_MODE_TRUST))) {
             unsigned char id = entry->userid & 0x7FFFF;
             snprintf(G_gpg_vstate.menu,
@@ -749,51 +748,77 @@ const bagl_element_t *ui_menu_pinmode_predisplay(const ux_menu_entry_t *entry,
     return element;
 }
 
+const ux_menu_entry_t ui_trust_warning[] = {
+    {NULL, NULL, -1, &C_icon_warning, "Warning", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "TRUST mode", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "won't request", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "any more PINs", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "or validation", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "before", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "operations!", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "Are you sure", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "you want to", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "select", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "TRUST mode?", NULL, 0, 0},
+    {NULL, ui_menu_pinmode_display, 3, &C_icon_back, "Cancel", NULL, 61, 40},
+    {NULL, ui_menu_pinmode_action, 127, &C_icon_validate_14, "Select", NULL, 61, 40},
+    UX_MENU_END};
+
 void ui_menu_pinmode_action(unsigned int value) {
     unsigned char s;
     value = value & 0x7FFF;
-    if (value == 128) {
-        if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
-            if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
-                ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_menu_pinmode_display, 0);
-                return;
-            }
-            // set new mode
-            s = G_gpg_vstate.pinmode;
-            nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &s, 1);
-            // disactivate pinpad if any
-            if (G_gpg_vstate.pinmode == PIN_MODE_HOST) {
-                s = 0;
-            } else {
-                s = 3;
-            }
-            gpg_activate_pinpad(s);
-        }
-    } else {
-        switch (value) {
-            case PIN_MODE_HOST:
-            case PIN_MODE_SCREEN:
-            case PIN_MODE_CONFIRM:
-                if (!gpg_pin_is_verified(PIN_ID_PW2)) {
-                    ui_info(PIN_USER_82, NOT_VERIFIED, ui_menu_pinmode_display, 0);
-                    return;
-                }
-                break;
 
-            case PIN_MODE_TRUST:
-                if (!gpg_pin_is_verified(PIN_ID_PW3)) {
-                    ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+    switch (value) {
+        case 128:
+            if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
+                if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
+                    ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_menu_pinmode_display, 0);
                     return;
                 }
+                // set new mode
+                s = G_gpg_vstate.pinmode;
+                nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &s, 1);
+                gpg_activate_pinpad(3);
+            }
+            value = G_gpg_vstate.pinmode + 1;
+            break;
+        case PIN_MODE_SCREEN:
+        case PIN_MODE_CONFIRM:
+            if (value == G_gpg_vstate.pinmode) {
+                // Current selected mode
+                value++;
                 break;
-            default:
-                ui_info(INVALID_SELECTION, EMPTY, ui_menu_pinmode_display, 0);
+            }
+            if (!gpg_pin_is_verified(PIN_ID_PW2)) {
+                ui_info(PIN_USER_82, NOT_VERIFIED, ui_menu_pinmode_display, 0);
                 return;
-        }
-        G_gpg_vstate.pinmode = value;
+            }
+            G_gpg_vstate.pinmode = value;
+            value++;
+            break;
+        case PIN_MODE_TRUST:
+            if (value == G_gpg_vstate.pinmode) {
+                // Current selected mode
+                value++;
+                break;
+            }
+            if (!gpg_pin_is_verified(PIN_ID_PW3)) {
+                ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+                return;
+            }
+            // Confirm request
+            UX_MENU_DISPLAY(0, ui_trust_warning, NULL);
+            return;
+        case 127:
+            G_gpg_vstate.pinmode = PIN_MODE_TRUST;
+            value = PIN_MODE_TRUST + 1;
+            break;
+        default:
+            value = 0;
+            ui_info(INVALID_SELECTION, EMPTY, ui_menu_pinmode_display, 0);
+            break;
     }
-    // redisplay first entry of the idle menu
-    ui_menu_pinmode_display(0);
+    ui_menu_pinmode_display(value);
 }
 
 /* ------------------------------- UIF MODE UX ------------------------------ */

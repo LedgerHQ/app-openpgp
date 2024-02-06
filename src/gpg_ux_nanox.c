@@ -706,36 +706,29 @@ void ui_menu_seedmode_action(unsigned int value) {
 void ui_menu_pinmode_action(unsigned int value);
 void ui_menu_pinmode_predisplay(void);
 
-#define ONHST_BUFF G_gpg_vstate.ux_buff1
-#define ONSCR_BUFF G_gpg_vstate.ux_buff2
-#define CONFI_BUFF G_gpg_vstate.ux_buff3
-#define TRUST_BUFF G_gpg_vstate.ux_buff4
+#define ONSCR_BUFF G_gpg_vstate.ux_buff1
+#define CONFI_BUFF G_gpg_vstate.ux_buff2
+#define TRUST_BUFF G_gpg_vstate.ux_buff3
 
 UX_STEP_CB_INIT(ux_menu_pinmode_1_step,
-                bnn,
-                ui_menu_pinmode_predisplay(),
-                ui_menu_pinmode_action(PIN_MODE_HOST),
-                {"On Host", ONHST_BUFF, ONHST_BUFF + 5});
-
-UX_STEP_CB_INIT(ux_menu_pinmode_2_step,
                 bnn,
                 ui_menu_pinmode_predisplay(),
                 ui_menu_pinmode_action(PIN_MODE_SCREEN),
                 {"On Screen", ONSCR_BUFF, ONSCR_BUFF + 5});
 
-UX_STEP_CB_INIT(ux_menu_pinmode_3_step,
+UX_STEP_CB_INIT(ux_menu_pinmode_2_step,
                 bnn,
                 ui_menu_pinmode_predisplay(),
                 ui_menu_pinmode_action(PIN_MODE_CONFIRM),
                 {"Confirm Only", CONFI_BUFF, CONFI_BUFF + 5});
 
-UX_STEP_CB_INIT(ux_menu_pinmode_4_step,
+UX_STEP_CB_INIT(ux_menu_pinmode_3_step,
                 bnn,
                 ui_menu_pinmode_predisplay(),
                 ui_menu_pinmode_action(PIN_MODE_TRUST),
                 {"Trust", TRUST_BUFF, TRUST_BUFF + 5});
 
-UX_STEP_CB(ux_menu_pinmode_6_step,
+UX_STEP_CB(ux_menu_pinmode_4_step,
            pb,
            ui_menu_pinmode_action(128),
            {
@@ -743,7 +736,7 @@ UX_STEP_CB(ux_menu_pinmode_6_step,
                "Set as Default",
            });
 
-UX_STEP_CB(ux_menu_pinmode_7_step,
+UX_STEP_CB(ux_menu_pinmode_5_step,
            pb,
            ui_menu_settings_display(2),
            {
@@ -756,19 +749,13 @@ UX_FLOW(ux_flow_pinmode,
         &ux_menu_pinmode_2_step,
         &ux_menu_pinmode_3_step,
         &ux_menu_pinmode_4_step,
-        &ux_menu_pinmode_6_step,
-        &ux_menu_pinmode_7_step);
+        &ux_menu_pinmode_5_step);
 
 void ui_menu_pinmode_predisplay() {
-    snprintf(ONHST_BUFF, 5, "%s", PIN_MODE_HOST == G_gpg_vstate.pinmode ? "ON" : "OFF");
     snprintf(ONSCR_BUFF, 5, "%s", PIN_MODE_SCREEN == G_gpg_vstate.pinmode ? "ON" : "OFF");
     snprintf(CONFI_BUFF, 5, "%s", PIN_MODE_CONFIRM == G_gpg_vstate.pinmode ? "ON" : "OFF");
     snprintf(TRUST_BUFF, 5, "%s", PIN_MODE_TRUST == G_gpg_vstate.pinmode ? "ON" : "OFF");
 
-    snprintf(ONHST_BUFF + 5,
-             sizeof(ONHST_BUFF) - 5,
-             "%s",
-             PIN_MODE_HOST == N_gpg_pstate->config_pin[0] ? "(Default)" : "");
     snprintf(ONSCR_BUFF + 5,
              sizeof(ONSCR_BUFF) - 5,
              "%s",
@@ -787,68 +774,89 @@ void ui_menu_pinmode_display(unsigned int value) {
     ui_flow_display(ux_flow_pinmode, value);
 }
 
+UX_STEP_NOCB(ui_trust_warning_step,
+             paging,
+             {.title = "Warning",
+              .text = "TRUST mode won't request any more PINs "
+                      "or validation before operations!\n\n"
+                      "Are you sure you want "
+                      "to select TRUST mode?"});
+
+UX_STEP_CB(ui_trust_warning_flow_cancel_step,
+           pb,
+           ui_menu_pinmode_display(PIN_MODE_TRUST),
+           {
+               &C_icon_crossmark,
+               "Cancel",
+           });
+
+UX_STEP_CB(ui_trust_selecting_flow_confirm_step,
+           pbb,
+           ui_menu_pinmode_action(127),
+           {
+               &C_icon_validate_14,
+               "Select",
+               "TRUST Mode",
+           });
+
+UX_FLOW(ui_trust_selecting_flow,
+        &ui_trust_warning_step,
+        &ui_trust_warning_flow_cancel_step,
+        &ui_trust_selecting_flow_confirm_step);
+
 void ui_menu_pinmode_action(unsigned int value) {
     unsigned char s;
-    value = value & 0x7FFF;
-    if (value == 128) {
-        if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
-            if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
-                ui_info(DEFAULT_MODE, NOT_ALLOWED);
-                return;
-            }
-            // set new mode
-            s = G_gpg_vstate.pinmode;
-            nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &s, 1);
-            // disactivate pinpad if any
-            if (G_gpg_vstate.pinmode == PIN_MODE_HOST) {
-                s = 0;
-            } else {
-                s = 3;
-            }
-            gpg_activate_pinpad(s);
-            value = G_gpg_vstate.pinmode;
-        }
-    } else {
-        switch (value) {
-            case PIN_MODE_HOST:
-            case PIN_MODE_SCREEN:
-            case PIN_MODE_CONFIRM:
-                if (!gpg_pin_is_verified(PIN_ID_PW2)) {
-                    ui_info(PIN_USER_82, NOT_VERIFIED);
-                    return;
-                }
-                break;
 
-            case PIN_MODE_TRUST:
-                if (!gpg_pin_is_verified(PIN_ID_PW3)) {
-                    ui_info(PIN_ADMIN, NOT_VERIFIED);
+    switch (value) {
+        case 128:
+            if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
+                if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
+                    ui_info(DEFAULT_MODE, NOT_ALLOWED);
                     return;
                 }
-                break;
-            default:
-                ui_info(INVALID_SELECTION, EMPTY);
-                return;
-        }
-        G_gpg_vstate.pinmode = value;
-    }
-    // redisplay active pin mode entry
-    switch (value) {
-        case PIN_MODE_HOST:
-            ui_menu_pinmode_display(0);
+                // set new mode
+                s = G_gpg_vstate.pinmode;
+                nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &s, 1);
+                gpg_activate_pinpad(3);
+            }
+            value = G_gpg_vstate.pinmode;
             break;
         case PIN_MODE_SCREEN:
-            ui_menu_pinmode_display(1);
-            break;
         case PIN_MODE_CONFIRM:
-            ui_menu_pinmode_display(2);
+            if (value == G_gpg_vstate.pinmode) {
+                // Current selected mode
+                break;
+            }
+            if (!gpg_pin_is_verified(PIN_ID_PW2)) {
+                ui_info(PIN_USER_82, NOT_VERIFIED);
+                return;
+            }
+            G_gpg_vstate.pinmode = value;
             break;
         case PIN_MODE_TRUST:
-            ui_menu_pinmode_display(3);
+            if (value == G_gpg_vstate.pinmode) {
+                // Current selected mode
+                break;
+            }
+            if (!gpg_pin_is_verified(PIN_ID_PW3)) {
+                ui_info(PIN_ADMIN, NOT_VERIFIED);
+                return;
+            }
+            // Confirm request
+            ux_flow_init(0, ui_trust_selecting_flow, NULL);
+            return;
+        case 127:
+            G_gpg_vstate.pinmode = PIN_MODE_TRUST;
+            value = PIN_MODE_TRUST;
             break;
         default:
-            ui_menu_pinmode_display(0);
+            value = 0;
+            ui_info(INVALID_SELECTION, EMPTY);
             break;
     }
+
+    // redisplay active pin mode entry
+    ui_menu_pinmode_display(value);
 }
 
 /* ------------------------------- UIF MODE UX ------------------------------ */

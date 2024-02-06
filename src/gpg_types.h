@@ -271,8 +271,6 @@ struct gpg_v_state_s {
     char ux_buff1[32];
     char ux_buff2[32];
     char ux_buff3[32];
-    char ux_buff4[32];
-    char ux_buff5[32];
 #endif
 
 #ifdef GPG_LOG
@@ -294,10 +292,10 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define PIN_ID_PW3 0x83
 #define PIN_ID_RC  0x84
 
-#define PIN_MODE_HOST    1
-#define PIN_MODE_SCREEN  2
-#define PIN_MODE_CONFIRM 3
-#define PIN_MODE_TRUST   4
+// PIN_MODE_HOST not supported by Ledger App
+#define PIN_MODE_SCREEN  0
+#define PIN_MODE_CONFIRM 1
+#define PIN_MODE_TRUST   2
 
 /* ---  CLA  --- */
 #define CLA_APP_DEF      0x00
