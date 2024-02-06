@@ -19,12 +19,6 @@
 #ifndef GPG_UX_H
 #define GPG_UX_H
 
-#if GPG_MULTISLOT
-#if GPG_KEYS_SLOTS != 3
-#error menu definition not correct for current value of GPG_KEYS_SLOTS
-#endif
-#endif
-
 #define STR(x)  #x
 #define XSTR(x) STR(x)
 

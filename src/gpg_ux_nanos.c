@@ -33,10 +33,6 @@ void ui_menu_tmpl_type_action(unsigned int value);
 void ui_menu_seedmode_action(unsigned int value);
 void ui_menu_reset_action(unsigned int value);
 
-#if GPG_MULTISLOT
-void ui_menu_slot_action(unsigned int value);
-#endif
-
 const ux_menu_entry_t ui_menu_settings[];
 void ui_menu_main_display(unsigned int value);
 unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int button_mask_counter);
@@ -899,22 +895,6 @@ void ui_menu_reset_action(unsigned int value) {
     ui_menu_main_display(0);
 }
 
-/* ------------------------------ RESET KEY SLOT ----------------------------- */
-
-void ui_menu_reset_slot_action(unsigned int value);
-
-const ux_menu_entry_t ui_menu_reset_slot[] = {
-    {NULL, NULL, 0, NULL, "Really Reset ?", NULL, 0, 0},
-    {NULL, ui_menu_main_display, 0, &C_icon_back, "No", NULL, 61, 40},
-    {NULL, ui_menu_reset_slot_action, 0, NULL, "Yes", NULL, 0, 0},
-    UX_MENU_END};
-
-void ui_menu_reset_slot_action(unsigned int value) {
-    UNUSED(value);
-    gpg_install_slot(G_gpg_vstate.kslot);
-    ui_menu_main_display(0);
-}
-
 /* ------------------------------- SETTINGS UX ------------------------------- */
 
 const ux_menu_entry_t ui_menu_settings[] = {
@@ -923,69 +903,8 @@ const ux_menu_entry_t ui_menu_settings[] = {
     {NULL, ui_menu_pinmode_display, 0, NULL, "PIN mode", NULL, 0, 0},
     {NULL, ui_menu_uifmode_display, 0, NULL, "UIF mode", NULL, 0, 0},
     {ui_menu_reset, NULL, 0, NULL, "Reset App", NULL, 0, 0},
-    {ui_menu_reset_slot, NULL, 0, NULL, "Reset Slot", NULL, 0, 0},
     {NULL, ui_menu_main_display, 2, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
-
-/* --------------------------------- SLOT UX --------------------------------- */
-
-#if GPG_MULTISLOT
-
-const ux_menu_entry_t ui_menu_slot[] = {
-    {NULL, NULL, -1, NULL, "Choose:", NULL, 0, 0},
-    {NULL, ui_menu_slot_action, 1, NULL, "", NULL, 0, 0},
-    {NULL, ui_menu_slot_action, 2, NULL, "", NULL, 0, 0},
-    {NULL, ui_menu_slot_action, 3, NULL, "", NULL, 0, 0},
-    {NULL, ui_menu_slot_action, 128, NULL, "Set Default", NULL, 0, 0},
-    {NULL, ui_menu_main_display, 1, &C_icon_back, "Back", NULL, 61, 40},
-    UX_MENU_END};
-
-const bagl_element_t *ui_menu_slot_predisplay(const ux_menu_entry_t *entry,
-                                              bagl_element_t *element) {
-    unsigned int slot;
-    if (element->component.userid == 0x20) {
-        for (slot = 1; slot <= 3; slot++) {
-            if (entry == &ui_menu_slot[slot]) {
-                break;
-            }
-        }
-        if (slot != 4) {
-            snprintf(G_gpg_vstate.menu,
-                     sizeof(G_gpg_vstate.menu),
-                     "Slot %d  %s  %s",
-                     slot,
-                     slot == N_gpg_pstate->config_slot[1] + 1 ? "#" : " ", /* default */
-                     slot == G_gpg_vstate.slot + 1 ? "+" : " " /* selected*/);
-            element->text = G_gpg_vstate.menu;
-        }
-    }
-    return element;
-}
-
-void ui_menu_slot_display(unsigned int value) {
-    UX_MENU_DISPLAY(value, ui_menu_slot, ui_menu_slot_predisplay);
-}
-
-void ui_menu_slot_action(unsigned int value) {
-    unsigned char s;
-
-    if (value == 128) {
-        s = G_gpg_vstate.slot;
-        nvm_write((void *) (&N_gpg_pstate->config_slot[1]), &s, 1);
-        value = s + 1;
-    } else {
-        s = (unsigned char) (value - 1);
-        if (s != G_gpg_vstate.slot) {
-            G_gpg_vstate.slot = s;
-            G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
-            gpg_mse_reset();
-            ui_CCID_reset();
-        }
-    }
-    // redisplay first entry of the idle menu
-    ui_menu_slot_display(value);
-}
-#endif
 
 /* --------------------------------- INFO UX --------------------------------- */
 
@@ -1005,9 +924,6 @@ const ux_menu_entry_t ui_menu_info[] = {
 
 const ux_menu_entry_t ui_menu_main[] = {
     {NULL, NULL, 0, NULL, "", "", 0, 0},
-#if GPG_MULTISLOT
-    {NULL, ui_menu_slot_display, 0, NULL, "Select slot", NULL, 0, 0},
-#endif
     {ui_menu_settings, NULL, 0, NULL, "Settings", NULL, 0, 0},
     {ui_menu_info, NULL, 0, NULL, "About", NULL, 0, 0},
     {NULL, (void *) os_sched_exit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
@@ -1032,15 +948,7 @@ const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
         if (element->component.userid == 0x22) {
             unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
             memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
-#if GPG_MULTISLOT
-            snprintf(G_gpg_vstate.menu,
-                     sizeof(G_gpg_vstate.menu),
-                     "ID: %x / %d",
-                     serial,
-                     G_gpg_vstate.slot + 1);
-#else
             snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "ID: %x", serial);
-#endif
         }
         if (G_gpg_vstate.menu[0] != 0) {
             element->text = G_gpg_vstate.menu;

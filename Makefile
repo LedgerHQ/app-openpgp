@@ -25,20 +25,7 @@ include $(BOLOS_SDK)/Makefile.defines
 #        Mandatory configuration       #
 ########################################
 # Application name
-ifeq ($(APPNAME),)
 APPNAME = OpenPGP
-endif
-ifeq ($(APPNAME),OpenPGP)
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-GPG_MULTISLOT:=0
-else
-GPG_MULTISLOT:=1
-endif
-else ifeq ($(APPNAME),OpenPGP.XL)
-GPG_MULTISLOT:=1
-else
-$(error APPNAME ($(APPNAME)) is not set or unknown)
-endif
 
 # Application version
 APPVERSION_M = 2
@@ -85,11 +72,7 @@ PATH_APP_LOAD_PARAMS = "2152157255'"
 #   * It must at least contains one value.
 #   * Values can be the app ticker or anything else but should be unique.
 VARIANT_PARAM = APPNAME
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-VARIANT_VALUES = OpenPGP OpenPGP.XL
-else
 VARIANT_VALUES = OpenPGP
-endif
 
 # Enabling DEBUG flag will enable PRINTF and disable optimizations
 #DEBUG = 1
@@ -135,7 +118,6 @@ DISABLE_STANDARD_WEBUSB = 1
 #        Main app configuration        #
 ########################################
 
-DEFINES   += GPG_MULTISLOT=$(GPG_MULTISLOT)
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_USB_CLASS_CCID
 DEFINES   += HAVE_RSA

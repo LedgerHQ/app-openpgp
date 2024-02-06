@@ -20,6 +20,7 @@
 
 #include "lcx_sha3.h"
 #include "usbd_ccid_if.h"
+#include "bolos_target.h"
 
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
@@ -37,10 +38,10 @@
 #define GPG_MIN_PW1_LENGTH 6
 #define GPG_MIN_PW3_LENGTH 8
 
-#if GPG_MULTISLOT
-#define GPG_KEYS_SLOTS 3
-#else
+#ifdef TARGET_NANOS
 #define GPG_KEYS_SLOTS 1
+#else
+#define GPG_KEYS_SLOTS 3
 #endif
 
 #define GPG_KEY_ATTRIBUTES_LENGTH 12

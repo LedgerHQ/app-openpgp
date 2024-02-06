@@ -32,10 +32,6 @@ void ui_menu_tmpl_type_action(unsigned int value);
 void ui_menu_seedmode_action(unsigned int value);
 void ui_menu_reset_action(unsigned int value);
 
-#if GPG_MULTISLOT
-void ui_menu_slot_action(unsigned int value);
-#endif
-
 void ui_menu_settings_display(unsigned int value);
 void ui_menu_main_display(unsigned int value);
 unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int button_mask_counter);
@@ -966,29 +962,6 @@ void ui_menu_reset_action(unsigned int value) {
     ui_menu_main_display(0);
 }
 
-/* ------------------------------ RESET KEY SLOT ----------------------------- */
-
-void ui_menu_reset_slot_action(unsigned int value);
-
-UX_STEP_CB(ux_menu_reset_slot_1_step,
-           bnn,
-           ui_menu_settings_display(4),
-           {"Ooops, NO!", "Do not reset", "the key slot"});
-
-UX_STEP_CB(ux_menu_reset_slot_2_step, bn, ui_menu_reset_slot_action(0), {"YES!", "Reset the slot"});
-
-UX_FLOW(ux_flow_reset_slot, &ux_menu_reset_slot_1_step, &ux_menu_reset_slot_2_step);
-
-void ui_menu_reset_slot_display(unsigned int value) {
-    ux_flow_init(value, ux_flow_reset_slot, NULL);
-}
-
-void ui_menu_reset_slot_action(unsigned int value) {
-    UNUSED(value);
-    gpg_install_slot(G_gpg_vstate.kslot);
-    ui_menu_main_display(0);
-}
-
 /* ------------------------------- SETTINGS UX ------------------------------- */
 
 const char *const settings_getter_values[] =
@@ -1029,8 +1002,6 @@ void ui_menu_settings_display(unsigned int value) {
 }
 
 /* --------------------------------- SLOT UX --------------------------------- */
-
-#if GPG_MULTISLOT
 
 void ui_menu_slot_action(unsigned int value);
 void ui_menu_slot_predisplay(void);
@@ -1116,7 +1087,6 @@ void ui_menu_slot_action(unsigned int value) {
     }
     ui_menu_slot_display(G_gpg_vstate.slot);
 }
-#endif
 
 /* --------------------------------- INFO UX --------------------------------- */
 
@@ -1161,9 +1131,7 @@ UX_STEP_NOCB_INIT(ux_menu_main_1_step,
                       G_gpg_vstate.ux_buff2,
                   });
 
-#if GPG_MULTISLOT
 UX_STEP_CB(ux_menu_main_2_step, pb, ui_menu_slot_display(0), {&C_icon_coggle, "Select Slot"});
-#endif
 
 UX_STEP_CB(ux_menu_main_3_step, pb, ui_menu_settings_display(0), {&C_icon_coggle, "Settings"});
 
@@ -1173,9 +1141,7 @@ UX_STEP_CB(ux_menu_main_5_step, pb, os_sched_exit(0), {&C_icon_dashboard_x, "Qui
 
 UX_FLOW(ux_flow_main,
         &ux_menu_main_1_step,
-#if GPG_MULTISLOT
         &ux_menu_main_2_step,
-#endif
         &ux_menu_main_3_step,
         &ux_menu_main_4_step,
         &ux_menu_main_5_step);
@@ -1195,15 +1161,11 @@ void ui_menu_main_predisplay() {
 
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
     memset(G_gpg_vstate.ux_buff2, 0, sizeof(G_gpg_vstate.ux_buff2));
-#if GPG_MULTISLOT
     snprintf(G_gpg_vstate.ux_buff2,
              sizeof(G_gpg_vstate.ux_buff2),
              "ID: %x / %d",
              serial,
              G_gpg_vstate.slot + 1);
-#else
-    snprintf(G_gpg_vstate.ux_buff2, sizeof(G_gpg_vstate.ux_buff2), "ID: %x", serial);
-#endif
 }
 
 void ui_menu_main_display(unsigned int value) {
