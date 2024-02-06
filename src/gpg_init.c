@@ -361,6 +361,8 @@ void gpg_init() {
     gpg_mse_reset();
     // pin conf
     G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
+    // seed conf
+    G_gpg_vstate.seed_mode = 1;
     // ux conf
     gpg_init_ux();
 }

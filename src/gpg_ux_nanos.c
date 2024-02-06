@@ -705,9 +705,50 @@ void ui_menu_seedmode_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_seedmode, ui_menu_seedmode_predisplay);
 }
 
-void ui_menu_seedmode_action(unsigned int value) {
-    G_gpg_vstate.seed_mode = value;
+static void toggle_seed(unsigned int value) {
+    if (value != 128) {
+        return;
+    }
+    if (G_gpg_vstate.seed_mode) {
+        G_gpg_vstate.seed_mode = 0;
+    } else {
+        G_gpg_vstate.seed_mode = 1;
+    }
     ui_menu_seedmode_display(0);
+}
+
+const ux_menu_entry_t ui_seed_warning[] = {
+    {NULL, NULL, -1, &C_icon_warning, "Warning", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "SEED mode", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "allows to", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "derive your", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "key from", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "Master SEED.", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "Without such", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "mode, an OS", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "or App update", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "will cause", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "your private", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "key to be", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "lost!", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "Are you sure", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "you want to", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "disable", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "SEED mode?", NULL, 0, 0},
+    {NULL, ui_menu_seedmode_display, 0, &C_icon_back, "Cancel", NULL, 61, 40},
+    {NULL, toggle_seed, 128, &C_icon_validate_14, "Disable", NULL, 0, 0},
+    UX_MENU_END};
+
+void ui_menu_seedmode_action(unsigned int value) {
+    if (value == 0) {
+        // Request deactivate
+        UX_MENU_DISPLAY(0, ui_seed_warning, NULL);
+    } else {
+        // Reactivate
+        G_gpg_vstate.seed_mode = 1;
+        ui_menu_seedmode_display(0);
+    }
 }
 
 /* ------------------------------- PIN MODE UX ------------------------------ */

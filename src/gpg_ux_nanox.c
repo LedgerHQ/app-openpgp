@@ -670,7 +670,7 @@ void ui_menu_seedmode_predisplay(void);
 UX_STEP_CB_INIT(ux_menu_seedmode_1_step,
                 bn,
                 ui_menu_seedmode_predisplay(),
-                ui_menu_seedmode_action(0),
+                ui_menu_seedmode_action(G_gpg_vstate.seed_mode),
                 {"Toggle seed mode", CUR_SEED_MODE});
 
 UX_STEP_CB(ux_menu_seedmode_2_step,
@@ -691,14 +691,57 @@ void ui_menu_seedmode_display(unsigned int value) {
     ui_flow_display(ux_flow_seedmode, value);
 }
 
-void ui_menu_seedmode_action(unsigned int value) {
-    UNUSED(value);
+static void toggle_seed() {
     if (G_gpg_vstate.seed_mode) {
         G_gpg_vstate.seed_mode = 0;
     } else {
         G_gpg_vstate.seed_mode = 1;
     }
     ui_menu_seedmode_display(0);
+}
+
+UX_STEP_NOCB(ui_seed_warning_step,
+             paging,
+             {.title = "Warning",
+              .text = "SEED mode allows to derive "
+                      "your key from Master SEED.\n"
+                      "Without such mode,\n"
+                      "an OS or App update\n"
+                      "will cause your private key to be lost!\n\n"
+                      "Are you sure you want "
+                      "to disable SEED mode?"});
+
+UX_STEP_CB(ui_seed_warning_flow_cancel_step,
+           pb,
+           ui_menu_seedmode_display(0),
+           {
+               &C_icon_crossmark,
+               "Cancel",
+           });
+
+UX_STEP_CB(ui_seed_disabling_flow_confirm_step,
+           pbb,
+           toggle_seed(),
+           {
+               &C_icon_validate_14,
+               "Disable",
+               "SEED Mode",
+           });
+
+UX_FLOW(ui_seed_disabling_flow,
+        &ui_seed_warning_step,
+        &ui_seed_warning_flow_cancel_step,
+        &ui_seed_disabling_flow_confirm_step);
+
+void ui_menu_seedmode_action(unsigned int value) {
+    if (value == 1) {
+        // Current value is 'enable' -> Confirm deactivate
+        ux_flow_init(0, ui_seed_disabling_flow, NULL);
+    } else {
+        // Current value is 'disable' -> Reactivate
+        G_gpg_vstate.seed_mode = 1;
+        ui_menu_seedmode_display(0);
+    }
 }
 
 /* ------------------------------- PIN MODE UX ------------------------------ */
