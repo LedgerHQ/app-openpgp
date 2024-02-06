@@ -72,9 +72,6 @@ static int gpg_sign(gpg_key_t *sigkey) {
         unsigned int ksz, l;
         ksz = U2BE(sigkey->attributes.value, 1) >> 3;
         switch (ksz) {
-            case 1024 / 8:
-                key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa1024;
-                break;
             case 2048 / 8:
                 key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa2048;
                 break;
@@ -262,9 +259,6 @@ int gpg_apdu_pso() {
                     ksz = U2BE(G_gpg_vstate.mse_dec->attributes.value, 1) >> 3;
                     key = NULL;
                     switch (ksz) {
-                        case 1024 / 8:
-                            key = (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa1024;
-                            break;
                         case 2048 / 8:
                             key = (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa2048;
                             break;

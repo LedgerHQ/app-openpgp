@@ -75,12 +75,8 @@ typedef struct gpg_key_s {
     /*  C1 C2 C3 */
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
     /*  key value */
-    /* WARN: changing the cx_<key>_t structures breaks backup/restore. Adapt backup/restore code
-     * to ensure backward compatibility.
-     */
     union {
         cx_rsa_private_key_t rsa;
-        cx_rsa_1024_private_key_t rsa1024;
         cx_rsa_2048_private_key_t rsa2048;
         cx_rsa_3072_private_key_t rsa3072;
         cx_rsa_4096_private_key_t rsa4096;
@@ -212,14 +208,12 @@ struct gpg_v_state_s {
         struct {
             union {
                 cx_rsa_public_key_t public;
-                cx_rsa_1024_public_key_t public1024;
                 cx_rsa_2048_public_key_t public2048;
                 cx_rsa_3072_public_key_t public3072;
                 cx_rsa_4096_public_key_t public4096;
             };
             union {
                 cx_rsa_private_key_t private;
-                cx_rsa_1024_private_key_t private1024;
                 cx_rsa_2048_private_key_t private2048;
                 cx_rsa_3072_private_key_t private3072;
                 cx_rsa_4096_private_key_t private4096;

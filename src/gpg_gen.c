@@ -87,9 +87,6 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
     rsa_pub = (cx_rsa_public_key_t *) &G_gpg_vstate.work.rsa.public;
     rsa_priv = (cx_rsa_private_key_t *) &G_gpg_vstate.work.rsa.private;
     switch (ksz) {
-        case 1024 / 8:
-            pkey_size = sizeof(cx_rsa_1024_private_key_t);
-            break;
         case 2048 / 8:
             pkey_size = sizeof(cx_rsa_2048_private_key_t);
             break;
@@ -155,12 +152,6 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
     ksz = U2BE(keygpg->attributes.value, 1) >> 3;
     gpg_io_mark();
     switch (ksz) {
-        case 1024 / 8:
-            if (keygpg->priv_key.rsa1024.size == 0) {
-                return SW_REFERENCED_DATA_NOT_FOUND;
-            }
-            gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa1024.n);
-            break;
         case 2048 / 8:
             if (keygpg->priv_key.rsa2048.size == 0) {
                 return SW_REFERENCED_DATA_NOT_FOUND;

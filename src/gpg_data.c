@@ -407,10 +407,6 @@ int gpg_apdu_put_data(unsigned int ref) {
                 rsa_pub = (cx_rsa_public_key_t *) &G_gpg_vstate.work.rsa.public;
                 rsa_priv = (cx_rsa_private_key_t *) &G_gpg_vstate.work.rsa.private;
                 switch (ksz) {
-                    case 1024 / 8:
-                        pkey_size = sizeof(cx_rsa_1024_private_key_t);
-                        pq = G_gpg_vstate.work.rsa.public1024.n;
-                        break;
                     case 2048 / 8:
                         pkey_size = sizeof(cx_rsa_2048_private_key_t);
                         pq = G_gpg_vstate.work.rsa.public2048.n;
