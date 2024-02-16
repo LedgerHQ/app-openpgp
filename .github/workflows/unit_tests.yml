@@ -1,0 +1,50 @@
+name: Unit testing with Codecov coverage checking
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  job_unit_test:
+    name: Unit test
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Build unit tests
+        run: |
+          cd unit-tests/
+          cmake -Bbuild -H. && make -C build && make -C build test
+
+      - name: Generate code coverage
+        run: |
+          cd unit-tests/
+          lcov --directory . -b "$(realpath build/)" --capture --initial -o coverage.base && \
+          lcov --rc lcov_branch_coverage=1 --directory . -b "$(realpath build/)" --capture -o coverage.capture && \
+          lcov --directory . -b "$(realpath build/)" --add-tracefile coverage.base --add-tracefile coverage.capture -o coverage.info && \
+          lcov --directory . -b "$(realpath build/)" --remove coverage.info '*/unit-tests/*' -o coverage.info && \
+          genhtml coverage.info -o coverage
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage
+          path: unit-tests/coverage
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./unit-tests/coverage.info
+          flags: unittests
+          name: codecov-app-openpgp
+          fail_ci_if_error: true
+          verbose: true

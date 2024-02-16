@@ -1,0 +1,45 @@
+name: Checks on the Tools client
+
+# This workflow performs some checks on the Python client used by the cli tool
+# It is there to help us maintain a level of quality in our codebase and does not have to be kept on forked
+# applications.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  lint:
+    name: Client linting
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone
+      uses: actions/checkout@v4
+    - name: Installing PIP dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -y libpcsclite-dev
+        pip install pylint
+        pip install -r pytools/requirements.txt
+    - name: Lint Python code
+      run: |
+        pylint --rc pytools/setup.cfg pytools/
+
+  mypy:
+    name: Type checking
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone
+      uses: actions/checkout@v4
+    - name: Installing PIP dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -y libpcsclite-dev
+        pip install mypy
+        pip install -r pytools/requirements.txt
+    - name: Mypy type checking
+      run: |
+        mypy pytools/
