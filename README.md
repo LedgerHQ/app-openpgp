@@ -54,6 +54,23 @@ Also, a backup/restore mechanism is provided. Please report to the [Documentatio
 
 > Warning: Without such configuration, an OS or App update will cause your private key to be lost!"
 
+The following is a repeatable process that will generate the same keys and fingerprints
+(even with different card serial numbers).
+
+1. Reset the OpenPGP App
+1. Set Key Templates from the OpenPGP App menu, if needed
+1. On computer, use `gpg` to edit the key with a fixed timestamp:
+
+```shell
+gpg --faked-system-time 19990101T000000! --card-edit # note the exclamation mark to keep the time fixed
+gpg> admin
+gpg> generate
+... # complete the wizard
+```
+
+While doing this, ensure that you use the same `--faked-system-time` and "Real Name" and "Email"
+during the generation wizard to reproduce the same keys each time.
+
 ### On screen reset
 
 The application can be reset as if it was fresh installed. In settings, choose reset and confirm.
