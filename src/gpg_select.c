@@ -51,7 +51,7 @@ int gpg_apdu_select() {
         }
 
         gpg_io_discard(0);
-        if (N_gpg_pstate->histo[7] != STATE_ACTIVATE) {
+        if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] != STATE_ACTIVATE) {
             sw = SW_STATE_TERMINATED;
         } else {
             sw = SW_OK;

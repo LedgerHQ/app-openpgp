@@ -41,6 +41,8 @@
 #define GPG_MIN_PW1_LENGTH 6
 #define GPG_MIN_PW3_LENGTH 8
 
+#define HISTO_LENGTH       15
+#define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
 #ifdef TARGET_NANOS
 #define GPG_KEYS_SLOTS 1
 #else
@@ -159,7 +161,7 @@ struct gpg_nv_state_s {
     /*  4F */
     unsigned char AID[16];
     /*  5F52 */
-    unsigned char histo[15];
+    unsigned char histo[HISTO_LENGTH];
 
     /*  C4 */
     unsigned char PW_status[4];

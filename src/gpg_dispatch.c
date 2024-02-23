@@ -254,7 +254,7 @@ int gpg_dispatch() {
             /* --- ACTIVATE/TERMINATE FILE --- */
         case INS_ACTIVATE_FILE:
             gpg_io_discard(0);
-            if (N_gpg_pstate->histo[7] == STATE_TERMINATE) {
+            if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] == STATE_TERMINATE) {
                 gpg_install(STATE_ACTIVATE);
             }
             return SW_OK;
@@ -272,7 +272,7 @@ int gpg_dispatch() {
     }
 
     /* Other commands allowed if not terminated */
-    if (N_gpg_pstate->histo[7] != STATE_ACTIVATE) {
+    if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] != STATE_ACTIVATE) {
         return SW_STATE_TERMINATED;
     }
 
