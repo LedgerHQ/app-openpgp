@@ -499,24 +499,29 @@ void trust_cb(bool confirm) {
 
 static void pin_cb(int token, uint8_t index) {
     const char* err = NULL;
-    int pin = 0;
     switch (token) {
         case TOKEN_PIN_BACK:
             ui_menu_settings();
             break;
         case TOKEN_PIN_SET:
+            if (G_gpg_vstate.pinmode == index) {
+                break;
+            }
             switch (index) {
                 case PIN_MODE_SCREEN:
                 case PIN_MODE_CONFIRM:
-                    pin = PIN_ID_PW2;
-                    err = PIN_USER_82;
+                    if ((gpg_pin_is_verified(PIN_ID_PW1) == 0) &&
+                        (gpg_pin_is_verified(PIN_ID_PW2) == 0)) {
+                        err = PIN_USER;
+                    }
                     break;
                 case PIN_MODE_TRUST:
-                    pin = PIN_ID_PW3;
-                    err = PIN_ADMIN;
+                    if (gpg_pin_is_verified(PIN_ID_PW3) == 0) {
+                        err = PIN_ADMIN;
+                    }
                     break;
             }
-            if (!gpg_pin_is_verified(pin)) {
+            if (err != NULL) {
                 ui_info(err, NOT_VERIFIED, ui_settings_pin, false);
                 break;
             }
