@@ -6,7 +6,6 @@ This module provides Ragger tests for Signing feature with SEED mode
 """
 import sys
 import pytest
-from Crypto.PublicKey import RSA, ECC
 
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, DataObject, PassWord, PubkeyAlgo
@@ -15,7 +14,7 @@ from utils import get_RSA_pub_key, get_ECDSA_pub_key, get_EDDSA_pub_key
 from utils import check_pincode, generate_key, get_key_attributes, KEY_TEMPLATES
 
 
-def _gen_key(client: CommandSender, template: str) -> RSA.RsaKey | ECC.EccKey:
+def _gen_key(client: CommandSender, template: str):
 
     # Verify PW3 (Admin)
     check_pincode(client, PassWord.PW3)
@@ -31,15 +30,13 @@ def _gen_key(client: CommandSender, template: str) -> RSA.RsaKey | ECC.EccKey:
 
      # Read the SIG pub Key
     if key_algo == PubkeyAlgo.RSA:
-        pubkey: RSA.RsaKey = get_RSA_pub_key(client, DataObject.DO_SIG_KEY)
-    elif key_algo == PubkeyAlgo.ECDSA:
-        pubkey: ECC.EccKey = get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
-    elif key_algo == PubkeyAlgo.EDDSA:
-        pubkey: ECC.EccKey = get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
-    else:
-        raise ValueError
+        return get_RSA_pub_key(client, DataObject.DO_SIG_KEY)
+    if key_algo == PubkeyAlgo.ECDSA:
+        return get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
+    if key_algo == PubkeyAlgo.EDDSA:
+        return get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
 
-    return pubkey
+    raise ValueError
 
 
 @pytest.mark.parametrize(
