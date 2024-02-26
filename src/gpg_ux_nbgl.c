@@ -280,82 +280,73 @@ static void template_key_cb(int token, uint8_t index) {
     uint32_t size = 0;
     uint8_t key_type = index + FIRST_USER_TOKEN;
 
-    switch (token) {
-        case TOKEN_TYPE_BACK:
-            break;
-        case TOKEN_TYPE_RSA2048:
-        case TOKEN_TYPE_RSA3072:
-        case TOKEN_TYPE_RSA4096:
-        case TOKEN_TYPE_SECP256K1:
-        case TOKEN_TYPE_Ed25519:
-            memset(&attributes, 0, sizeof(attributes));
-            switch (key_type) {
-                case TOKEN_TYPE_RSA2048:
-                case TOKEN_TYPE_RSA3072:
-                case TOKEN_TYPE_RSA4096:
-                    switch (key_type) {
-                        case TOKEN_TYPE_RSA2048:
-                            size = 2048;
-                            break;
-                        case TOKEN_TYPE_RSA3072:
-                            size = 3072;
-                            break;
-                        case TOKEN_TYPE_RSA4096:
-                            size = 4096;
-                            break;
-                    }
-                    attributes.value[0] = KEY_ID_RSA;
-                    U2BE_ENCODE(attributes.value, 1, size);
-                    attributes.value[3] = 0x00;
-                    attributes.value[4] = 0x20;
-                    attributes.value[5] = 0x01;
-                    attributes.length = 6;
-                    oid_len = 6;
-                    break;
+    if (token != TOKEN_TYPE_BACK) {
+        memset(&attributes, 0, sizeof(attributes));
+        switch (key_type) {
+            case TOKEN_TYPE_RSA2048:
+            case TOKEN_TYPE_RSA3072:
+            case TOKEN_TYPE_RSA4096:
+                switch (key_type) {
+                    case TOKEN_TYPE_RSA2048:
+                        size = 2048;
+                        break;
+                    case TOKEN_TYPE_RSA3072:
+                        size = 3072;
+                        break;
+                    case TOKEN_TYPE_RSA4096:
+                        size = 4096;
+                        break;
+                }
+                attributes.value[0] = KEY_ID_RSA;
+                U2BE_ENCODE(attributes.value, 1, size);
+                attributes.value[3] = 0x00;
+                attributes.value[4] = 0x20;
+                attributes.value[5] = 0x01;
+                attributes.length = 6;
+                oid_len = 6;
+                break;
 
-                case TOKEN_TYPE_SECP256K1:
-                    if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
-                        attributes.value[0] = KEY_ID_ECDH;
-                    } else {
-                        attributes.value[0] = KEY_ID_ECDSA;
-                    }
-                    oid = gpg_curve2oid(CX_CURVE_SECP256R1, &oid_len);
-                    memmove(attributes.value + 1, oid, sizeof(oid_len));
-                    attributes.length = 1 + oid_len;
-                    break;
+            case TOKEN_TYPE_SECP256K1:
+                if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
+                    attributes.value[0] = KEY_ID_ECDH;
+                } else {
+                    attributes.value[0] = KEY_ID_ECDSA;
+                }
+                oid = gpg_curve2oid(CX_CURVE_SECP256R1, &oid_len);
+                memmove(attributes.value + 1, oid, oid_len);
+                attributes.length = 1 + oid_len;
+                break;
 
-                case TOKEN_TYPE_Ed25519:
-                    if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
-                        attributes.value[0] = KEY_ID_ECDH;
-                        oid = gpg_curve2oid(CX_CURVE_Curve25519, &oid_len);
-                    } else {
-                        attributes.value[0] = KEY_ID_EDDSA;
-                        oid = gpg_curve2oid(CX_CURVE_Ed25519, &oid_len);
-                    }
-                    memmove(attributes.value + 1, oid, sizeof(oid_len));
-                    attributes.length = 1 + oid_len;
-                    break;
-            }
+            case TOKEN_TYPE_Ed25519:
+                if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
+                    attributes.value[0] = KEY_ID_ECDH;
+                    oid = gpg_curve2oid(CX_CURVE_Curve25519, &oid_len);
+                } else {
+                    attributes.value[0] = KEY_ID_EDDSA;
+                    oid = gpg_curve2oid(CX_CURVE_Ed25519, &oid_len);
+                }
+                memmove(attributes.value + 1, oid, oid_len);
+                attributes.length = 1 + oid_len;
+                break;
+        }
 
-            switch (G_gpg_vstate.ux_key) {
-                case TOKEN_TEMPLATE_SIG:
-                    dest = &G_gpg_vstate.kslot->sig;
-                    break;
-                case TOKEN_TEMPLATE_DEC:
-                    dest = &G_gpg_vstate.kslot->dec;
-                    break;
-                case TOKEN_TEMPLATE_AUT:
-                    dest = &G_gpg_vstate.kslot->aut;
-                    break;
-            }
+        switch (G_gpg_vstate.ux_key) {
+            case TOKEN_TEMPLATE_SIG:
+                dest = &G_gpg_vstate.kslot->sig;
+                break;
+            case TOKEN_TEMPLATE_DEC:
+                dest = &G_gpg_vstate.kslot->dec;
+                break;
+            case TOKEN_TEMPLATE_AUT:
+                dest = &G_gpg_vstate.kslot->aut;
+                break;
+        }
 
-            if (dest && attributes.value[0] &&
-                memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
-                PRINTF("TEMPLATE NVM_WRITE!!!!!\n");
-                nvm_write(dest, NULL, sizeof(gpg_key_t));
-                nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-            }
-            break;
+        if (dest && attributes.value[0] &&
+            memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
+            nvm_write(dest, NULL, sizeof(gpg_key_t));
+            nvm_write(&dest->attributes, &attributes, sizeof(attributes));
+        }
     }
     ui_settings_template();
 }
