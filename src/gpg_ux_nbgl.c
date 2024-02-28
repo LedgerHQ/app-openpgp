@@ -280,82 +280,73 @@ static void template_key_cb(int token, uint8_t index) {
     uint32_t size = 0;
     uint8_t key_type = index + FIRST_USER_TOKEN;
 
-    switch (token) {
-        case TOKEN_TYPE_BACK:
-            break;
-        case TOKEN_TYPE_RSA2048:
-        case TOKEN_TYPE_RSA3072:
-        case TOKEN_TYPE_RSA4096:
-        case TOKEN_TYPE_SECP256K1:
-        case TOKEN_TYPE_Ed25519:
-            memset(&attributes, 0, sizeof(attributes));
-            switch (key_type) {
-                case TOKEN_TYPE_RSA2048:
-                case TOKEN_TYPE_RSA3072:
-                case TOKEN_TYPE_RSA4096:
-                    switch (key_type) {
-                        case TOKEN_TYPE_RSA2048:
-                            size = 2048;
-                            break;
-                        case TOKEN_TYPE_RSA3072:
-                            size = 3072;
-                            break;
-                        case TOKEN_TYPE_RSA4096:
-                            size = 4096;
-                            break;
-                    }
-                    attributes.value[0] = KEY_ID_RSA;
-                    U2BE_ENCODE(attributes.value, 1, size);
-                    attributes.value[3] = 0x00;
-                    attributes.value[4] = 0x20;
-                    attributes.value[5] = 0x01;
-                    attributes.length = 6;
-                    oid_len = 6;
-                    break;
+    if (token != TOKEN_TYPE_BACK) {
+        memset(&attributes, 0, sizeof(attributes));
+        switch (key_type) {
+            case TOKEN_TYPE_RSA2048:
+            case TOKEN_TYPE_RSA3072:
+            case TOKEN_TYPE_RSA4096:
+                switch (key_type) {
+                    case TOKEN_TYPE_RSA2048:
+                        size = 2048;
+                        break;
+                    case TOKEN_TYPE_RSA3072:
+                        size = 3072;
+                        break;
+                    case TOKEN_TYPE_RSA4096:
+                        size = 4096;
+                        break;
+                }
+                attributes.value[0] = KEY_ID_RSA;
+                U2BE_ENCODE(attributes.value, 1, size);
+                attributes.value[3] = 0x00;
+                attributes.value[4] = 0x20;
+                attributes.value[5] = 0x01;
+                attributes.length = 6;
+                oid_len = 6;
+                break;
 
-                case TOKEN_TYPE_SECP256K1:
-                    if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
-                        attributes.value[0] = KEY_ID_ECDH;
-                    } else {
-                        attributes.value[0] = KEY_ID_ECDSA;
-                    }
-                    oid = gpg_curve2oid(CX_CURVE_SECP256R1, &oid_len);
-                    memmove(attributes.value + 1, oid, sizeof(oid_len));
-                    attributes.length = 1 + oid_len;
-                    break;
+            case TOKEN_TYPE_SECP256K1:
+                if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
+                    attributes.value[0] = KEY_ID_ECDH;
+                } else {
+                    attributes.value[0] = KEY_ID_ECDSA;
+                }
+                oid = gpg_curve2oid(CX_CURVE_SECP256R1, &oid_len);
+                memmove(attributes.value + 1, oid, oid_len);
+                attributes.length = 1 + oid_len;
+                break;
 
-                case TOKEN_TYPE_Ed25519:
-                    if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
-                        attributes.value[0] = KEY_ID_ECDH;
-                        oid = gpg_curve2oid(CX_CURVE_Curve25519, &oid_len);
-                    } else {
-                        attributes.value[0] = KEY_ID_EDDSA;
-                        oid = gpg_curve2oid(CX_CURVE_Ed25519, &oid_len);
-                    }
-                    memmove(attributes.value + 1, oid, sizeof(oid_len));
-                    attributes.length = 1 + oid_len;
-                    break;
-            }
+            case TOKEN_TYPE_Ed25519:
+                if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
+                    attributes.value[0] = KEY_ID_ECDH;
+                    oid = gpg_curve2oid(CX_CURVE_Curve25519, &oid_len);
+                } else {
+                    attributes.value[0] = KEY_ID_EDDSA;
+                    oid = gpg_curve2oid(CX_CURVE_Ed25519, &oid_len);
+                }
+                memmove(attributes.value + 1, oid, oid_len);
+                attributes.length = 1 + oid_len;
+                break;
+        }
 
-            switch (G_gpg_vstate.ux_key) {
-                case TOKEN_TEMPLATE_SIG:
-                    dest = &G_gpg_vstate.kslot->sig;
-                    break;
-                case TOKEN_TEMPLATE_DEC:
-                    dest = &G_gpg_vstate.kslot->dec;
-                    break;
-                case TOKEN_TEMPLATE_AUT:
-                    dest = &G_gpg_vstate.kslot->aut;
-                    break;
-            }
+        switch (G_gpg_vstate.ux_key) {
+            case TOKEN_TEMPLATE_SIG:
+                dest = &G_gpg_vstate.kslot->sig;
+                break;
+            case TOKEN_TEMPLATE_DEC:
+                dest = &G_gpg_vstate.kslot->dec;
+                break;
+            case TOKEN_TEMPLATE_AUT:
+                dest = &G_gpg_vstate.kslot->aut;
+                break;
+        }
 
-            if (dest && attributes.value[0] &&
-                memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
-                PRINTF("TEMPLATE NVM_WRITE!!!!!\n");
-                nvm_write(dest, NULL, sizeof(gpg_key_t));
-                nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-            }
-            break;
+        if (dest && attributes.value[0] &&
+            memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
+            nvm_write(dest, NULL, sizeof(gpg_key_t));
+            nvm_write(&dest->attributes, &attributes, sizeof(attributes));
+        }
     }
     ui_settings_template();
 }
@@ -499,24 +490,29 @@ void trust_cb(bool confirm) {
 
 static void pin_cb(int token, uint8_t index) {
     const char* err = NULL;
-    int pin = 0;
     switch (token) {
         case TOKEN_PIN_BACK:
             ui_menu_settings();
             break;
         case TOKEN_PIN_SET:
+            if (G_gpg_vstate.pinmode == index) {
+                break;
+            }
             switch (index) {
                 case PIN_MODE_SCREEN:
                 case PIN_MODE_CONFIRM:
-                    pin = PIN_ID_PW2;
-                    err = PIN_USER_82;
+                    if ((gpg_pin_is_verified(PIN_ID_PW1) == 0) &&
+                        (gpg_pin_is_verified(PIN_ID_PW2) == 0)) {
+                        err = PIN_USER;
+                    }
                     break;
                 case PIN_MODE_TRUST:
-                    pin = PIN_ID_PW3;
-                    err = PIN_ADMIN;
+                    if (gpg_pin_is_verified(PIN_ID_PW3) == 0) {
+                        err = PIN_ADMIN;
+                    }
                     break;
             }
-            if (!gpg_pin_is_verified(pin)) {
+            if (err != NULL) {
                 ui_info(err, NOT_VERIFIED, ui_settings_pin, false);
                 break;
             }
@@ -823,276 +819,6 @@ enum {
 
 static void ui_menu_pinentry_cb(void);
 
-#ifdef WAIT_NEXT_SDK
-static void setPinCodeText(bool add) {
-    bool enableValidate, enableBackspace, enableDigits;
-    bool redrawKeypad = false;
-    uint8_t minLen;
-    nbgl_refresh_mode_t mode = BLACK_AND_WHITE_FAST_REFRESH;
-
-    minLen = (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? GPG_MIN_PW3_LENGTH : GPG_MIN_PW1_LENGTH;
-    enableDigits = (G_gpg_vstate.pinLen < GPG_MAX_PW_LENGTH);
-    enableValidate = (G_gpg_vstate.pinLen >= minLen);
-    enableBackspace = (G_gpg_vstate.pinLen > 0);
-    if (add) {
-        if ((G_gpg_vstate.pinLen == minLen) ||             // activate "validate" button on keypad
-            (G_gpg_vstate.pinLen == GPG_MAX_PW_LENGTH) ||  // deactivate "digits" on keypad
-            (G_gpg_vstate.pinLen == 1)) {                  // activate "backspace"
-            redrawKeypad = true;
-        }
-    } else {                                          // remove
-        if ((G_gpg_vstate.pinLen == 0) ||             // deactivate "backspace" button on keypad
-            (G_gpg_vstate.pinLen == (minLen - 1)) ||  // deactivate "validate" button on keypad
-            (G_gpg_vstate.pinLen == (GPG_MAX_PW_LENGTH - 1))) {  // reactivate "digits" on keypad
-            redrawKeypad = true;
-        }
-    }
-    nbgl_layoutUpdateHiddenDigits(G_gpg_vstate.layoutCtx,
-                                  G_gpg_vstate.hiddenDigitsIndex,
-                                  G_gpg_vstate.pinLen);
-    if (redrawKeypad) {
-        nbgl_layoutUpdateKeypad(G_gpg_vstate.layoutCtx,
-                                G_gpg_vstate.keypadIndex,
-                                enableValidate,
-                                enableBackspace,
-                                enableDigits);
-    }
-
-    if ((!add) && (G_gpg_vstate.pinLen == 0)) {
-        // Full refresh to fully clean the bullets when reaching 0 digits
-        mode = FULL_COLOR_REFRESH;
-    }
-    nbgl_refreshSpecialWithPostRefresh(mode, POST_REFRESH_FORCE_POWER_ON);
-}
-
-static void validate_pin(void) {
-    unsigned int sw = SW_UNKNOWN;
-    unsigned int len1 = 0;
-    unsigned char* pin1 = NULL;
-    gpg_pin_t* pin = NULL;
-
-    switch (G_gpg_vstate.io_ins) {
-        case INS_VERIFY:
-            pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
-            sw = gpg_pin_check(pin,
-                               G_gpg_vstate.io_p2,
-                               G_gpg_vstate.ux_pinentry,
-                               G_gpg_vstate.pinLen);
-            gpg_io_discard(1);
-            if (sw == SW_PIN_BLOCKED) {
-                gpg_io_insert_u16(sw);
-                gpg_io_do(IO_RETURN_AFTER_TX);
-                ui_info(PIN_LOCKED, EMPTY, ui_init, false);
-                break;
-            } else if (sw != SW_OK) {
-                snprintf(G_gpg_vstate.line,
-                         sizeof(G_gpg_vstate.line),
-                         "%d tries remaining",
-                         pin->counter);
-                ui_info(WRONG_PIN, G_gpg_vstate.line, ui_menu_pinentry_cb, false);
-                break;
-            }
-            gpg_io_insert_u16(sw);
-            gpg_io_do(IO_RETURN_AFTER_TX);
-            snprintf(G_gpg_vstate.line,
-                     sizeof(G_gpg_vstate.line),
-                     "%s PIN",
-                     (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "ADMIN" : "USER");
-            ui_info(G_gpg_vstate.line, "VERIFIED", ui_init, true);
-            break;
-
-        case INS_CHANGE_REFERENCE_DATA:
-            switch (G_gpg_vstate.ux_step) {
-                case 0:
-                    // Check Current pin code
-                    pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
-                    sw = gpg_pin_check(pin,
-                                       G_gpg_vstate.io_p2,
-                                       G_gpg_vstate.ux_pinentry,
-                                       G_gpg_vstate.pinLen);
-                    gpg_io_discard(1);
-                    if (sw == SW_PIN_BLOCKED) {
-                        gpg_io_insert_u16(sw);
-                        gpg_io_do(IO_RETURN_AFTER_TX);
-                        ui_info(PIN_LOCKED, EMPTY, ui_init, false);
-                        break;
-                    } else if (sw != SW_OK) {
-                        snprintf(G_gpg_vstate.line,
-                                 sizeof(G_gpg_vstate.line),
-                                 " %d tries remaining",
-                                 pin->counter);
-                        ui_info(WRONG_PIN, G_gpg_vstate.line, ui_menu_pinentry_cb, false);
-                        break;
-                    }
-                    ui_menu_pinentry_display(++G_gpg_vstate.ux_step);
-                    break;
-                case 1:
-                    // Store the New pin codes
-                    gpg_io_insert_u8(G_gpg_vstate.pinLen);
-                    gpg_io_insert(G_gpg_vstate.ux_pinentry, G_gpg_vstate.pinLen);
-                    ui_menu_pinentry_display(++G_gpg_vstate.ux_step);
-                    break;
-                case 2:
-                    // Compare the 2 pin codes (New + Confirm)
-                    len1 = G_gpg_vstate.work.io_buffer[0];
-                    pin1 = G_gpg_vstate.work.io_buffer + 1;
-                    if ((len1 != G_gpg_vstate.pinLen) ||
-                        (memcmp(pin1, G_gpg_vstate.ux_pinentry, G_gpg_vstate.pinLen) != 0)) {
-                        gpg_io_discard(1);
-                        ui_info(PIN_DIFFERS, EMPTY, ui_menu_pinentry_cb, false);
-                    } else {
-                        pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
-                        sw = gpg_pin_set(pin, G_gpg_vstate.work.io_buffer + 1, G_gpg_vstate.pinLen);
-                        gpg_io_discard(1);
-                        gpg_io_insert_u16(sw);
-                        gpg_io_do(IO_RETURN_AFTER_TX);
-                        if (sw != SW_OK) {
-                            ui_info("Process Error", EMPTY, ui_init, false);
-                        } else {
-                            snprintf(G_gpg_vstate.line,
-                                     sizeof(G_gpg_vstate.line),
-                                     "%s PIN",
-                                     (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "ADMIN" : "USER");
-                            ui_info(G_gpg_vstate.line, "CHANGED", ui_init, true);
-                        }
-                    }
-                    break;
-                default:
-                    break;
-            }
-            break;
-
-        default:
-            break;
-    }
-}
-
-static void keypad_cb(char touchedKey) {
-    switch (touchedKey) {
-        case BACKSPACE_KEY:
-            if (G_gpg_vstate.pinLen > 0) {
-                G_gpg_vstate.pinLen--;
-                G_gpg_vstate.ux_pinentry[G_gpg_vstate.pinLen] = 0;
-            }
-            setPinCodeText(false);
-            break;
-
-        case VALIDATE_KEY:
-            // Gray out keyboard / buttons as a first user feedback
-            nbgl_layoutUpdateKeypad(G_gpg_vstate.layoutCtx,
-                                    G_gpg_vstate.keypadIndex,
-                                    false,
-                                    false,
-                                    true);
-            nbgl_refreshSpecialWithPostRefresh(BLACK_AND_WHITE_FAST_REFRESH,
-                                               POST_REFRESH_FORCE_POWER_ON);
-
-            validate_pin();
-            break;
-
-        default:
-            if ((touchedKey >= 0x30) && (touchedKey < 0x40)) {
-                if (G_gpg_vstate.pinLen < GPG_MAX_PW_LENGTH) {
-                    G_gpg_vstate.ux_pinentry[G_gpg_vstate.pinLen] = touchedKey;
-                    G_gpg_vstate.pinLen++;
-                }
-                setPinCodeText(true);
-            }
-            break;
-    }
-}
-
-static void pinentry_cb(int token, uint8_t index) {
-    UNUSED(index);
-    if (token == TOKEN_PIN_ENTRY_BACK) {
-        gpg_io_discard(0);
-        gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
-        gpg_io_do(IO_RETURN_AFTER_TX);
-        ui_init();
-    }
-}
-
-void ui_menu_pinentry_display(unsigned int value) {
-    nbgl_layoutDescription_t layoutDescription = {0};
-    nbgl_layoutCenteredInfo_t centeredInfo = {0};
-    int status = -1;
-
-    // reset the pin buffer
-    memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
-    G_gpg_vstate.pinLen = 0;
-
-    layoutDescription.onActionCallback = pinentry_cb;
-    layoutDescription.modal = false;
-    layoutDescription.withLeftBorder = false;
-    G_gpg_vstate.layoutCtx = nbgl_layoutGet(&layoutDescription);
-
-    nbgl_layoutAddProgressIndicator(G_gpg_vstate.layoutCtx,
-                                    0,
-                                    0,
-                                    true,
-                                    TOKEN_PIN_ENTRY_BACK,
-                                    TUNE_TAP_CASUAL);
-
-    memset(G_gpg_vstate.line, 0, sizeof(G_gpg_vstate.line));
-    if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
-        switch (value) {
-            case 0:
-                // Default or initial case
-                memmove(G_gpg_vstate.line, "Current", 7);
-                break;
-            case 1:
-                memmove(G_gpg_vstate.line, "New", 3);
-                break;
-            case 2:
-                memmove(G_gpg_vstate.line, "Confirm", 7);
-                break;
-            default:
-                break;
-        }
-        G_gpg_vstate.ux_step = value;
-    } else {
-        memmove(G_gpg_vstate.line, "Enter", 5);
-    }
-    snprintf(G_gpg_vstate.menu,
-             sizeof(G_gpg_vstate.menu),
-             "%s %s PIN",
-             G_gpg_vstate.line,
-             (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? "Admin" : "User");
-
-    // add description
-    centeredInfo.text1 = G_gpg_vstate.menu;
-    centeredInfo.style = LARGE_CASE_INFO;
-    centeredInfo.onTop = true;
-    nbgl_layoutAddCenteredInfo(G_gpg_vstate.layoutCtx, &centeredInfo);
-
-    // add keypad (Not shuffled pin)
-    status = nbgl_layoutAddKeypad(G_gpg_vstate.layoutCtx, keypad_cb, false);
-    if (status < 0) {
-        return;
-    }
-    G_gpg_vstate.keypadIndex = (unsigned int) status;
-
-    // add hidden digits - GPG_MAX_PW_LENGTH (12) is not yet supported
-    status = nbgl_layoutAddHiddenDigits(G_gpg_vstate.layoutCtx, 10);
-    if (status < 0) {
-        return;
-    }
-    G_gpg_vstate.hiddenDigitsIndex = (unsigned int) status;
-
-    nbgl_layoutDraw(G_gpg_vstate.layoutCtx);
-    nbgl_refreshSpecialWithPostRefresh(FULL_COLOR_CLEAN_REFRESH, POST_REFRESH_FORCE_POWER_ON);
-}
-
-static void ui_menu_pinentry_cb(void) {
-    unsigned int value = 0;
-
-    if ((G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) && (G_gpg_vstate.ux_step == 2)) {
-        // Current step is Change Password with PINs differ
-        value = 1;
-    }
-    ui_menu_pinentry_display(value);
-}
-#else
 static void validate_pin(const uint8_t* pinentry, uint8_t length) {
     unsigned int sw = SW_UNKNOWN;
     unsigned int len1 = 0;
@@ -1250,7 +976,6 @@ static void ui_menu_pinentry_cb(void) {
     }
     ui_menu_pinentry_display(value);
 }
-#endif
 
 /* ------------------------------ UIF CONFIRM UX ----------------------------- */
 void uif_confirm_cb(bool confirm) {

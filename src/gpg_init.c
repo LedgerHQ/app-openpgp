@@ -261,7 +261,7 @@ const unsigned char C_default_AID[] = {
     0x00,
     0x00};
 
-const unsigned char C_default_Histo[] = {
+const unsigned char C_default_Histo[HISTO_LENGTH] = {
     0x00,
     0x31,
     0xC5,  // select method: by DF/partialDF; IO-file:readbinary; RFU???
@@ -269,6 +269,11 @@ const unsigned char C_default_Histo[] = {
     0xC0,  // select method: by DF/partialDF ,
     0x01,  // data coding style: ontime/byte
     0x80,  // chaining
+    0x00,  // Padding zero bytes
+    0x00,
+    0x00,
+    0x00,
+    0x00,
     0x7F,  // zero state
     0x90,
     0x00};
@@ -408,9 +413,9 @@ void gpg_install(unsigned char app_state) {
     nvm_write((void *) (N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
 
     // historical bytes
-    memmove(G_gpg_vstate.work.io_buffer, C_default_Histo, sizeof(C_default_Histo));
-    G_gpg_vstate.work.io_buffer[7] = app_state;
-    nvm_write((void *) (N_gpg_pstate->histo), G_gpg_vstate.work.io_buffer, sizeof(C_default_Histo));
+    memmove(G_gpg_vstate.work.io_buffer, C_default_Histo, HISTO_LENGTH);
+    G_gpg_vstate.work.io_buffer[HISTO_OFFSET_STATE] = app_state;
+    nvm_write((void *) (N_gpg_pstate->histo), G_gpg_vstate.work.io_buffer, HISTO_LENGTH);
 
     // AID
     memmove(G_gpg_vstate.work.io_buffer, C_default_AID, sizeof(C_default_AID));

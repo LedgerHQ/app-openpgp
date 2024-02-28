@@ -30,8 +30,7 @@ extern const char *const C_RIGHT_PIN;
 extern const char *const C_PIN_CHANGED;
 extern const char *const C_PIN_LOCKED;
 extern const char *const C_PIN_DIFFERS;
-extern const char *const C_PIN_USER_81;
-extern const char *const C_PIN_USER_82;
+extern const char *const C_PIN_USER;
 extern const char *const C_PIN_ADMIN;
 
 extern const char *const C_VERIFIED;
@@ -57,8 +56,7 @@ extern const char *const C_EMPTY;
 #define PIN_CHANGED       PICSTR(C_PIN_CHANGED)
 #define PIN_LOCKED        PICSTR(C_PIN_LOCKED)
 #define PIN_DIFFERS       PICSTR(C_PIN_DIFFERS)
-#define PIN_USER_81       PICSTR(C_PIN_USER_81)
-#define PIN_USER_82       PICSTR(C_PIN_USER_82)
+#define PIN_USER          PICSTR(C_PIN_USER)
 #define PIN_ADMIN         PICSTR(C_PIN_ADMIN)
 #define VERIFIED          PICSTR(C_VERIFIED)
 #define NOT_VERIFIED      PICSTR(C_NOT_VERIFIED)

@@ -80,7 +80,7 @@ int gpg_apdu_get_data(unsigned int ref) {
             break;
         case 0x5F52:
             /* Historical bytes */
-            gpg_io_insert((const unsigned char *) N_gpg_pstate->histo, 15);
+            gpg_io_insert((const unsigned char *) N_gpg_pstate->histo, HISTO_LENGTH);
             break;
         case 0x7F66:
             /* Extended length information */
@@ -115,7 +115,7 @@ int gpg_apdu_get_data(unsigned int ref) {
             memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6,
                     G_gpg_vstate.kslot->serial,
                     4);
-            gpg_io_insert_tlv(0x5F52, 15, (const unsigned char *) N_gpg_pstate->histo);
+            gpg_io_insert_tlv(0x5F52, HISTO_LENGTH, (const unsigned char *) N_gpg_pstate->histo);
             gpg_io_insert_tlv(0x7F66, sizeof(C_ext_length), C_ext_length);
 
             gpg_io_mark();

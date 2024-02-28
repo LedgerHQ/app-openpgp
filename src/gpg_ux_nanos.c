@@ -830,8 +830,8 @@ void ui_menu_pinmode_action(unsigned int value) {
                 value++;
                 break;
             }
-            if (!gpg_pin_is_verified(PIN_ID_PW2)) {
-                ui_info(PIN_USER_82, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+            if ((gpg_pin_is_verified(PIN_ID_PW1) == 0) && (gpg_pin_is_verified(PIN_ID_PW2) == 0)) {
+                ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display, 0);
                 return;
             }
             G_gpg_vstate.pinmode = value;
