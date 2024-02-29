@@ -84,8 +84,9 @@ typedef struct gpg_key_s {
         cx_rsa_private_key_t rsa;
         cx_rsa_2048_private_key_t rsa2048;
         cx_rsa_3072_private_key_t rsa3072;
+#ifdef WITH_SUPPORT_RSA4096
         cx_rsa_4096_private_key_t rsa4096;
-
+#endif
         cx_ecfp_private_key_t ecfp;
         cx_ecfp_256_private_key_t ecfp256;
         cx_ecfp_384_private_key_t ecfp384;
@@ -215,13 +216,17 @@ struct gpg_v_state_s {
                 cx_rsa_public_key_t public;
                 cx_rsa_2048_public_key_t public2048;
                 cx_rsa_3072_public_key_t public3072;
+#ifdef WITH_SUPPORT_RSA4096
                 cx_rsa_4096_public_key_t public4096;
+#endif
             };
             union {
                 cx_rsa_private_key_t private;
                 cx_rsa_2048_private_key_t private2048;
                 cx_rsa_3072_private_key_t private3072;
+#ifdef WITH_SUPPORT_RSA4096
                 cx_rsa_4096_private_key_t private4096;
+#endif
             };
         } rsa;
 

@@ -11,7 +11,7 @@ This specification is available in *doc* directory and at <https://g10code.com/p
 
 The application supports:
 
-- RSA with key up to 4096 bits
+- RSA with key up to 3072 bits
 - ECDSA with secp256k1
 - EDDSA with Ed25519 curve
 - ECDH with secp256k1 and curve25519 curves

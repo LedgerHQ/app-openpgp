@@ -474,13 +474,17 @@ void tmpl_key_selector(unsigned int idx) {
 
 const char *const tmpl_type_getter_values[] = {LABEL_RSA2048,
                                                LABEL_RSA3072,
+#ifdef WITH_SUPPORT_RSA4096
                                                LABEL_RSA4096,
+#endif
                                                LABEL_SECP256K1,
                                                LABEL_Ed25519};
 
 const unsigned int tmpl_type_getter_values_map[] = {2048,
                                                     3072,
+#ifdef WITH_SUPPORT_RSA4096
                                                     4096,
+#endif
                                                     CX_CURVE_SECP256R1,
                                                     CX_CURVE_Ed25519};
 
@@ -567,9 +571,11 @@ void ui_menu_template_predisplay() {
         case 3072:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_RSA3072);
             break;
+#ifdef WITH_SUPPORT_RSA4096
         case 4096:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_RSA4096);
             break;
+#endif
         case CX_CURVE_SECP256R1:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_SECP256K1);
             break;
@@ -597,7 +603,9 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     switch (G_gpg_vstate.ux_type) {
         case 2048:
         case 3072:
+#ifdef WITH_SUPPORT_RSA4096
         case 4096:
+#endif
             attributes.value[0] = KEY_ID_RSA;
             U2BE_ENCODE(attributes.value, 1, G_gpg_vstate.ux_type);
             attributes.value[3] = 0x00;

@@ -93,9 +93,11 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
         case 3072 / 8:
             pkey_size = sizeof(cx_rsa_3072_private_key_t);
             break;
+#ifdef WITH_SUPPORT_RSA4096
         case 4096 / 8:
             pkey_size = sizeof(cx_rsa_4096_private_key_t);
             break;
+#endif
         default:
             break;
     }
@@ -164,12 +166,16 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa3072.n);
             break;
+#ifdef WITH_SUPPORT_RSA4096
         case 4096 / 8:
             if (keygpg->priv_key.rsa4096.size == 0) {
                 return SW_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa4096.n);
             break;
+#endif
+        default:
+            return SW_REFERENCED_DATA_NOT_FOUND;
     }
     gpg_io_insert_tlv(0x82, 4, keygpg->pub_key.rsa);
 
