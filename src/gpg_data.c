@@ -231,6 +231,8 @@ int gpg_apdu_put_data(unsigned int ref) {
     void *pkey = NULL;
     cx_aes_key_t aes_key = {0};
     cx_err_t error = CX_INTERNAL_ERROR;
+    unsigned int pkey_size = 0;
+    unsigned int ksz, curve;
 
     G_gpg_vstate.DO_current = ref;
 
@@ -326,7 +328,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             /* ----------------- Extended Header list -----------------*/
         case 0x3FFF: {
             unsigned int len_e, len_p, len_q;
-            unsigned int endof, ksz, reset_cnt;
+            unsigned int endof, reset_cnt;
             gpg_key_t *keygpg = NULL;
             // fecth 4D
             gpg_io_fetch_tl(&t, &l);
@@ -400,7 +402,6 @@ int gpg_apdu_put_data(unsigned int ref) {
                 unsigned char *p, *q, *pq;
                 cx_rsa_public_key_t *rsa_pub;
                 cx_rsa_private_key_t *rsa_priv;
-                unsigned int pkey_size = 0;
                 // check length
                 ksz = U2BE(keygpg->attributes.value, 1) >> 3;
                 rsa_pub = (cx_rsa_public_key_t *) &G_gpg_vstate.work.rsa.public;
@@ -476,12 +477,9 @@ int gpg_apdu_put_data(unsigned int ref) {
                     nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
                 }
                 sw = SW_OK;
-            }
-            else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
-                     (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
-                     (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
-                unsigned int curve;
-
+            } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
+                       (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
+                       (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
                 curve = gpg_oid2curve(&keygpg->attributes.value[1], keygpg->attributes.length - 1);
                 if (curve == CX_CURVE_NONE) {
                     sw = SW_WRONG_DATA;
@@ -637,9 +635,35 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SW_WRONG_LENGTH;
                 break;
             }
-            nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
-            sw = SW_OK;
+            switch (G_gpg_vstate.work.io_buffer[0]) {
+                case KEY_ID_RSA:
+                    ksz = U2BE(G_gpg_vstate.work.io_buffer, 1);
+                    if ((ksz != 2048) && (ksz != 3072)) {
+                        sw = SW_WRONG_DATA;
+                    } else {
+                        sw = SW_OK;
+                    }
+                    break;
+                case KEY_ID_ECDH:
+                case KEY_ID_ECDSA:
+                case KEY_ID_EDDSA:
+                    curve =
+                        gpg_oid2curve(G_gpg_vstate.work.io_buffer + 1, G_gpg_vstate.io_length - 1);
+                    if (curve == CX_CURVE_NONE) {
+                        sw = SW_WRONG_DATA;
+                    } else {
+                        sw = SW_OK;
+                    }
+                    break;
+                default:
+                    sw = SW_WRONG_DATA;
+                    break;
+            }
+
+            if (sw == SW_OK) {
+                nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+                nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            }
             break;
 
             /* ----------------- PWS status ----------------- */
@@ -961,7 +985,6 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 break;
             }
             offset = G_gpg_vstate.io_offset;
-            
             ksz = U2BE(G_gpg_vstate.mse_dec->attributes.value, 1) >> 3;
             switch (ksz) {
                 case 2048 / 8:
@@ -981,12 +1004,10 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             }
 
             if ((key == NULL) || (key->size != ksz)) {
-                PRINTF("[DATA] - put_key_data: Wrong key len: %d / %d\n", ksz, key->size);
                 sw = SW_CONDITIONS_NOT_SATISFIED;
                 break;
             }
             if (len != GPG_IO_BUFFER_LENGTH) {
-                PRINTF("[DATA] - put_key_data: Wrong buffer len: %d / %d\n", len, GPG_IO_BUFFER_LENGTH);
                 sw = SW_CONDITIONS_NOT_SATISFIED;
                 break;
             }
@@ -1004,9 +1025,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 sw = SW_WRONG_DATA;
                 break;
             }
-            nvm_write((unsigned char *) key,
-                      G_gpg_vstate.work.io_buffer,
-                      len);
+            nvm_write((unsigned char *) key, G_gpg_vstate.work.io_buffer, len);
             sw = SW_OK;
             break;
 

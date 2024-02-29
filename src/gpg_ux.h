@@ -29,8 +29,7 @@
 #define LABEL_RSA2048   "RSA 2048"
 #define LABEL_RSA3072   "RSA 3072"
 #define LABEL_RSA4096   "RSA 4096"
-#define LABEL_NISTP256  "NIST P256"
-#define LABEL_SECP256K1 "SECP 256K1"
+#define LABEL_SECP256R1 "SECP 256R1"
 #define LABEL_Ed25519   "Ed25519"
 
 void ui_CCID_reset(void);

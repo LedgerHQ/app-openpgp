@@ -51,9 +51,9 @@ This specification is available in doc directory at [G10CODE]_.
 The application supports:
 
 - RSA with key up to 3072 bits
-- ECDSA with secp256k1, secp256r1, brainpool 256r1 and brainpool 256t1 curves
+- ECDSA with secp256R1
 - EDDSA with Ed25519 curve
-- ECDH with secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and curve25519 curves
+- ECDH with secp256R1 and curve25519 curves
 
 This release has known missing parts (see also [GPGADD]_):
 
@@ -154,7 +154,7 @@ The full menu layout is:
  |         Choose Type...
  |             RSA 2048
  |             RSA 3072
- |             NIST P256
+ |             SECP 256R1
  |             ED25519
  |         Set Template
  |     Seed mode *ON/OFF*

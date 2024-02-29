@@ -230,7 +230,7 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     uint32_t i, len;
     cx_err_t error = CX_INTERNAL_ERROR;
 
-    if (keygpg->pub_key.ecfp256.W_len == 0) {
+    if (keygpg->pub_key.ecfp.W_len == 0) {
         return SW_REFERENCED_DATA_NOT_FOUND;
     }
     gpg_io_discard(1);
@@ -238,23 +238,23 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
     if (curve == CX_CURVE_Ed25519) {
         memmove(G_gpg_vstate.work.io_buffer + 128,
-                keygpg->pub_key.ecfp256.W,
-                keygpg->pub_key.ecfp256.W_len);
+                keygpg->pub_key.ecfp.W,
+                keygpg->pub_key.ecfp.W_len);
         CX_CHECK(cx_edwards_compress_point_no_throw(CX_CURVE_Ed25519,
                                                     G_gpg_vstate.work.io_buffer + 128,
                                                     65));
         gpg_io_insert_tlv(0x86, 32,
                           G_gpg_vstate.work.io_buffer + 129);  // 129: discard 02
     } else if (curve == CX_CURVE_Curve25519) {
-        len = keygpg->pub_key.ecfp256.W_len - 1;
+        len = keygpg->pub_key.ecfp.W_len - 1;
         for (i = 0; i <= len; i++) {
-            G_gpg_vstate.work.io_buffer[128 + i] = keygpg->pub_key.ecfp256.W[len - i];
+            G_gpg_vstate.work.io_buffer[128 + i] = keygpg->pub_key.ecfp.W[len - i];
         }
         gpg_io_insert_tlv(0x86, 32, G_gpg_vstate.work.io_buffer + 128);
     } else {
         gpg_io_insert_tlv(0x86,
-                          keygpg->pub_key.ecfp256.W_len,
-                          (unsigned char *) &keygpg->pub_key.ecfp256.W);
+                          keygpg->pub_key.ecfp.W_len,
+                          (unsigned char *) &keygpg->pub_key.ecfp.W);
     }
     return SW_OK;
 

@@ -539,7 +539,7 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
 #ifdef WITH_SUPPORT_RSA4096
     {NULL, ui_menu_tmpl_type_action, 4096, NULL, LABEL_RSA4096, NULL, 0, 0},
 #endif
-    {NULL, ui_menu_tmpl_type_action, CX_CURVE_SECP256R1, NULL, LABEL_NISTP256, NULL, 0, 0},
+    {NULL, ui_menu_tmpl_type_action, CX_CURVE_SECP256R1, NULL, LABEL_SECP256R1, NULL, 0, 0},
     {NULL, ui_menu_tmpl_type_action, CX_CURVE_Ed25519, NULL, LABEL_Ed25519, NULL, 0, 0},
     {ui_menu_template, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
@@ -578,7 +578,7 @@ const bagl_element_t *ui_menu_template_predisplay(const ux_menu_entry_t *entry,
                     break;
 #endif
                 case CX_CURVE_SECP256R1:
-                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_NISTP256);
+                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_SECP256R1);
                     break;
                 case CX_CURVE_Ed25519:
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_Ed25519);

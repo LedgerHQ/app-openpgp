@@ -207,7 +207,7 @@ enum {
 #ifdef WITH_SUPPORT_RSA4096
     TOKEN_TYPE_RSA4096,
 #endif
-    TOKEN_TYPE_SECP256K1,
+    TOKEN_TYPE_SECP256R1,
     TOKEN_TYPE_Ed25519,
     TOKEN_TYPE_BACK
 };
@@ -217,7 +217,7 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
 #ifdef WITH_SUPPORT_RSA4096
                                            LABEL_RSA4096,
 #endif
-                                           LABEL_SECP256K1,
+                                           LABEL_SECP256R1,
                                            LABEL_Ed25519};
 
 static uint32_t _getKeyType(const uint8_t key) {
@@ -260,7 +260,7 @@ static uint32_t _getKeyType(const uint8_t key) {
             tag = attributes[1];
             switch (tag) {
                 case 0x2A:
-                    token = TOKEN_TYPE_SECP256K1;
+                    token = TOKEN_TYPE_SECP256R1;
                     break;
                 case 0x2B:
                     token = TOKEN_TYPE_Ed25519;
@@ -268,7 +268,7 @@ static uint32_t _getKeyType(const uint8_t key) {
             }
             break;
         case KEY_ID_ECDSA:
-            token = TOKEN_TYPE_SECP256K1;
+            token = TOKEN_TYPE_SECP256R1;
             break;
         case KEY_ID_EDDSA:
             token = TOKEN_TYPE_Ed25519;
@@ -315,7 +315,7 @@ static void template_key_cb(int token, uint8_t index) {
                 oid_len = 6;
                 break;
 
-            case TOKEN_TYPE_SECP256K1:
+            case TOKEN_TYPE_SECP256R1:
                 if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
                     attributes.value[0] = KEY_ID_ECDH;
                 } else {
@@ -409,8 +409,8 @@ static void ui_settings_template(void) {
                 bar.subText = PIC(LABEL_RSA4096);
                 break;
 #endif
-            case TOKEN_TYPE_SECP256K1:
-                bar.subText = PIC(LABEL_SECP256K1);
+            case TOKEN_TYPE_SECP256R1:
+                bar.subText = PIC(LABEL_SECP256R1);
                 break;
             case TOKEN_TYPE_Ed25519:
                 bar.subText = PIC(LABEL_Ed25519);
