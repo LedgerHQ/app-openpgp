@@ -590,7 +590,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     UNUSED(value);
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
     gpg_key_t *dest = NULL;
-    const unsigned char *oid;
+    const unsigned char *oid = NULL;
     unsigned int oid_len;
 
     memset(&attributes, 0, sizeof(attributes));

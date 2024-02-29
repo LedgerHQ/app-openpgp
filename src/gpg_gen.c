@@ -304,7 +304,6 @@ int gpg_apdu_gen() {
         case GEN_ASYM_KEY_SEED:
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
-                // RSA
                 sw = gpg_gen_rsa_kyey(keygpg, name);
                 if (sw != SW_OK) {
                     break;
@@ -312,7 +311,6 @@ int gpg_apdu_gen() {
             } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
                        (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
                        (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
-                // ECC
                 sw = gpg_gen_ecc_kyey(keygpg, name);
                 if (sw != SW_OK) {
                     break;
@@ -323,12 +321,10 @@ int gpg_apdu_gen() {
         // --- read pubkey ---
         case READ_ASYM_KEY:
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
-                // read RSA
                 sw = gpg_read_rsa_kyey(keygpg);
             } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
                        (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
                        (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
-                // read ECC
                 sw = gpg_read_ecc_kyey(keygpg);
             }
             l = G_gpg_vstate.io_length;

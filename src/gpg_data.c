@@ -395,7 +395,6 @@ int gpg_apdu_put_data(unsigned int ref) {
                 break;
             }
 
-            // --- RSA KEY ---
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 unsigned int e = 0;
                 unsigned char *p, *q, *pq;
@@ -476,14 +475,13 @@ int gpg_apdu_put_data(unsigned int ref) {
                 }
                 sw = SW_OK;
             }
-            // --- ECC KEY ---
             else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
                      (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
                      (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
                 unsigned int curve;
 
                 curve = gpg_oid2curve(&keygpg->attributes.value[1], keygpg->attributes.length - 1);
-                if (curve == 0) {
+                if (curve == CX_CURVE_NONE) {
                     sw = SW_WRONG_DATA;
                     break;
                 }
@@ -801,8 +799,8 @@ end:
 // cmd
 // resp  TID API COMPAT len_pub len_priv priv
 int gpg_apdu_get_key_data(unsigned int ref) {
-    cx_aes_key_t keyenc;
-    gpg_key_t *keygpg;
+    cx_aes_key_t keyenc = {0};
+    gpg_key_t *keygpg = NULL;
     unsigned int len = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
     int sw = SW_UNKNOWN;
@@ -832,7 +830,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
 
     // encrypted part
     switch (keygpg->attributes.value[0]) {
-        case KEY_ID_RSA:  // RSA
+        case KEY_ID_RSA:
             // insert pubkey
             gpg_io_insert_u32(4);
             gpg_io_insert(keygpg->pub_key.rsa, 4);
@@ -853,7 +851,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             sw = SW_OK;
             break;
 
-        case KEY_ID_ECDH:  // ECC
+        case KEY_ID_ECDH:
         case KEY_ID_ECDSA:
         case KEY_ID_EDDSA:
             // insert pubkey
@@ -889,10 +887,9 @@ end:
 // cmd   TID API COMPAT len_pub len_priv priv
 // resp  -
 int gpg_apdu_put_key_data(unsigned int ref) {
-    cx_aes_key_t keyenc;
-    gpg_key_t *keygpg;
-    unsigned int len;
-    unsigned int offset;
+    cx_aes_key_t keyenc = {0};
+    gpg_key_t *keygpg = NULL;
+    unsigned int len = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
     int sw = SW_UNKNOWN;
 
@@ -920,7 +917,6 @@ int gpg_apdu_put_key_data(unsigned int ref) {
     gpg_io_fetch_u32();
 
     switch (keygpg->attributes.value[0]) {
-        // RSA
         case KEY_ID_RSA:
             // insert pubkey
             len = gpg_io_fetch_u32();
@@ -955,8 +951,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             sw = SW_OK;
             break;
 
-        // ECC
-        case KEY_ID_ECDH:  // ECC
+        case KEY_ID_ECDH:
         case KEY_ID_ECDSA:
         case KEY_ID_EDDSA:
             // insert pubkey

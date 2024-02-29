@@ -237,7 +237,6 @@ static uint32_t _getKeyType(const uint8_t key) {
     }
     switch (attributes[0]) {
         case KEY_ID_RSA:
-            // RSA
             tag = U2BE(attributes, 1);
             switch (tag) {
                 case 2048:
