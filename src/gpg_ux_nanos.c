@@ -621,7 +621,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
                 attributes.value[0] = KEY_ID_ECDSA;
             }
             oid = gpg_curve2oid(G_gpg_vstate.ux_type, &oid_len);
-            memmove(attributes.value + 1, oid, sizeof(oid_len));
+            memmove(attributes.value + 1, oid, oid_len);
             attributes.length = 1 + oid_len;
             break;
 
