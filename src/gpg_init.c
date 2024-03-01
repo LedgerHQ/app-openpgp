@@ -40,12 +40,9 @@ const unsigned char C_OID_SECP384R1[5] = {
 const unsigned char C_OID_SECP521R1[5] = {
   0x2B, 0x81, 0x04, 0x00, 0x23
 };
-
-//secp256k1: 1.3.132.0.10
-const unsigned char C_OID_SECP256K1[5] = {
-  0x2B, 0x81, 0x04, 0x00, 0x0A
-};
 */
+// secp256k1: 1.3.132.0.10
+const unsigned char C_OID_SECP256K1[5] = {0x2B, 0x81, 0x04, 0x00, 0x0A};
 
 /*
 //brainpool 256t1: 1.3.36.3.3.2.8.1.1.8
@@ -97,20 +94,23 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
     if ((len == sizeof(C_OID_SECP256R1)) && (memcmp(oid, C_OID_SECP256R1, len) == 0)) {
         return CX_CURVE_SECP256R1;
     }
-    /*
-    if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
-      return CX_CURVE_SECP256K1;
-    }
 
+    if ((len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len) == 0)) {
+        return CX_CURVE_SECP256K1;
+    }
+    /*
     if ( (len == sizeof(C_OID_SECP384R1)) && (memcmp(oid, C_OID_SECP384R1, len)==0) ) {
       return CX_CURVE_SECP384R1;
     }
     if ( (len == sizeof(C_OID_SECP521R1)) && (memcmp(oid, C_OID_SECP521R1, len)==0) ) {
       return CX_CURVE_SECP521R1;
     }
-   */
+    */
 
     /*
+    if ( (len == sizeof(C_OID_BRAINPOOL256T1)) && (memcmp(oid, C_OID_BRAINPOOL256T1, len)==0) ) {
+      return CX_CURVE_BrainPoolP256T1;
+    }
     if ( (len == sizeof(C_OID_BRAINPOOL256R1)) && (memcmp(oid, C_OID_BRAINPOOL256R1, len)==0) ) {
       return CX_CURVE_BrainPoolP256R1;
     }
@@ -120,7 +120,7 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
     if ( (len == sizeof(C_OID_BRAINPOOL512R1)) && (memcmp(oid, C_OID_BRAINPOOL512R1, len)==0) ) {
       return CX_CURVE_BrainPoolP512R1;
     }
-   */
+    */
     if ((len == sizeof(C_OID_Ed25519)) && (memcmp(oid, C_OID_Ed25519, len) == 0)) {
         return CX_CURVE_Ed25519;
     }
@@ -129,14 +129,6 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
         return CX_CURVE_Curve25519;
     }
 
-    /*
-    if ( (len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len)==0) ) {
-      return CX_CURVE_256K1;
-    }
-    if ( (len == sizeof(C_OID_BRAINPOOL256T1)) && (memcmp(oid, C_OID_BRAINPOOL256T1, len)==0) ) {
-      return CX_CURVE_BrainPoolP256T1;
-    }
-    */
     return CX_CURVE_NONE;
 }
 
@@ -146,11 +138,11 @@ unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
             *len = sizeof(C_OID_SECP256R1);
             return (unsigned char *) PIC(C_OID_SECP256R1);
 
-        /*
         case CX_CURVE_SECP256K1:
-          *len = sizeof(C_OID_SECP256K1);
-          return   (unsigned char*)PIC(C_OID_SECP256K1);
+            *len = sizeof(C_OID_SECP256K1);
+            return (unsigned char *) PIC(C_OID_SECP256K1);
 
+        /*
         case CX_CURVE_SECP384R1:
           *len = sizeof(C_OID_SECP384R1);
           return   (unsigned char*)PIC(C_OID_SECP384R1);
@@ -188,6 +180,7 @@ unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
 
 unsigned int gpg_curve2domainlen(unsigned int cv) {
     switch (cv) {
+        case CX_CURVE_SECP256K1:
         case CX_CURVE_SECP256R1:
         case CX_CURVE_Ed25519:
         case CX_CURVE_Curve25519:

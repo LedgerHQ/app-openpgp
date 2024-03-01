@@ -51,9 +51,9 @@ This specification is available in doc directory at [G10CODE]_.
 The application supports:
 
 - RSA with key up to 3072 bits
-- ECDSA with secp256R1
+- ECDSA with secp256R1 and secp256K1
 - EDDSA with Ed25519 curve
-- ECDH with secp256R1 and curve25519 curves
+- ECDH with secp256R1, secp256K1 and curve25519 curves
 
 This release has known missing parts (see also [GPGADD]_):
 
@@ -290,6 +290,7 @@ This 3 commands fix, in that order, the template for Signature, Decryption, Auth
 Supported curve name are:
 
 - secp256k1 with tag 19
+- secp256r1 with tag 19
 - nistp256 with tag 19
 - cv25519 (only for key 2)
 - ed25519  with tag 22 (only for key 1 and 3)
