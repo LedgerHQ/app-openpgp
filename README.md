@@ -321,3 +321,11 @@ It outputs 3 artifacts:
 
 - `compiled_app_binaries` within binary files of the build process for each device
 - `code-coverage` within HTML details of code coverage
+
+## Known limitations
+
+Today, the current App has some known limitations.
+
+- RSA4096 is disabled, because of an issue with the watchdog, resetting the device
+  during long prime number operation.
+- Using Ed25519 template, the decrypt doesn't output a correct result.
