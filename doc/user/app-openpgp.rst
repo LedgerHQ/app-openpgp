@@ -50,10 +50,10 @@ This specification is available in doc directory at [G10CODE]_.
 
 The application supports:
 
-- RSA with key up to 4096 bits
-- ECDSA with secp256k1, secp256r1, brainpool 256r1 and brainpool 256t1 curves
+- RSA with key up to 3072 bits
+- ECDSA with secp256R1
 - EDDSA with Ed25519 curve
-- ECDH with secp256k1, secp256r1, brainpool 256r1, brainpool 256t1 and curve25519 curves
+- ECDH with secp256R1 and curve25519 curves
 
 This release has known missing parts (see also [GPGADD]_):
 
@@ -154,8 +154,7 @@ The full menu layout is:
  |         Choose Type...
  |             RSA 2048
  |             RSA 3072
- |             RSA 4096
- |             NIST P256
+ |             SECP 256R1
  |             ED25519
  |         Set Template
  |     Seed mode *ON/OFF*
@@ -1100,7 +1099,7 @@ The *usage* field tells you each key purpose:
 The *card-no* field provides you with the serial number of the card on which the key are stored.
 You should have 3 or less keys with the same serial. These are the keys we want to restore.
 
-For each key you also have the key template (*rsa2048*, *rsa3072*, *rsa4096*, *ed2559*, *cv25519*) followed by the
+For each key you also have the key template (*rsa2048*, *rsa3072*, *ed2559*, *cv25519*) followed by the
 short fingerprint, e.g. ``ed25519/8451AAF7D43D1095``
 
 Please note the serial and the 3 key template names: ``FD6C11BE`` , ``ed25519:cv25519:ed25519``.
@@ -1465,7 +1464,7 @@ Its usage is:
  |  ``--set-templates SIG:DEC:AUT``
  |                        ``Set template identifier for selected 'key-type'``
  |                        ``If 'key-type' is not specified, set for all keys (SIG:DEC:AUT)``
- |                        ``Valid values are rsa2048, rsa3072, rsa4096, nistp256, ed25519, cv25519``
+ |                        ``Valid values are rsa2048, rsa3072, nistp256, ed25519, cv25519``
  |  ``--seed-key            Regenerate all keys, based on seed mode``
  |  ``--file FILE           Public Key export file (default is 'pubkey')``
 

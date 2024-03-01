@@ -65,7 +65,6 @@ static void gpg_pso_reset_PW1() {
 }
 
 static int gpg_sign(gpg_key_t *sigkey) {
-    // --- RSA
     cx_err_t error = CX_INTERNAL_ERROR;
     if (sigkey->attributes.value[0] == KEY_ID_RSA) {
         cx_rsa_private_key_t *key = NULL;
@@ -78,9 +77,11 @@ static int gpg_sign(gpg_key_t *sigkey) {
             case 3072 / 8:
                 key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa3072;
                 break;
+#ifdef WITH_SUPPORT_RSA4096
             case 4096 / 8:
                 key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa4096;
                 break;
+#endif
             default:
                 break;
         }
@@ -113,7 +114,6 @@ static int gpg_sign(gpg_key_t *sigkey) {
         gpg_pso_reset_PW1();
         return SW_OK;
     }
-    // --- ECDSA/EdDSA
     if ((sigkey->attributes.value[0] == KEY_ID_ECDSA) ||
         (sigkey->attributes.value[0] == KEY_ID_EDDSA)) {
         cx_ecfp_private_key_t *key;
@@ -223,7 +223,7 @@ int gpg_apdu_pso() {
         // --- PSO:ENC ---
         case PSO_ENC: {
             unsigned int msg_len;
-            cx_aes_key_t *key;
+            cx_aes_key_t *key = NULL;
             key = &G_gpg_vstate.kslot->AES_dec;
             if (!(key->size != 16)) {
                 return SW_CONDITIONS_NOT_SATISFIED;
@@ -252,7 +252,7 @@ int gpg_apdu_pso() {
             switch (pad_byte) {
                 // --- PSO:DEC:RSA
                 case 0x00: {
-                    cx_rsa_private_key_t *key;
+                    cx_rsa_private_key_t *key = NULL;
                     if (G_gpg_vstate.mse_dec->attributes.value[0] != KEY_ID_RSA) {
                         return SW_CONDITIONS_NOT_SATISFIED;
                     }
@@ -265,9 +265,11 @@ int gpg_apdu_pso() {
                         case 3072 / 8:
                             key = (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa3072;
                             break;
+#ifdef WITH_SUPPORT_RSA4096
                         case 4096 / 8:
                             key = (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa4096;
                             break;
+#endif
                     }
 
                     if ((key == NULL) || (key->size != ksz)) {

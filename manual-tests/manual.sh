@@ -10,6 +10,7 @@ dirName=$(dirname "${exeName}")
 gnupg_home_dir="$(realpath "${dirName}/gnupg")"
 
 VERBOSE=false
+EXPERT=false
 
 #===============================================================================
 #
@@ -23,7 +24,8 @@ help() {
   echo
   echo "Options:"
   echo
-  echo "  -c <init|card|encrypt|decryptsign|verify>  : Requested command"
+  echo "  -c <init|reset|card|encrypt|decryptsign|verify>  : Requested command"
+  echo "  -e     : Expert mode mode"
   echo "  -v     : Verbose mode"
   echo "  -h     : Displays this help"
   echo
@@ -32,10 +34,10 @@ help() {
 
 #===============================================================================
 #
-#     kill_process - Kill running process, ensure clear next operation
+#     reset - Kill running process, ensure clear next operation
 #
 #===============================================================================
-kill_process() {
+reset() {
   # Kill running process
   killall scdaemon gpg-agent 2>/dev/null
 }
@@ -46,7 +48,7 @@ kill_process() {
 #
 #===============================================================================
 init() {
-  kill_process
+  reset
 
   # Cleanup old gnupg home directory
   dir=$(basename "${gnupg_home_dir}")
@@ -68,8 +70,11 @@ init() {
 #
 #===============================================================================
 card() {
+  local expert_mode=""
 
-  gpg --homedir "${gnupg_home_dir}" --card-edit
+  [[ ${EXPERT} == true ]] && expert_mode="--expert"
+
+  gpg --homedir "${gnupg_home_dir}" ${expert_mode} --card-edit
 }
 
 #===============================================================================
@@ -79,7 +84,8 @@ card() {
 #===============================================================================
 encrypt() {
   local recipient=""
-  kill_process
+  local verbose_mode=""
+  reset
   rm -fr foo*
   echo CLEAR > foo.txt
 
@@ -98,8 +104,9 @@ encrypt() {
 #
 #===============================================================================
 decrypt() {
+  local verbose_mode=""
 
-  kill_process
+  reset
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
@@ -121,8 +128,9 @@ decrypt() {
 #
 #===============================================================================
 sign() {
+  local verbose_mode=""
 
-  kill_process
+  reset
   rm -fr foo*
   echo CLEAR > foo.txt
 
@@ -137,8 +145,9 @@ sign() {
 #
 #===============================================================================
 verify() {
+  local verbose_mode=""
 
-  kill_process
+  reset
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
@@ -156,12 +165,12 @@ if (($# < 1)); then
   help
 fi
 
-while getopts ":c:vh" opt; do
+while getopts ":c:evh" opt; do
   case $opt in
 
     c)
       case ${OPTARG} in
-        init|card|encrypt|decrypt|sign|verify)
+        init|reset|card|encrypt|decrypt|sign|verify)
           CMD=${OPTARG}
           ;;
         *)
@@ -171,6 +180,7 @@ while getopts ":c:vh" opt; do
       esac
       ;;
 
+    e)  EXPERT=true ;;
     v)  VERBOSE=true ;;
     h)  help ;;
 

@@ -56,7 +56,7 @@ const unsigned char C_OID_BRAINPOOL256T1[9] = {
 const unsigned char C_OID_BRAINPOOL256R1[9] = {
   0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x08
 };
-//brainpool 284r1: 1.3.36.3.3.2.8.1.1.11
+//brainpool 384r1: 1.3.36.3.3.2.8.1.1.11
 const unsigned char C_OID_BRAINPOOL384R1[9] = {
    0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0B
 };
@@ -66,7 +66,7 @@ const unsigned char C_OID_BRAINPOOL512R1[9] = {
 };
 */
 
-// Ed25519/curve25519: 1.3.6.1.4.1.11591.15.1
+// "twisted" curve25519 for Ed25519: 1.3.6.1.4.1.11591.15.1
 const unsigned char C_OID_Ed25519[9] = {
     0x2B,
     0x06,
@@ -79,7 +79,7 @@ const unsigned char C_OID_Ed25519[9] = {
     0x01,
 };
 
-// Ed25519/curve25519: 1.3.6.1.4.1.11591.15.1
+// "Montgomery" curve25519 for X25519: 1.3.6.1.4.1.11591.1.5.1
 const unsigned char C_OID_cv25519[10] = {
     0x2B,
     0x06,

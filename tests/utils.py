@@ -22,7 +22,7 @@ ROOT_SCREENSHOT_PATH = Path(__file__).parent.resolve()
 KEY_TEMPLATES = {
     "rsa2048" : "010800002001",
     "rsa3072" : "010C00002001",
-    "rsa4096" : "011000002001",
+    # "rsa4096" : "011000002001", Not supported yet
     "nistp256": "132A8648CE3D030107",
     "ed25519" : "162B06010401DA470F01",
     "cv25519" : "122B060104019755010501"

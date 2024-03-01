@@ -93,9 +93,11 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
         case 3072 / 8:
             pkey_size = sizeof(cx_rsa_3072_private_key_t);
             break;
+#ifdef WITH_SUPPORT_RSA4096
         case 4096 / 8:
             pkey_size = sizeof(cx_rsa_4096_private_key_t);
             break;
+#endif
         default:
             break;
     }
@@ -164,12 +166,16 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa3072.n);
             break;
+#ifdef WITH_SUPPORT_RSA4096
         case 4096 / 8:
             if (keygpg->priv_key.rsa4096.size == 0) {
                 return SW_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa4096.n);
             break;
+#endif
+        default:
+            return SW_REFERENCED_DATA_NOT_FOUND;
     }
     gpg_io_insert_tlv(0x82, 4, keygpg->pub_key.rsa);
 
@@ -224,7 +230,7 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     uint32_t i, len;
     cx_err_t error = CX_INTERNAL_ERROR;
 
-    if (keygpg->pub_key.ecfp256.W_len == 0) {
+    if (keygpg->pub_key.ecfp.W_len == 0) {
         return SW_REFERENCED_DATA_NOT_FOUND;
     }
     gpg_io_discard(1);
@@ -232,23 +238,23 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
     if (curve == CX_CURVE_Ed25519) {
         memmove(G_gpg_vstate.work.io_buffer + 128,
-                keygpg->pub_key.ecfp256.W,
-                keygpg->pub_key.ecfp256.W_len);
+                keygpg->pub_key.ecfp.W,
+                keygpg->pub_key.ecfp.W_len);
         CX_CHECK(cx_edwards_compress_point_no_throw(CX_CURVE_Ed25519,
                                                     G_gpg_vstate.work.io_buffer + 128,
                                                     65));
         gpg_io_insert_tlv(0x86, 32,
                           G_gpg_vstate.work.io_buffer + 129);  // 129: discard 02
     } else if (curve == CX_CURVE_Curve25519) {
-        len = keygpg->pub_key.ecfp256.W_len - 1;
+        len = keygpg->pub_key.ecfp.W_len - 1;
         for (i = 0; i <= len; i++) {
-            G_gpg_vstate.work.io_buffer[128 + i] = keygpg->pub_key.ecfp256.W[len - i];
+            G_gpg_vstate.work.io_buffer[128 + i] = keygpg->pub_key.ecfp.W[len - i];
         }
         gpg_io_insert_tlv(0x86, 32, G_gpg_vstate.work.io_buffer + 128);
     } else {
         gpg_io_insert_tlv(0x86,
-                          keygpg->pub_key.ecfp256.W_len,
-                          (unsigned char *) &keygpg->pub_key.ecfp256.W);
+                          keygpg->pub_key.ecfp.W_len,
+                          (unsigned char *) &keygpg->pub_key.ecfp.W);
     }
     return SW_OK;
 
@@ -304,7 +310,6 @@ int gpg_apdu_gen() {
         case GEN_ASYM_KEY_SEED:
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
-                // RSA
                 sw = gpg_gen_rsa_kyey(keygpg, name);
                 if (sw != SW_OK) {
                     break;
@@ -312,7 +317,6 @@ int gpg_apdu_gen() {
             } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
                        (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
                        (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
-                // ECC
                 sw = gpg_gen_ecc_kyey(keygpg, name);
                 if (sw != SW_OK) {
                     break;
@@ -323,12 +327,10 @@ int gpg_apdu_gen() {
         // --- read pubkey ---
         case READ_ASYM_KEY:
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
-                // read RSA
                 sw = gpg_read_rsa_kyey(keygpg);
             } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
                        (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
                        (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
-                // read ECC
                 sw = gpg_read_ecc_kyey(keygpg);
             }
             l = G_gpg_vstate.io_length;
