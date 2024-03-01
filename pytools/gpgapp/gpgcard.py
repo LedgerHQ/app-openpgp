@@ -330,7 +330,7 @@ class GPGCard() :
         self.get_all()
         with open(file_name, mode="w+b") as f:
             pickle.dump(
-                (self.data.AID, self.data.PW_status, self.data.rsa_pub_exp,
+                (self.data.AID, self.data.PW_status, self.data.rsa_pub_exp, self.data.digital_counter,
                 self.data.private_01, self.data.private_02,
                 self.data.private_03, self.data.private_04,
                 self.data.name, self.data.login, self.data.salutation, self.data.url, self.data.lang,
@@ -351,7 +351,7 @@ class GPGCard() :
         """
 
         with open(file_name, mode="r+b") as f:
-            (self.data.AID, self.data.PW_status, self.data.rsa_pub_exp,
+            (self.data.AID, self.data.PW_status, self.data.rsa_pub_exp, self.data.digital_counter,
             self.data.private_01, self.data.private_02, self.data.private_03, self.data.private_04,
             self.data.name, self.data.login, self.data.salutation, self.data.url, self.data.lang,
             self.data.sig.key, self.data.sig.uif, self.data.sig.attribute, self.data.sig.date,
@@ -373,7 +373,11 @@ class GPGCard() :
         self._put_data(DataObject.DO_LOGIN,      self.data.login.encode("utf-8"))
         self._put_data(DataObject.DO_CARD_LANG,  self.data.lang.encode("utf-8"))
         self._put_data(DataObject.DO_URL,        self.data.url.encode("utf-8"))
-        self._put_data(DataObject.DO_CARD_SALUTATION, bytes.fromhex(USER_SALUTATION[self.data.salutation]))
+        if len(self.data.salutation) == 0:
+            self._put_data(DataObject.DO_CARD_SALUTATION, b'\x30')
+        else:
+            self._put_data(DataObject.DO_CARD_SALUTATION,
+                           bytes.fromhex(USER_SALUTATION[self.data.salutation]))
 
         self._put_data(DataObject.DO_SIG_ATTR,   self.data.sig.attribute)
         self._put_data(DataObject.DO_DEC_ATTR,   self.data.dec.attribute)
@@ -384,7 +388,35 @@ class GPGCard() :
         self._put_data(DataObject.DO_UIF_AUT,    self.data.aut.uif.to_bytes(2, "little"))
 
         self._put_data(DataObject.DO_SIG_COUNT,  self.data.digital_counter.to_bytes(4, "big"))
-        self._put_data(DataObject.CMD_RSA_EXP,   self.data.rsa_pub_exp.to_bytes(4, "big"))
+        self._put_data(DataObject.CMD_RSA_EXP,   self.data.rsa_pub_exp.to_bytes(4, "little"))
+
+        self._put_data(DataObject.DO_CERT, self.data.aut.cert.encode("utf-8"))
+        self._put_data(DataObject.DO_CERT, self.data.dec.cert.encode("utf-8"))
+        self._put_data(DataObject.DO_CERT, self.data.sig.cert.encode("utf-8"))
+
+        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint)
+        self._put_data(DataObject.DO_FINGERPRINT_WR_SIG, self.data.sig.fingerprint)
+        date = str(self.data.sig.date)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        bdate = int(dt.timestamp()).to_bytes(4, "big")
+        self._put_data(DataObject.DO_DATES_WR_SIG, bdate)
+        self._put_data(DataObject.DO_SIG_KEY, self.data.sig.key)
+
+        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
+        self._put_data(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
+        date = str(self.data.dec.date)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        bdate = int(dt.timestamp()).to_bytes(4, "big")
+        self._put_data(DataObject.DO_DATES_WR_DEC, bdate)
+        self._put_data(DataObject.DO_DEC_KEY, self.data.dec.key)
+
+        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
+        self._put_data(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
+        date = str(self.data.aut.date)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        bdate = int(dt.timestamp()).to_bytes(4, "big")
+        self._put_data(DataObject.DO_DATES_WR_AUT, bdate)
+        self._put_data(DataObject.DO_AUT_KEY, self.data.aut.key)
 
 
     def export_pub_key(self, pubkey: dict, file_name: str) -> None:
@@ -810,13 +842,13 @@ class GPGCard() :
         return self.data.rsa_pub_exp
 
     def get_key_cert(self, key: str) -> str:
-        """Get key fingerprint
+        """Get key Certificate
 
         Args:
             key (str): Key type (SIG, DC, AUT)
 
         Return:
-            Key Fingerprint
+            Key Certificate
         """
 
         return self._get_key_object(key).cert

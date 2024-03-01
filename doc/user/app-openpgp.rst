@@ -310,9 +310,9 @@ Seed mode
 When generating new keys on the device, those keys can be generated randomly or in a deterministic way.
 The deterministic way is specified in [GPGADD]_.
 The current mode is displayed in the first sub menu.
-To activate the seeded mode select *ON*, to deactivate the seeded mode select *OFF*.
+To activate the seed mode select *ON*, to deactivate the seed mode select *OFF*.
 
-When the application starts, the seeded mode is always set to *ON*
+When the application starts, the seed mode is always set to *ON*
 
 PIN mode
 ~~~~~~~~
@@ -1059,6 +1059,9 @@ The backup/restore tool is located in ``pytools`` directory.
 
 See `Tools` later in this document for the tools details and usage.
 
+Note: The keys backup will work *only* if the SEED Mode is enabled!
+
+
 Restore without backup
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1375,40 +1378,11 @@ Tools
 
 There are 2 tools provided:
 
-- ``backup.py``: Backup and Restore of the configuration
 - ``gpgcli.py``: General test tool
+- ``backup.py``: Backup and Restore of the configuration
 
 If you encounter an error when performing the backup/restore, reload your scdaemon with
 ``gpgconf --reload scdaemon``
-
-Backup tool
------------
-
-The tool usage is the following:
-
- | ``$ ./backup.py --help``
- | ``usage: backup.py [-h] [--reader READER] [--slot {1,2,3}] [--pinpad] --adm-pin PIN --user-pin PIN [--restore] [--file FILE]``
- |
- | ``Backup/Restore OpenPGP App configuration``
- |
- | ``options:``
- |  ``-h, --help       show this help message and exit``
- |  ``--reader READER  PCSC reader name (default is 'Ledger')``
- |  ``--slot {1,2,3}   Select slot (1 to 3)``
- |  ``--pinpad         PIN validation will be delegated to pinpad``
- |  ``--adm-pin PIN    Admin PIN (if pinpad not used)``
- |  ``--user-pin PIN   User PIN (if pinpad not used)``
- |  ``--restore        Perform a Restore instead of Backup``
- |  ``--file FILE      Backup/Restore file (default is 'gpg_backup')``
- |
- | ``Keys restore is only possible with SEED mode...``
-
-To perform a backup, simply use the tool like this:
-
- | ``$ ./backup.py --adm-pin 12345678 --user-pin 123456``
- | ``Connect to card 'Ledger'...``
- | ``Configuration saved in file 'gpg_backup'.``
-
 
 Test command line tool
 ----------------------
@@ -1482,7 +1456,7 @@ Sample output to get Card information:
  |   ``- Manufacturer      : 2C97``
  |   ``- Serial            : E1A67CBF``
  | ``=============== Historical Bytes ===============``
- |  ``- historical bytes    : 0031c573c001800790000000000000``
+ |  ``- historical bytes    : 0031c573c001800000000000059000``
  | ``=============== Max Extended Length ===============``
  |  ``- Command             : 254``
  |  ``- Response            : 254``
@@ -1567,6 +1541,41 @@ Sample output to get Card information:
  |     ``* Public exp      : 0x010001``
  |     ``* Private key size: 1040``
 
+
+Backup tool
+-----------
+
+The tool usage is the following:
+
+ | ``$ ./backup.py --help``
+ | ``usage: backup.py [-h] [--reader READER] [--slot {1,2,3}] [--pinpad] --adm-pin PIN --user-pin PIN [--restore] [--file FILE]``
+ |
+ | ``Backup/Restore OpenPGP App configuration``
+ |
+ | ``options:``
+ |  ``-h, --help       show this help message and exit``
+ |  ``--reader READER  PCSC reader name (default is 'Ledger')``
+ |  ``--slot {1,2,3}   Select slot (1 to 3)``
+ |  ``--pinpad         PIN validation will be delegated to pinpad``
+ |  ``--adm-pin PIN    Admin PIN (if pinpad not used)``
+ |  ``--user-pin PIN   User PIN (if pinpad not used)``
+ |  ``--restore        Perform a Restore instead of Backup``
+ |  ``--file FILE      Backup/Restore file (default is 'gpg_backup')``
+ |
+ | ``Keys restore is only possible with SEED mode...``
+
+To perform a backup, simply use the tool like this:
+
+ | ``$ ./backup.py --adm-pin 12345678 --user-pin 123456``
+ | ``Connect to card 'Ledger'...``
+ | ``Configuration saved in file 'gpg_backup'.``
+
+Once the configuration is restored, just use the previous tool to re-generate the seeded keys:
+
+ | ``./gpgcli.py --user-pin 123456 --adm-pin 12345678 --seed-key``
+ | ``Connect to card 'Ledger'...``
+ | ``Verify PINs...``
+ | ``Get card info...``
 
 Annexes
 =======
