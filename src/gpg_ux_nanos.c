@@ -1002,11 +1002,9 @@ const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
         explicit_bzero(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu));
         if (element->component.userid == 0x21) {
             memmove(G_gpg_vstate.menu, (void *) (N_gpg_pstate->name.value), 12);
-            if (G_gpg_vstate.menu[0] == 0) {
-                strlcpy(G_gpg_vstate.menu, "<No Name>", 9);
-            } else {
+            if (G_gpg_vstate.menu[0] != 0) {
                 for (int i = 0; i < 12; i++) {
-                    if (G_gpg_vstate.menu[i] == '<') {
+                    if ((G_gpg_vstate.menu[i] == '<') || (G_gpg_vstate.menu[i] == '>')) {
                         G_gpg_vstate.menu[i] = ' ';
                     }
                 }

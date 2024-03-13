@@ -96,7 +96,7 @@ void ui_init(void) {
     memmove(name, (void*) (N_gpg_pstate->name.value), 20);
     if (name[0] != 0) {
         for (int i = 0; i < 12; i++) {
-            if (name[i] == '<') {
+            if ((name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
         }

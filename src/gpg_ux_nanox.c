@@ -1207,11 +1207,9 @@ UX_FLOW(ux_flow_main,
 void ui_menu_main_predisplay() {
     explicit_bzero(G_gpg_vstate.ux_buff1, sizeof(G_gpg_vstate.ux_buff1));
     memmove(G_gpg_vstate.ux_buff1, (void *) (N_gpg_pstate->name.value), 20);
-    if (G_gpg_vstate.ux_buff1[0] == 0) {
-        strlcpy(G_gpg_vstate.ux_buff1, "<No Name>", 9);
-    } else {
+    if (G_gpg_vstate.ux_buff1[0] != 0) {
         for (int i = 0; i < 12; i++) {
-            if (G_gpg_vstate.ux_buff1[i] == '<') {
+            if ((G_gpg_vstate.menu[i] == '<') || (G_gpg_vstate.menu[i] == '>')) {
                 G_gpg_vstate.ux_buff1[i] = ' ';
             }
         }
