@@ -111,7 +111,7 @@ int gpg_apdu_get_data(unsigned int ref) {
 
             /* ----------------- aid, histo, ext_length, ... ----------------- */
         case 0x6E:
-            gpg_io_insert_tlv(0x4F, 16, (const unsigned char *) N_gpg_pstate->AID);
+            gpg_io_insert_tlv(0x4F, AID_LENGTH, (const unsigned char *) N_gpg_pstate->AID);
             memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6,
                     G_gpg_vstate.kslot->serial,
                     4);
@@ -743,7 +743,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                                               G_gpg_vstate.io_length,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
-            CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer + 16,
+            CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer + CX_AES_128_KEY_LEN,
                                               G_gpg_vstate.io_length,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
@@ -809,11 +809,11 @@ static int gpg_init_keyenc(cx_aes_key_t *keyenc) {
     if (sw != SW_OK) {
         return sw;
     }
-    sw = gpg_pso_derive_key_seed(seed, (unsigned char *) PIC("key "), 1, seed, 16);
+    sw = gpg_pso_derive_key_seed(seed, (unsigned char *) PIC("key "), 1, seed, CX_AES_BLOCK_SIZE);
     if (sw != SW_OK) {
         return sw;
     }
-    CX_CHECK(cx_aes_init_key_no_throw(seed, 16, keyenc));
+    CX_CHECK(cx_aes_init_key_no_throw(seed, CX_AES_BLOCK_SIZE, keyenc));
 
 end:
     if (error != CX_OK) {

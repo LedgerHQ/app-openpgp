@@ -242,7 +242,7 @@ int gpg_dispatch() {
 #ifdef GPG_LOG
         case INS_GET_LOG:
             gpg_io_discard(1);
-            gpg_io_insert(G_gpg_vstate.log_buffer, 32);
+            gpg_io_insert(G_gpg_vstate.log_buffer, sizeof(G_gpg_vstate.log_buffer));
             return SW_OK;
 #endif
 

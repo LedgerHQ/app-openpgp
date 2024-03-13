@@ -225,7 +225,7 @@ int gpg_apdu_pso() {
             unsigned int msg_len;
             cx_aes_key_t *key = NULL;
             key = &G_gpg_vstate.kslot->AES_dec;
-            if (!(key->size != 16)) {
+            if (!(key->size != CX_AES_128_KEY_LEN)) {
                 return SW_CONDITIONS_NOT_SATISFIED;
             }
             msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
@@ -238,7 +238,7 @@ int gpg_apdu_pso() {
                                      &ksz));
             // send
             gpg_io_discard(0);
-            G_gpg_vstate.work.io_buffer[0] = 0x02;
+            G_gpg_vstate.work.io_buffer[0] = PAD_AES;
             gpg_io_inserted(1 + ksz);
             return SW_OK;
         }
@@ -251,7 +251,7 @@ int gpg_apdu_pso() {
 
             switch (pad_byte) {
                 // --- PSO:DEC:RSA
-                case 0x00: {
+                case PAD_RSA: {
                     cx_rsa_private_key_t *key = NULL;
                     if (G_gpg_vstate.mse_dec->attributes.value[0] != KEY_ID_RSA) {
                         return SW_CONDITIONS_NOT_SATISFIED;
@@ -291,10 +291,10 @@ int gpg_apdu_pso() {
                 }
 
                 // --- PSO:DEC:AES
-                case 0x02: {
+                case PAD_AES: {
                     cx_aes_key_t *key;
                     key = &G_gpg_vstate.kslot->AES_dec;
-                    if (!(key->size != 16)) {
+                    if (!(key->size != CX_AES_128_KEY_LEN)) {
                         return SW_CONDITIONS_NOT_SATISFIED;
                     }
                     msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
@@ -312,7 +312,7 @@ int gpg_apdu_pso() {
                 }
 
                 // --- PSO:DEC:ECDH
-                case 0xA6: {
+                case PAD_ECDH: {
                     cx_ecfp_private_key_t *key;
                     unsigned int curve;
 

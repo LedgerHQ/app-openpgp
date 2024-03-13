@@ -41,6 +41,7 @@
 #define GPG_MIN_PW1_LENGTH 6
 #define GPG_MIN_PW3_LENGTH 8
 
+#define AID_LENGTH         16
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
 #ifdef TARGET_NANOS
@@ -52,6 +53,10 @@
 #define GPG_KEY_ATTRIBUTES_LENGTH 12
 
 #define GPG_RSA_DEFAULT_PUB 0x00010001U
+
+#ifndef CX_AES_128_KEY_LEN
+#define CX_AES_128_KEY_LEN CX_AES_BLOCK_SIZE
+#endif
 
 /* ---  Keys IDs  --- */
 // https://www.rfc-editor.org/rfc/rfc4880#section-9.1
@@ -160,7 +165,7 @@ struct gpg_nv_state_s {
 
     /* -- Application  Related Data -- */
     /*  4F */
-    unsigned char AID[16];
+    unsigned char AID[AID_LENGTH];
     /*  5F52 */
     unsigned char histo[HISTO_LENGTH];
 
@@ -292,7 +297,7 @@ struct gpg_v_state_s {
 #endif
 
 #ifdef GPG_LOG
-    unsigned char log_buffer[32];
+    unsigned char log_buffer[256];
 #endif
 };
 typedef struct gpg_v_state_s gpg_v_state_t;
@@ -367,6 +372,7 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define SW_INS_NOT_SUPPORTED             0x6d00
 #define SW_CLA_NOT_SUPPORTED             0x6e00
 #define SW_UNKNOWN                       0x6f00
+#define SW_CORRECT_BYTES_AVAILABLE       0x6100
 #define SW_OK                            0x9000
 
 /* ---  P1/P2 constants  --- */
@@ -393,5 +399,10 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define KEY_DEC 0xb8
 #define KEY_AUT 0xa4
 #define KEY_NB  3
+
+/* ---  Padding indicators  --- */
+#define PAD_RSA  0x00
+#define PAD_AES  0x02
+#define PAD_ECDH 0xa6
 
 #endif
