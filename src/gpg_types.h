@@ -287,9 +287,6 @@ struct gpg_v_state_s {
 #ifdef HAVE_NBGL
     char line[112];
     unsigned int ux_step;
-    unsigned int keypadIndex;
-    unsigned int hiddenDigitsIndex;
-    unsigned char pinLen;
     nbgl_layout_t *layoutCtx;
 #endif
 
