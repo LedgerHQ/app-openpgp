@@ -1208,7 +1208,7 @@ void ui_menu_main_predisplay() {
     explicit_bzero(G_gpg_vstate.ux_buff1, sizeof(G_gpg_vstate.ux_buff1));
     memmove(G_gpg_vstate.ux_buff1, (void *) (N_gpg_pstate->name.value), 20);
     if (G_gpg_vstate.ux_buff1[0] == 0) {
-        memmove(G_gpg_vstate.ux_buff1, "<No Name>", 9);
+        strlcpy(G_gpg_vstate.ux_buff1, "<No Name>", 9);
     } else {
         for (int i = 0; i < 12; i++) {
             if (G_gpg_vstate.ux_buff1[i] == '<') {

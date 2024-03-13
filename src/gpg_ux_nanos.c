@@ -1003,7 +1003,7 @@ const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
         if (element->component.userid == 0x21) {
             memmove(G_gpg_vstate.menu, (void *) (N_gpg_pstate->name.value), 12);
             if (G_gpg_vstate.menu[0] == 0) {
-                memmove(G_gpg_vstate.menu, "<No Name>", 9);
+                strlcpy(G_gpg_vstate.menu, "<No Name>", 9);
             } else {
                 for (int i = 0; i < 12; i++) {
                     if (G_gpg_vstate.menu[i] == '<') {
