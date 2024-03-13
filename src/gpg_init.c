@@ -31,12 +31,13 @@ const unsigned char C_MAGIC[8] = {'G', 'P', 'G', 'C', 'A', 'R', 'D', '3'};
 
 // secp256r1 / NIST P256 /ansi-x9.62 : 1.2.840.10045.3.1.7
 const unsigned char C_OID_SECP256R1[8] = {0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07};
-/*
-//secp384r1 / NIST P384 /ansi-x9.62 :1.3.132.0.34
+
+/* Unsupported (yet) Curves
+// secp384r1 / NIST P384 /ansi-x9.62 :1.3.132.0.34
 const unsigned char C_OID_SECP384R1[5] = {
   0x2B, 0x81, 0x04, 0x00 , 0x22
 };
-//secp521r1 / NIST P521 /ansi-x9.62 : 1.3.132.0.35
+// secp521r1 / NIST P521 /ansi-x9.62 : 1.3.132.0.35
 const unsigned char C_OID_SECP521R1[5] = {
   0x2B, 0x81, 0x04, 0x00, 0x23
 };
@@ -44,20 +45,20 @@ const unsigned char C_OID_SECP521R1[5] = {
 // secp256k1: 1.3.132.0.10
 const unsigned char C_OID_SECP256K1[5] = {0x2B, 0x81, 0x04, 0x00, 0x0A};
 
-/*
-//brainpool 256t1: 1.3.36.3.3.2.8.1.1.8
+/* Unsupported (yet) Curves
+// brainpool 256t1: 1.3.36.3.3.2.8.1.1.8
 const unsigned char C_OID_BRAINPOOL256T1[9] = {
   0x2B,0x24,0x03,0x03,0x02,0x08,0x01,0x01,0x07
 };
-//brainpool 256r1: 1.3.36.3.3.2.8.1.1.7
+// brainpool 256r1: 1.3.36.3.3.2.8.1.1.7
 const unsigned char C_OID_BRAINPOOL256R1[9] = {
   0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x08
 };
-//brainpool 384r1: 1.3.36.3.3.2.8.1.1.11
+// brainpool 384r1: 1.3.36.3.3.2.8.1.1.11
 const unsigned char C_OID_BRAINPOOL384R1[9] = {
    0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0B
 };
-//brainpool 512r1: 1.3.36.3.3.2.8.1.1.13
+// brainpool 512r1: 1.3.36.3.3.2.8.1.1.13
 const unsigned char C_OID_BRAINPOOL512R1[9] = {
   0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0D
 };
@@ -98,16 +99,14 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
     if ((len == sizeof(C_OID_SECP256K1)) && (memcmp(oid, C_OID_SECP256K1, len) == 0)) {
         return CX_CURVE_SECP256K1;
     }
-    /*
+    /* Unsupported (yet) Curves
     if ( (len == sizeof(C_OID_SECP384R1)) && (memcmp(oid, C_OID_SECP384R1, len)==0) ) {
       return CX_CURVE_SECP384R1;
     }
     if ( (len == sizeof(C_OID_SECP521R1)) && (memcmp(oid, C_OID_SECP521R1, len)==0) ) {
       return CX_CURVE_SECP521R1;
     }
-    */
 
-    /*
     if ( (len == sizeof(C_OID_BRAINPOOL256T1)) && (memcmp(oid, C_OID_BRAINPOOL256T1, len)==0) ) {
       return CX_CURVE_BrainPoolP256T1;
     }
@@ -142,7 +141,7 @@ unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
             *len = sizeof(C_OID_SECP256K1);
             return (unsigned char *) PIC(C_OID_SECP256K1);
 
-        /*
+        /* Unsupported (yet) Curves
         case CX_CURVE_SECP384R1:
           *len = sizeof(C_OID_SECP384R1);
           return   (unsigned char*)PIC(C_OID_SECP384R1);
@@ -150,9 +149,7 @@ unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
         case CX_CURVE_SECP521R1:
           *len = sizeof(C_OID_SECP521R1);
           return   (unsigned char*)PIC(C_OID_SECP521R1);
-        */
 
-        /*
         case CX_CURVE_BrainPoolP256R1:
           *len = sizeof(C_OID_SECP256R1);
           return   (unsigned char*)PIC(C_OID_SECP256R1);
@@ -455,7 +452,7 @@ void gpg_install(unsigned char app_state) {
         nvm_write((void *) (&N_gpg_pstate->config_pin), G_gpg_vstate.work.io_buffer, 1);
         gpg_activate_pinpad(3);
 
-        // default key template: RSA 2048)
+        // default key template
         for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
             gpg_install_slot((gpg_key_slot_t *) &N_gpg_pstate->keys[s]);
         }

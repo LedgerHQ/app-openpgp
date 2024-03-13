@@ -219,7 +219,7 @@ static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
 
     nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
     gpg_io_clear();
-    return SW_OK;
+    error = SW_OK;
 
 end:
     return error;
@@ -256,7 +256,7 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
                           keygpg->pub_key.ecfp.W_len,
                           (unsigned char *) &keygpg->pub_key.ecfp.W);
     }
-    return SW_OK;
+    error = SW_OK;
 
 end:
     return error;

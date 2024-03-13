@@ -379,7 +379,6 @@ int gpg_apdu_put_data(unsigned int ref) {
                     case 0x93:
                         len_q = l;
                         break;
-                        break;
                     case 0x94:
                     case 0x95:
                     case 0x96:
@@ -1007,12 +1006,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 sw = SW_CONDITIONS_NOT_SATISFIED;
                 break;
             }
-            if (len != GPG_IO_BUFFER_LENGTH) {
-                sw = SW_CONDITIONS_NOT_SATISFIED;
-                break;
-            }
 
-            PRINTF("[DATA] - put_key_data: key len: %d\n", len);
             gpg_io_discard(0);
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
@@ -1021,7 +1015,6 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                                      G_gpg_vstate.work.io_buffer,
                                      &ksz));
             if (len != ksz) {
-                PRINTF("[DATA] - put_key_data: Wrong aes output len: %d / %d\n", len, ksz);
                 sw = SW_WRONG_DATA;
                 break;
             }

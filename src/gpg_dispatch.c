@@ -249,7 +249,6 @@ int gpg_dispatch() {
             /* --- SELECT --- */
         case INS_SELECT:
             return gpg_apdu_select();
-            break;
 
             /* --- ACTIVATE/TERMINATE FILE --- */
         case INS_ACTIVATE_FILE:
@@ -258,17 +257,14 @@ int gpg_dispatch() {
                 gpg_install(STATE_ACTIVATE);
             }
             return SW_OK;
-            break;
 
         case INS_TERMINATE_DF:
             gpg_io_discard(0);
             if (gpg_pin_is_verified(PIN_ID_PW3) || (N_gpg_pstate->PW3.counter == 0)) {
                 gpg_install(STATE_TERMINATE);
                 return SW_OK;
-                break;
             }
             return SW_CONDITIONS_NOT_SATISFIED;
-            break;
     }
 
     /* Other commands allowed if not terminated */
@@ -283,12 +279,6 @@ int gpg_dispatch() {
     }
 
     switch (G_gpg_vstate.io_ins) {
-#ifdef GPG_DEBUG_APDU
-        case 0x42:
-            sw = debug_apdu();
-            break;
-#endif
-
         case INS_EXIT:
             os_sched_exit(0);
             sw = SW_OK;
