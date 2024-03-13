@@ -308,13 +308,11 @@ int gpg_dispatch() {
             }
             gpg_io_fetch_tl(&t, &l);
             if (t != 0x60) {
-                // TODO add l check
                 sw = SW_WRONG_DATA;
                 break;
             }
             gpg_io_fetch_tl(&t, &l);
             if (t != 0x5C) {
-                // TODO add l check
                 sw = SW_WRONG_DATA;
                 break;
             }
