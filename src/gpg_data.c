@@ -460,9 +460,9 @@ int gpg_apdu_put_data(unsigned int ref) {
                 p = G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset;
                 q = p + len_p;
                 memmove(pq + ksz - len_p, p, len_p);
-                memset(pq, 0, ksz - len_p);
+                explicit_bzero(pq, ksz - len_p);
                 memmove(pq + 2 * ksz - len_q, q, len_q);
-                memset(pq + ksz, 0, ksz - len_q);
+                explicit_bzero(pq + ksz, ksz - len_q);
 
                 // regenerate RSA private key
                 unsigned char _e[4];

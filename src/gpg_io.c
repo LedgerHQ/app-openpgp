@@ -64,7 +64,7 @@ void gpg_io_discard(int clear) {
 }
 
 void gpg_io_clear() {
-    memset(G_gpg_vstate.work.io_buffer, 0, GPG_IO_BUFFER_LENGTH);
+    explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
 }
 
 /* ----------------------------------------------------------------------- */

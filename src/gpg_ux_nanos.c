@@ -40,13 +40,13 @@ unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int bu
 /* ------------------------------- Helpers  UX ------------------------------- */
 
 void ui_info(const char *msg1, const char *msg2, const void *menu_display, unsigned int value) {
-    memset(&G_gpg_vstate.ui_dogsays[0], 0, sizeof(ux_menu_entry_t));
+    explicit_bzero(&G_gpg_vstate.ui_dogsays[0], sizeof(ux_menu_entry_t));
     G_gpg_vstate.ui_dogsays[0].callback = menu_display;
     G_gpg_vstate.ui_dogsays[0].userid = value;
     G_gpg_vstate.ui_dogsays[0].line1 = msg1;
     G_gpg_vstate.ui_dogsays[0].line2 = msg2;
 
-    memset(&G_gpg_vstate.ui_dogsays[1], 0, sizeof(ux_menu_entry_t));
+    explicit_bzero(&G_gpg_vstate.ui_dogsays[1], sizeof(ux_menu_entry_t));
     UX_MENU_DISPLAY(0, G_gpg_vstate.ui_dogsays, NULL);
 };
 
@@ -101,7 +101,7 @@ void ui_menu_uifconfirm_display(unsigned int value) {
 }
 
 unsigned int ui_uifconfirm_predisplay(const bagl_element_t *element) {
-    memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+    explicit_bzero(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu));
 
     switch (element->component.userid) {
         case 1:
@@ -370,7 +370,7 @@ unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
 
 void ui_menu_pinentry_display(unsigned int value) {
     if (value == 0) {
-        memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
+        explicit_bzero(G_gpg_vstate.ux_pinentry, sizeof(G_gpg_vstate.ux_pinentry));
         G_gpg_vstate.ux_pinLen = 0;
         G_gpg_vstate.ux_pinentry[0] = 5;
     }
@@ -600,7 +600,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     const unsigned char *oid;
     unsigned int oid_len;
 
-    memset(&attributes, 0, sizeof(attributes));
+    explicit_bzero(&attributes, sizeof(attributes));
     switch (G_gpg_vstate.ux_type) {
         case 2048:
         case 3072:
@@ -999,7 +999,7 @@ const ux_menu_entry_t ui_menu_main[] = {
 const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
                                               bagl_element_t *element) {
     if (entry == &ui_menu_main[0]) {
-        memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+        explicit_bzero(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu));
         if (element->component.userid == 0x21) {
             memmove(G_gpg_vstate.menu, (void *) (N_gpg_pstate->name.value), 12);
             if (G_gpg_vstate.menu[0] == 0) {
@@ -1014,7 +1014,7 @@ const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
         }
         if (element->component.userid == 0x22) {
             unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
-            memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+            explicit_bzero(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu));
             snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "ID: %x", serial);
         }
         if (G_gpg_vstate.menu[0] != 0) {

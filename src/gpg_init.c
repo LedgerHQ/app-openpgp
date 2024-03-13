@@ -345,12 +345,12 @@ const unsigned char C_sha256_PW2[] = {
 /* ----------------------------------------------------------------------- */
 
 void gpg_init() {
-    memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
+    explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     // first init ?
     if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC)) != 0) {
         gpg_install(STATE_ACTIVATE);
         nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC));
-        memset(&G_gpg_vstate, 0, sizeof(gpg_v_state_t));
+        explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     }
 
     // key conf

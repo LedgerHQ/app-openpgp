@@ -303,7 +303,7 @@ unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
 
 void ui_menu_pinentry_display(unsigned int value) {
     if (value == 0) {
-        memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
+        explicit_bzero(G_gpg_vstate.ux_pinentry, sizeof(G_gpg_vstate.ux_pinentry));
         G_gpg_vstate.ux_pinLen = 0;
         G_gpg_vstate.ux_pinentry[0] = 5;
     }
@@ -595,7 +595,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     const unsigned char *oid = NULL;
     unsigned int oid_len;
 
-    memset(&attributes, 0, sizeof(attributes));
+    explicit_bzero(&attributes, sizeof(attributes));
     switch (G_gpg_vstate.ux_type) {
         case 2048:
         case 3072:
@@ -1205,7 +1205,7 @@ UX_FLOW(ux_flow_main,
         &ux_menu_main_5_step);
 
 void ui_menu_main_predisplay() {
-    memset(G_gpg_vstate.ux_buff1, 0, sizeof(G_gpg_vstate.ux_buff1));
+    explicit_bzero(G_gpg_vstate.ux_buff1, sizeof(G_gpg_vstate.ux_buff1));
     memmove(G_gpg_vstate.ux_buff1, (void *) (N_gpg_pstate->name.value), 20);
     if (G_gpg_vstate.ux_buff1[0] == 0) {
         memmove(G_gpg_vstate.ux_buff1, "<No Name>", 9);
@@ -1218,7 +1218,7 @@ void ui_menu_main_predisplay() {
     }
 
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
-    memset(G_gpg_vstate.ux_buff2, 0, sizeof(G_gpg_vstate.ux_buff2));
+    explicit_bzero(G_gpg_vstate.ux_buff2, sizeof(G_gpg_vstate.ux_buff2));
     snprintf(G_gpg_vstate.ux_buff2,
              sizeof(G_gpg_vstate.ux_buff2),
              "ID: %x / %d",

@@ -67,7 +67,7 @@ static void ui_setting_header(const char* title,
     layoutDescription.modal = false;
     layoutCtx = nbgl_layoutGet(&layoutDescription);
 
-    memset(&bar, 0, sizeof(nbgl_layoutBar_t));
+    explicit_bzero(&bar, sizeof(nbgl_layoutBar_t));
     bar.text = PIC(title);
     bar.iconLeft = &C_leftArrow32px;
     bar.token = back_token;
@@ -92,7 +92,7 @@ void ui_init(void) {
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
 
-    memset(name, 0, sizeof(name));
+    explicit_bzero(name, sizeof(name));
     memmove(name, (void*) (N_gpg_pstate->name.value), 20);
     if (name[0] != 0) {
         for (int i = 0; i < 12; i++) {
@@ -101,7 +101,7 @@ void ui_init(void) {
             }
         }
     }
-    memset(G_gpg_vstate.menu, 0, sizeof(G_gpg_vstate.menu));
+    explicit_bzero(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu));
     snprintf(G_gpg_vstate.menu,
              sizeof(G_gpg_vstate.menu),
              "%s\nID: %x / %d",
@@ -286,7 +286,7 @@ static void template_key_cb(int token, uint8_t index) {
     uint8_t key_type = index + FIRST_USER_TOKEN;
 
     if (token != TOKEN_TYPE_BACK) {
-        memset(&attributes, 0, sizeof(attributes));
+        explicit_bzero(&attributes, sizeof(attributes));
         switch (key_type) {
             case TOKEN_TYPE_RSA2048:
             case TOKEN_TYPE_RSA3072:
@@ -396,7 +396,7 @@ static void ui_settings_template(void) {
     ui_setting_header("Keys templates", TOKEN_TEMPLATE_BACK, template_cb);
 
     for (i = 0; i < KEY_NB; i++) {
-        memset(&bar, 0, sizeof(nbgl_layoutBar_t));
+        explicit_bzero(&bar, sizeof(nbgl_layoutBar_t));
         switch (_getKeyType(TOKEN_TEMPLATE_SIG + i)) {
             case TOKEN_TYPE_RSA2048:
                 bar.subText = PIC(LABEL_RSA2048);
@@ -637,7 +637,7 @@ static void ui_settings_uif(void) {
     ui_setting_header("User Interaction Flags", TOKEN_UIF_BACK, uif_cb);
 
     if (G_gpg_vstate.kslot->sig.UIF[0] != 2) {
-        memset(&option, 0, sizeof(nbgl_layoutSwitch_t));
+        explicit_bzero(&option, sizeof(nbgl_layoutSwitch_t));
         option.initState = G_gpg_vstate.kslot->sig.UIF[0];
         option.text = "UIF for Signature";
         option.token = TOKEN_UIF_SIG;
@@ -647,7 +647,7 @@ static void ui_settings_uif(void) {
     }
 
     if (G_gpg_vstate.kslot->dec.UIF[0] != 2) {
-        memset(&option, 0, sizeof(nbgl_layoutSwitch_t));
+        explicit_bzero(&option, sizeof(nbgl_layoutSwitch_t));
         option.initState = G_gpg_vstate.kslot->dec.UIF[0];
         option.text = "UIF for Decryption";
         option.token = TOKEN_UIF_DEC;
@@ -657,7 +657,7 @@ static void ui_settings_uif(void) {
     }
 
     if (G_gpg_vstate.kslot->aut.UIF[0] != 2) {
-        memset(&option, 0, sizeof(nbgl_layoutSwitch_t));
+        explicit_bzero(&option, sizeof(nbgl_layoutSwitch_t));
         option.initState = G_gpg_vstate.kslot->aut.UIF[0];
         option.text = "UIF for Authentication";
         option.token = TOKEN_UIF_AUT;
@@ -690,7 +690,7 @@ enum {
 
 static bool reset_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
     UNUSED(page);
-    memset(content, 0, sizeof(nbgl_pageContent_t));
+    explicit_bzero(content, sizeof(nbgl_pageContent_t));
     content->type = INFO_LONG_PRESS;
     content->infoLongPress.text =
         "Reset the app to factory default?\nThis will delete ALL the keys!!!";
@@ -745,7 +745,7 @@ static bool settings_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
                                         TOKEN_SETTINGS_PIN,
                                         TOKEN_SETTINGS_UIF,
                                         TOKEN_SETTINGS_RESET};
-    memset(content, 0, sizeof(nbgl_pageContent_t));
+    explicit_bzero(content, sizeof(nbgl_pageContent_t));
     switch (page) {
         case SETTINGS_PAGE_INFO:
             content->type = INFOS_LIST;
@@ -940,7 +940,7 @@ void ui_menu_pinentry_display(unsigned int value) {
     char line[10];
 
     // Init the page title
-    memset(G_gpg_vstate.line, 0, sizeof(G_gpg_vstate.line));
+    explicit_bzero(G_gpg_vstate.line, sizeof(G_gpg_vstate.line));
     if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
         switch (value) {
             case 0:
