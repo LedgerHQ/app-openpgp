@@ -425,7 +425,7 @@ static void validate_pin() {
                          sizeof(G_gpg_vstate.menu),
                          " %d tries remaining",
                          pin->counter);
-                ui_info(WRONG_PIN, EMPTY, ui_menu_main_display, 0);
+                ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
                 return;
             }
             offset = 1 + G_gpg_vstate.work.io_buffer[0];

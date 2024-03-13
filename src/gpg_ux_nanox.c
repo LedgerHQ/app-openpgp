@@ -329,11 +329,11 @@ static void validate_pin() {
         gpg_io_insert_u16(sw);
         gpg_io_do(IO_RETURN_AFTER_TX);
         if (sw != SW_OK) {
-            snprintf(G_gpg_vstate.menu,
-                     sizeof(G_gpg_vstate.menu),
+            snprintf(G_gpg_vstate.ux_buff1,
+                     sizeof(G_gpg_vstate.ux_buff1),
                      " %d tries remaining",
                      pin->counter);
-            ui_info(WRONG_PIN, G_gpg_vstate.menu);
+            ui_info(WRONG_PIN, G_gpg_vstate.ux_buff1);
         } else {
             ui_menu_main_display(0);
         }
@@ -354,11 +354,11 @@ static void validate_pin() {
                 gpg_io_discard(1);
                 gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
                 gpg_io_do(IO_RETURN_AFTER_TX);
-                snprintf(G_gpg_vstate.menu,
-                         sizeof(G_gpg_vstate.menu),
+                snprintf(G_gpg_vstate.ux_buff1,
+                         sizeof(G_gpg_vstate.ux_buff1),
                          " %d tries remaining",
                          pin->counter);
-                ui_info(WRONG_PIN, EMPTY);
+                ui_info(WRONG_PIN, G_gpg_vstate.ux_buff1);
                 return;
             }
             offset = 1 + G_gpg_vstate.work.io_buffer[0];
