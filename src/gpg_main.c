@@ -50,6 +50,9 @@ void app_main(void) {
         sw = gpg_dispatch();
         if (sw) {
             PRINTF("[MAIN] - FINALLY INSERT sw=0x%x\n", sw);
+            if ((sw != SW_OK) && ((sw & 0xFF00) != SW_CORRECT_BYTES_AVAILABLE)) {
+                gpg_io_discard(1);
+            }
             gpg_io_insert_u16(sw);
             io_flags = 0;
         } else {
