@@ -95,8 +95,8 @@ int gpg_apdu_get_data(unsigned int ref) {
             break;
         case 0x5F50:
             /* Uniform resource locator */
-            gpg_io_insert((const unsigned char *) N_gpg_pstate->url.value,
-                          N_gpg_pstate->url.length);
+            gpg_io_insert((const unsigned char *) N_gpg_pstate->keys[G_gpg_vstate.slot].url.value,
+                          N_gpg_pstate->keys[G_gpg_vstate.slot].url.length);
             break;
         case 0x65:
             /* Name, Language, salutation */
@@ -571,14 +571,14 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Uniform resource locator */
         case 0x5F50:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->url.value)) {
+            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->keys[G_gpg_vstate.slot].url.value)) {
                 sw = SW_WRONG_LENGTH;
                 break;
             }
-            nvm_write((void *) N_gpg_pstate->url.value,
+            nvm_write((void *) N_gpg_pstate->keys[G_gpg_vstate.slot].url.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->url.length,
+            nvm_write((void *) &N_gpg_pstate->keys[G_gpg_vstate.slot].url.length,
                       &G_gpg_vstate.io_length,
                       sizeof(unsigned int));
             sw = SW_OK;

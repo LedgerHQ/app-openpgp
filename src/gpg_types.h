@@ -129,6 +129,8 @@ typedef struct gpg_key_slot_s {
     unsigned int sig_count;
     /* D5 */
     cx_aes_key_t AES_dec;
+    /*  5F50 */
+    LV(url, GPG_EXT_PRIVATE_DO_LENGTH);
 
 } gpg_key_slot_t;
 
@@ -152,8 +154,6 @@ struct gpg_nv_state_s {
 
     /*  5E */
     LV(login, GPG_EXT_PRIVATE_DO_LENGTH);
-    /*  5F50 */
-    LV(url, GPG_EXT_PRIVATE_DO_LENGTH);
 
     /* -- Cardholder Related Data -- */
     /*  5B */
