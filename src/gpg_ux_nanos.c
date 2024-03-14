@@ -535,6 +535,7 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
 #ifdef WITH_SUPPORT_RSA4096
     {NULL, ui_menu_tmpl_type_action, 4096, NULL, LABEL_RSA4096, NULL, 0, 0},
 #endif
+    {NULL, ui_menu_tmpl_type_action, CX_CURVE_SECP256K1, NULL, LABEL_SECP256K1, NULL, 0, 0},
     {NULL, ui_menu_tmpl_type_action, CX_CURVE_SECP256R1, NULL, LABEL_SECP256R1, NULL, 0, 0},
     {NULL, ui_menu_tmpl_type_action, CX_CURVE_Ed25519, NULL, LABEL_Ed25519, NULL, 0, 0},
     {ui_menu_template, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
@@ -573,6 +574,9 @@ const bagl_element_t *ui_menu_template_predisplay(const ux_menu_entry_t *entry,
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_RSA4096);
                     break;
 #endif
+                case CX_CURVE_SECP256K1:
+                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_SECP256K1);
+                    break;
                 case CX_CURVE_SECP256R1:
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_SECP256R1);
                     break;
@@ -615,6 +619,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
             attributes.length = 6;
             break;
 
+        case CX_CURVE_SECP256K1:
         case CX_CURVE_SECP256R1:
             if (G_gpg_vstate.ux_key == 2) {
                 attributes.value[0] = KEY_ID_ECDH;
