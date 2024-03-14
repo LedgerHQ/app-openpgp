@@ -64,7 +64,7 @@ void gpg_io_discard(int clear) {
 }
 
 void gpg_io_clear() {
-    memset(G_gpg_vstate.work.io_buffer, 0, GPG_IO_BUFFER_LENGTH);
+    explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -242,7 +242,7 @@ void gpg_io_do(unsigned int io_flags) {
             memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, tx);
             G_gpg_vstate.io_length -= tx;
             G_gpg_vstate.io_offset += tx;
-            G_io_apdu_buffer[tx] = 0x61;
+            G_io_apdu_buffer[tx] = (SW_CORRECT_BYTES_AVAILABLE >> 8) & 0xFF;
             if (G_gpg_vstate.io_length > MAX_OUT - 2) {
                 xx = MAX_OUT - 2;
             } else {
@@ -317,6 +317,13 @@ void gpg_io_do(unsigned int io_flags) {
             break;
     }
 
+    PRINTF("[IO] - io_do: 1st APDU=0x %02x.%02x.%02x.%02x - %d (0x%x)\n",
+           G_gpg_vstate.io_cla,
+           G_gpg_vstate.io_ins,
+           G_gpg_vstate.io_p1,
+           G_gpg_vstate.io_p2,
+           G_gpg_vstate.io_lc,
+           G_gpg_vstate.io_lc);
     while (G_gpg_vstate.io_cla & CLA_APP_CHAIN) {
         G_io_apdu_buffer[0] = ((SW_OK >> 8) & 0xFF);
         G_io_apdu_buffer[1] = (SW_OK & 0xFF);
@@ -338,6 +345,13 @@ void gpg_io_do(unsigned int io_flags) {
         if ((G_gpg_vstate.io_length + G_gpg_vstate.io_lc) > GPG_IO_BUFFER_LENGTH) {
             return;
         }
+        PRINTF("[IO] - io_do: Next APDU=0x %02x.%02x.%02x.%02x - %d (0x%x)\n",
+               G_gpg_vstate.io_cla,
+               G_gpg_vstate.io_ins,
+               G_gpg_vstate.io_p1,
+               G_gpg_vstate.io_p2,
+               G_gpg_vstate.io_lc,
+               G_gpg_vstate.io_lc);
         memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_length,
                 G_io_apdu_buffer + OFFSET_CDATA,
                 G_gpg_vstate.io_lc);

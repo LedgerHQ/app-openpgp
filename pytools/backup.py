@@ -34,7 +34,7 @@ def get_argparser() -> Namespace:
         formatter_class=RawTextHelpFormatter
     )
     parser.add_argument("--reader", type=str, default="Ledger",
-                        help="PCSC reader name (default is '%(default)s')")
+                        help="PCSC reader name (default is '%(default)s') or 'speculos'")
 
     parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")
 
@@ -50,6 +50,9 @@ def get_argparser() -> Namespace:
 
     parser.add_argument("--file", type=str, default="gpg_backup",
                         help="Backup/Restore file (default is '%(default)s')")
+
+    parser.add_argument("--seed-key", action="store_true",
+                        help="After Restore, regenerate all keys, based on seed mode")
 
     return parser.parse_args()
 
@@ -95,6 +98,10 @@ def entrypoint() -> None:
         if args.restore:
             gpgcard.restore(args.file)
             print(f"Configuration restored from file '{args.file}'.")
+
+            if args.seed_key:
+                gpgcard.seed_key()
+
         else:
             gpgcard.backup(args.file)
             print(f"Configuration saved in file '{args.file}'.")

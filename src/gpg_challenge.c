@@ -43,7 +43,7 @@ int gpg_apdu_get_challenge() {
         unsigned int path[2];
         unsigned char chain[32] = {0};
 
-        memset(chain, 0, 32);
+        explicit_bzero(chain, 32);
         path[0] = 0x80475047;
         path[1] = 0x0F0F0F0F;
         CX_CHECK(os_derive_bip32_no_throw(CX_CURVE_SECP256K1, path, 2, Sr, chain));

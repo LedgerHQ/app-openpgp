@@ -38,7 +38,7 @@ def get_argparser() -> Namespace:
     parser.add_argument("--info", action="store_true",
                         help="Get and display card information")
     parser.add_argument("--reader", type=str, default="Ledger",
-                        help="PCSC reader name (default is '%(default)s')")
+                        help="PCSC reader name (default is '%(default)s') or 'speculos'")
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
     parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")

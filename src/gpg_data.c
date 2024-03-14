@@ -95,8 +95,8 @@ int gpg_apdu_get_data(unsigned int ref) {
             break;
         case 0x5F50:
             /* Uniform resource locator */
-            gpg_io_insert((const unsigned char *) N_gpg_pstate->url.value,
-                          N_gpg_pstate->url.length);
+            gpg_io_insert((const unsigned char *) N_gpg_pstate->keys[G_gpg_vstate.slot].url.value,
+                          N_gpg_pstate->keys[G_gpg_vstate.slot].url.length);
             break;
         case 0x65:
             /* Name, Language, salutation */
@@ -111,7 +111,7 @@ int gpg_apdu_get_data(unsigned int ref) {
 
             /* ----------------- aid, histo, ext_length, ... ----------------- */
         case 0x6E:
-            gpg_io_insert_tlv(0x4F, 16, (const unsigned char *) N_gpg_pstate->AID);
+            gpg_io_insert_tlv(0x4F, AID_LENGTH, (const unsigned char *) N_gpg_pstate->AID);
             memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6,
                     G_gpg_vstate.kslot->serial,
                     4);
@@ -379,7 +379,6 @@ int gpg_apdu_put_data(unsigned int ref) {
                     case 0x93:
                         len_q = l;
                         break;
-                        break;
                     case 0x94:
                     case 0x95:
                     case 0x96:
@@ -460,9 +459,9 @@ int gpg_apdu_put_data(unsigned int ref) {
                 p = G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset;
                 q = p + len_p;
                 memmove(pq + ksz - len_p, p, len_p);
-                memset(pq, 0, ksz - len_p);
+                explicit_bzero(pq, ksz - len_p);
                 memmove(pq + 2 * ksz - len_q, q, len_q);
-                memset(pq + ksz, 0, ksz - len_q);
+                explicit_bzero(pq + ksz, ksz - len_q);
 
                 // regenerate RSA private key
                 unsigned char _e[4];
@@ -572,14 +571,14 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Uniform resource locator */
         case 0x5F50:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->url.value)) {
+            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->keys[G_gpg_vstate.slot].url.value)) {
                 sw = SW_WRONG_LENGTH;
                 break;
             }
-            nvm_write((void *) N_gpg_pstate->url.value,
+            nvm_write((void *) N_gpg_pstate->keys[G_gpg_vstate.slot].url.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->url.length,
+            nvm_write((void *) &N_gpg_pstate->keys[G_gpg_vstate.slot].url.length,
                       &G_gpg_vstate.io_length,
                       sizeof(unsigned int));
             sw = SW_OK;
@@ -743,7 +742,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                                               G_gpg_vstate.io_length,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
-            CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer + 16,
+            CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer + CX_AES_128_KEY_LEN,
                                               G_gpg_vstate.io_length,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
@@ -809,11 +808,11 @@ static int gpg_init_keyenc(cx_aes_key_t *keyenc) {
     if (sw != SW_OK) {
         return sw;
     }
-    sw = gpg_pso_derive_key_seed(seed, (unsigned char *) PIC("key "), 1, seed, 16);
+    sw = gpg_pso_derive_key_seed(seed, (unsigned char *) PIC("key "), 1, seed, CX_AES_BLOCK_SIZE);
     if (sw != SW_OK) {
         return sw;
     }
-    CX_CHECK(cx_aes_init_key_no_throw(seed, 16, keyenc));
+    CX_CHECK(cx_aes_init_key_no_throw(seed, CX_AES_BLOCK_SIZE, keyenc));
 
 end:
     if (error != CX_OK) {
@@ -1007,12 +1006,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 sw = SW_CONDITIONS_NOT_SATISFIED;
                 break;
             }
-            if (len != GPG_IO_BUFFER_LENGTH) {
-                sw = SW_CONDITIONS_NOT_SATISFIED;
-                break;
-            }
 
-            PRINTF("[DATA] - put_key_data: key len: %d\n", len);
             gpg_io_discard(0);
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
@@ -1021,7 +1015,6 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                                      G_gpg_vstate.work.io_buffer,
                                      &ksz));
             if (len != ksz) {
-                PRINTF("[DATA] - put_key_data: Wrong aes output len: %d / %d\n", len, ksz);
                 sw = SW_WRONG_DATA;
                 break;
             }

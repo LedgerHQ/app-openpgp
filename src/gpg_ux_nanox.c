@@ -287,8 +287,7 @@ unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
         }
     } else if (element->component.userid == 2) {
         unsigned int i;
-        G_gpg_vstate.menu[0] = ' ';
-        for (i = 1; i < G_gpg_vstate.ux_pinentry[0]; i++) {
+        for (i = 0; i < G_gpg_vstate.ux_pinLen; i++) {
             G_gpg_vstate.menu[i] = '*';
         }
         G_gpg_vstate.menu[i] = C_pin_digit[G_gpg_vstate.ux_pinentry[i]];
@@ -304,9 +303,9 @@ unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
 
 void ui_menu_pinentry_display(unsigned int value) {
     if (value == 0) {
-        memset(G_gpg_vstate.ux_pinentry, 0, sizeof(G_gpg_vstate.ux_pinentry));
-        G_gpg_vstate.ux_pinentry[0] = 1;
-        G_gpg_vstate.ux_pinentry[1] = 5;
+        explicit_bzero(G_gpg_vstate.ux_pinentry, sizeof(G_gpg_vstate.ux_pinentry));
+        G_gpg_vstate.ux_pinLen = 0;
+        G_gpg_vstate.ux_pinentry[0] = 5;
     }
     UX_DISPLAY(ui_pinentry_action, (void *) ui_pinentry_predisplay);
 }
@@ -315,7 +314,7 @@ static void validate_pin() {
     unsigned int offset, len, sw = SW_UNKNOWN;
     gpg_pin_t *pin;
 
-    for (offset = 1; offset <= G_gpg_vstate.ux_pinentry[0]; offset++) {
+    for (offset = 0; offset <= G_gpg_vstate.ux_pinLen; offset++) {
         G_gpg_vstate.menu[offset] = C_pin_digit[G_gpg_vstate.ux_pinentry[offset]];
     }
 
@@ -323,17 +322,17 @@ static void validate_pin() {
         pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
         sw = gpg_pin_check(pin,
                            G_gpg_vstate.io_p2,
-                           (unsigned char *) (G_gpg_vstate.menu + 1),
-                           G_gpg_vstate.ux_pinentry[0]);
+                           (unsigned char *) G_gpg_vstate.menu,
+                           G_gpg_vstate.ux_pinLen);
         gpg_io_discard(1);
         gpg_io_insert_u16(sw);
         gpg_io_do(IO_RETURN_AFTER_TX);
         if (sw != SW_OK) {
-            snprintf(G_gpg_vstate.menu,
-                     sizeof(G_gpg_vstate.menu),
+            snprintf(G_gpg_vstate.ux_buff1,
+                     sizeof(G_gpg_vstate.ux_buff1),
                      " %d tries remaining",
                      pin->counter);
-            ui_info(WRONG_PIN, G_gpg_vstate.menu);
+            ui_info(WRONG_PIN, G_gpg_vstate.ux_buff1);
         } else {
             ui_menu_main_display(0);
         }
@@ -341,8 +340,8 @@ static void validate_pin() {
 
     if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
         if (G_gpg_vstate.io_p1 <= 2) {
-            gpg_io_insert_u8(G_gpg_vstate.ux_pinentry[0]);
-            gpg_io_insert((unsigned char *) (G_gpg_vstate.menu + 1), G_gpg_vstate.ux_pinentry[0]);
+            gpg_io_insert_u8(G_gpg_vstate.ux_pinLen);
+            gpg_io_insert((unsigned char *) G_gpg_vstate.menu, G_gpg_vstate.ux_pinLen);
             G_gpg_vstate.io_p1++;
         }
         if (G_gpg_vstate.io_p1 == 3) {
@@ -354,11 +353,11 @@ static void validate_pin() {
                 gpg_io_discard(1);
                 gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
                 gpg_io_do(IO_RETURN_AFTER_TX);
-                snprintf(G_gpg_vstate.menu,
-                         sizeof(G_gpg_vstate.menu),
+                snprintf(G_gpg_vstate.ux_buff1,
+                         sizeof(G_gpg_vstate.ux_buff1),
                          " %d tries remaining",
                          pin->counter);
-                ui_info(WRONG_PIN, EMPTY);
+                ui_info(WRONG_PIN, G_gpg_vstate.ux_buff1);
                 return;
             }
             offset = 1 + G_gpg_vstate.work.io_buffer[0];
@@ -388,7 +387,7 @@ static void validate_pin() {
 
 unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int button_mask_counter) {
     UNUSED(button_mask_counter);
-    unsigned int offset = G_gpg_vstate.ux_pinentry[0];
+    unsigned int offset = G_gpg_vstate.ux_pinLen;
     char digit;
 
     switch (button_mask) {
@@ -413,9 +412,8 @@ unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int bu
             digit = C_pin_digit[G_gpg_vstate.ux_pinentry[offset]];
             // next digit
             if ((digit >= '0') && (digit <= '9')) {
-                offset++;
-                G_gpg_vstate.ux_pinentry[0] = offset;
-                if (offset == GPG_MAX_PW_LENGTH + 1) {
+                G_gpg_vstate.ux_pinLen = ++offset;
+                if (offset == GPG_MAX_PW_LENGTH) {
                     validate_pin();
                 } else {
                     G_gpg_vstate.ux_pinentry[offset] = 5;
@@ -424,15 +422,13 @@ unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int bu
             }
             // cancel digit
             else if (digit == '<') {
-                if (offset > 1) {
-                    offset--;
-                    G_gpg_vstate.ux_pinentry[0] = offset;
+                if (offset > 0) {
+                    G_gpg_vstate.ux_pinLen--;
                 }
                 ui_menu_pinentry_display(1);
             }
             // validate pin
             else if (digit == 'V') {
-                G_gpg_vstate.ux_pinentry[0] = offset - 1;
                 validate_pin();
             }
             // cancel input without check
@@ -599,7 +595,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     const unsigned char *oid = NULL;
     unsigned int oid_len;
 
-    memset(&attributes, 0, sizeof(attributes));
+    explicit_bzero(&attributes, sizeof(attributes));
     switch (G_gpg_vstate.ux_type) {
         case 2048:
         case 3072:
@@ -1209,20 +1205,18 @@ UX_FLOW(ux_flow_main,
         &ux_menu_main_5_step);
 
 void ui_menu_main_predisplay() {
-    memset(G_gpg_vstate.ux_buff1, 0, sizeof(G_gpg_vstate.ux_buff1));
+    explicit_bzero(G_gpg_vstate.ux_buff1, sizeof(G_gpg_vstate.ux_buff1));
     memmove(G_gpg_vstate.ux_buff1, (void *) (N_gpg_pstate->name.value), 20);
-    if (G_gpg_vstate.ux_buff1[0] == 0) {
-        memmove(G_gpg_vstate.ux_buff1, "<No Name>", 9);
-    } else {
+    if (G_gpg_vstate.ux_buff1[0] != 0) {
         for (int i = 0; i < 12; i++) {
-            if (G_gpg_vstate.ux_buff1[i] == '<') {
+            if ((G_gpg_vstate.menu[i] == '<') || (G_gpg_vstate.menu[i] == '>')) {
                 G_gpg_vstate.ux_buff1[i] = ' ';
             }
         }
     }
 
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
-    memset(G_gpg_vstate.ux_buff2, 0, sizeof(G_gpg_vstate.ux_buff2));
+    explicit_bzero(G_gpg_vstate.ux_buff2, sizeof(G_gpg_vstate.ux_buff2));
     snprintf(G_gpg_vstate.ux_buff2,
              sizeof(G_gpg_vstate.ux_buff2),
              "ID: %x / %d",

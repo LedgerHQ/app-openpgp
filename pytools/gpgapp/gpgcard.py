@@ -24,14 +24,12 @@ from typing import Optional, Tuple
 from dataclasses import dataclass
 from Crypto.PublicKey.RSA import construct
 
-# pylint: disable=import-error
-from smartcard.System import readers  # type: ignore
-from smartcard.pcsc import PCSCReader  # type: ignore
-from smartcard import CardConnectionDecorator  # type: ignore
-# pylint: enable=import-error
 from gpgapp.gpgcmd import DataObject, ErrorCodes, KeyTypes, PassWord, PubkeyAlgo  # type: ignore
 from gpgapp.gpgcmd import KEY_OPERATIONS, KEY_TEMPLATES, USER_SALUTATION  # type: ignore
 
+# pylint: disable=import-error
+from ledgercomm import Transport  # type: ignore
+# pylint: enable=import-error
 
 APDU_MAX_SIZE: int = 0xFE
 APDU_CHAINING_MODE: int = 0x10
@@ -143,7 +141,7 @@ class CardInfo:
 class GPGCard() :
     def __init__(self) -> None:
         self.log: bool = False
-        self.connection: CardConnectionDecorator = None
+        self.transport: Transport = None
         self.slot_current: bytes = b"\x00"
         self.slot_config: bytes = bytes(3)
         self.data: CardInfo = CardInfo()
@@ -156,21 +154,17 @@ class GPGCard() :
             device (str): Reader device name
         """
 
-        allreaders: list = readers()
-        for elt in allreaders:
-            if str(elt).startswith(device):
-                reader: PCSCReader.PCSCReader = elt
-                self.connection = reader.createConnection()
-                self.connection.connect()
-                return
+        if device == "speculos":
+            self.transport = Transport("tcp", server="127.0.0.1", port=9999, debug=False)
+        else:
+            self.transport = Transport("hid")
         print("")
-        raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "No Reader detected!")
 
 
     def disconnect(self):
         """Connect from the selected Reader"""
 
-        return self.connection.disconnect()
+        self.transport.close()
 
 
     ############### LOG interface ###############
@@ -1236,8 +1230,9 @@ class GPGCard() :
         """
 
         self.add_log("send", data)
-        resp, sw1, sw2 = self.connection.transmit(list(data))
-        sw = (sw1 << 8) | sw2
+        sw, resp = self.transport.exchange_raw(data)
+        sw1 = (sw >> 8) & 0xFF
+        sw2 = sw & 0xFF
         self.add_log("recv", resp, sw)
         if sw != ErrorCodes.ERR_SUCCESS and not long_resp:
             raise GPGCardExcpetion(sw, "")
