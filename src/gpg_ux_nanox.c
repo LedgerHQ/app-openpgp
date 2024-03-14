@@ -473,6 +473,7 @@ const char *const tmpl_type_getter_values[] = {LABEL_RSA2048,
 #ifdef WITH_SUPPORT_RSA4096
                                                LABEL_RSA4096,
 #endif
+                                               LABEL_SECP256K1,
                                                LABEL_SECP256R1,
                                                LABEL_Ed25519};
 
@@ -481,6 +482,7 @@ const unsigned int tmpl_type_getter_values_map[] = {2048,
 #ifdef WITH_SUPPORT_RSA4096
                                                     4096,
 #endif
+                                                    CX_CURVE_SECP256K1,
                                                     CX_CURVE_SECP256R1,
                                                     CX_CURVE_Ed25519};
 
@@ -572,6 +574,9 @@ void ui_menu_template_predisplay() {
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_RSA4096);
             break;
 #endif
+        case CX_CURVE_SECP256K1:
+            snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_SECP256K1);
+            break;
         case CX_CURVE_SECP256R1:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_SECP256R1);
             break;
@@ -610,6 +615,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
             attributes.length = 6;
             break;
 
+        case CX_CURVE_SECP256K1:
         case CX_CURVE_SECP256R1:
             oid = gpg_curve2oid(G_gpg_vstate.ux_type, &oid_len);
             if (oid == NULL) {

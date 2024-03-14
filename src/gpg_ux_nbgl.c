@@ -207,6 +207,7 @@ enum {
 #ifdef WITH_SUPPORT_RSA4096
     TOKEN_TYPE_RSA4096,
 #endif
+    TOKEN_TYPE_SECP256K1,
     TOKEN_TYPE_SECP256R1,
     TOKEN_TYPE_Ed25519,
     TOKEN_TYPE_BACK
@@ -217,12 +218,12 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
 #ifdef WITH_SUPPORT_RSA4096
                                            LABEL_RSA4096,
 #endif
+                                           LABEL_SECP256K1,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
 
 static uint32_t _getKeyType(const uint8_t key) {
     uint8_t* attributes = NULL;
-    uint32_t tag = 0;
     uint32_t token = 0;
 
     switch (key) {
@@ -241,8 +242,7 @@ static uint32_t _getKeyType(const uint8_t key) {
     }
     switch (attributes[0]) {
         case KEY_ID_RSA:
-            tag = U2BE(attributes, 1);
-            switch (tag) {
+            switch (U2BE(attributes, 1)) {
                 case 2048:
                     token = TOKEN_TYPE_RSA2048;
                     break;
@@ -257,18 +257,31 @@ static uint32_t _getKeyType(const uint8_t key) {
             }
             break;
         case KEY_ID_ECDH:
-            tag = attributes[1];
-            switch (tag) {
+            switch (attributes[1]) {
                 case 0x2A:
                     token = TOKEN_TYPE_SECP256R1;
                     break;
                 case 0x2B:
-                    token = TOKEN_TYPE_Ed25519;
+                    switch (attributes[2]) {
+                        case 0x06:
+                            token = TOKEN_TYPE_Ed25519;
+                            break;
+                        case 0x81:
+                            token = TOKEN_TYPE_SECP256K1;
+                            break;
+                    }
                     break;
             }
             break;
         case KEY_ID_ECDSA:
-            token = TOKEN_TYPE_SECP256R1;
+            switch (attributes[1]) {
+                case 0x2A:
+                    token = TOKEN_TYPE_SECP256R1;
+                    break;
+                case 0x2B:
+                    token = TOKEN_TYPE_SECP256K1;
+                    break;
+            }
             break;
         case KEY_ID_EDDSA:
             token = TOKEN_TYPE_Ed25519;
@@ -313,6 +326,17 @@ static void template_key_cb(int token, uint8_t index) {
                 attributes.value[5] = 0x01;
                 attributes.length = 6;
                 oid_len = 6;
+                break;
+
+            case TOKEN_TYPE_SECP256K1:
+                if (G_gpg_vstate.ux_key == TOKEN_TEMPLATE_DEC) {
+                    attributes.value[0] = KEY_ID_ECDH;
+                } else {
+                    attributes.value[0] = KEY_ID_ECDSA;
+                }
+                oid = gpg_curve2oid(CX_CURVE_SECP256K1, &oid_len);
+                memmove(attributes.value + 1, oid, oid_len);
+                attributes.length = 1 + oid_len;
                 break;
 
             case TOKEN_TYPE_SECP256R1:
@@ -409,6 +433,9 @@ static void ui_settings_template(void) {
                 bar.subText = PIC(LABEL_RSA4096);
                 break;
 #endif
+            case TOKEN_TYPE_SECP256K1:
+                bar.subText = PIC(LABEL_SECP256K1);
+                break;
             case TOKEN_TYPE_SECP256R1:
                 bar.subText = PIC(LABEL_SECP256R1);
                 break;
