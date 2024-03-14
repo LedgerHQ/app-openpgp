@@ -62,6 +62,16 @@ init() {
     echo enable-pinpad-varlen
     echo card-timeout 1
   } > "${dir}/scdaemon.conf"
+
+  if [[ ${EXPERT} == true ]]; then
+    {
+      echo log-file /tmp/scd.log
+      echo debug-level guru
+      echo debug-all
+    } >> "${dir}/scdaemon.conf"
+  fi
+
+  gpgconf --reload scdaemon
 }
 
 #===============================================================================

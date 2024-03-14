@@ -1562,6 +1562,7 @@ The tool usage is the following:
  |  ``--user-pin PIN   User PIN (if pinpad not used)``
  |  ``--restore        Perform a Restore instead of Backup``
  |  ``--file FILE      Backup/Restore file (default is 'gpg_backup')``
+ |  ``--seed-key       After Restore, regenerate all keys, based on seed mode``
  |
  | ``Keys restore is only possible with SEED mode...``
 
@@ -1571,12 +1572,11 @@ To perform a backup, simply use the tool like this:
  | ``Connect to card 'Ledger'...``
  | ``Configuration saved in file 'gpg_backup'.``
 
-Once the configuration is restored, just use the previous tool to re-generate the seeded keys:
+To *restore* a backup, simply use the tool like this:
 
- | ``./gpgcli.py --user-pin 123456 --adm-pin 12345678 --seed-key``
+ | ``$ ./backup.py --restore --adm-pin 12345678 --user-pin 123456 --seed-key``
  | ``Connect to card 'Ledger'...``
- | ``Verify PINs...``
- | ``Get card info...``
+ | ``Configuration saved in file 'gpg_backup'.``
 
 Annexes
 =======
