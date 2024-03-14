@@ -321,12 +321,15 @@ int gpg_apdu_pso() {
                     }
                     key = &G_gpg_vstate.mse_dec->priv_key.ecfp;
                     gpg_io_fetch_l(&l);
-                    gpg_io_fetch_tl(&t, &l);
-                    if (t != 0x7f49) {
+                    if (l != 37) {
                         return SW_WRONG_DATA;
                     }
                     gpg_io_fetch_tl(&t, &l);
-                    if (t != 0x86) {
+                    if ((t != 0x7f49) || (l != 34)) {
+                        return SW_WRONG_DATA;
+                    }
+                    gpg_io_fetch_tl(&t, &l);
+                    if ((t != 0x86) || (l != 32)) {
                         return SW_WRONG_DATA;
                     }
 
