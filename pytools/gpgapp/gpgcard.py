@@ -236,7 +236,9 @@ class GPGCard() :
         self.data.login                       = self._get_data(DataObject.DO_LOGIN).decode("utf-8")
         self.data.url                         = self._get_data(DataObject.DO_URL).decode("utf-8")
         self.data.histo_bytes                 = self._get_data(DataObject.DO_HIST)
-        self.data.hw_features                 = int(self._get_data(DataObject.DO_GEN_FEATURES)[0])
+        data                                  = self._get_data(DataObject.DO_GEN_FEATURES)
+        if data:
+            self.data.hw_features             = data[0]
 
         data                                  = self._get_data(DataObject.DO_CARDHOLDER_DATA)
         tags                                  = self._decode_tlv(data)
