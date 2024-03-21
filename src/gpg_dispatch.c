@@ -17,6 +17,13 @@
 
 #include "gpg_vars.h"
 
+/**
+ * Check INS access condition
+ * Verify if the corresponding PW is verified
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_check_access_ins() {
     int sw = SW_UNKNOWN;
 
@@ -92,6 +99,13 @@ static int gpg_check_access_ins() {
     return sw;
 }
 
+/**
+ * Check INS Read access condition
+ * Verify if the corresponding PW is verified
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_check_access_read_DO() {
     int sw = SW_UNKNOWN;
 
@@ -163,6 +177,13 @@ static int gpg_check_access_read_DO() {
     return sw;
 }
 
+/**
+ * Check INS Write access condition
+ * Verify if the corresponding PW is verified
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_check_access_write_DO() {
     int sw = SW_UNKNOWN;
 
@@ -228,7 +249,12 @@ static int gpg_check_access_write_DO() {
     return sw;
 }
 
-/* assume command is fully received */
+/**
+ * APDU Handler: dispatch command
+ *
+ * @return Status Word
+ *
+ */
 int gpg_dispatch() {
     unsigned int tag, t, l;
     int sw = SW_UNKNOWN;

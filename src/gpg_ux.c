@@ -18,6 +18,10 @@
 
 #include "usbd_ccid_if.h"
 
+/**
+ * Reset CCID
+ *
+ */
 void ui_CCID_reset(void) {
     io_usb_ccid_set_card_inserted(0);
     io_usb_ccid_set_card_inserted(1);

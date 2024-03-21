@@ -58,12 +58,24 @@ const unsigned char gpg_oid_sha512[] = {0x30,
                                         0x04,
                                         0x40};
 
+/**
+ * Reset PW1 verified status
+ *
+ */
 static void gpg_pso_reset_PW1() {
     if (N_gpg_pstate->PW_status[0] == 0) {
         gpg_pin_set_verified(PIN_ID_PW1, 0);
     }
 }
 
+/**
+ * Perform a Digital Signature
+ *
+ * @param[in]  sigKey signing key
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_sign(gpg_key_t *sigkey) {
     cx_err_t error = CX_INTERNAL_ERROR;
     if (sigkey->attributes.value[0] == KEY_ID_RSA) {
@@ -180,6 +192,12 @@ end:
     return error;
 }
 
+/**
+ * APDU handler to Perform Security Operation
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_pso() {
     unsigned int t, l, ksz;
     cx_err_t error = CX_INTERNAL_ERROR;
@@ -387,6 +405,12 @@ end:
     return error;
 }
 
+/**
+ * APDU handler to Internal Authentication
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_internal_authenticate() {
     // --- PSO:AUTH ---
     if (G_gpg_vstate.kslot->aut.UIF[0]) {

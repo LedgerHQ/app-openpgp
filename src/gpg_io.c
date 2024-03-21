@@ -30,6 +30,12 @@
 /* MISC                                                                    */
 /* ----------------------------------------------------------------------- */
 
+/**
+ * Set Offset in APDU buffer
+ *
+ * @param[in]  offset value to set
+ *
+ */
 void gpg_io_set_offset(unsigned int offset) {
     switch (offset) {
         case IO_OFFSET_END:
@@ -45,15 +51,32 @@ void gpg_io_set_offset(unsigned int offset) {
     }
 }
 
+/**
+ * Mark current offset in APDU buffer
+ *
+ */
 void gpg_io_mark() {
     G_gpg_vstate.io_mark = G_gpg_vstate.io_offset;
 }
 
+/**
+ * Shift empty space in APDU buffer
+ *
+ * @param[in]  len space length
+ *
+ */
 void gpg_io_inserted(unsigned int len) {
     G_gpg_vstate.io_offset += len;
     G_gpg_vstate.io_length += len;
 }
 
+/**
+ * Discard APDU buffer values
+ * Set Length, Offset and Mark to 0
+ *
+ * @param[in]  clear request to fully zeroed the buffer
+ *
+ */
 void gpg_io_discard(int clear) {
     G_gpg_vstate.io_length = 0;
     G_gpg_vstate.io_offset = 0;
@@ -63,6 +86,10 @@ void gpg_io_discard(int clear) {
     }
 }
 
+/**
+ * Clear (zeroed) the APDU buffer
+ *
+ */
 void gpg_io_clear() {
     explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
 }
@@ -71,6 +98,12 @@ void gpg_io_clear() {
 /* INSERT data to be sent                                                  */
 /* ----------------------------------------------------------------------- */
 
+/**
+ * Move APDU buffer content after a hole
+ *
+ * @param[in]  sz hole length
+ *
+ */
 static void gpg_io_hole(unsigned int sz) {
     LEDGER_ASSERT((G_gpg_vstate.io_length + sz) <= GPG_IO_BUFFER_LENGTH, "Bad hole!");
     memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + sz,
@@ -79,18 +112,37 @@ static void gpg_io_hole(unsigned int sz) {
     G_gpg_vstate.io_length += sz;
 }
 
+/**
+ * Insert a data buffer into the APDU buffer
+ *
+ * @param[in]  buff data buffer
+ * @param[in]  len buffer length
+ *
+ */
 void gpg_io_insert(unsigned char const *buff, unsigned int len) {
     gpg_io_hole(len);
     memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, buff, len);
     G_gpg_vstate.io_offset += len;
 }
 
+/**
+ * Insert a u32 value into the APDU buffer
+ *
+ * @param[in]  v32 value to insert
+ *
+ */
 void gpg_io_insert_u32(unsigned int v32) {
     gpg_io_hole(4);
     U4BE_ENCODE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset, v32);
     G_gpg_vstate.io_offset += 4;
 }
 
+/**
+ * Insert a u24 value into the APDU buffer
+ *
+ * @param[in]  v24 value to insert
+ *
+ */
 void gpg_io_insert_u24(unsigned int v24) {
     gpg_io_hole(3);
     G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 0] = v24 >> 16;
@@ -98,17 +150,38 @@ void gpg_io_insert_u24(unsigned int v24) {
     G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 2] = v24 >> 0;
     G_gpg_vstate.io_offset += 3;
 }
+
+/**
+ * Insert a u16 value into the APDU buffer
+ *
+ * @param[in]  v16 value to insert
+ *
+ */
 void gpg_io_insert_u16(unsigned int v16) {
     gpg_io_hole(2);
     U2BE_ENCODE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset, v16);
     G_gpg_vstate.io_offset += 2;
 }
+
+/**
+ * Insert a u8 value into the APDU buffer
+ *
+ * @param[in]  v8 value to insert
+ *
+ */
 void gpg_io_insert_u8(unsigned int v8) {
     gpg_io_hole(1);
     G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 0] = v8;
     G_gpg_vstate.io_offset += 1;
 }
 
+/**
+ * Insert a TAG into the APDU buffer
+ * (To handle TLV)
+ *
+ * @param[in]  T tag to insert
+ *
+ */
 void gpg_io_insert_t(unsigned int T) {
     if (T & 0xFF00) {
         gpg_io_insert_u16(T);
@@ -117,6 +190,14 @@ void gpg_io_insert_t(unsigned int T) {
     }
 }
 
+/**
+ * Insert a TAG/LENGTH into the APDU buffer
+ * (To handle TLV)
+ *
+ * @param[in]  T tag to insert
+ * @param[in]  L length to insert
+ *
+ */
 void gpg_io_insert_tl(unsigned int T, unsigned int L) {
     gpg_io_insert_t(T);
     if (L < 128) {
@@ -129,6 +210,15 @@ void gpg_io_insert_tl(unsigned int T, unsigned int L) {
     }
 }
 
+/**
+ * Insert a TAG/LENGTH/VALUE into the APDU buffer
+ * (To handle TLV)
+ *
+ * @param[in]  T tag to insert
+ * @param[in]  L length to insert
+ * @param[in]  V data to insert
+ *
+ */
 void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V) {
     gpg_io_insert_tl(T, L);
     gpg_io_insert(V, L);
@@ -138,6 +228,12 @@ void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V) {
 /* FECTH data from received buffer                                         */
 /* ----------------------------------------------------------------------- */
 
+/**
+ * Read a u32 value from the APDU buffer
+ *
+ * @return  value retrieved
+ *
+ */
 unsigned int gpg_io_fetch_u32() {
     unsigned int v32;
     v32 = U4BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
@@ -145,6 +241,12 @@ unsigned int gpg_io_fetch_u32() {
     return v32;
 }
 
+/**
+ * Read a u24 value from the APDU buffer
+ *
+ * @return  value retrieved
+ *
+ */
 unsigned int gpg_io_fetch_u24() {
     unsigned int v24;
     v24 = ((G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 0] << 16) |
@@ -154,6 +256,12 @@ unsigned int gpg_io_fetch_u24() {
     return v24;
 }
 
+/**
+ * Read a u16 value from the APDU buffer
+ *
+ * @return  value retrieved
+ *
+ */
 unsigned int gpg_io_fetch_u16() {
     unsigned int v16;
     v16 = U2BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
@@ -161,6 +269,12 @@ unsigned int gpg_io_fetch_u16() {
     return v16;
 }
 
+/**
+ * Read a u8 value from the APDU buffer
+ *
+ * @return  value retrieved
+ *
+ */
 unsigned int gpg_io_fetch_u8() {
     unsigned int v8;
     v8 = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
@@ -168,6 +282,13 @@ unsigned int gpg_io_fetch_u8() {
     return v8;
 }
 
+/**
+ * Read a TAG from the APDU buffer
+ * (To handle TLV)
+ *
+ * @param[out]  T read tag
+ *
+ */
 void gpg_io_fetch_t(unsigned int *T) {
     *T = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
     G_gpg_vstate.io_offset++;
@@ -177,6 +298,13 @@ void gpg_io_fetch_t(unsigned int *T) {
     }
 }
 
+/**
+ * Read a LENGTH from the APDU buffer
+ * (To handle TLV)
+ *
+ * @param[out]  L read length
+ *
+ */
 void gpg_io_fetch_l(unsigned int *L) {
     *L = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
 
@@ -196,16 +324,40 @@ void gpg_io_fetch_l(unsigned int *L) {
     }
 }
 
+/**
+ * Read a TAG/LENGTH from the APDU buffer
+ * (To handle TLV)
+ *
+ * @param[out]  T read tag
+ * @param[out]  L read length
+ *
+ */
 void gpg_io_fetch_tl(unsigned int *T, unsigned int *L) {
     gpg_io_fetch_t(T);
     gpg_io_fetch_l(L);
 }
 
+/**
+ * Read a buffer from the APDU buffer and write it in NVRam
+ * (To handle TLV)
+ *
+ * @param[in]  buffer NVRAM address
+ * @param[in]  len buffer length
+ *
+ */
 void gpg_io_fetch_nv(unsigned char *buffer, int len) {
     nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
     G_gpg_vstate.io_offset += len;
 }
 
+/**
+ * Read a buffer from the APDU buffer
+ * (To handle TLV)
+ *
+ * @param[out]  buffer data buffer
+ * @param[in]  len buffer length
+ *
+ */
 int gpg_io_fetch(unsigned char *buffer, int len) {
     if (buffer) {
         memmove(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
@@ -220,6 +372,12 @@ int gpg_io_fetch(unsigned char *buffer, int len) {
 
 #define MAX_OUT GPG_APDU_LENGTH
 
+/**
+ * APDU Receive/transmit
+ *
+ * @param[in]  flag io buffer flag
+ *
+ */
 void gpg_io_do(unsigned int io_flags) {
     unsigned int rx = 0;
 

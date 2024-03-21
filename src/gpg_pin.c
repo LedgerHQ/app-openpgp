@@ -18,6 +18,14 @@
 #include "gpg_vars.h"
 #include "gpg_ux.h"
 
+/**
+ * Get Pin structure from reference ID value
+ *
+ * @param[in]  pinref PinCode reference ID
+ *
+ * @return Pin structure, or NULL if invalid
+ *
+ */
 gpg_pin_t *gpg_pin_get_pin(int pinref) {
     switch (pinref) {
         case PIN_ID_PW1:
@@ -31,6 +39,14 @@ gpg_pin_t *gpg_pin_get_pin(int pinref) {
     return NULL;
 }
 
+/**
+ * Get Pin index from reference ID value
+ *
+ * @param[in]  pinref PinCode reference ID
+ *
+ * @return Pin index
+ *
+ */
 static int gpg_pin_get_state_index(unsigned int pinref) {
     switch (pinref) {
         case PIN_ID_PW1:
@@ -45,6 +61,16 @@ static int gpg_pin_get_state_index(unsigned int pinref) {
     return -1;
 }
 
+/**
+ * Compare the PinCode hash and handle the associated counter
+ *
+ * @param[in]  pin PinCode reference to check
+ * @param[in]  pin_val PinCode value
+ * @param[in]  pin_len PinCode length
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, int pin_len) {
     unsigned int counter;
     cx_err_t error = CX_INTERNAL_ERROR;
@@ -75,6 +101,16 @@ end:
     return error;
 }
 
+/**
+ * Check the PinCode value and set verification status
+ *
+ * @param[in]  pin PinCode reference to check
+ * @param[in]  pin_val PinCode value
+ * @param[in]  pin_len PinCode length
+ *
+ * @return Status Word
+ *
+ */
 int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len) {
     int sw = SW_UNKNOWN;
     gpg_pin_set_verified(pinID, 0);
@@ -85,6 +121,16 @@ int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsig
     return sw;
 }
 
+/**
+ * Set the PinCode value in NVRam
+ *
+ * @param[in]  pin PinCode reference to set
+ * @param[in]  pin_val PinCode value
+ * @param[in]  pin_len PinCode length
+ *
+ * @return Status Word
+ *
+ */
 int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     cx_sha256_t sha256;
     cx_err_t error = CX_INTERNAL_ERROR;
@@ -103,6 +149,13 @@ end:
     return SW_OK;
 }
 
+/**
+ * Change the Pin verification status
+ *
+ * @param[in]  pinID PinCode ID to change
+ * @param[in]  verified new status
+ *
+ */
 void gpg_pin_set_verified(int pinID, int verified) {
     int idx;
     idx = gpg_pin_get_state_index(pinID);
@@ -111,6 +164,14 @@ void gpg_pin_set_verified(int pinID, int verified) {
     }
 }
 
+/**
+ * Check if the selected Pin is verified
+ *
+ * @param[in]  pinID PinCode ID to check
+ *
+ * @return 0 or 1 (false or true)
+ *
+ */
 int gpg_pin_is_verified(int pinID) {
     int idx;
     idx = gpg_pin_get_state_index(pinID);
@@ -120,10 +181,24 @@ int gpg_pin_is_verified(int pinID) {
     return 0;
 }
 
+/**
+ * Check if the selected Pin is blocked
+ *
+ * @param[in]  pin PinCode reference to check
+ *
+ * @return 0 or 1 (false or true)
+ *
+ */
 int gpg_pin_is_blocked(gpg_pin_t *pin) {
     return pin->counter == 0;
 }
 
+/**
+ * APDU handler to Verify PinCode
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_verify() {
     int sw = SW_UNKNOWN;
     gpg_pin_t *pin;
@@ -196,6 +271,12 @@ int gpg_apdu_verify() {
     return SW_WRONG_DATA;
 }
 
+/**
+ * APDU handler to Change PinCode
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_change_ref_data() {
     int sw = SW_UNKNOWN;
     gpg_pin_t *pin;
@@ -237,6 +318,12 @@ int gpg_apdu_change_ref_data() {
     return sw;
 }
 
+/**
+ * APDU handler to Reste PinCode or Counter
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_reset_retry_counter() {
     int sw = SW_UNKNOWN;
     gpg_pin_t *pin_pw1;

@@ -26,6 +26,7 @@
 /* ----------------------------------------------------------------------- */
 /* ---                        NanoX  UI layout                         --- */
 /* ----------------------------------------------------------------------- */
+
 void ui_menu_tmpl_set_action(unsigned int value);
 void ui_menu_tmpl_key_action(unsigned int value);
 void ui_menu_tmpl_type_action(unsigned int value);
@@ -51,6 +52,13 @@ UX_STEP_CB(ux_menu_popup_1_step,
 
 UX_FLOW(ux_flow_popup, &ux_menu_popup_1_step);
 
+/**
+ * Display popup message on screen
+ *
+ * @param[in] msg1 1st part of the message
+ * @param[in] msg2 2nd part of the message
+ *
+ */
 void ui_info(const char *msg1, const char *msg2) {
     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s. %s", msg1, msg2);
     ux_flow_init(0, ux_flow_popup, NULL);
@@ -75,6 +83,10 @@ UX_FLOW(ux_flow_uifconfirm,
         &ux_menu_uifconfirm_3_step,
         &ux_menu_uifconfirm_2_step);
 
+/**
+ * UIF page display preparation callback
+ *
+ */
 void ui_menu_uifconfirm_predisplay() {
     switch (G_gpg_vstate.io_ins) {
         case INS_INTERNAL_AUTHENTICATE:
@@ -103,10 +115,24 @@ void ui_menu_uifconfirm_predisplay() {
     }
 }
 
+/**
+ * UIF page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_uifconfirm_display(unsigned int value) {
     ui_flow_display(ux_flow_uifconfirm, value);
 }
 
+/**
+ * UIF Confirmation Action callback
+ *
+ * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_uifconfirm_action(unsigned int value) {
     unsigned int sw = SW_SECURITY_UIF_ISSUE;
 
@@ -165,6 +191,10 @@ UX_FLOW(ux_flow_pinconfirm,
         &ux_menu_pinconfirm_2_step,
         &ux_menu_pinconfirm_3_step);
 
+/**
+ * Pin Confirm page display preparation callback
+ *
+ */
 void ui_menu_pinconfirm_predisplay() {
     if ((G_gpg_vstate.io_p2 == PIN_ID_PW1) || (G_gpg_vstate.io_p2 == PIN_ID_PW2) ||
         (G_gpg_vstate.io_p2 == PIN_ID_PW3)) {
@@ -178,11 +208,25 @@ void ui_menu_pinconfirm_predisplay() {
     }
 }
 
+/**
+ * Pin Confirm page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_pinconfirm_display(unsigned int value) {
     UNUSED(value);
     ux_flow_init(0, ux_flow_pinconfirm, NULL);
 }
 
+/**
+ * Pin Confirm Confirmation Action callback
+ *
+ * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_pinconfirm_action(unsigned int value) {
     unsigned int sw = SW_UNKNOWN;
 
@@ -250,6 +294,14 @@ const bagl_element_t ui_pinentry_action[] = {
 
 static const char C_pin_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '<', 'A', 'V'};
 
+/**
+ * Pin Entry page display preparation callback
+ *
+ * @param[in] element selected element to display
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
     if (element->component.userid == 1) {
         if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
@@ -301,6 +353,12 @@ unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
     return 1;
 }
 
+/**
+ * Pin Entry page display
+ *
+ * @param[in] value indicate if pin is reset
+ *
+ */
 void ui_menu_pinentry_display(unsigned int value) {
     if (value == 0) {
         explicit_bzero(G_gpg_vstate.ux_pinentry, sizeof(G_gpg_vstate.ux_pinentry));
@@ -310,6 +368,10 @@ void ui_menu_pinentry_display(unsigned int value) {
     UX_DISPLAY(ui_pinentry_action, (void *) ui_pinentry_predisplay);
 }
 
+/**
+ * Pin Entry Validation callback
+ *
+ */
 static void validate_pin() {
     unsigned int offset, len, sw = SW_UNKNOWN;
     gpg_pin_t *pin;
@@ -385,6 +447,15 @@ static void validate_pin() {
     }
 }
 
+/**
+ * Pin Entry page Action callback
+ *
+ * @param[in] button_mask selected button
+ * @param[in] button_mask_counter unused
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int button_mask_counter) {
     UNUSED(button_mask_counter);
     unsigned int offset = G_gpg_vstate.ux_pinLen;
@@ -451,14 +522,28 @@ const char *const tmpl_key_getter_values[] = {LABEL_SIG, LABEL_DEC, LABEL_AUT};
 
 const unsigned int tmpl_key_getter_values_map[] = {1, 2, 3};
 
-const char *tmpl_key_getter(unsigned int idx) {
+/**
+ * Helper to get the key name
+ *
+ * @param[in] idx key index
+ *
+ * @return key name, or NULL if not found
+ *
+ */
+static const char *tmpl_key_getter(unsigned int idx) {
     if (idx < ARRAYLEN(tmpl_key_getter_values)) {
         return tmpl_key_getter_values[idx];
     }
     return NULL;
 }
 
-void tmpl_key_selector(unsigned int idx) {
+/**
+ * Helper to select the key name and display the Template page
+ *
+ * @param[in] idx key index
+ *
+ */
+static void tmpl_key_selector(unsigned int idx) {
     if (idx < ARRAYLEN(tmpl_key_getter_values)) {
         idx = tmpl_key_getter_values_map[idx];
     } else {
@@ -486,14 +571,28 @@ const unsigned int tmpl_type_getter_values_map[] = {2048,
                                                     CX_CURVE_SECP256R1,
                                                     CX_CURVE_Ed25519};
 
-const char *tmpl_type_getter(unsigned int idx) {
+/**
+ * Helper to get the key type
+ *
+ * @param[in] idx key index
+ *
+ * @return key type, or NULL if not found
+ *
+ */
+static const char *tmpl_type_getter(unsigned int idx) {
     if (idx < ARRAYLEN(tmpl_type_getter_values)) {
         return tmpl_type_getter_values[idx];
     }
     return NULL;
 }
 
-void tmpl_type_selector(unsigned int idx) {
+/**
+ * Helper to select the key type and display the Template page
+ *
+ * @param[in] idx key index
+ *
+ */
+static void tmpl_type_selector(unsigned int idx) {
     if (idx < ARRAYLEN(tmpl_type_getter_values)) {
         idx = tmpl_type_getter_values_map[idx];
     } else {
@@ -546,6 +645,10 @@ UX_FLOW(ux_flow_template,
         &ux_menu_template_3_step,
         &ux_menu_template_4_step);
 
+/**
+ * Template page display preparation callback
+ *
+ */
 void ui_menu_template_predisplay() {
     switch (G_gpg_vstate.ux_key) {
         case 1:
@@ -589,10 +692,21 @@ void ui_menu_template_predisplay() {
     }
 }
 
+/**
+ * Template page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_template_display(unsigned int value) {
     ui_flow_display(ux_flow_template, value);
 }
 
+/**
+ * Template Action callback
+ *
+ * @param[in] value unused
+ */
 void ui_menu_tmpl_set_action(unsigned int value) {
     UNUSED(value);
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
@@ -696,14 +810,28 @@ UX_STEP_CB(ux_menu_seedmode_2_step,
 
 UX_FLOW(ux_flow_seedmode, &ux_menu_seedmode_1_step, &ux_menu_seedmode_2_step);
 
+/**
+ * Seed Mode page display preparation callback
+ *
+ */
 void ui_menu_seedmode_predisplay() {
     snprintf(CUR_SEED_MODE, sizeof(CUR_SEED_MODE), "%s", G_gpg_vstate.seed_mode ? "ON" : "OFF");
 }
 
+/**
+ * Seed Mode page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_seedmode_display(unsigned int value) {
     ui_flow_display(ux_flow_seedmode, value);
 }
 
+/**
+ * Seed Mode toggle callback
+ *
+ */
 static void toggle_seed() {
     if (G_gpg_vstate.seed_mode) {
         G_gpg_vstate.seed_mode = 0;
@@ -746,6 +874,12 @@ UX_FLOW(ui_seed_disabling_flow,
         &ui_seed_warning_flow_cancel_step,
         &ui_seed_disabling_flow_confirm_step);
 
+/**
+ * Seed Mode Action callback
+ *
+ * @param[in] value seed mode state
+ *
+ */
 void ui_menu_seedmode_action(unsigned int value) {
     if (value == 1) {
         // Current value is 'enable' -> Confirm deactivate
@@ -807,6 +941,10 @@ UX_FLOW(ux_flow_pinmode,
         &ux_menu_pinmode_4_step,
         &ux_menu_pinmode_5_step);
 
+/**
+ * Pin Mode page display preparation callback
+ *
+ */
 void ui_menu_pinmode_predisplay() {
     snprintf(ONSCR_BUFF, 5, "%s", PIN_MODE_SCREEN == G_gpg_vstate.pinmode ? "ON" : "OFF");
     snprintf(CONFI_BUFF, 5, "%s", PIN_MODE_CONFIRM == G_gpg_vstate.pinmode ? "ON" : "OFF");
@@ -826,6 +964,12 @@ void ui_menu_pinmode_predisplay() {
              PIN_MODE_TRUST == N_gpg_pstate->config_pin[0] ? "(Default)" : "");
 }
 
+/**
+ * Pin Mode page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_pinmode_display(unsigned int value) {
     ui_flow_display(ux_flow_pinmode, value);
 }
@@ -860,6 +1004,12 @@ UX_FLOW(ui_trust_selecting_flow,
         &ui_trust_warning_flow_cancel_step,
         &ui_trust_selecting_flow_confirm_step);
 
+/**
+ * Pin Mode Action callback
+ *
+ * @param[in] value token indication the selected action
+ *
+ */
 void ui_menu_pinmode_action(unsigned int value) {
     unsigned char s;
 
@@ -956,16 +1106,32 @@ UX_FLOW(ux_flow_uif,
         &ux_menu_uif_3_step,
         &ux_menu_uif_4_step);
 
+/**
+ * UIF page display preparation callback
+ *
+ */
 void ui_menu_uifmode_predisplay() {
     snprintf(SIG_BUFF, sizeof(SIG_BUFF), "%s", G_gpg_vstate.kslot->sig.UIF[0] ? "ON" : "OFF");
     snprintf(DEC_BUFF, sizeof(DEC_BUFF), "%s", G_gpg_vstate.kslot->dec.UIF[0] ? "ON" : "OFF");
     snprintf(AUT_BUFF, sizeof(AUT_BUFF), "%s", G_gpg_vstate.kslot->aut.UIF[0] ? "ON" : "OFF");
 }
 
+/**
+ * UIF page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_uifmode_display(unsigned int value) {
     ui_flow_display(ux_flow_uif, value);
 }
 
+/**
+ * UIF Confirmation Action callback
+ *
+ * @param[in] value indicate the targeted key
+ *
+ */
 void ui_menu_uifmode_action(unsigned int value) {
     unsigned char *uif;
     unsigned char new_uif;
@@ -1009,10 +1175,22 @@ UX_STEP_CB(ux_menu_reset_2_step, bn, ui_menu_reset_action(0), {"YES!", "Reset th
 
 UX_FLOW(ux_flow_reset, &ux_menu_reset_1_step, &ux_menu_reset_2_step);
 
+/**
+ * Reset page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_reset_display(unsigned int value) {
     ux_flow_init(value, ux_flow_reset, NULL);
 }
 
+/**
+ * Reset Action callback
+ *
+ * @param[in] value unused
+ *
+ */
 void ui_menu_reset_action(unsigned int value) {
     UNUSED(value);
     unsigned char magic[4];
@@ -1031,6 +1209,14 @@ void ui_menu_reset_action(unsigned int value) {
 const char *const settings_getter_values[] =
     {"Key template", "Seed mode", "PIN mode", "UIF mode", "Reset", "Back"};
 
+/**
+ * Helper to retrieve page title
+ *
+ * @param[in] idx page index
+ *
+ * @return page title, or NULL
+ *
+ */
 const char *settings_getter(unsigned int idx) {
     if (idx < ARRAYLEN(settings_getter_values)) {
         return settings_getter_values[idx];
@@ -1038,6 +1224,12 @@ const char *settings_getter(unsigned int idx) {
     return NULL;
 }
 
+/**
+ * Settings page display
+ *
+ * @param[in] idx page index
+ *
+ */
 void settings_selector(unsigned int idx) {
     switch (idx) {
         case 0:
@@ -1061,6 +1253,12 @@ void settings_selector(unsigned int idx) {
     }
 }
 
+/**
+ * Settings page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_settings_display(unsigned int value) {
     ux_menulist_init_select(G_ux.stack_count - 1, settings_getter, settings_selector, value);
 }
@@ -1112,6 +1310,10 @@ UX_FLOW(ux_flow_slot,
         &ux_menu_slot_4_step,
         &ux_menu_slot_5_step);
 
+/**
+ * Slot page display preparation callback
+ *
+ */
 void ui_menu_slot_predisplay() {
     snprintf(SLOT1,
              sizeof(SLOT1),
@@ -1130,10 +1332,22 @@ void ui_menu_slot_predisplay() {
              3 == G_gpg_vstate.slot + 1 ? "+" : " ");
 }
 
+/**
+ * Slot page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_slot_display(unsigned int value) {
     ui_flow_display(ux_flow_slot, value);
 }
 
+/**
+ * Slot Action callback
+ *
+ * @param[in] value token indication the selected action
+ *
+ */
 void ui_menu_slot_action(unsigned int value) {
     unsigned char s;
 
@@ -1177,6 +1391,12 @@ UX_STEP_CB(ux_menu_info_2_step,
 
 UX_FLOW(ux_flow_info, &ux_menu_info_1_step, &ux_menu_info_2_step);
 
+/**
+ * Info page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_info_display(unsigned int value) {
     UNUSED(value);
     ux_flow_init(0, ux_flow_info, NULL);
@@ -1210,6 +1430,10 @@ UX_FLOW(ux_flow_main,
         &ux_menu_main_4_step,
         &ux_menu_main_5_step);
 
+/**
+ * Main page display preparation callback
+ *
+ */
 void ui_menu_main_predisplay() {
     explicit_bzero(G_gpg_vstate.ux_buff1, sizeof(G_gpg_vstate.ux_buff1));
     memmove(G_gpg_vstate.ux_buff1, (void *) (N_gpg_pstate->name.value), 20);
@@ -1230,6 +1454,12 @@ void ui_menu_main_predisplay() {
              G_gpg_vstate.slot + 1);
 }
 
+/**
+ * Main page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_main_display(unsigned int value) {
     // reserve a display stack slot if none yet
     if (G_ux.stack_count == 0) {
@@ -1241,6 +1471,10 @@ void ui_menu_main_display(unsigned int value) {
 
 /* --- INIT --- */
 
+/**
+ * home page definition
+ *
+ */
 void ui_init(void) {
     ui_menu_main_display(0);
 }
