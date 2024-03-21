@@ -34,6 +34,8 @@
 #define LABEL_Ed25519   "Ed25519"
 
 void ui_CCID_reset(void);
+void app_quit(void);
+void app_reset(void);
 void ui_init(void);
 void ui_menu_pinconfirm_display(unsigned int value);
 void ui_menu_pinentry_display(unsigned int value);

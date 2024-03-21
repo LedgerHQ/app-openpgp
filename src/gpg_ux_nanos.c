@@ -47,10 +47,10 @@ unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int bu
  * @param[in] menu_display next page display callback
  *
  */
-void ui_info(const char *msg1, const char *msg2, const void *menu_display, unsigned int value) {
+void ui_info(const char *msg1, const char *msg2, const void *menu_display) {
     explicit_bzero(&G_gpg_vstate.ui_dogsays[0], sizeof(ux_menu_entry_t));
     G_gpg_vstate.ui_dogsays[0].callback = menu_display;
-    G_gpg_vstate.ui_dogsays[0].userid = value;
+    G_gpg_vstate.ui_dogsays[0].userid = 0;
     G_gpg_vstate.ui_dogsays[0].line1 = msg1;
     G_gpg_vstate.ui_dogsays[0].line2 = msg2;
 
@@ -471,7 +471,7 @@ static void validate_pin() {
                      sizeof(G_gpg_vstate.menu),
                      " %d tries remaining",
                      pin->counter);
-            ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
+            ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display);
         } else {
             ui_menu_main_display(0);
         }
@@ -496,7 +496,7 @@ static void validate_pin() {
                          sizeof(G_gpg_vstate.menu),
                          " %d tries remaining",
                          pin->counter);
-                ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
+                ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display);
                 return;
             }
             offset = 1 + G_gpg_vstate.work.io_buffer[0];
@@ -508,7 +508,7 @@ static void validate_pin() {
                 gpg_io_discard(1);
                 gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
                 gpg_io_do(IO_RETURN_AFTER_TX);
-                ui_info(PIN_DIFFERS, EMPTY, ui_menu_main_display, 0);
+                ui_info(PIN_DIFFERS, EMPTY, ui_menu_main_display);
             } else {
                 sw = gpg_pin_set(gpg_pin_get_pin(G_gpg_vstate.io_p2),
                                  G_gpg_vstate.work.io_buffer + offset + 1,
@@ -749,7 +749,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
             break;
     }
     if (attributes.value[0] == 0) {
-        ui_info(INVALID_SELECTION, TEMPLATE_TYPE, ui_menu_template_display, 0);
+        ui_info(INVALID_SELECTION, TEMPLATE_TYPE, ui_menu_template_display);
         return;
     }
 
@@ -770,9 +770,9 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     if (dest != NULL) {
         nvm_write(dest, NULL, sizeof(gpg_key_t));
         nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-        ui_info(OK, EMPTY, ui_menu_template_display, 0);
+        ui_info(OK, EMPTY, ui_menu_template_display);
     } else {
-        ui_info(INVALID_SELECTION, TEMPLATE_KEY, ui_menu_template_display, 0);
+        ui_info(INVALID_SELECTION, TEMPLATE_KEY, ui_menu_template_display);
     }
 }
 
@@ -981,7 +981,7 @@ void ui_menu_pinmode_action(unsigned int value) {
         case 128:
             if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
                 if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
-                    ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_menu_pinmode_display, 0);
+                    ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_menu_pinmode_display);
                     return;
                 }
                 // set new mode
@@ -999,7 +999,7 @@ void ui_menu_pinmode_action(unsigned int value) {
                 break;
             }
             if ((gpg_pin_is_verified(PIN_ID_PW1) == 0) && (gpg_pin_is_verified(PIN_ID_PW2) == 0)) {
-                ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+                ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display);
                 return;
             }
             G_gpg_vstate.pinmode = value;
@@ -1012,7 +1012,7 @@ void ui_menu_pinmode_action(unsigned int value) {
                 break;
             }
             if (!gpg_pin_is_verified(PIN_ID_PW3)) {
-                ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+                ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display);
                 return;
             }
             // Confirm request
@@ -1024,7 +1024,7 @@ void ui_menu_pinmode_action(unsigned int value) {
             break;
         default:
             value = 0;
-            ui_info(INVALID_SELECTION, EMPTY, ui_menu_pinmode_display, 0);
+            ui_info(INVALID_SELECTION, EMPTY, ui_menu_pinmode_display);
             break;
     }
     ui_menu_pinmode_display(value);
@@ -1107,7 +1107,7 @@ void ui_menu_uifmode_action(unsigned int value) {
             uif = &G_gpg_vstate.kslot->aut.UIF[0];
             break;
         default:
-            ui_info(INVALID_SELECTION, EMPTY, ui_menu_uifmode_display, 0);
+            ui_info(INVALID_SELECTION, EMPTY, ui_menu_uifmode_display);
             return;
     }
     if (uif[0] == 0) {
@@ -1117,7 +1117,7 @@ void ui_menu_uifmode_action(unsigned int value) {
         new_uif = 0;
         nvm_write(&uif[0], &new_uif, 1);
     } else /*if (uif[0] == 2 )*/ {
-        ui_info(UIF_LOCKED, EMPTY, ui_menu_uifmode_display, 0);
+        ui_info(UIF_LOCKED, EMPTY, ui_menu_uifmode_display);
         return;
     }
     ui_menu_uifmode_display(value);
@@ -1139,15 +1139,8 @@ const ux_menu_entry_t ui_menu_reset[] = {
  */
 void ui_menu_reset_action(unsigned int value) {
     UNUSED(value);
-    unsigned char magic[4];
-    magic[0] = 0;
-    magic[1] = 0;
-    magic[2] = 0;
-    magic[3] = 0;
-    nvm_write((void *) (N_gpg_pstate->magic), magic, 4);
-    gpg_init();
-    ui_CCID_reset();
-    ui_menu_main_display(0);
+
+    app_reset();
 }
 
 /* ------------------------------- SETTINGS UX ------------------------------- */
@@ -1181,7 +1174,7 @@ const ux_menu_entry_t ui_menu_main[] = {
     {NULL, NULL, 0, NULL, "", "", 0, 0},
     {ui_menu_settings, NULL, 0, NULL, "Settings", NULL, 0, 0},
     {ui_menu_info, NULL, 0, NULL, "About", NULL, 0, 0},
-    {NULL, (void *) os_sched_exit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
+    {NULL, (void *) app_quit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
     UX_MENU_END};
 
 /**
@@ -1238,10 +1231,6 @@ void ui_init(void) {
     ui_menu_main_display(0);
     // setup the first screen changing
     UX_CALLBACK_SET_INTERVAL(1000);
-}
-
-void io_seproxyhal_display(const bagl_element_t *element) {
-    io_seproxyhal_display_default((bagl_element_t *) element);
 }
 
 #endif  // defined(HAVE_BAGL) && defined(TARGET_NANOS)

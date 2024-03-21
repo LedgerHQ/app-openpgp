@@ -1193,15 +1193,8 @@ void ui_menu_reset_display(unsigned int value) {
  */
 void ui_menu_reset_action(unsigned int value) {
     UNUSED(value);
-    unsigned char magic[4];
-    magic[0] = 0;
-    magic[1] = 0;
-    magic[2] = 0;
-    magic[3] = 0;
-    nvm_write((void *) (N_gpg_pstate->magic), magic, 4);
-    gpg_init();
-    ui_CCID_reset();
-    ui_menu_main_display(0);
+
+    app_reset();
 }
 
 /* ------------------------------- SETTINGS UX ------------------------------- */
@@ -1421,7 +1414,7 @@ UX_STEP_CB(ux_menu_main_3_step, pb, ui_menu_settings_display(0), {&C_icon_coggle
 
 UX_STEP_CB(ux_menu_main_4_step, pb, ui_menu_info_display(0), {&C_icon_certificate, "About"});
 
-UX_STEP_CB(ux_menu_main_5_step, pb, os_sched_exit(0), {&C_icon_dashboard_x, "Quit app"});
+UX_STEP_CB(ux_menu_main_5_step, pb, app_quit(), {&C_icon_dashboard_x, "Quit app"});
 
 UX_FLOW(ux_flow_main,
         &ux_menu_main_1_step,
@@ -1477,10 +1470,6 @@ void ui_menu_main_display(unsigned int value) {
  */
 void ui_init(void) {
     ui_menu_main_display(0);
-}
-
-void io_seproxyhal_display(const bagl_element_t *element) {
-    io_seproxyhal_display_default((bagl_element_t *) element);
 }
 
 #endif  // defined(HAVE_BAGL) && (defined(TARGET_NANOX) || defined(TARGET_NANOS2))

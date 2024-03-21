@@ -89,11 +89,6 @@ static void ui_setting_header(const char* title,
 //  ----------------------- HOME PAGE -------------------------
 //  -----------------------------------------------------------
 
-void app_quit(void) {
-    // exit app here
-    os_sched_exit(-1);
-}
-
 /**
  * home page definition
  *
@@ -840,15 +835,12 @@ static bool reset_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
  */
 static void reset_ctrl_cb(int token, uint8_t index) {
     UNUSED(index);
-    unsigned char magic[4] = {0, 0, 0, 0};
 
     if (token != TOKEN_RESET) {
         return;
     }
-    nvm_write((void*) (N_gpg_pstate->magic), magic, sizeof(magic));
-    gpg_init();
-    ui_CCID_reset();
-    ui_init();
+
+    app_reset();
 }
 
 /* ------------------------------- SETTINGS UX ------------------------------- */

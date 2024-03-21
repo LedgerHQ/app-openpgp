@@ -24,7 +24,7 @@
 /* -- A Kind of Magic -- */
 /* ----------------------*/
 
-const unsigned char C_MAGIC[8] = {'G', 'P', 'G', 'C', 'A', 'R', 'D', '3'};
+const unsigned char C_MAGIC[MAGIC_LENGTH] = {'G', 'P', 'G', 'C', 'A', 'R', 'D', '3'};
 /* ----------------------*/
 /* --ECC OID -- */
 /* ----------------------*/
@@ -374,9 +374,9 @@ const unsigned char C_sha256_PW2[] = {
 void gpg_init() {
     explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     // first init ?
-    if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC)) != 0) {
+    if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH) != 0) {
         gpg_install(STATE_ACTIVATE);
-        nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC));
+        nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
         explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     }
 
@@ -389,10 +389,6 @@ void gpg_init() {
     // seed conf
     G_gpg_vstate.seed_mode = 1;
     // ux conf
-    gpg_init_ux();
-}
-
-void gpg_init_ux() {
     G_gpg_vstate.ux_type = -1;
     G_gpg_vstate.ux_key = -1;
 }
