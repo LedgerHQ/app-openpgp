@@ -20,6 +20,12 @@
 const unsigned char C_MF[] = {0x3F, 0x00};
 const unsigned char C_ATR[] = {0x2F, 0x02};
 
+/**
+ * APDU handler to Select the card
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_select() {
     int sw = SW_UNKNOWN;
 

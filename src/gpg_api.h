@@ -18,17 +18,27 @@
 #ifndef GPG_API_H
 #define GPG_API_H
 
-void gpg_activate_pinpad(uint8_t enabled);
+/* ----------------------------------------------------------------------- */
+/* ---                              INIT                              ---- */
+/* ----------------------------------------------------------------------- */
 
+void gpg_activate_pinpad(uint8_t enabled);
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len);
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len);
 unsigned int gpg_curve2domainlen(unsigned int cv);
 
 void gpg_init(void);
-void gpg_init_ux(void);
 void gpg_install(unsigned char app_state);
-void gpg_install_slot(gpg_key_slot_t *slot);
+
+/* ----------------------------------------------------------------------- */
+/* ---                            DISPATCH                            ---- */
+/* ----------------------------------------------------------------------- */
+
 int gpg_dispatch(void);
+
+/* ----------------------------------------------------------------------- */
+/* ---                              DATA                              ---- */
+/* ----------------------------------------------------------------------- */
 
 void gpg_apdu_select_data(unsigned int ref, int record);
 int gpg_apdu_get_data(unsigned int ref);
@@ -36,6 +46,10 @@ int gpg_apdu_get_next_data(unsigned int ref);
 int gpg_apdu_put_data(unsigned int ref);
 int gpg_apdu_get_key_data(unsigned int ref);
 int gpg_apdu_put_key_data(unsigned int ref);
+
+/* ----------------------------------------------------------------------- */
+/* ---                              PSO                               ---- */
+/* ----------------------------------------------------------------------- */
 
 int gpg_pso_derive_slot_seed(int slot, unsigned char *seed);
 int gpg_pso_derive_key_seed(unsigned char *Sn,
@@ -45,27 +59,48 @@ int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned int Ski_len);
 int gpg_apdu_pso(void);
 int gpg_apdu_internal_authenticate(void);
+
+/* ----------------------------------------------------------------------- */
+/* ---                              GEN                               ---- */
+/* ----------------------------------------------------------------------- */
+
 int gpg_apdu_gen(void);
+
+/* ----------------------------------------------------------------------- */
+/* ---                           CHALLENGE                            ---- */
+/* ----------------------------------------------------------------------- */
+
 int gpg_apdu_get_challenge(void);
 
+/* ----------------------------------------------------------------------- */
+/* ---                            SELECT                              ---- */
+/* ----------------------------------------------------------------------- */
+
 int gpg_apdu_select(void);
+
+/* ----------------------------------------------------------------------- */
+/* ---                              PIN                               ---- */
+/* ----------------------------------------------------------------------- */
 
 int gpg_apdu_verify(void);
 int gpg_apdu_change_ref_data(void);
 int gpg_apdu_reset_retry_counter(void);
 
 gpg_pin_t *gpg_pin_get_pin(int id);
-int gpg_pin_is_blocked(gpg_pin_t *pin);
 int gpg_pin_is_verified(int pinID);
 void gpg_pin_set_verified(int pinID, int verified);
 int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len);
 int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
 
+/* ----------------------------------------------------------------------- */
+/* ---                              MSE                               ---- */
+/* ----------------------------------------------------------------------- */
+
 void gpg_mse_reset();
 int gpg_apdu_mse();
 
 /* ----------------------------------------------------------------------- */
-/* ---                                  IO                            ---- */
+/* ---                               IO                               ---- */
 /* ----------------------------------------------------------------------- */
 void gpg_io_discard(int clear);
 void gpg_io_clear(void);

@@ -17,6 +17,13 @@
 
 #include "gpg_vars.h"
 
+/**
+ * Set a new MSE configuration
+ *
+ * @param[in]  crt selected key
+ * @param[in]  ref new operation type
+ *
+ */
 static void gpg_mse_set(int crt, int ref) {
     if (crt == KEY_AUT) {
         if (ref == 0x02) {
@@ -37,11 +44,21 @@ static void gpg_mse_set(int crt, int ref) {
     }
 }
 
+/**
+ * Reset MSE config
+ *
+ */
 void gpg_mse_reset() {
     gpg_mse_set(KEY_AUT, 0x03);
     gpg_mse_set(KEY_DEC, 0x02);
 }
 
+/**
+ * APDU handler to Manage Security Environment
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_mse() {
     int crt, ref;
 

@@ -926,9 +926,6 @@ class GPGCard() :
         if not attributes or len(attributes) == 0:
             return ""
 
-        if attributes[0] not in set(iter(PubkeyAlgo)):
-            return ""
-
         if attributes[0] == PubkeyAlgo.RSA:
             if attributes[5] == 0:
                 fmt = "standard (e, p, q)"
@@ -944,14 +941,12 @@ class GPGCard() :
             return ret
 
         if attributes[0] == PubkeyAlgo.ECDSA:
-            ret = "ECDSA"
+            return "ECDSA"
         if attributes[0] == PubkeyAlgo.ECDH:
-            ret = "ECDH"
+            return "ECDH"
         if attributes[0] == PubkeyAlgo.EDDSA:
-            ret = "EDDSA"
-        else:
-            ret = ""
-        return ret
+            return "EDDSA"
+        return ""
 
 
     def decode_key(self, key: str) -> dict:

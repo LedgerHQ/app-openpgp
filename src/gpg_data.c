@@ -19,12 +19,27 @@
 #include "gpg_ux.h"
 #include "cx_errors.h"
 
+/**
+ * Select a DO (Data Object) in the current template
+ *
+ * @param[in] ref DO tag
+ * @param[in] record Offset of the record
+ *
+ */
 void gpg_apdu_select_data(unsigned int ref, int record) {
     G_gpg_vstate.DO_current = ref;
     G_gpg_vstate.DO_reccord = record;
     G_gpg_vstate.DO_offset = 0;
 }
 
+/**
+ * Read a DO (Data Object) from the card
+ *
+ * @param[in] ref DO tag
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_get_data(unsigned int ref) {
     int sw = SW_UNKNOWN;
 
@@ -211,6 +226,14 @@ int gpg_apdu_get_data(unsigned int ref) {
     return sw;
 }
 
+/**
+ * Read the next instance of the same DO (Data Object) from the card
+ *
+ * @param[in] ref DO tag
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_get_next_data(unsigned int ref) {
     int sw = SW_UNKNOWN;
 
@@ -224,6 +247,14 @@ int gpg_apdu_get_next_data(unsigned int ref) {
     return sw;
 }
 
+/**
+ * Write a DO (Data Object) to the card
+ *
+ * @param[in] ref DO tag
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_put_data(unsigned int ref) {
     unsigned int t, l, sw;
     unsigned int *ptr_l = NULL;
@@ -799,6 +830,15 @@ end:
     return error;
 }
 
+/**
+ * Init an encryption key to protect Private Key
+ * Used for Backup/Restore
+ *
+ * @param[out] keyenc aes encryption key
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_init_keyenc(cx_aes_key_t *keyenc) {
     int sw = SW_UNKNOWN;
     unsigned char seed[32];
@@ -821,8 +861,15 @@ end:
     return SW_OK;
 }
 
-// cmd
-// resp  TID API COMPAT len_pub len_priv priv
+/**
+ * Read a Key DO (Data Object) from the card
+ * for Backup
+ *
+ * @param[in] ref DO tag
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_get_key_data(unsigned int ref) {
     cx_aes_key_t keyenc = {0};
     gpg_key_t *keygpg = NULL;
@@ -932,8 +979,15 @@ end:
     return error;
 }
 
-// cmd   TID API COMPAT len_pub len_priv priv
-// resp  -
+/**
+ * Write a key DO (Data Object) to the card
+ * For Restore
+ *
+ * @param[in] ref DO tag
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_put_key_data(unsigned int ref) {
     cx_aes_key_t keyenc = {0};
     gpg_key_t *keygpg = NULL;

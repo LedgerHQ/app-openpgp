@@ -41,6 +41,7 @@
 #define GPG_MIN_PW1_LENGTH 6
 #define GPG_MIN_PW3_LENGTH 8
 
+#define MAGIC_LENGTH       8
 #define AID_LENGTH         16
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
@@ -136,7 +137,7 @@ typedef struct gpg_key_slot_s {
 
 struct gpg_nv_state_s {
     /* magic */
-    unsigned char magic[8];
+    unsigned char magic[MAGIC_LENGTH];
 
     /* pin mode */
     unsigned char config_pin[1];

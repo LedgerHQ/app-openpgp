@@ -39,10 +39,18 @@ unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int bu
 
 /* ------------------------------- Helpers  UX ------------------------------- */
 
-void ui_info(const char *msg1, const char *msg2, const void *menu_display, unsigned int value) {
+/**
+ * Display popup message on screen
+ *
+ * @param[in] msg1 1st part of the message
+ * @param[in] msg2 2nd part of the message
+ * @param[in] menu_display next page display callback
+ *
+ */
+void ui_info(const char *msg1, const char *msg2, const void *menu_display) {
     explicit_bzero(&G_gpg_vstate.ui_dogsays[0], sizeof(ux_menu_entry_t));
     G_gpg_vstate.ui_dogsays[0].callback = menu_display;
-    G_gpg_vstate.ui_dogsays[0].userid = value;
+    G_gpg_vstate.ui_dogsays[0].userid = 0;
     G_gpg_vstate.ui_dogsays[0].line1 = msg1;
     G_gpg_vstate.ui_dogsays[0].line2 = msg2;
 
@@ -95,11 +103,25 @@ const bagl_element_t ui_uifconfirm_action[] = {
      G_gpg_vstate.menu},
 };
 
+/**
+ * UIF page display
+ *
+ * @param[in] value unused
+ *
+ */
 void ui_menu_uifconfirm_display(unsigned int value) {
     UNUSED(value);
     UX_DISPLAY(ui_uifconfirm_action, (void *) ui_uifconfirm_predisplay);
 }
 
+/**
+ * UIF page display preparation callback
+ *
+ * @param[in] element selected element to display
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_uifconfirm_predisplay(const bagl_element_t *element) {
     explicit_bzero(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu));
 
@@ -140,6 +162,15 @@ unsigned int ui_uifconfirm_predisplay(const bagl_element_t *element) {
     return 1;
 }
 
+/**
+ * UIF page Action callback
+ *
+ * @param[in] button_mask selected button
+ * @param[in] button_mask_counter unused
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_uifconfirm_action_button(unsigned int button_mask,
                                          unsigned int button_mask_counter) {
     UNUSED(button_mask_counter);
@@ -216,6 +247,14 @@ const bagl_element_t ui_pinconfirm_action[] = {
      G_gpg_vstate.menu},
 };
 
+/**
+ * Pin Confirm display preparation callback
+ *
+ * @param[in] element selected element to display
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_pinconfirm_predisplay(const bagl_element_t *element) {
     if (element->component.userid == 1) {
         if ((G_gpg_vstate.io_p2 == PIN_ID_PW1) || (G_gpg_vstate.io_p2 == PIN_ID_PW2) ||
@@ -239,11 +278,26 @@ unsigned int ui_pinconfirm_predisplay(const bagl_element_t *element) {
     return 1;
 }
 
+/**
+ * Pin Confirm page display
+ *
+ * @param[in] value unused
+ *
+ */
 void ui_menu_pinconfirm_display(unsigned int value) {
     UNUSED(value);
     UX_DISPLAY(ui_pinconfirm_action, (void *) ui_pinconfirm_predisplay);
 }
 
+/**
+ * Pin Confirm Action callback
+ *
+ * @param[in] button_mask selected button
+ * @param[in] button_mask_counter unused
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_pinconfirm_action_button(unsigned int button_mask,
                                          unsigned int button_mask_counter) {
     UNUSED(button_mask_counter);
@@ -317,6 +371,14 @@ const bagl_element_t ui_pinentry_action[] = {
 
 static const char C_pin_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '<', 'A', 'V'};
 
+/**
+ * Pin Entry display preparation callback
+ *
+ * @param[in] element selected element to display
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
     if (element->component.userid == 1) {
         if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
@@ -368,6 +430,12 @@ unsigned int ui_pinentry_predisplay(const bagl_element_t *element) {
     return 1;
 }
 
+/**
+ * Pin Entry page display
+ *
+ * @param[in] value indicate if pin is reset
+ *
+ */
 void ui_menu_pinentry_display(unsigned int value) {
     if (value == 0) {
         explicit_bzero(G_gpg_vstate.ux_pinentry, sizeof(G_gpg_vstate.ux_pinentry));
@@ -377,6 +445,10 @@ void ui_menu_pinentry_display(unsigned int value) {
     UX_DISPLAY(ui_pinentry_action, (void *) ui_pinentry_predisplay);
 }
 
+/**
+ * Pin Entry Validation callback
+ *
+ */
 static void validate_pin() {
     unsigned int offset, len, sw = SW_UNKNOWN;
     gpg_pin_t *pin;
@@ -399,7 +471,7 @@ static void validate_pin() {
                      sizeof(G_gpg_vstate.menu),
                      " %d tries remaining",
                      pin->counter);
-            ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
+            ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display);
         } else {
             ui_menu_main_display(0);
         }
@@ -424,7 +496,7 @@ static void validate_pin() {
                          sizeof(G_gpg_vstate.menu),
                          " %d tries remaining",
                          pin->counter);
-                ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display, 0);
+                ui_info(WRONG_PIN, G_gpg_vstate.menu, ui_menu_main_display);
                 return;
             }
             offset = 1 + G_gpg_vstate.work.io_buffer[0];
@@ -436,7 +508,7 @@ static void validate_pin() {
                 gpg_io_discard(1);
                 gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
                 gpg_io_do(IO_RETURN_AFTER_TX);
-                ui_info(PIN_DIFFERS, EMPTY, ui_menu_main_display, 0);
+                ui_info(PIN_DIFFERS, EMPTY, ui_menu_main_display);
             } else {
                 sw = gpg_pin_set(gpg_pin_get_pin(G_gpg_vstate.io_p2),
                                  G_gpg_vstate.work.io_buffer + offset + 1,
@@ -452,6 +524,15 @@ static void validate_pin() {
     }
 }
 
+/**
+ * Pin Entry page Action callback
+ *
+ * @param[in] button_mask selected button
+ * @param[in] button_mask_counter unused
+ *
+ * @return Error code
+ *
+ */
 unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int button_mask_counter) {
     UNUSED(button_mask_counter);
     unsigned int offset = G_gpg_vstate.ux_pinLen;
@@ -541,6 +622,15 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
     {ui_menu_template, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
+/**
+ * Template page display preparation callback
+ *
+ * @param[in] entry selected menu to display
+ * @param[in] element selected element to display
+ *
+ * @return Eelement to display
+ *
+ */
 const bagl_element_t *ui_menu_template_predisplay(const ux_menu_entry_t *entry,
                                                   bagl_element_t *element) {
     if (element->component.userid == 0x20) {
@@ -593,10 +683,22 @@ const bagl_element_t *ui_menu_template_predisplay(const ux_menu_entry_t *entry,
     return element;
 }
 
+/**
+ * Template page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_template_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_template, ui_menu_template_predisplay);
 }
 
+/**
+ * Template Action callback
+ *
+ * @param[in] value unused
+ *
+ */
 void ui_menu_tmpl_set_action(unsigned int value) {
     UNUSED(value);
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
@@ -647,7 +749,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
             break;
     }
     if (attributes.value[0] == 0) {
-        ui_info(INVALID_SELECTION, TEMPLATE_TYPE, ui_menu_template_display, 0);
+        ui_info(INVALID_SELECTION, TEMPLATE_TYPE, ui_menu_template_display);
         return;
     }
 
@@ -668,17 +770,29 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     if (dest != NULL) {
         nvm_write(dest, NULL, sizeof(gpg_key_t));
         nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-        ui_info(OK, EMPTY, ui_menu_template_display, 0);
+        ui_info(OK, EMPTY, ui_menu_template_display);
     } else {
-        ui_info(INVALID_SELECTION, TEMPLATE_KEY, ui_menu_template_display, 0);
+        ui_info(INVALID_SELECTION, TEMPLATE_KEY, ui_menu_template_display);
     }
 }
 
+/**
+ * Key Name Template Action callback
+ *
+ * @param[in] value selected key
+ *
+ */
 void ui_menu_tmpl_key_action(unsigned int value) {
     G_gpg_vstate.ux_key = value;
     ui_menu_template_display(0);
 }
 
+/**
+ * Key Type Template Action callback
+ *
+ * @param[in] value selected key
+ *
+ */
 void ui_menu_tmpl_type_action(unsigned int value) {
     G_gpg_vstate.ux_type = value;
     ui_menu_template_display(1);
@@ -693,6 +807,15 @@ const ux_menu_entry_t ui_menu_seedmode[] = {
     {ui_menu_settings, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
+/**
+ * Seed Mode page display preparation callback
+ *
+ * @param[in] entry selected menu to display
+ * @param[in] element selected element to display
+ *
+ * @return Eelement to display
+ *
+ */
 const bagl_element_t *ui_menu_seedmode_predisplay(const ux_menu_entry_t *entry,
                                                   bagl_element_t *element) {
     if (element->component.userid == 0x20) {
@@ -707,10 +830,22 @@ const bagl_element_t *ui_menu_seedmode_predisplay(const ux_menu_entry_t *entry,
     return element;
 }
 
+/**
+ * Seed Mode page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_seedmode_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_seedmode, ui_menu_seedmode_predisplay);
 }
 
+/**
+ * Seed Mode toggle callback
+ *
+ * @param[in] value selected seed mode
+ *
+ */
 static void toggle_seed(unsigned int value) {
     if (value != 128) {
         return;
@@ -746,6 +881,12 @@ const ux_menu_entry_t ui_seed_warning[] = {
     {NULL, toggle_seed, 128, &C_icon_validate_14, "Disable", NULL, 0, 0},
     UX_MENU_END};
 
+/**
+ * Seed Mode Action callback
+ *
+ * @param[in] value selected mode
+ *
+ */
 void ui_menu_seedmode_action(unsigned int value) {
     if (value == 0) {
         // Request deactivate
@@ -772,10 +913,25 @@ const ux_menu_entry_t ui_menu_pinmode[] = {
     {ui_menu_settings, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
+/**
+ * Pin Mode page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_pinmode_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_pinmode, ui_menu_pinmode_predisplay);
 }
 
+/**
+ * Pin Mode page display preparation callback
+ *
+ * @param[in] entry selected menu to display
+ * @param[in] element selected element to display
+ *
+ * @return element to display
+ *
+ */
 const bagl_element_t *ui_menu_pinmode_predisplay(const ux_menu_entry_t *entry,
                                                  bagl_element_t *element) {
     if (element->component.userid == 0x20) {
@@ -811,6 +967,12 @@ const ux_menu_entry_t ui_trust_warning[] = {
     {NULL, ui_menu_pinmode_action, 127, &C_icon_validate_14, "Select", NULL, 61, 40},
     UX_MENU_END};
 
+/**
+ * Pin Mode Action callback
+ *
+ * @param[in] value selected mode
+ *
+ */
 void ui_menu_pinmode_action(unsigned int value) {
     unsigned char s;
     value = value & 0x7FFF;
@@ -819,7 +981,7 @@ void ui_menu_pinmode_action(unsigned int value) {
         case 128:
             if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
                 if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
-                    ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_menu_pinmode_display, 0);
+                    ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_menu_pinmode_display);
                     return;
                 }
                 // set new mode
@@ -837,7 +999,7 @@ void ui_menu_pinmode_action(unsigned int value) {
                 break;
             }
             if ((gpg_pin_is_verified(PIN_ID_PW1) == 0) && (gpg_pin_is_verified(PIN_ID_PW2) == 0)) {
-                ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+                ui_info(PIN_USER, NOT_VERIFIED, ui_menu_pinmode_display);
                 return;
             }
             G_gpg_vstate.pinmode = value;
@@ -850,7 +1012,7 @@ void ui_menu_pinmode_action(unsigned int value) {
                 break;
             }
             if (!gpg_pin_is_verified(PIN_ID_PW3)) {
-                ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display, 0);
+                ui_info(PIN_ADMIN, NOT_VERIFIED, ui_menu_pinmode_display);
                 return;
             }
             // Confirm request
@@ -862,7 +1024,7 @@ void ui_menu_pinmode_action(unsigned int value) {
             break;
         default:
             value = 0;
-            ui_info(INVALID_SELECTION, EMPTY, ui_menu_pinmode_display, 0);
+            ui_info(INVALID_SELECTION, EMPTY, ui_menu_pinmode_display);
             break;
     }
     ui_menu_pinmode_display(value);
@@ -886,6 +1048,15 @@ void ui_menu_uifmode_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_uifmode, ui_menu_uifmode_predisplay);
 }
 
+/**
+ * UIF page display preparation callback
+ *
+ * @param[in] entry selected menu to display
+ * @param[in] element selected element to display
+ *
+ * @return element to display
+ *
+ */
 const bagl_element_t *ui_menu_uifmode_predisplay(const ux_menu_entry_t *entry,
                                                  bagl_element_t *element) {
     if (element->component.userid == 0x20) {
@@ -916,6 +1087,12 @@ const bagl_element_t *ui_menu_uifmode_predisplay(const ux_menu_entry_t *entry,
     return element;
 }
 
+/**
+ * UIF Action callback
+ *
+ * @param[in] value selected key
+ *
+ */
 void ui_menu_uifmode_action(unsigned int value) {
     unsigned char *uif;
     unsigned char new_uif;
@@ -930,7 +1107,7 @@ void ui_menu_uifmode_action(unsigned int value) {
             uif = &G_gpg_vstate.kslot->aut.UIF[0];
             break;
         default:
-            ui_info(INVALID_SELECTION, EMPTY, ui_menu_uifmode_display, 0);
+            ui_info(INVALID_SELECTION, EMPTY, ui_menu_uifmode_display);
             return;
     }
     if (uif[0] == 0) {
@@ -940,7 +1117,7 @@ void ui_menu_uifmode_action(unsigned int value) {
         new_uif = 0;
         nvm_write(&uif[0], &new_uif, 1);
     } else /*if (uif[0] == 2 )*/ {
-        ui_info(UIF_LOCKED, EMPTY, ui_menu_uifmode_display, 0);
+        ui_info(UIF_LOCKED, EMPTY, ui_menu_uifmode_display);
         return;
     }
     ui_menu_uifmode_display(value);
@@ -954,17 +1131,16 @@ const ux_menu_entry_t ui_menu_reset[] = {
     {NULL, ui_menu_reset_action, 0, NULL, "Yes", NULL, 0, 0},
     UX_MENU_END};
 
+/**
+ * Reset Action callback
+ *
+ * @param[in] value unused
+ *
+ */
 void ui_menu_reset_action(unsigned int value) {
     UNUSED(value);
-    unsigned char magic[4];
-    magic[0] = 0;
-    magic[1] = 0;
-    magic[2] = 0;
-    magic[3] = 0;
-    nvm_write((void *) (N_gpg_pstate->magic), magic, 4);
-    gpg_init();
-    ui_CCID_reset();
-    ui_menu_main_display(0);
+
+    app_reset();
 }
 
 /* ------------------------------- SETTINGS UX ------------------------------- */
@@ -998,9 +1174,18 @@ const ux_menu_entry_t ui_menu_main[] = {
     {NULL, NULL, 0, NULL, "", "", 0, 0},
     {ui_menu_settings, NULL, 0, NULL, "Settings", NULL, 0, 0},
     {ui_menu_info, NULL, 0, NULL, "About", NULL, 0, 0},
-    {NULL, (void *) os_sched_exit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
+    {NULL, (void *) app_quit, 0, &C_icon_dashboard, "Quit app", NULL, 50, 29},
     UX_MENU_END};
 
+/**
+ * Main page display preparation callback
+ *
+ * @param[in] entry selected menu to display
+ * @param[in] element selected element to display
+ *
+ * @return Eelement to display
+ *
+ */
 const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
                                               bagl_element_t *element) {
     if (entry == &ui_menu_main[0]) {
@@ -1026,20 +1211,26 @@ const bagl_element_t *ui_menu_main_predisplay(const ux_menu_entry_t *entry,
     }
     return element;
 }
+/**
+ * Main page display
+ *
+ * @param[in] value flow step
+ *
+ */
 void ui_menu_main_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_main, ui_menu_main_predisplay);
 }
 
 /* --- INIT --- */
 
+/**
+ * home page definition
+ *
+ */
 void ui_init(void) {
     ui_menu_main_display(0);
     // setup the first screen changing
     UX_CALLBACK_SET_INTERVAL(1000);
-}
-
-void io_seproxyhal_display(const bagl_element_t *element) {
-    io_seproxyhal_display_default((bagl_element_t *) element);
 }
 
 #endif  // defined(HAVE_BAGL) && defined(TARGET_NANOS)

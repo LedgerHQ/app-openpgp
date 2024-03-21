@@ -31,32 +31,39 @@
 /* ----------------------------------------------------------------------- */
 /* ---                        NBGL  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
-void ui_menu_settings();
-void ui_menu_slot_action();
+static void ui_menu_settings();
+static void ui_menu_slot_action();
 static void settings_ctrl_cb(int token, uint8_t index);
 static void ui_settings_template(void);
 static void ui_settings_seed(void);
 static void ui_settings_pin(void);
 
-// contexts for background and modal pages
+// context for background and modal pages
 static nbgl_layout_t layoutCtx = {0};
-
-enum {
-    TOKEN_SETTINGS_TEMPLATE = FIRST_USER_TOKEN,
-    TOKEN_SETTINGS_SEED,
-    TOKEN_SETTINGS_PIN,
-    TOKEN_SETTINGS_UIF,
-    TOKEN_SETTINGS_RESET,
-};
 
 /* ------------------------------- Helpers  UX ------------------------------- */
 
+/**
+ * Display popup message on screen
+ *
+ * @param[in] msg1 1st part of the message
+ * @param[in] msg2 2nd part of the message
+ *
+ */
 static void ui_info(const char* msg1, const char* msg2, nbgl_callback_t cb, bool isSuccess) {
     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s\n%s", msg1, msg2);
 
     nbgl_useCaseStatus((const char*) G_gpg_vstate.menu, isSuccess, cb);
 };
 
+/**
+ * Display Setting page header
+ *
+ * @param[in] title page title
+ * @param[in] back_token token for back button
+ * @param[in] touch_cb action callback
+ *
+ */
 static void ui_setting_header(const char* title,
                               uint8_t back_token,
                               nbgl_layoutTouchCallback_t touch_cb) {
@@ -82,12 +89,10 @@ static void ui_setting_header(const char* title,
 //  ----------------------- HOME PAGE -------------------------
 //  -----------------------------------------------------------
 
-void app_quit(void) {
-    // exit app here
-    os_sched_exit(-1);
-}
-
-// home page definition
+/**
+ * home page definition
+ *
+ */
 void ui_init(void) {
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
@@ -129,6 +134,13 @@ enum {
     TOKEN_SLOT_BACK,
 };
 
+/**
+ * Slot Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void slot_cb(int token, uint8_t index) {
     switch (token) {
         case TOKEN_SLOT_BACK:
@@ -151,7 +163,11 @@ static void slot_cb(int token, uint8_t index) {
     }
 }
 
-void ui_menu_slot_action(void) {
+/**
+ * Slot Navigation callback
+ *
+ */
+static void ui_menu_slot_action(void) {
     nbgl_layoutRadioChoice_t choices = {0};
     nbgl_layoutButton_t buttonInfo = {0};
     static char* names[GPG_KEYS_SLOTS] = {0};
@@ -191,6 +207,7 @@ void ui_menu_slot_action(void) {
 //  -----------------------------------------------------------
 
 /* ------------------------------- TEMPLATE UX ------------------------------- */
+
 enum {
     TOKEN_TEMPLATE_SIG = FIRST_USER_TOKEN,
     TOKEN_TEMPLATE_DEC,
@@ -222,6 +239,14 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
 
+/**
+ * Determine the selected key type from its attributes
+ *
+ * @param[in] key token describing the selected key
+ *
+ * @return token describing the selected key type
+ *
+ */
 static uint32_t _getKeyType(const uint8_t key) {
     uint8_t* attributes = NULL;
     uint32_t token = 0;
@@ -290,6 +315,13 @@ static uint32_t _getKeyType(const uint8_t key) {
     return token;
 }
 
+/**
+ * Key Template Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void template_key_cb(int token, uint8_t index) {
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
     gpg_key_t* dest = NULL;
@@ -384,6 +416,13 @@ static void template_key_cb(int token, uint8_t index) {
     ui_settings_template();
 }
 
+/**
+ * Template Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void template_cb(int token, uint8_t index) {
     UNUSED(index);
     static nbgl_layoutRadioChoice_t choices = {0};
@@ -411,6 +450,10 @@ static void template_cb(int token, uint8_t index) {
     }
 }
 
+/**
+ * Template Navigation callback
+ *
+ */
 static void ui_settings_template(void) {
     nbgl_layoutBar_t bar = {0};
     uint32_t i;
@@ -458,11 +501,18 @@ static void ui_settings_template(void) {
 }
 
 /* --------------------------------- SEED UX --------------------------------- */
+
 enum {
     TOKEN_SEED = FIRST_USER_TOKEN,
     TOKEN_SEED_BACK,
 };
 
+/**
+ * Seed Mode Confirmation callback
+ *
+ * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
+ *
+ */
 void seed_confirm_cb(bool confirm) {
     if (confirm) {
         G_gpg_vstate.seed_mode = 0;
@@ -473,6 +523,13 @@ void seed_confirm_cb(bool confirm) {
     }
 }
 
+/**
+ * Seed Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void seed_cb(int token, uint8_t index) {
     switch (token) {
         case TOKEN_SEED_BACK:
@@ -494,6 +551,10 @@ static void seed_cb(int token, uint8_t index) {
     }
 }
 
+/**
+ * Seed Navigation callback
+ *
+ */
 static void ui_settings_seed(void) {
     static nbgl_layoutSwitch_t option = {0};
 
@@ -517,6 +578,12 @@ enum {
     TOKEN_PIN_BACK,
 };
 
+/**
+ * Trust Mode Confirmation callback
+ *
+ * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
+ *
+ */
 void trust_cb(bool confirm) {
     if (confirm) {
         G_gpg_vstate.pinmode = G_gpg_vstate.pinmode_req;
@@ -526,6 +593,13 @@ void trust_cb(bool confirm) {
     }
 }
 
+/**
+ * Pin Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void pin_cb(int token, uint8_t index) {
     const char* err = NULL;
     switch (token) {
@@ -582,6 +656,10 @@ static void pin_cb(int token, uint8_t index) {
     }
 }
 
+/**
+ * Pin Navigation callback
+ *
+ */
 static void ui_settings_pin(void) {
     static nbgl_layoutRadioChoice_t choices = {0};
     nbgl_layoutButton_t buttonInfo = {0};
@@ -624,6 +702,7 @@ static void ui_settings_pin(void) {
 }
 
 /* --------------------------------- UIF UX ---------------------------------- */
+
 enum {
     TOKEN_UIF_SIG = FIRST_USER_TOKEN,
     TOKEN_UIF_DEC,
@@ -631,6 +710,13 @@ enum {
     TOKEN_UIF_BACK,
 };
 
+/**
+ * UIF Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void uif_cb(int token, uint8_t index) {
     unsigned char* uif = NULL;
     switch (token) {
@@ -657,6 +743,10 @@ static void uif_cb(int token, uint8_t index) {
     }
 }
 
+/**
+ * UIF Navigation callback
+ *
+ */
 static void ui_settings_uif(void) {
     static nbgl_layoutSwitch_t option = {0};
     uint8_t nbOptions = 0;
@@ -711,10 +801,18 @@ static void ui_settings_uif(void) {
 }
 
 /* -------------------------------- RESET UX --------------------------------- */
+
 enum {
     TOKEN_RESET = FIRST_USER_TOKEN,
 };
 
+/**
+ * Reset Navigation callback
+ *
+ * @param[in] page selected page to display
+ * @param[in] content describe the widgets to display on the page
+ *
+ */
 static bool reset_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
     UNUSED(page);
     explicit_bzero(content, sizeof(nbgl_pageContent_t));
@@ -728,20 +826,32 @@ static bool reset_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
     return true;
 }
 
+/**
+ * Reset Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void reset_ctrl_cb(int token, uint8_t index) {
     UNUSED(index);
-    unsigned char magic[4] = {0, 0, 0, 0};
 
     if (token != TOKEN_RESET) {
         return;
     }
-    nvm_write((void*) (N_gpg_pstate->magic), magic, sizeof(magic));
-    gpg_init();
-    ui_CCID_reset();
-    ui_init();
+
+    app_reset();
 }
 
 /* ------------------------------- SETTINGS UX ------------------------------- */
+
+enum {
+    TOKEN_SETTINGS_TEMPLATE = FIRST_USER_TOKEN,
+    TOKEN_SETTINGS_SEED,
+    TOKEN_SETTINGS_PIN,
+    TOKEN_SETTINGS_UIF,
+    TOKEN_SETTINGS_RESET,
+};
 
 enum {
     SETTINGS_PAGE_PARAMS,
@@ -754,6 +864,14 @@ enum {
 #else
 #define VERSION_STR "App  " XSTR(APPVERSION)
 #endif
+
+/**
+ * Settings Navigation callback
+ *
+ * @param[in] page selected page to display
+ * @param[in] content describe the widgets to display on the page
+ *
+ */
 static bool settings_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
     bool ret = false;
 
@@ -793,6 +911,13 @@ static bool settings_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
     return ret;
 }
 
+/**
+ * Settings Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void settings_ctrl_cb(int token, uint8_t index) {
     UNUSED(index);
     switch (token) {
@@ -820,8 +945,11 @@ static void settings_ctrl_cb(int token, uint8_t index) {
     }
 }
 
-// settings menu definition
-void ui_menu_settings() {
+/**
+ * Settings menu definition
+ *
+ */
+static void ui_menu_settings() {
     nbgl_useCaseSettings(APPNAME,
                          SETTINGS_PAGE_PARAMS,
                          SETTINGS_PAGE_NB,
@@ -832,6 +960,13 @@ void ui_menu_settings() {
 }
 
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
+
+/**
+ * Pin Confirmation callback
+ *
+ * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
+ *
+ */
 void pin_confirm_cb(bool confirm) {
     gpg_pin_set_verified(G_gpg_vstate.io_p2, confirm);
 
@@ -841,6 +976,12 @@ void pin_confirm_cb(bool confirm) {
     ui_init();
 }
 
+/**
+ * Pin Confirmation page display
+ *
+ * @param[in] value PinCode ID to confirm
+ *
+ */
 void ui_menu_pinconfirm_display(unsigned int value) {
     snprintf(G_gpg_vstate.menu,
              sizeof(G_gpg_vstate.menu),
@@ -851,13 +992,20 @@ void ui_menu_pinconfirm_display(unsigned int value) {
 }
 
 /* ------------------------------ PIN ENTRY UX ----------------------------- */
+
 enum {
     TOKEN_PIN_ENTRY_BACK = FIRST_USER_TOKEN,
 };
 
 static void ui_menu_pinentry_cb(void);
 
-static void validate_pin(const uint8_t* pinentry, uint8_t length) {
+/**
+ * Pin Entry Validation callback
+ *
+ * @param[in] value PinCode ID to confirm
+ *
+ */
+static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
     unsigned int sw = SW_UNKNOWN;
     unsigned int len1 = 0;
     unsigned char* pin1 = NULL;
@@ -952,6 +1100,13 @@ static void validate_pin(const uint8_t* pinentry, uint8_t length) {
     }
 }
 
+/**
+ * Pin Entry Action callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
+ *
+ */
 static void pinentry_cb(int token, uint8_t index) {
     UNUSED(index);
     if (token == TOKEN_PIN_ENTRY_BACK) {
@@ -962,14 +1117,20 @@ static void pinentry_cb(int token, uint8_t index) {
     }
 }
 
-void ui_menu_pinentry_display(unsigned int value) {
+/**
+ * Pin Entry page display
+ *
+ * @param[in] step Pin Entry step
+ *
+ */
+void ui_menu_pinentry_display(unsigned int step) {
     uint8_t minLen;
     char line[10];
 
     // Init the page title
     explicit_bzero(G_gpg_vstate.line, sizeof(G_gpg_vstate.line));
     if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
-        switch (value) {
+        switch (step) {
             case 0:
                 // Default or initial case
                 snprintf(line, sizeof(line), "Current");
@@ -983,7 +1144,7 @@ void ui_menu_pinentry_display(unsigned int value) {
             default:
                 break;
         }
-        G_gpg_vstate.ux_step = value;
+        G_gpg_vstate.ux_step = step;
     } else {
         snprintf(line, sizeof(line), "Enter");
     }
@@ -1001,10 +1162,14 @@ void ui_menu_pinentry_display(unsigned int value) {
                        TOKEN_PIN_ENTRY_BACK,
                        false,
                        TUNE_TAP_CASUAL,
-                       validate_pin,
+                       pinentry_validate_cb,
                        pinentry_cb);
 }
 
+/**
+ * Pin Entry Navigation callback
+ *
+ */
 static void ui_menu_pinentry_cb(void) {
     unsigned int value = 0;
 
@@ -1016,6 +1181,13 @@ static void ui_menu_pinentry_cb(void) {
 }
 
 /* ------------------------------ UIF CONFIRM UX ----------------------------- */
+
+/**
+ * UIF Confirmation callback
+ *
+ * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
+ *
+ */
 void uif_confirm_cb(bool confirm) {
     unsigned int sw = SW_SECURITY_UIF_ISSUE;
 
@@ -1037,6 +1209,12 @@ void uif_confirm_cb(bool confirm) {
     ui_init();
 }
 
+/**
+ * UIF page display
+ *
+ * @param[in] step unused
+ *
+ */
 void ui_menu_uifconfirm_display(unsigned int value) {
     UNUSED(value);
 

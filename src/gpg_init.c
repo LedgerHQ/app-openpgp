@@ -24,7 +24,7 @@
 /* -- A Kind of Magic -- */
 /* ----------------------*/
 
-const unsigned char C_MAGIC[8] = {'G', 'P', 'G', 'C', 'A', 'R', 'D', '3'};
+const unsigned char C_MAGIC[MAGIC_LENGTH] = {'G', 'P', 'G', 'C', 'A', 'R', 'D', '3'};
 /* ----------------------*/
 /* --ECC OID -- */
 /* ----------------------*/
@@ -91,6 +91,15 @@ const unsigned char C_OID_cv25519[10] = {
     0x01,
 };
 
+/**
+ * Retrieve Curve associated to a given OID
+ *
+ * @param[in]  oid Selected OID as a reference
+ * @param[in]  len OID length
+ *
+ * @return Found Curve, or CX_CURVE_NONE if not supported
+ *
+ */
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
     if ((len == sizeof(C_OID_SECP256R1)) && (memcmp(oid, C_OID_SECP256R1, len) == 0)) {
         return CX_CURVE_SECP256R1;
@@ -131,6 +140,15 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
     return CX_CURVE_NONE;
 }
 
+/**
+ * Retrieve OID of the selected Curve
+ *
+ * @param[in]  cv Selected Curve as a reference
+ * @param[out] len OID length
+ *
+ * @return Found OID, or NULL if not supported
+ *
+ */
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
     switch (cv) {
         case CX_CURVE_SECP256R1:
@@ -175,6 +193,14 @@ unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
     return NULL;
 }
 
+/**
+ * Retrieve the selected Curve length
+ *
+ * @param[in]  cv Selected Curve as a reference
+ *
+ * @return Length, or 0 if not supported
+ *
+ */
 unsigned int gpg_curve2domainlen(unsigned int cv) {
     switch (cv) {
         case CX_CURVE_SECP256K1:
@@ -341,12 +367,16 @@ const unsigned char C_sha256_PW2[] = {
 /* --- boot init                                                       --- */
 /* ----------------------------------------------------------------------- */
 
+/**
+ * App global config
+ *
+ */
 void gpg_init() {
     explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     // first init ?
-    if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC)) != 0) {
+    if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH) != 0) {
         gpg_install(STATE_ACTIVATE);
-        nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, sizeof(C_MAGIC));
+        nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
         explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     }
 
@@ -359,10 +389,6 @@ void gpg_init() {
     // seed conf
     G_gpg_vstate.seed_mode = 1;
     // ux conf
-    gpg_init_ux();
-}
-
-void gpg_init_ux() {
     G_gpg_vstate.ux_type = -1;
     G_gpg_vstate.ux_key = -1;
 }
@@ -370,6 +396,13 @@ void gpg_init_ux() {
 /* ----------------------------------------------------------------------- */
 /* ---  Install/ReInstall GPGapp                                       --- */
 /* ----------------------------------------------------------------------- */
+
+/**
+ * App dedicated slot config
+ *
+ * @param[in]  slot Selected slot to configure
+ *
+ */
 void gpg_install_slot(gpg_key_slot_t *slot) {
     unsigned char tmp[4];
     unsigned int l;
@@ -396,6 +429,12 @@ void gpg_install_slot(gpg_key_slot_t *slot) {
     nvm_write((void *) (&slot->aut.UIF), &tmp, 2);
 }
 
+/**
+ * App 1st installation or reinstallation
+ *
+ * @param[in] app_state  Current App (card) state
+ *
+ */
 void gpg_install(unsigned char app_state) {
     gpg_pin_t pin;
 
@@ -459,6 +498,14 @@ void gpg_install(unsigned char app_state) {
     }
 }
 
+/**
+ * Setup pinpad configuration
+ *
+ * @param[in]  enabled pinpad configuration
+ *
+ * @return N/A
+ *
+ */
 void gpg_activate_pinpad(uint8_t enabled) {
     uint8_t e = enabled ? 3 : 0;
 

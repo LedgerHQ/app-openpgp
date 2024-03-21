@@ -19,8 +19,14 @@
 #include "cx_ram.h"
 #include "cx_errors.h"
 
-/* @in slot     slot num [0 ; GPG_KEYS_SLOTS[
- * @out seed    32 bytes master seed for given slot
+/**
+ * Derivate the App Path from the Master Seed for a specific slot
+ *
+ * @param[in] slot Selected slot
+ * @param[out] seed 32 bytes seed for given slot
+ *
+ * @return Status Word
+ *
  */
 int gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
     unsigned int path[2];
@@ -39,11 +45,17 @@ end:
     return SW_OK;
 }
 
-/* @in  Sn         master seed slot number
- * @in  key_name   key name: 'sig ', 'auth ', 'dec '
- * @in  idx        sub-seed index
- * @out Ski        generated sub_seed
- * @in  Ski_len    sub-seed length
+/**
+ * Derivate the Key from the Generated Seed
+ *
+ * @param[in]  Sn Seed for the selected slot
+ * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  idx sub-seed index
+ * @param[out] Ski generated sub_seed
+ * @param[in]  Ski_len sub-seed length
+ *
+ * @return Status Word
+ *
  */
 int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned char *key_name,
@@ -74,6 +86,15 @@ end:
     return SW_OK;
 }
 
+/**
+ * Generate a RSA key pair and writes it in NVRam
+ *
+ * @param[in]  keygpg pointer on key structure
+ * @param[in]  name key name: 'sig ', 'auth ', 'dec '
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
     cx_rsa_public_key_t *rsa_pub = NULL;
     cx_rsa_private_key_t *rsa_priv = NULL;
@@ -146,6 +167,14 @@ end:
     return error;
 }
 
+/**
+ * Read a RSA key pair
+ *
+ * @param[in]  keygpg pointer on key structure
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
     uint32_t ksz = 0;
 
@@ -182,6 +211,15 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
     return SW_OK;
 }
 
+/**
+ * Generate an Elliptic Curve key pair and writes it in NVRam
+ *
+ * @param[in]  keygpg pointer on key structure
+ * @param[in]  name key name: 'sig ', 'auth ', 'dec '
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
     uint32_t curve = 0, keepprivate = 0;
     uint32_t ksz = 0, reset_cnt = 0;
@@ -225,6 +263,14 @@ end:
     return error;
 }
 
+/**
+ * Read an Elliptic Curve key pair
+ *
+ * @param[in]  keygpg pointer on key structure
+ *
+ * @return Status Word
+ *
+ */
 static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     uint32_t curve = 0;
     uint32_t i, len;
@@ -262,7 +308,12 @@ end:
     return error;
 }
 
-/* assume command is fully received */
+/**
+ * APDU handler to Generate/Read key pair
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_gen() {
     uint32_t t, l;
     gpg_key_t *keygpg = NULL;

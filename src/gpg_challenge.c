@@ -18,6 +18,12 @@
 #include "gpg_vars.h"
 #include "cx_errors.h"
 
+/**
+ * Generate a Random Number
+ *
+ * @return Status Word
+ *
+ */
 int gpg_apdu_get_challenge() {
     unsigned int olen;
     cx_err_t error = CX_INTERNAL_ERROR;

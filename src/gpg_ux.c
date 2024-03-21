@@ -16,9 +16,38 @@
  *  limitations under the License.
  *****************************************************************************/
 
+#include "gpg_vars.h"
+#include "gpg_ux.h"
 #include "usbd_ccid_if.h"
 
+/**
+ * Reset CCID
+ *
+ */
 void ui_CCID_reset(void) {
     io_usb_ccid_set_card_inserted(0);
     io_usb_ccid_set_card_inserted(1);
+}
+
+/**
+ * Exit app
+ *
+ */
+void app_quit(void) {
+    // exit app here
+    os_sched_exit(0);
+}
+
+/**
+ * Reset app
+ *
+ */
+void app_reset(void) {
+    unsigned char magic[MAGIC_LENGTH];
+
+    explicit_bzero(magic, MAGIC_LENGTH);
+    nvm_write((void*) (N_gpg_pstate->magic), magic, MAGIC_LENGTH);
+    gpg_init();
+    ui_CCID_reset();
+    ui_init();
 }
