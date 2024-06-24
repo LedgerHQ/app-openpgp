@@ -17,7 +17,7 @@
  *****************************************************************************/
 
 #include "bolos_target.h"
-#if defined(HAVE_NBGL) && defined(TARGET_STAX)
+#if defined(HAVE_NBGL) && (defined(TARGET_STAX) || defined(TARGET_FLEX))
 
 #include "os.h"
 #include "glyphs.h"
@@ -1240,4 +1240,4 @@ void ui_menu_uifconfirm_display(unsigned int value) {
     nbgl_useCaseChoice(NULL, "Confirm operation", G_gpg_vstate.menu, "Yes", "No", uif_confirm_cb);
 }
 
-#endif  // defined(HAVE_NBGL) && defined(TARGET_STAX)
+#endif  // defined(HAVE_NBGL) && (defined(TARGET_STAX) || defined(TARGET_FLEX))

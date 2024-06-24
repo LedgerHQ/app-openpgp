@@ -125,6 +125,12 @@ Thus, you must ensure (or add):
   - ifdProductID: 0x6009
   - ifdFriendlyName: Ledger Stax
 
+- for Flex:
+
+  - ifdVendorID: 0x2C97
+  - ifdProductID: 0x7009
+  - ifdFriendlyName: Ledger Flex
+
 Notes:
 
 - The 3 entry nodes must be added for each device. It can be easier to add new ones at the end of each list.

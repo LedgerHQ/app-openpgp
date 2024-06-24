@@ -50,6 +50,7 @@ ICON_NANOS = icons/gpg_16px.gif
 ICON_NANOX = icons/gpg_14px.gif
 ICON_NANOSP = icons/gpg_14px.gif
 ICON_STAX = icons/gpg_32px.gif
+ICON_FLEX = icons/gpg_40px.gif
 
 # Application allowed derivation curves.
 # Possibles curves are: secp256k1, secp256r1, ed25519 and bls12381g1
