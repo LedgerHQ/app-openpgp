@@ -197,7 +197,7 @@ with:
 Select Slot
 -------------
 
-For Nanos, this menu is only available on *XL* version. It is available on all other devices.
+This menu is not available on Nanos, limited to a single slot. It is available on all other devices.
 
 A Slot is a set of 3 key pairs *Signature, Decryption, Authentication* as defined by gnupg specification.
 
@@ -414,7 +414,7 @@ Configuration
 
 In order to use a Ledger device with gpg it is needed to explicitly setup
 the reader and the delegated PIN support.
-Edit the file ``~/.gnupg/scdaemon.conf`` and add the following lines:
+Create or edit the file ``~/.gnupg/scdaemon.conf`` and add the following lines:
 
  | ``reader-port "Ledger Token"``
  | ``allow-admin``
