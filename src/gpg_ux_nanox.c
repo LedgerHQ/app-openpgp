@@ -1195,6 +1195,7 @@ void ui_menu_reset_action(unsigned int value) {
     UNUSED(value);
 
     app_reset();
+    ui_init();
 }
 
 /* ------------------------------- SETTINGS UX ------------------------------- */
