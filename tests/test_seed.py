@@ -5,7 +5,13 @@
 This module provides Ragger tests for Signing feature with SEED mode
 """
 import sys
+from typing import Union
 import pytest
+
+from Crypto.PublicKey.RSA import RsaKey
+from Crypto.PublicKey.ECC import EccKey
+
+from ragger.backend import BackendInterface
 
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, DataObject, PassWord, PubkeyAlgo
@@ -14,7 +20,7 @@ from utils import get_RSA_pub_key, get_ECDSA_pub_key, get_EDDSA_pub_key
 from utils import check_pincode, generate_key, get_key_attributes, KEY_TEMPLATES
 
 
-def _gen_key(client: CommandSender, template: str):
+def _gen_key(client: CommandSender, template: str) -> Union[RsaKey,EccKey]:
 
     # Verify PW3 (Admin)
     check_pincode(client, PassWord.PW3)
@@ -50,7 +56,7 @@ def _gen_key(client: CommandSender, template: str):
         # "cv25519",   # ECDH, SDK returns CX_EC_INVALID_CURVE
     ],
 )
-def test_seed_key(backend, template):
+def test_seed_key(backend: BackendInterface, template: str) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 

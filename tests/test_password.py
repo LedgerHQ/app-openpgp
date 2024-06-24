@@ -4,11 +4,16 @@
 """
 This module provides Ragger tests for Password feature
 """
+from pathlib import Path
 import pytest
+from ragger.error import ExceptionRAPDU
+from ragger.backend import BackendInterface
+from ragger.firmware import Firmware
+from ragger.navigator import Navigator
+
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, PassWord
 
-from ragger.error import ExceptionRAPDU
 
 from utils import util_navigate
 
@@ -22,7 +27,7 @@ from utils import util_navigate
         (PassWord.PW3, "12345678"),
     ],
 )
-def test_verify(backend, pwd, value):
+def test_verify(backend: BackendInterface, pwd: PassWord, value: str) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -49,7 +54,7 @@ def test_verify(backend, pwd, value):
     assert err.value.status & 0xFFF0 == 0x63c0
 
 
-def test_verify_wrong(backend):
+def test_verify_wrong(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -60,7 +65,10 @@ def test_verify_wrong(backend):
 
 
 # In this test we check the card Password verification with Pinpad
-def test_verify_confirm_accepted(firmware, backend, navigator, test_name):
+def test_verify_confirm_accepted(firmware: Firmware,
+                                 backend: BackendInterface,
+                                 navigator: Navigator,
+                                 test_name: Path) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -70,11 +78,14 @@ def test_verify_confirm_accepted(firmware, backend, navigator, test_name):
 
     # Check the status (Asynchronous)
     response = client.get_async_response()
-    assert response.status == Errors.SW_OK
+    assert response and response.status == Errors.SW_OK
 
 
 # In this test we check the Rejected card Password verification with Pinpad
-def test_verify_confirm_refused(firmware, backend, navigator, test_name):
+def test_verify_confirm_refused(firmware: Firmware,
+                                backend: BackendInterface,
+                                navigator: Navigator,
+                                test_name: Path) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -96,7 +107,7 @@ def test_verify_confirm_refused(firmware, backend, navigator, test_name):
         (PassWord.PW3, "12345678", "87654321"),
     ],
 )
-def test_change(backend, pwd, actual, new):
+def test_change(backend: BackendInterface, pwd: PassWord, actual: str, new: str) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -114,7 +125,7 @@ def test_change(backend, pwd, actual, new):
 
 
 # In this test we check the Password Reset
-def test_reset(backend):
+def test_reset(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -136,7 +147,7 @@ def test_reset(backend):
 
 
 # In this test we check the Get Challenge
-def test_challenge(backend):
+def test_challenge(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
