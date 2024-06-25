@@ -24,7 +24,7 @@ help() {
   echo
   echo "Options:"
   echo
-  echo "  -c <init|reset|card|encrypt|decryptsign|verify>  : Requested command"
+  echo "  -c <init|reset|card|encrypt|decrypt|sign|verify>  : Requested command"
   echo "  -e     : Expert mode mode"
   echo "  -v     : Verbose mode"
   echo "  -h     : Displays this help"

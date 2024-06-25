@@ -103,7 +103,7 @@ Usage: ./manual.sh <options>
 
 Options:
 
-  -c <init|card|encrypt|decryptsign|verify>  : Requested command
+  -c <init|card|encrypt|decrypt|sign|verify>  : Requested command
   -v     : Verbose mode
   -h     : Displays this help
 ```
