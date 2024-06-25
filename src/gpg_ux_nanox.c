@@ -781,7 +781,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     if (dest != NULL) {
         nvm_write(dest, NULL, sizeof(gpg_key_t));
         nvm_write(&dest->attributes, &attributes, sizeof(attributes));
-        ui_menu_template_display(1);
+        ui_menu_template_display(0);
     } else {
         ui_info(INVALID_SELECTION, TEMPLATE_KEY);
     }
