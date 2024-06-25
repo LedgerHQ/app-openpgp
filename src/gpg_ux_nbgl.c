@@ -323,6 +323,16 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
 
+#ifdef NO_DECRYPT_cv25519
+static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
+                                              LABEL_RSA3072,
+#ifdef WITH_SUPPORT_RSA4096
+                                              LABEL_RSA4096,
+#endif
+                                              LABEL_SECP256K1,
+                                              LABEL_SECP256R1};
+#endif
+
 /**
  * Determine the selected key type from its attributes
  *
@@ -523,8 +533,16 @@ static void template_cb(int token, uint8_t index) {
                               TOKEN_TYPE_BACK,
                               template_key_cb);
 
-            choices.names = (const char* const*) keyTypeTexts;
-            choices.nbChoices = ARRAYLEN(keyTypeTexts);
+#ifdef NO_DECRYPT_cv25519
+            if (token == TOKEN_TEMPLATE_DEC) {
+                choices.names = (const char* const*) keyTypeDecTexts;
+                choices.nbChoices = ARRAYLEN(keyTypeDecTexts);
+            } else
+#endif
+            {
+                choices.names = (const char* const*) keyTypeTexts;
+                choices.nbChoices = ARRAYLEN(keyTypeTexts);
+            }
             choices.initChoice = _getKeyType(token) - FIRST_USER_TOKEN;
             choices.token = token;
             nbgl_layoutAddRadioChoice(layoutCtx, &choices);

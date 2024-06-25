@@ -570,6 +570,23 @@ const unsigned int tmpl_type_getter_values_map[] = {2048,
                                                     CX_CURVE_SECP256K1,
                                                     CX_CURVE_SECP256R1,
                                                     CX_CURVE_Ed25519};
+#ifdef NO_DECRYPT_cv25519
+const char *const tmpl_type_getter_Decvalues[] = {LABEL_RSA2048,
+                                                  LABEL_RSA3072,
+#ifdef WITH_SUPPORT_RSA4096
+                                                  LABEL_RSA4096,
+#endif
+                                                  LABEL_SECP256K1,
+                                                  LABEL_SECP256R1};
+
+const unsigned int tmpl_type_getter_Decvalues_map[] = {2048,
+                                                       3072,
+#ifdef WITH_SUPPORT_RSA4096
+                                                       4096,
+#endif
+                                                       CX_CURVE_SECP256K1,
+                                                       CX_CURVE_SECP256R1};
+#endif
 
 /**
  * Helper to get the key type
@@ -580,8 +597,17 @@ const unsigned int tmpl_type_getter_values_map[] = {2048,
  *
  */
 static const char *tmpl_type_getter(unsigned int idx) {
-    if (idx < ARRAYLEN(tmpl_type_getter_values)) {
-        return tmpl_type_getter_values[idx];
+#ifdef NO_DECRYPT_cv25519
+    if (G_gpg_vstate.ux_key == 2) {
+        if (idx < ARRAYLEN(tmpl_type_getter_Decvalues)) {
+            return tmpl_type_getter_Decvalues[idx];
+        }
+    } else
+#endif
+    {
+        if (idx < ARRAYLEN(tmpl_type_getter_values)) {
+            return tmpl_type_getter_values[idx];
+        }
     }
     return NULL;
 }
@@ -593,10 +619,21 @@ static const char *tmpl_type_getter(unsigned int idx) {
  *
  */
 static void tmpl_type_selector(unsigned int idx) {
-    if (idx < ARRAYLEN(tmpl_type_getter_values)) {
-        idx = tmpl_type_getter_values_map[idx];
-    } else {
-        idx = 0;
+#ifdef NO_DECRYPT_cv25519
+    if (G_gpg_vstate.ux_key == 2) {
+        if (idx < ARRAYLEN(tmpl_type_getter_Decvalues)) {
+            idx = tmpl_type_getter_Decvalues_map[idx];
+        } else {
+            idx = 0;
+        }
+    } else
+#endif
+    {
+        if (idx < ARRAYLEN(tmpl_type_getter_values)) {
+            idx = tmpl_type_getter_values_map[idx];
+        } else {
+            idx = 0;
+        }
     }
     G_gpg_vstate.ux_type = idx;
     ui_menu_template_display(1);
@@ -684,7 +721,14 @@ void ui_menu_template_predisplay() {
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_SECP256R1);
             break;
         case CX_CURVE_Ed25519:
-            snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_Ed25519);
+#ifdef NO_DECRYPT_cv25519
+            if (G_gpg_vstate.ux_key == 2) {
+                snprintf(KEY_TYPE, sizeof(KEY_TYPE), "Choose type...");
+            } else
+#endif
+            {
+                snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_Ed25519);
+            }
             break;
         default:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), "Choose type...");

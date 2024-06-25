@@ -124,6 +124,8 @@ DEFINES   += HAVE_USB_CLASS_CCID
 DEFINES   += HAVE_RSA
 # Watchdog issue causing the device reset with long prime number computation
 # DEFINES   += WITH_SUPPORT_RSA4096
+# Limitation (maybe due to openpgp itself): no support of DEC operation with cv25519
+DEFINES   += NO_DECRYPT_cv25519
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 DEFINES   += HAVE_UX_LEGACY
