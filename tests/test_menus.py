@@ -161,15 +161,17 @@ def test_menu_settings(firmware: Firmware, backend: BackendInterface, navigator:
             NavInsID.BOTH_CLICK,    # Key Template
             NavInsID.BOTH_CLICK,    # Choose Key
             NavInsID.RIGHT_CLICK,   # Decryption
-            NavInsID.BOTH_CLICK,    # Key Decryption
+            NavInsID.RIGHT_CLICK,   # Authentication
+            NavInsID.BOTH_CLICK,    # Key Authentication
             NavInsID.RIGHT_CLICK,   # Choose Type
             NavInsID.BOTH_CLICK,    # (Select)
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # SECP 256K1
-            NavInsID.RIGHT_CLICK,   # Type SECP 256K1
+            NavInsID.BOTH_CLICK,    # SECP 256R1
+            NavInsID.RIGHT_CLICK,   # Type SECP 256R1
             NavInsID.BOTH_CLICK,    # Set Template
+            NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,    # (Back)
@@ -213,7 +215,7 @@ def test_menu_settings(firmware: Firmware, backend: BackendInterface, navigator:
         if firmware == Firmware.STAX:
             instructions = [
                 NavIns(NavInsID.TOUCH, (350, 130)), # Key Template
-                NavIns(NavInsID.TOUCH, (350, 300)), # Decryption
+                NavIns(NavInsID.TOUCH, (350, 390)), # Authentication
                 NavIns(NavInsID.TOUCH, (350, 390)), # SECP 256K1
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
                 NavIns(NavInsID.TOUCH, (350, 220)), # Seed mode
@@ -232,7 +234,7 @@ def test_menu_settings(firmware: Firmware, backend: BackendInterface, navigator:
         else:
             instructions = [
                 NavIns(NavInsID.TOUCH, (430, 130)), # Key Template
-                NavIns(NavInsID.TOUCH, (430, 280)), # Decryption
+                NavIns(NavInsID.TOUCH, (430, 420)), # Authentication
                 NavIns(NavInsID.TOUCH, (430, 320)), # SECP 256K1
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
                 NavIns(NavInsID.TOUCH, (430, 230)), # Seed mode
