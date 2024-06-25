@@ -1366,13 +1366,9 @@ UX_STEP_NOCB(ux_menu_info_1_step,
              bnnn,
              {
                  "OpenPGP Card",
-                 "(c) Ledger SAS",
+                 "Version " APPVERSION,
                  "Spec  " XSTR(SPEC_VERSION),
-#ifdef HAVE_PRINTF
-                 "[DBG] App  " XSTR(APPVERSION),
-#else
-                 "App  " XSTR(APPVERSION),
-#endif
+                 "(c) Ledger SAS",
              });
 
 UX_STEP_CB(ux_menu_info_2_step,

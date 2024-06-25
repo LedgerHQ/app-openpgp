@@ -1159,13 +1159,9 @@ const ux_menu_entry_t ui_menu_settings[] = {
 
 const ux_menu_entry_t ui_menu_info[] = {
     {NULL, NULL, -1, NULL, "OpenPGP Card", NULL, 0, 0},
-    {NULL, NULL, -1, NULL, "(c) Ledger SAS", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "Version  " APPVERSION, NULL, 0, 0},
     {NULL, NULL, -1, NULL, "Spec  " XSTR(SPEC_VERSION), NULL, 0, 0},
-#ifdef HAVE_PRINTF
-    {NULL, NULL, -1, NULL, "[DBG] App  " XSTR(APPVERSION), NULL, 0, 0},
-#else
-    {NULL, NULL, -1, NULL, "App  " XSTR(APPVERSION), NULL, 0, 0},
-#endif
+    {NULL, NULL, -1, NULL, "(c) Ledger SAS", NULL, 0, 0},
     {NULL, ui_menu_main_display, 3, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 
