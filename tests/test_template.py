@@ -29,7 +29,6 @@ from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO
         # "rsa4096",   # Invalid signature?
         # "nistp256",  # ECDSA, Pb with Pubkey generation?
         "ed25519",   # EdDSA
-        # "cv25519",   # ECDH, SDK returns CX_EC_INVALID_CURVE
     ],
 )
 def test_sign(backend: BackendInterface, template: str) -> None:
