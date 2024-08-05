@@ -82,6 +82,7 @@ opensc-pkcs11: opensc-pkcs11.so
                user-pin-initialized
                protected-authentication-path
                token-initialized
+```
 
 Check the installation of CCID driver and more particularly its device config:
 
@@ -103,10 +104,13 @@ Usage: ./manual.sh <options>
 
 Options:
 
-  -c <init|card|encrypt|decrypt|sign|verify>  : Requested command
+  -c <init|reset|card|encrypt|decrypt|sign|verify|default>  : Requested command
+  -e     : Expert mode
   -v     : Verbose mode
   -h     : Displays this help
 ```
+
+> Note: This script allows to automatically use a test gpg directory, like setting `GNUGPGHOME`
 
 The `init` command allows to prepare a local `gnupg` home directory, with the default minimal config file for *scdaemon*.
 For further investigations, you can also add in the file `manual-tests/gnupg/scdaemon.conf` the following lines:
@@ -116,6 +120,16 @@ debug-level expert
 debug 11
 log-file /tmp/scdaemon.log
 ```
+
+The `reset` command just allows to kill running *scdaemon* or *gpg-agent* processes. Useful to start clean tests.
+
+The `card` command is a shortcut to the `gpg --card-edit` command.
+
+The `default` command, used **after** keys creation, allows to configure the default keys for signature and decryption.
+The information is written in the file `manual-tests/gnupg/gpg.conf`.
+This step is very useful when playing with backup/restore to ensure the default key will be found.
+
+The other commands are shortcuts allowing basic operations to test the key.
 
 ## Step 3: Verify the card status and the pin code
 
