@@ -94,11 +94,9 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 case 3072 / 8:
                     rsa_key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa3072;
                     break;
-#ifdef WITH_SUPPORT_RSA4096
                 case 4096 / 8:
                     rsa_key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa4096;
                     break;
-#endif
                 default:
                     break;
             }
@@ -286,12 +284,10 @@ int gpg_apdu_pso() {
                             rsa_key =
                                 (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa3072;
                             break;
-#ifdef WITH_SUPPORT_RSA4096
                         case 4096 / 8:
                             rsa_key =
                                 (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa4096;
                             break;
-#endif
                     }
 
                     if ((rsa_key == NULL) || (rsa_key->size != ksz)) {
