@@ -7,6 +7,8 @@ This module provides Ragger tests for Cipher feature
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import PKCS1_v1_5
 
+from ragger.backend import BackendInterface
+
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, DataObject, PassWord
 
@@ -14,7 +16,7 @@ from utils import check_pincode, generate_key, get_RSA_pub_key
 
 
 # In this test we check the symmetric key encryption
-def test_AES(backend):
+def test_AES(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -42,7 +44,7 @@ def test_AES(backend):
 
 
 # In this test we check the symmetric key encryption
-def test_Asym(backend):
+def test_Asym(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -68,7 +70,7 @@ def test_Asym(backend):
 
 
 # In this test we check the symmetric key encryption with MSE
-def test_MSE(backend):
+def test_MSE(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 

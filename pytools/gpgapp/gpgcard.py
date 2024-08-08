@@ -1010,6 +1010,7 @@ class GPGCard() :
 
         op = KEY_OPERATIONS[action]
         attributes = None
+        b_key: int = 0
         if key == KeyTypes.KEY_SIG:
             attributes = self.data.sig.attribute
             b_key = DataObject.DO_SIG_KEY
@@ -1167,6 +1168,7 @@ class GPGCard() :
 
         dt = datetime.utcnow().replace(microsecond=0)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
+        tag: Optional[DataObject] = None
         if key == KeyTypes.KEY_SIG:
             self.data.sig.date = dt
             tag = DataObject.DO_DATES_WR_SIG
@@ -1176,7 +1178,8 @@ class GPGCard() :
         elif key == KeyTypes.KEY_DEC:
             self.data.dec.date = dt
             tag = DataObject.DO_DATES_WR_DEC
-        self._put_data(tag, bdate)
+        if tag:
+            self._put_data(tag, bdate)
 
 
     def _decode_tlv(self, tlv: bytes) -> dict:

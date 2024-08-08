@@ -11,6 +11,8 @@ from Crypto.Signature import pkcs1_15, eddsa
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import DSS
 
+from ragger.backend import BackendInterface
+
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, DataObject, PassWord, PubkeyAlgo
 
@@ -27,10 +29,9 @@ from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO
         # "rsa4096",   # Invalid signature?
         # "nistp256",  # ECDSA, Pb with Pubkey generation?
         "ed25519",   # EdDSA
-        # "cv25519",   # ECDH, SDK returns CX_EC_INVALID_CURVE
     ],
 )
-def test_sign(backend, template):
+def test_sign(backend: BackendInterface, template: str) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -67,16 +68,16 @@ def test_sign(backend, template):
 
     # Read the SIG pub Key and Verify the signature
     if key_algo == PubkeyAlgo.RSA:
-        pubkey = get_RSA_pub_key(client, DataObject.DO_SIG_KEY)
-        verifier = pkcs1_15.new(pubkey)
-        verifier.verify(hash_obj, rapdu.data)
+        pubRsakey = get_RSA_pub_key(client, DataObject.DO_SIG_KEY)
+        rsaVerifier = pkcs1_15.new(pubRsakey)
+        rsaVerifier.verify(hash_obj, rapdu.data)
     elif key_algo == PubkeyAlgo.ECDSA:
-        pubkey = get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
-        verifier = DSS.new(pubkey, 'fips-186-3')
+        pubEcckey = get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
+        verifier = DSS.new(pubEcckey, 'fips-186-3')
         verifier.verify(hash_obj, rapdu.data[2:])
     elif key_algo == PubkeyAlgo.EDDSA:
-        pubkey = get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
-        verifier = eddsa.new(pubkey, 'rfc8032')
-        verifier.verify(plain, rapdu.data)
+        pubEcckey = get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
+        eddsaVerifier = eddsa.new(pubEcckey, 'rfc8032')
+        eddsaVerifier.verify(plain, rapdu.data)
     else:
         raise ValueError

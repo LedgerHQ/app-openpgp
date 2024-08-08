@@ -264,6 +264,9 @@ int gpg_apdu_put_data(unsigned int ref) {
     cx_err_t error = CX_INTERNAL_ERROR;
     unsigned int pkey_size = 0;
     unsigned int ksz, curve;
+#ifdef NO_DECRYPT_cv25519
+    bool decKey = false;
+#endif
 
     G_gpg_vstate.DO_current = ref;
 
@@ -655,6 +658,9 @@ int gpg_apdu_put_data(unsigned int ref) {
         case 0xC2:
             ptr_l = &G_gpg_vstate.kslot->dec.attributes.length;
             ptr_v = G_gpg_vstate.kslot->dec.attributes.value;
+#ifdef NO_DECRYPT_cv25519
+            decKey = true;
+#endif
             goto WRITE_ATTRIBUTES;
         case 0xC3:
             ptr_l = &G_gpg_vstate.kslot->aut.attributes.length;
@@ -679,6 +685,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 case KEY_ID_EDDSA:
                     curve =
                         gpg_oid2curve(G_gpg_vstate.work.io_buffer + 1, G_gpg_vstate.io_length - 1);
+#ifdef NO_DECRYPT_cv25519
+                    if ((decKey) && (curve == CX_CURVE_Curve25519)) {
+                        sw = SW_WRONG_DATA;
+                        break;
+                    }
+#endif
                     if (curve == CX_CURVE_NONE) {
                         sw = SW_WRONG_DATA;
                     } else {

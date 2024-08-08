@@ -24,8 +24,8 @@ help() {
   echo
   echo "Options:"
   echo
-  echo "  -c <init|reset|card|encrypt|decryptsign|verify>  : Requested command"
-  echo "  -e     : Expert mode mode"
+  echo "  -c <init|reset|card|encrypt|decrypt|sign|verify|default>  : Requested command"
+  echo "  -e     : Expert mode"
   echo "  -v     : Verbose mode"
   echo "  -h     : Displays this help"
   echo
@@ -40,6 +40,30 @@ help() {
 reset() {
   # Kill running process
   killall scdaemon gpg-agent 2>/dev/null
+}
+
+#===============================================================================
+#
+#     default - Set default key in conf file
+#
+#===============================================================================
+default() {
+  dir=$(basename "${gnupg_home_dir}")
+  if [[ ! -d "${dir}" ]]; then
+    mkdir "${dir}"
+    chmod 700 "${dir}"
+  fi
+
+  recipient=$(gpg --homedir "${gnupg_home_dir}" --card-status | grep "General key info" | awk  '{print $NF}')
+
+  if [[ ${recipient} =~ "none" ]]; then
+    read -r -p "Enter default key name: " recipient
+  fi
+
+  {
+    echo "default-key ${recipient}"
+    echo "default-recipient ${recipient}"
+   } > "${dir}/gpg.conf"
 }
 
 #===============================================================================
@@ -93,19 +117,15 @@ card() {
 #
 #===============================================================================
 encrypt() {
-  local recipient=""
   local verbose_mode=""
+
   reset
   rm -fr foo*
   echo CLEAR > foo.txt
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  recipient=$(gpg --homedir "${gnupg_home_dir}" --card-status  | grep "General key info" | awk  '{print $NF}')
-
-  echo "Encrypt with recipient '${recipient}'"
-
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --encrypt --recipient "${recipient}" foo.txt
+  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --encrypt foo.txt
 }
 
 #===============================================================================
@@ -123,8 +143,7 @@ decrypt() {
   gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --decrypt foo.txt.gpg > foo_dec.txt
 
   # Check with original clear file
-  diff foo.txt foo_dec.txt >/dev/null
-  if [[ $? -eq 0 ]]; then
+  if diff foo.txt foo_dec.txt >/dev/null; then
     echo "Success !"
   else
     echo "Decryption error!"
@@ -180,7 +199,7 @@ while getopts ":c:evh" opt; do
 
     c)
       case ${OPTARG} in
-        init|reset|card|encrypt|decrypt|sign|verify)
+        init|reset|card|encrypt|decrypt|sign|verify|default)
           CMD=${OPTARG}
           ;;
         *)

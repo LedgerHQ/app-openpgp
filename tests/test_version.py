@@ -4,17 +4,18 @@
 """
 This module provides Ragger tests for Version check
 """
+from ragger.utils.misc import get_current_app_name_and_version
+from ragger.backend import BackendInterface
+
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, DataObject, PassWord
 from application_client.response_unpacker import unpack_info_response
-
-from ragger.utils.misc import get_current_app_name_and_version
 
 from utils import verify_name, verify_version, decode_tlv, check_pincode
 
 
 # In this test we check the App name and version
-def test_check_version(backend):
+def test_check_version(backend: BackendInterface) -> None:
     """Check version and name"""
 
     # Send the APDU
@@ -26,7 +27,7 @@ def test_check_version(backend):
 
 
 # In this test we check the Card activation
-def test_activate(backend):
+def test_activate(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -36,7 +37,7 @@ def test_activate(backend):
 
 
 # In this test we get the Card Application ID value
-def test_info(backend):
+def test_info(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -57,7 +58,7 @@ def test_info(backend):
 
 
 # In this test we test the User Data information
-def test_user(backend):
+def test_user(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -89,7 +90,7 @@ def test_user(backend):
     assert rapdu.data.hex()[20:28] == serial
 
 
-def _check_card_value(client, tag: DataObject, value: str):
+def _check_card_value(client: CommandSender, tag: DataObject, value: str) -> None:
 
     rapdu = client.put_data(tag, value.encode("utf-8"))
     assert rapdu.status == Errors.SW_OK
@@ -101,7 +102,7 @@ def _check_card_value(client, tag: DataObject, value: str):
     assert rvalue == value
 
 
-def _check_user_value(client, tag: DataObject, value: str):
+def _check_user_value(client: CommandSender, tag: DataObject, value: str) -> None:
 
     rapdu = client.put_data(tag, value.encode("utf-8"))
     assert rapdu.status == Errors.SW_OK

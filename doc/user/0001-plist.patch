@@ -6,6 +6,7 @@
  		<string>0x2C97</string>
 +		<string>0x2C97</string>
 +		<string>0x2C97</string>
++		<string>0x2C97</string>
  		<string>0x17EF</string>
  		<string>0x17EF</string>
  		<string>0x17EF</string>
@@ -19,6 +20,7 @@
 +		<string>0x4009</string>
 +		<string>0x5009</string>
 +		<string>0x6009</string>
++		<string>0x7009</string>
  		<string>0x6007</string>
  		<string>0x6055</string>
  		<string>0x6111</string>
@@ -28,6 +30,7 @@
  		<string>Ledger Nano X</string>
 +		<string>Ledger Nano S Plus</string>
 +		<string>Ledger Stax</string>
++		<string>Ledger Flex</string>
  		<string>Lenovo Lenovo USB Smartcard Keyboard</string>
  		<string>Lenovo Lenovo USB Smartcard Keyboard</string>
  		<string>Lenovo Lenovo Smartcard Wired Keyboard II</string>

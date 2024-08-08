@@ -125,6 +125,12 @@ Thus, you must ensure (or add):
   - ifdProductID: 0x6009
   - ifdFriendlyName: Ledger Stax
 
+- for Flex:
+
+  - ifdVendorID: 0x2C97
+  - ifdProductID: 0x7009
+  - ifdFriendlyName: Ledger Flex
+
 Notes:
 
 - The 3 entry nodes must be added for each device. It can be easier to add new ones at the end of each list.
@@ -197,7 +203,7 @@ with:
 Select Slot
 -------------
 
-For Nanos, this menu is only available on *XL* version. It is available on all other devices.
+This menu is not available on Nanos, limited to a single slot. It is available on all other devices.
 
 A Slot is a set of 3 key pairs *Signature, Decryption, Authentication* as defined by gnupg specification.
 
@@ -414,7 +420,7 @@ Configuration
 
 In order to use a Ledger device with gpg it is needed to explicitly setup
 the reader and the delegated PIN support.
-Edit the file ``~/.gnupg/scdaemon.conf`` and add the following lines:
+Create or edit the file ``~/.gnupg/scdaemon.conf`` and add the following lines:
 
  | ``reader-port "Ledger Token"``
  | ``allow-admin``
@@ -1137,7 +1143,7 @@ Finally run the following command:
 
  | ``python3 -m gpgcard.gpgcli --pinpad --set-template ed255519:cv25519:ed255519 --set-fingerprints``
  |   ``'2C688345BDDA0EDFB24DB4FB8451AAF7D43D1095:DF157BD4AC3BD1EE991099C80953D871FC4B9EA4:CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB'``
- |   ``--set-serial 'FD6C11BE' --seed-key``
+ |   ``--serial 'FD6C11BE' --seed-key``
 
 Restore lost Keyring
 ~~~~~~~~~~~~~~~~~~~~
@@ -1576,7 +1582,7 @@ To *restore* a backup, simply use the tool like this:
 
  | ``$ ./backup.py --restore --adm-pin 12345678 --user-pin 123456 --seed-key``
  | ``Connect to card 'Ledger'...``
- | ``Configuration saved in file 'gpg_backup'.``
+ | ``Configuration restored from file 'gpg_backup'.``
 
 Annexes
 =======

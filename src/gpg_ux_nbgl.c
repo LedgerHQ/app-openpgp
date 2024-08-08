@@ -17,7 +17,7 @@
  *****************************************************************************/
 
 #include "bolos_target.h"
-#if defined(HAVE_NBGL) && defined(TARGET_STAX)
+#if defined(HAVE_NBGL) && (defined(TARGET_STAX) || defined(TARGET_FLEX))
 
 #include "os.h"
 #include "glyphs.h"
@@ -31,15 +31,16 @@
 /* ----------------------------------------------------------------------- */
 /* ---                        NBGL  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
-static void ui_menu_settings();
 static void ui_menu_slot_action();
-static void settings_ctrl_cb(int token, uint8_t index);
 static void ui_settings_template(void);
 static void ui_settings_seed(void);
 static void ui_settings_pin(void);
+static void ui_settings_uif(void);
+static void ui_reset(void);
 
 // context for background and modal pages
 static nbgl_layout_t layoutCtx = {0};
+static uint8_t setting_initPage;
 
 /* ------------------------------- Helpers  UX ------------------------------- */
 
@@ -76,7 +77,7 @@ static void ui_setting_header(const char* title,
 
     explicit_bzero(&bar, sizeof(nbgl_layoutBar_t));
     bar.text = PIC(title);
-    bar.iconLeft = &C_leftArrow32px;
+    bar.iconLeft = &LEFT_ARROW_ICON;
     bar.token = back_token;
     bar.centered = true;
     bar.inactive = false;
@@ -89,11 +90,48 @@ static void ui_setting_header(const char* title,
 //  ----------------------- HOME PAGE -------------------------
 //  -----------------------------------------------------------
 
+enum {
+    TOKEN_SETTINGS_TEMPLATE = FIRST_USER_TOKEN,
+    TOKEN_SETTINGS_SEED,
+    TOKEN_SETTINGS_PIN,
+    TOKEN_SETTINGS_UIF,
+    TOKEN_SETTINGS_RESET,
+};
+
 /**
- * home page definition
+ * Settings callback
+ *
+ * @param[in] token button Id pressed
+ * @param[in] index widget index on the page
  *
  */
-void ui_init(void) {
+static void controlsCallback(int token, uint8_t index, int page) {
+    UNUSED(index);
+    setting_initPage = page;
+    switch (token) {
+        case TOKEN_SETTINGS_TEMPLATE:
+            ui_settings_template();
+            break;
+        case TOKEN_SETTINGS_SEED:
+            ui_settings_seed();
+            break;
+        case TOKEN_SETTINGS_PIN:
+            ui_settings_pin();
+            break;
+        case TOKEN_SETTINGS_UIF:
+            ui_settings_uif();
+            break;
+        case TOKEN_SETTINGS_RESET:
+            ui_reset();
+            break;
+    }
+}
+
+/**
+ * home page display
+ *
+ */
+static void ui_home_init(void) {
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
 
@@ -114,14 +152,60 @@ void ui_init(void) {
              serial,
              G_gpg_vstate.slot + 1);
 
-    nbgl_useCaseHomeExt(APPNAME,
-                        &C_gpg_64px,
-                        G_gpg_vstate.menu,
-                        true,
-                        "Select Slot",
-                        ui_menu_slot_action,
-                        ui_menu_settings,
-                        app_quit);
+    static nbgl_contentInfoList_t infosList = {0};
+
+    static const char* const infoTypes[] = {"Version", "Specifications", "Developer"};
+    static const char* const infoContents[] = {APPVERSION, XSTR(SPEC_VERSION), "(c) 2024 Ledger"};
+
+    infosList.nbInfos = ARRAYLEN(infoTypes);
+    infosList.infoTypes = (const char**) infoTypes;
+    infosList.infoContents = (const char**) infoContents;
+
+    static nbgl_content_t contents = {0};
+    static nbgl_genericContents_t settingContents = {0};
+
+    static const char* const barTexts[] = {"Key Template",
+                                           "Seed mode",
+                                           "Pin mode",
+                                           "UIF mode",
+                                           "Reset"};
+    static const uint8_t barTokens[] = {TOKEN_SETTINGS_TEMPLATE,
+                                        TOKEN_SETTINGS_SEED,
+                                        TOKEN_SETTINGS_PIN,
+                                        TOKEN_SETTINGS_UIF,
+                                        TOKEN_SETTINGS_RESET};
+    contents.type = BARS_LIST;
+    contents.content.barsList.barTexts = barTexts;
+    contents.content.barsList.tokens = barTokens;
+    contents.content.barsList.nbBars = ARRAYLEN(barTexts);
+    contents.content.barsList.tuneId = TUNE_TAP_CASUAL;
+    contents.contentActionCallback = controlsCallback;
+
+    settingContents.callbackCallNeeded = false;
+    settingContents.contentsList = &contents;
+    settingContents.nbContents = 1;
+
+    static nbgl_homeAction_t actionContent = {0};
+    actionContent.text = "Select Slot";
+    actionContent.callback = ui_menu_slot_action;
+
+    nbgl_useCaseHomeAndSettings(APPNAME,
+                                &C_gpg_64px,
+                                G_gpg_vstate.menu,
+                                setting_initPage,
+                                &settingContents,
+                                &infosList,
+                                &actionContent,
+                                app_quit);
+}
+
+/**
+ * home page init
+ *
+ */
+void ui_init(void) {
+    setting_initPage = INIT_HOME_PAGE;
+    ui_home_init();
 }
 
 //  -----------------------------------------------------------
@@ -238,6 +322,16 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_SECP256K1,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
+
+#ifdef NO_DECRYPT_cv25519
+static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
+                                              LABEL_RSA3072,
+#ifdef WITH_SUPPORT_RSA4096
+                                              LABEL_RSA4096,
+#endif
+                                              LABEL_SECP256K1,
+                                              LABEL_SECP256R1};
+#endif
 
 /**
  * Determine the selected key type from its attributes
@@ -429,7 +523,7 @@ static void template_cb(int token, uint8_t index) {
 
     switch (token) {
         case TOKEN_TEMPLATE_BACK:
-            ui_menu_settings();
+            ui_home_init();
             break;
         case TOKEN_TEMPLATE_SIG:
         case TOKEN_TEMPLATE_DEC:
@@ -439,8 +533,16 @@ static void template_cb(int token, uint8_t index) {
                               TOKEN_TYPE_BACK,
                               template_key_cb);
 
-            choices.names = (const char* const*) keyTypeTexts;
-            choices.nbChoices = ARRAYLEN(keyTypeTexts);
+#ifdef NO_DECRYPT_cv25519
+            if (token == TOKEN_TEMPLATE_DEC) {
+                choices.names = (const char* const*) keyTypeDecTexts;
+                choices.nbChoices = ARRAYLEN(keyTypeDecTexts);
+            } else
+#endif
+            {
+                choices.names = (const char* const*) keyTypeTexts;
+                choices.nbChoices = ARRAYLEN(keyTypeTexts);
+            }
             choices.initChoice = _getKeyType(token) - FIRST_USER_TOKEN;
             choices.token = token;
             nbgl_layoutAddRadioChoice(layoutCtx, &choices);
@@ -451,7 +553,7 @@ static void template_cb(int token, uint8_t index) {
 }
 
 /**
- * Template Navigation callback
+ * Template Settings menu
  *
  */
 static void ui_settings_template(void) {
@@ -489,7 +591,7 @@ static void ui_settings_template(void) {
                 break;
         }
         bar.text = PIC(keyNameTexts[i]);
-        bar.iconRight = &C_Next32px;
+        bar.iconRight = &RIGHT_ARROW_ICON;
         bar.token = TOKEN_TEMPLATE_SIG + i;
         bar.centered = false;
         bar.tuneId = TUNE_TAP_CASUAL;
@@ -533,7 +635,7 @@ void seed_confirm_cb(bool confirm) {
 static void seed_cb(int token, uint8_t index) {
     switch (token) {
         case TOKEN_SEED_BACK:
-            ui_menu_settings();
+            ui_home_init();
             break;
         case TOKEN_SEED:
             if (index == 0) {
@@ -552,7 +654,7 @@ static void seed_cb(int token, uint8_t index) {
 }
 
 /**
- * Seed Navigation callback
+ * Seed Settings menu
  *
  */
 static void ui_settings_seed(void) {
@@ -604,7 +706,7 @@ static void pin_cb(int token, uint8_t index) {
     const char* err = NULL;
     switch (token) {
         case TOKEN_PIN_BACK:
-            ui_menu_settings();
+            ui_home_init();
             break;
         case TOKEN_PIN_SET:
             if (G_gpg_vstate.pinmode == index) {
@@ -657,7 +759,7 @@ static void pin_cb(int token, uint8_t index) {
 }
 
 /**
- * Pin Navigation callback
+ * Pin Settings menu
  *
  */
 static void ui_settings_pin(void) {
@@ -721,7 +823,7 @@ static void uif_cb(int token, uint8_t index) {
     unsigned char* uif = NULL;
     switch (token) {
         case TOKEN_UIF_BACK:
-            ui_menu_settings();
+            ui_home_init();
             break;
         case TOKEN_UIF_SIG:
             uif = &G_gpg_vstate.kslot->sig.UIF[0];
@@ -737,14 +839,14 @@ static void uif_cb(int token, uint8_t index) {
         return;
     }
     if (uif[0] == 2) {
-        ui_info(UIF_LOCKED, EMPTY, ui_menu_settings, false);
+        ui_info(UIF_LOCKED, EMPTY, ui_home_init, false);
     } else if (uif[0] != index) {
         nvm_write(&uif[0], &index, 1);
     }
 }
 
 /**
- * UIF Navigation callback
+ * UIF Settings menu
  *
  */
 static void ui_settings_uif(void) {
@@ -802,161 +904,53 @@ static void ui_settings_uif(void) {
 
 /* -------------------------------- RESET UX --------------------------------- */
 
-enum {
-    TOKEN_RESET = FIRST_USER_TOKEN,
-};
+enum { TOKEN_RESET = FIRST_USER_TOKEN, TOKEN_RESET_BACK };
 
-/**
- * Reset Navigation callback
- *
- * @param[in] page selected page to display
- * @param[in] content describe the widgets to display on the page
- *
- */
-static bool reset_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
-    UNUSED(page);
-    explicit_bzero(content, sizeof(nbgl_pageContent_t));
-    content->type = INFO_LONG_PRESS;
-    content->infoLongPress.text =
-        "Reset the app to factory default?\nThis will delete ALL the keys!!!";
-    content->infoLongPress.icon = NULL;
-    content->infoLongPress.longPressText = "Yes";
-    content->infoLongPress.longPressToken = TOKEN_RESET;
-    content->infoLongPress.tuneId = TUNE_TAP_CASUAL;
-    return true;
-}
-
-/**
- * Reset Action callback
- *
- * @param[in] token button Id pressed
- * @param[in] index widget index on the page
- *
- */
-static void reset_ctrl_cb(int token, uint8_t index) {
-    UNUSED(index);
-
-    if (token != TOKEN_RESET) {
-        return;
-    }
-
-    app_reset();
-}
-
-/* ------------------------------- SETTINGS UX ------------------------------- */
-
-enum {
-    TOKEN_SETTINGS_TEMPLATE = FIRST_USER_TOKEN,
-    TOKEN_SETTINGS_SEED,
-    TOKEN_SETTINGS_PIN,
-    TOKEN_SETTINGS_UIF,
-    TOKEN_SETTINGS_RESET,
-};
-
-enum {
-    SETTINGS_PAGE_PARAMS,
-    SETTINGS_PAGE_INFO,
-    SETTINGS_PAGE_NB,
-};
-
-#ifdef HAVE_PRINTF
-#define VERSION_STR "[DBG] App  " XSTR(APPVERSION)
-#else
-#define VERSION_STR "App  " XSTR(APPVERSION)
-#endif
-
-/**
- * Settings Navigation callback
- *
- * @param[in] page selected page to display
- * @param[in] content describe the widgets to display on the page
- *
- */
-static bool settings_nav_cb(uint8_t page, nbgl_pageContent_t* content) {
-    bool ret = false;
-
-    static const char* const infoTypes[] = {"Name", "Developer", "Specifications", "Version"};
-    static const char* const infoContents[] = {"OpenPGP Card",
-                                               "(c) Ledger SAS",
-                                               XSTR(SPEC_VERSION),
-                                               VERSION_STR};
-    static const char* const barTexts[] = {"Key Template",
-                                           "Seed mode",
-                                           "Pin mode",
-                                           "UIF mode",
-                                           "Reset"};
-    static const uint8_t barTokens[] = {TOKEN_SETTINGS_TEMPLATE,
-                                        TOKEN_SETTINGS_SEED,
-                                        TOKEN_SETTINGS_PIN,
-                                        TOKEN_SETTINGS_UIF,
-                                        TOKEN_SETTINGS_RESET};
-    explicit_bzero(content, sizeof(nbgl_pageContent_t));
-    switch (page) {
-        case SETTINGS_PAGE_INFO:
-            content->type = INFOS_LIST;
-            content->infosList.nbInfos = ARRAYLEN(infoTypes);
-            content->infosList.infoTypes = infoTypes;
-            content->infosList.infoContents = infoContents;
-            ret = true;
-            break;
-        case SETTINGS_PAGE_PARAMS:
-            content->type = BARS_LIST;
-            content->barsList.barTexts = barTexts;
-            content->barsList.tokens = barTokens;
-            content->barsList.nbBars = ARRAYLEN(barTokens);
-            content->barsList.tuneId = TUNE_TAP_CASUAL;
-            ret = true;
-            break;
-    }
-    return ret;
-}
-
-/**
- * Settings Action callback
- *
- * @param[in] token button Id pressed
- * @param[in] index widget index on the page
- *
- */
-static void settings_ctrl_cb(int token, uint8_t index) {
-    UNUSED(index);
+static void reset_cb(int token, uint8_t index) {
+    setting_initPage = 0;
     switch (token) {
-        case TOKEN_SETTINGS_TEMPLATE:
-            ui_settings_template();
+        case TOKEN_RESET_BACK:
+            ui_home_init();
             break;
-        case TOKEN_SETTINGS_SEED:
-            ui_settings_seed();
-            break;
-        case TOKEN_SETTINGS_PIN:
-            ui_settings_pin();
-            break;
-        case TOKEN_SETTINGS_UIF:
-            ui_settings_uif();
-            break;
-        case TOKEN_SETTINGS_RESET:
-            nbgl_useCaseSettings("Reset to Default",
-                                 0,
-                                 1,
-                                 true,
-                                 ui_menu_settings,
-                                 reset_nav_cb,
-                                 reset_ctrl_cb);
+        case TOKEN_RESET:
+            switch (index) {
+                case 0:
+                    app_reset();
+                    ui_info("App Reset", "Done", ui_init, true);
+                    break;
+                case 1:
+                    ui_home_init();
+                    break;
+            }
             break;
     }
 }
 
 /**
- * Settings menu definition
+ * Reset Settings menu
  *
  */
-static void ui_menu_settings() {
-    nbgl_useCaseSettings(APPNAME,
-                         SETTINGS_PAGE_PARAMS,
-                         SETTINGS_PAGE_NB,
-                         false,
-                         ui_init,
-                         settings_nav_cb,
-                         settings_ctrl_cb);
+static void ui_reset(void) {
+    nbgl_contentCenteredInfo_t centeredInfo = {0};
+    nbgl_layoutChoiceButtons_t buttonInfo = {0};
+
+    ui_setting_header("Reset to Default", TOKEN_RESET_BACK, reset_cb);
+
+    centeredInfo.onTop = true;
+    centeredInfo.text1 = "This will reset the app to factory default,\nand delete ALL the keys!!!";
+    centeredInfo.text2 = "Are you sure you want to continue?";
+    centeredInfo.style = LARGE_CASE_BOLD_INFO;
+
+    nbgl_layoutAddCenteredInfo(layoutCtx, &centeredInfo);
+
+    buttonInfo.topText = "Reset";
+    buttonInfo.bottomText = "Cancel";
+    buttonInfo.token = TOKEN_RESET;
+    buttonInfo.style = BOTH_ROUNDED_STYLE;
+    buttonInfo.tuneId = TUNE_TAP_CASUAL;
+    nbgl_layoutAddChoiceButtons(layoutCtx, &buttonInfo);
+
+    nbgl_layoutDraw(layoutCtx);
 }
 
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
@@ -1156,14 +1150,14 @@ void ui_menu_pinentry_display(unsigned int step) {
 
     minLen = (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? GPG_MIN_PW3_LENGTH : GPG_MIN_PW1_LENGTH;
     // Draw the keypad
-    nbgl_useCaseKeypad(G_gpg_vstate.menu,
-                       minLen,
-                       GPG_MAX_PW_LENGTH,
-                       TOKEN_PIN_ENTRY_BACK,
-                       false,
-                       TUNE_TAP_CASUAL,
-                       pinentry_validate_cb,
-                       pinentry_cb);
+    nbgl_useCaseKeypadPIN(G_gpg_vstate.menu,
+                          minLen,
+                          GPG_MAX_PW_LENGTH,
+                          TOKEN_PIN_ENTRY_BACK,
+                          false,
+                          TUNE_TAP_CASUAL,
+                          pinentry_validate_cb,
+                          pinentry_cb);
 }
 
 /**
@@ -1246,4 +1240,4 @@ void ui_menu_uifconfirm_display(unsigned int value) {
     nbgl_useCaseChoice(NULL, "Confirm operation", G_gpg_vstate.menu, "Yes", "No", uif_confirm_cb);
 }
 
-#endif  // defined(HAVE_NBGL) && defined(TARGET_STAX)
+#endif  // defined(HAVE_NBGL) && (defined(TARGET_STAX) || defined(TARGET_FLEX))

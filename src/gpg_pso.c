@@ -94,11 +94,9 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 case 3072 / 8:
                     rsa_key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa3072;
                     break;
-#ifdef WITH_SUPPORT_RSA4096
                 case 4096 / 8:
                     rsa_key = (cx_rsa_private_key_t *) &sigkey->priv_key.rsa4096;
                     break;
-#endif
                 default:
                     break;
             }
@@ -286,12 +284,10 @@ int gpg_apdu_pso() {
                             rsa_key =
                                 (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa3072;
                             break;
-#ifdef WITH_SUPPORT_RSA4096
                         case 4096 / 8:
                             rsa_key =
                                 (cx_rsa_private_key_t *) &G_gpg_vstate.mse_dec->priv_key.rsa4096;
                             break;
-#endif
                     }
 
                     if ((rsa_key == NULL) || (rsa_key->size != ksz)) {
@@ -339,43 +335,71 @@ int gpg_apdu_pso() {
                         break;
                     }
                     ecfp_key = &G_gpg_vstate.mse_dec->priv_key.ecfp;
-                    gpg_io_fetch_l(&l);
-                    gpg_io_fetch_tl(&t, &l);
-                    if (t != 0x7f49) {
-                        error = SW_WRONG_DATA;
-                        break;
-                    }
-                    gpg_io_fetch_tl(&t, &l);
-                    if (t != 0x86) {
-                        error = SW_WRONG_DATA;
-                        break;
-                    }
-
                     curve = gpg_oid2curve(G_gpg_vstate.mse_dec->attributes.value + 1,
                                           G_gpg_vstate.mse_dec->attributes.length - 1);
                     if (ecfp_key->curve != curve) {
                         error = SW_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
+                    // Check APDU content tags
+                    gpg_io_fetch_l(&l);
+                    gpg_io_fetch_tl(&t, &l);
+                    // TAG 0x7f49 announces a Public Key DO
+                    if (t != 0x7f49) {
+                        error = SW_WRONG_DATA;
+                        break;
+                    }
+                    gpg_io_fetch_tl(&t, &l);
+                    // TAG 0x86 announces an External Public Key (with its length)
+                    if (t != 0x86) {
+                        error = SW_WRONG_DATA;
+                        break;
+                    }
+
                     if (curve == CX_CURVE_Curve25519) {
-                        for (cnt = 0; cnt <= 31; cnt++) {
-                            G_gpg_vstate.work.io_buffer[512 + cnt] =
-                                (G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset)[31 - cnt];
+                        uint8_t raw_public_key[65];
+                        uint8_t secret[32];
+                        cx_ecpoint_t public_point;
+                        uint8_t i;
+
+                        if (l != 32) {
+                            PRINTF("[PSO] - PSO:DEC:ECDH - Wrong Ext Pub Key size %d\n", l);
+                            error = SW_WRONG_DATA;
+                            break;
                         }
-                        G_gpg_vstate.work.io_buffer[511] = 0x02;
+
+                        CX_CHECK(cx_ecdomain_parameters_length(ecfp_key->curve, &ksz));
+                        if (ksz != 32) {
+                            PRINTF("[PSO] - PSO:DEC:ECDH - Wrong curve Key size %d\n", ksz);
+                            error = SW_WRONG_DATA;
+                            break;
+                        }
+                        // Reverse key bytes order
+                        for (i = 0; i <= 31; i++) {
+                            raw_public_key[i] =
+                                (G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset)[31 - i];
+                        }
+
+                        CX_CHECK(cx_bn_lock(32, 0));
+                        CX_CHECK(cx_ecpoint_alloc(&public_point, CX_CURVE_Curve25519));
+                        CX_CHECK(cx_ecpoint_decompress(&public_point, raw_public_key, 32, 0));
+                        CX_CHECK(cx_ecpoint_export(&public_point,
+                                                   raw_public_key + 1,
+                                                   32,
+                                                   raw_public_key + 1 + 32,
+                                                   32));
+                        CX_CHECK(cx_bn_unlock());
+                        raw_public_key[0] = 0x04;
                         CX_CHECK(cx_ecdh_no_throw(ecfp_key,
                                                   CX_ECDH_X,
-                                                  G_gpg_vstate.work.io_buffer + 511,
-                                                  65,
-                                                  G_gpg_vstate.work.io_buffer + 256,
-                                                  160));
-                        CX_CHECK(cx_ecdomain_parameters_length(ecfp_key->curve, &ksz));
-
-                        for (cnt = 0; cnt <= 31; cnt++) {
-                            G_gpg_vstate.work.io_buffer[128 + cnt] =
-                                G_gpg_vstate.work.io_buffer[287 - cnt];
+                                                  raw_public_key,
+                                                  sizeof(raw_public_key),
+                                                  secret,
+                                                  sizeof(secret)));
+                        // Reverse key bytes order
+                        for (i = 0; i <= 31; i++) {
+                            G_gpg_vstate.work.io_buffer[128 + i] = secret[31 - i];
                         }
-                        ksz = 32;
                     } else {
                         CX_CHECK(
                             cx_ecdh_no_throw(ecfp_key,
