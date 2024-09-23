@@ -43,7 +43,7 @@ def util_navigate(
     assert text
     valid_instr: list[NavIns | NavInsID] = []
 
-    if firmware.device == "nanos":
+    if firmware == Firmware.NANOS:
         text, txt_cfg = text.split("_")
         nav_inst = NavInsID.RIGHT_CLICK
         if txt_cfg == "Yes":
@@ -53,7 +53,7 @@ def util_navigate(
         else:
             raise ValueError(f'Wrong text "{text}"')
 
-    elif firmware.device.startswith("nano"):
+    elif firmware.is_nano:
         text = text.split("_")[1]
         nav_inst = NavInsID.RIGHT_CLICK
         valid_instr.append(NavInsID.BOTH_CLICK)

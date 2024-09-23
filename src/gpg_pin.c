@@ -319,7 +319,7 @@ int gpg_apdu_change_ref_data() {
 }
 
 /**
- * APDU handler to Reste PinCode or Counter
+ * APDU handler to Reset PinCode or Counter
  *
  * @return Status Word
  *

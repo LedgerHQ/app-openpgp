@@ -592,13 +592,20 @@ unsigned int ui_pinentry_action_button(unsigned int button_mask, unsigned int bu
 }
 
 /* ------------------------------- template UX ------------------------------- */
+#ifdef NO_DECRYPT_cv25519
+void ui_menu_template_display_type(unsigned int value);
+#endif
 
 const ux_menu_entry_t ui_menu_tmpl_key[];
 const ux_menu_entry_t ui_menu_tmpl_type[];
 
 const ux_menu_entry_t ui_menu_template[] = {
     {ui_menu_tmpl_key, NULL, -1, NULL, "Choose key...", NULL, 0, 0},
+#ifdef NO_DECRYPT_cv25519
+    {NULL, ui_menu_template_display_type, -1, NULL, "Choose type...", NULL, 0, 0},
+#else
     {ui_menu_tmpl_type, NULL, -1, NULL, "Choose type...", NULL, 0, 0},
+#endif
     {NULL, ui_menu_tmpl_set_action, -1, NULL, "Set template", NULL, 0, 0},
     {ui_menu_settings, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
@@ -621,6 +628,19 @@ const ux_menu_entry_t ui_menu_tmpl_type[] = {
     {NULL, ui_menu_tmpl_type_action, CX_CURVE_Ed25519, NULL, LABEL_Ed25519, NULL, 0, 0},
     {ui_menu_template, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
+
+#ifdef NO_DECRYPT_cv25519
+const ux_menu_entry_t ui_menu_tmpl_Dectype[] = {
+    {NULL, ui_menu_tmpl_type_action, 2048, NULL, LABEL_RSA2048, NULL, 0, 0},
+    {NULL, ui_menu_tmpl_type_action, 3072, NULL, LABEL_RSA3072, NULL, 0, 0},
+#ifdef WITH_SUPPORT_RSA4096
+    {NULL, ui_menu_tmpl_type_action, 4096, NULL, LABEL_RSA4096, NULL, 0, 0},
+#endif
+    {NULL, ui_menu_tmpl_type_action, CX_CURVE_SECP256K1, NULL, LABEL_SECP256K1, NULL, 0, 0},
+    {NULL, ui_menu_tmpl_type_action, CX_CURVE_SECP256R1, NULL, LABEL_SECP256R1, NULL, 0, 0},
+    {ui_menu_template, NULL, 0, &C_icon_back, "Back", NULL, 61, 40},
+    UX_MENU_END};
+#endif
 
 /**
  * Template page display preparation callback
@@ -671,7 +691,17 @@ const bagl_element_t *ui_menu_template_predisplay(const ux_menu_entry_t *entry,
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_SECP256R1);
                     break;
                 case CX_CURVE_Ed25519:
-                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), " %s", LABEL_Ed25519);
+#ifdef NO_DECRYPT_cv25519
+                    if (G_gpg_vstate.ux_key == 2) {
+                        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Choose type...");
+                    } else
+#endif
+                    {
+                        snprintf(G_gpg_vstate.menu,
+                                 sizeof(G_gpg_vstate.menu),
+                                 " %s",
+                                 LABEL_Ed25519);
+                    }
                     break;
                 default:
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Choose type...");
@@ -692,7 +722,16 @@ const bagl_element_t *ui_menu_template_predisplay(const ux_menu_entry_t *entry,
 void ui_menu_template_display(unsigned int value) {
     UX_MENU_DISPLAY(value, ui_menu_template, ui_menu_template_predisplay);
 }
-
+#ifdef NO_DECRYPT_cv25519
+void ui_menu_template_display_type(unsigned int value) {
+    UNUSED(value);
+    if (G_gpg_vstate.ux_key == 2) {
+        UX_MENU_DISPLAY(0, ui_menu_tmpl_Dectype, ui_menu_template_predisplay);
+    } else {
+        UX_MENU_DISPLAY(0, ui_menu_tmpl_type, ui_menu_template_predisplay);
+    }
+}
+#endif
 /**
  * Template Action callback
  *
@@ -1141,6 +1180,7 @@ void ui_menu_reset_action(unsigned int value) {
     UNUSED(value);
 
     app_reset();
+    ui_init();
 }
 
 /* ------------------------------- SETTINGS UX ------------------------------- */
@@ -1158,13 +1198,9 @@ const ux_menu_entry_t ui_menu_settings[] = {
 
 const ux_menu_entry_t ui_menu_info[] = {
     {NULL, NULL, -1, NULL, "OpenPGP Card", NULL, 0, 0},
-    {NULL, NULL, -1, NULL, "(c) Ledger SAS", NULL, 0, 0},
+    {NULL, NULL, -1, NULL, "Version  " APPVERSION, NULL, 0, 0},
     {NULL, NULL, -1, NULL, "Spec  " XSTR(SPEC_VERSION), NULL, 0, 0},
-#ifdef HAVE_PRINTF
-    {NULL, NULL, -1, NULL, "[DBG] App  " XSTR(APPVERSION), NULL, 0, 0},
-#else
-    {NULL, NULL, -1, NULL, "App  " XSTR(APPVERSION), NULL, 0, 0},
-#endif
+    {NULL, NULL, -1, NULL, "(c) Ledger SAS", NULL, 0, 0},
     {NULL, ui_menu_main_display, 3, &C_icon_back, "Back", NULL, 61, 40},
     UX_MENU_END};
 

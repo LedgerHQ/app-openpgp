@@ -29,8 +29,8 @@ APPNAME = OpenPGP
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 2
-APPVERSION_P = 2
+APPVERSION_N = 3
+APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 SPECVERSION:="3.3.1"
@@ -50,6 +50,7 @@ ICON_NANOS = icons/gpg_16px.gif
 ICON_NANOX = icons/gpg_14px.gif
 ICON_NANOSP = icons/gpg_14px.gif
 ICON_STAX = icons/gpg_32px.gif
+ICON_FLEX = icons/gpg_40px.gif
 
 # Application allowed derivation curves.
 # Possibles curves are: secp256k1, secp256r1, ed25519 and bls12381g1
@@ -124,6 +125,8 @@ DEFINES   += HAVE_USB_CLASS_CCID
 DEFINES   += HAVE_RSA
 # Watchdog issue causing the device reset with long prime number computation
 # DEFINES   += WITH_SUPPORT_RSA4096
+# Limitation (maybe due to openpgp itself): no support of DEC operation with cv25519
+DEFINES   += NO_DECRYPT_cv25519
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 DEFINES   += HAVE_UX_LEGACY

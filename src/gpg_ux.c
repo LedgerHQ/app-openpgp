@@ -49,5 +49,4 @@ void app_reset(void) {
     nvm_write((void*) (N_gpg_pstate->magic), magic, MAGIC_LENGTH);
     gpg_init();
     ui_CCID_reset();
-    ui_init();
 }
