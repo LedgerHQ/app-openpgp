@@ -553,40 +553,34 @@ static void tmpl_key_selector(unsigned int idx) {
     ui_menu_template_display(0);
 }
 
+// clang-format off
 const char *const tmpl_type_getter_values[] = {LABEL_RSA2048,
                                                LABEL_RSA3072,
-#ifdef WITH_SUPPORT_RSA4096
                                                LABEL_RSA4096,
-#endif
                                                LABEL_SECP256K1,
                                                LABEL_SECP256R1,
                                                LABEL_Ed25519};
 
 const unsigned int tmpl_type_getter_values_map[] = {2048,
                                                     3072,
-#ifdef WITH_SUPPORT_RSA4096
                                                     4096,
-#endif
                                                     CX_CURVE_SECP256K1,
                                                     CX_CURVE_SECP256R1,
                                                     CX_CURVE_Ed25519};
 #ifdef NO_DECRYPT_cv25519
 const char *const tmpl_type_getter_Decvalues[] = {LABEL_RSA2048,
                                                   LABEL_RSA3072,
-#ifdef WITH_SUPPORT_RSA4096
                                                   LABEL_RSA4096,
-#endif
                                                   LABEL_SECP256K1,
                                                   LABEL_SECP256R1};
 
 const unsigned int tmpl_type_getter_Decvalues_map[] = {2048,
                                                        3072,
-#ifdef WITH_SUPPORT_RSA4096
                                                        4096,
-#endif
                                                        CX_CURVE_SECP256K1,
                                                        CX_CURVE_SECP256R1};
 #endif
+// clang-format on
 
 /**
  * Helper to get the key type
@@ -709,11 +703,9 @@ void ui_menu_template_predisplay() {
         case 3072:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_RSA3072);
             break;
-#ifdef WITH_SUPPORT_RSA4096
         case 4096:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_RSA4096);
             break;
-#endif
         case CX_CURVE_SECP256K1:
             snprintf(KEY_TYPE, sizeof(KEY_TYPE), " %s", LABEL_SECP256K1);
             break;
@@ -762,9 +754,7 @@ void ui_menu_tmpl_set_action(unsigned int value) {
     switch (G_gpg_vstate.ux_type) {
         case 2048:
         case 3072:
-#ifdef WITH_SUPPORT_RSA4096
         case 4096:
-#endif
             attributes.value[0] = KEY_ID_RSA;
             U2BE_ENCODE(attributes.value, 1, G_gpg_vstate.ux_type);
             attributes.value[3] = 0x00;

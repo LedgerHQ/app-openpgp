@@ -305,20 +305,17 @@ static const char* const keyNameTexts[] = {LABEL_SIG, LABEL_DEC, LABEL_AUT};
 enum {
     TOKEN_TYPE_RSA2048 = FIRST_USER_TOKEN,
     TOKEN_TYPE_RSA3072,
-#ifdef WITH_SUPPORT_RSA4096
     TOKEN_TYPE_RSA4096,
-#endif
     TOKEN_TYPE_SECP256K1,
     TOKEN_TYPE_SECP256R1,
     TOKEN_TYPE_Ed25519,
     TOKEN_TYPE_BACK
 };
 
+// clang-format off
 static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_RSA3072,
-#ifdef WITH_SUPPORT_RSA4096
                                            LABEL_RSA4096,
-#endif
                                            LABEL_SECP256K1,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
@@ -326,12 +323,11 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
 #ifdef NO_DECRYPT_cv25519
 static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
                                               LABEL_RSA3072,
-#ifdef WITH_SUPPORT_RSA4096
                                               LABEL_RSA4096,
-#endif
                                               LABEL_SECP256K1,
                                               LABEL_SECP256R1};
 #endif
+// clang-format on
 
 /**
  * Determine the selected key type from its attributes
@@ -368,11 +364,9 @@ static uint32_t _getKeyType(const uint8_t key) {
                 case 3072:
                     token = TOKEN_TYPE_RSA3072;
                     break;
-#ifdef WITH_SUPPORT_RSA4096
                 case 4096:
                     token = TOKEN_TYPE_RSA4096;
                     break;
-#endif
             }
             break;
         case KEY_ID_ECDH:
@@ -429,9 +423,7 @@ static void template_key_cb(int token, uint8_t index) {
         switch (key_type) {
             case TOKEN_TYPE_RSA2048:
             case TOKEN_TYPE_RSA3072:
-#ifdef WITH_SUPPORT_RSA4096
             case TOKEN_TYPE_RSA4096:
-#endif
                 switch (key_type) {
                     case TOKEN_TYPE_RSA2048:
                         size = 2048;
@@ -439,11 +431,9 @@ static void template_key_cb(int token, uint8_t index) {
                     case TOKEN_TYPE_RSA3072:
                         size = 3072;
                         break;
-#ifdef WITH_SUPPORT_RSA4096
                     case TOKEN_TYPE_RSA4096:
                         size = 4096;
                         break;
-#endif
                 }
                 attributes.value[0] = KEY_ID_RSA;
                 U2BE_ENCODE(attributes.value, 1, size);
@@ -573,11 +563,9 @@ static void ui_settings_template(void) {
             case TOKEN_TYPE_RSA3072:
                 bar.subText = PIC(LABEL_RSA3072);
                 break;
-#ifdef WITH_SUPPORT_RSA4096
             case TOKEN_TYPE_RSA4096:
                 bar.subText = PIC(LABEL_RSA4096);
                 break;
-#endif
             case TOKEN_TYPE_SECP256K1:
                 bar.subText = PIC(LABEL_SECP256K1);
                 break;
