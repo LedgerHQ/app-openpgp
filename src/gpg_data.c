@@ -448,12 +448,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                         pkey_size = sizeof(cx_rsa_3072_private_key_t);
                         pq = G_gpg_vstate.work.rsa.public3072.n;
                         break;
-#ifdef WITH_SUPPORT_RSA4096
                     case 4096 / 8:
                         pkey_size = sizeof(cx_rsa_4096_private_key_t);
                         pq = G_gpg_vstate.work.rsa.public4096.n;
                         break;
-#endif
                     default:
                         break;
                 }
@@ -674,7 +672,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             switch (G_gpg_vstate.work.io_buffer[0]) {
                 case KEY_ID_RSA:
                     ksz = U2BE(G_gpg_vstate.work.io_buffer, 1);
-                    if ((ksz != 2048) && (ksz != 3072)) {
+                    if ((ksz != 2048) && (ksz != 3072) && (ksz != 4096)) {
                         sw = SW_WRONG_DATA;
                     } else {
                         sw = SW_OK;
@@ -927,12 +925,10 @@ int gpg_apdu_get_key_data(unsigned int ref) {
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
                     len = sizeof(cx_rsa_3072_private_key_t);
                     break;
-#ifdef WITH_SUPPORT_RSA4096
                 case 4096 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
                     len = sizeof(cx_rsa_4096_private_key_t);
                     break;
-#endif
             }
 
             if ((key == NULL) || (key->size != ksz)) {
@@ -1060,12 +1056,10 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
                     len = sizeof(cx_rsa_3072_private_key_t);
                     break;
-#ifdef WITH_SUPPORT_RSA4096
                 case 4096 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
                     len = sizeof(cx_rsa_4096_private_key_t);
                     break;
-#endif
             }
 
             if ((key == NULL) || (key->size != ksz)) {
