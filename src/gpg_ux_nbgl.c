@@ -45,7 +45,7 @@ static uint8_t setting_initPage;
 /* ------------------------------- Helpers  UX ------------------------------- */
 
 /**
- * Display popup message on screen
+ * @brief Display popup message on screen
  *
  * @param[in] msg1 1st part of the message
  * @param[in] msg2 2nd part of the message
@@ -58,7 +58,7 @@ static void ui_info(const char* msg1, const char* msg2, nbgl_callback_t cb, bool
 };
 
 /**
- * Display Setting page header
+ * @brief Display Setting page header
  *
  * @param[in] title page title
  * @param[in] back_token token for back button
@@ -69,20 +69,19 @@ static void ui_setting_header(const char* title,
                               uint8_t back_token,
                               nbgl_layoutTouchCallback_t touch_cb) {
     nbgl_layoutDescription_t layoutDescription = {0};
-    nbgl_layoutBar_t bar = {0};
+    nbgl_layoutHeader_t headerDesc = {0};
 
     layoutDescription.onActionCallback = touch_cb;
     layoutDescription.modal = false;
     layoutCtx = nbgl_layoutGet(&layoutDescription);
 
-    explicit_bzero(&bar, sizeof(nbgl_layoutBar_t));
-    bar.text = PIC(title);
-    bar.iconLeft = &LEFT_ARROW_ICON;
-    bar.token = back_token;
-    bar.centered = true;
-    bar.inactive = false;
-    bar.tuneId = TUNE_TAP_CASUAL;
-    nbgl_layoutAddTouchableBar(layoutCtx, &bar);
+    headerDesc.type = HEADER_BACK_AND_TEXT;
+    headerDesc.backAndText.text = PIC(title);
+    headerDesc.backAndText.token = back_token;
+#ifdef HAVE_PIEZO_SOUND
+    headerDesc.backAndText.tuneId = TUNE_TAP_CASUAL;
+#endif
+    nbgl_layoutAddHeader(layoutCtx, &headerDesc);
     nbgl_layoutAddSeparationLine(layoutCtx);
 }
 
@@ -90,6 +89,7 @@ static void ui_setting_header(const char* title,
 //  ----------------------- HOME PAGE -------------------------
 //  -----------------------------------------------------------
 
+// clang-format off
 enum {
     TOKEN_SETTINGS_TEMPLATE = FIRST_USER_TOKEN,
     TOKEN_SETTINGS_SEED,
@@ -97,12 +97,14 @@ enum {
     TOKEN_SETTINGS_UIF,
     TOKEN_SETTINGS_RESET,
 };
+// clang-format on
 
 /**
- * Settings callback
+ * @brief Settings callback
  *
  * @param[in] token button Id pressed
- * @param[in] index widget index on the page
+ * @param[in] index widget value
+ * @param[in] page index of the page
  *
  */
 static void controlsCallback(int token, uint8_t index, int page) {
@@ -128,17 +130,22 @@ static void controlsCallback(int token, uint8_t index, int page) {
 }
 
 /**
- * home page display
+ * @brief home page display
  *
  */
 static void ui_home_init(void) {
+    static nbgl_contentInfoList_t infosList = {0};
+    static nbgl_content_t contents = {0};
+    static nbgl_genericContents_t settingContents = {0};
+    static const char* const infoTypes[] = {"Version", "Specifications", "Developer"};
+    static const char* const infoContents[] = {APPVERSION, XSTR(SPEC_VERSION), "(c) 2025 Ledger"};
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
 
     explicit_bzero(name, sizeof(name));
-    memmove(name, (void*) (N_gpg_pstate->name.value), 20);
-    if (name[0] != 0) {
-        for (int i = 0; i < 12; i++) {
+    if (N_gpg_pstate->name.value[0] != 0) {
+        memmove(name, (void*) (N_gpg_pstate->name.value), sizeof(name) - 1);
+        for (uint8_t i = 0; i < sizeof(name) - 1; i++) {
             if ((name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
@@ -152,17 +159,9 @@ static void ui_home_init(void) {
              serial,
              G_gpg_vstate.slot + 1);
 
-    static nbgl_contentInfoList_t infosList = {0};
-
-    static const char* const infoTypes[] = {"Version", "Specifications", "Developer"};
-    static const char* const infoContents[] = {APPVERSION, XSTR(SPEC_VERSION), "(c) 2024 Ledger"};
-
     infosList.nbInfos = ARRAYLEN(infoTypes);
     infosList.infoTypes = (const char**) infoTypes;
     infosList.infoContents = (const char**) infoContents;
-
-    static nbgl_content_t contents = {0};
-    static nbgl_genericContents_t settingContents = {0};
 
     static const char* const barTexts[] = {"Key Template",
                                            "Seed mode",
@@ -181,7 +180,6 @@ static void ui_home_init(void) {
     contents.content.barsList.tuneId = TUNE_TAP_CASUAL;
     contents.contentActionCallback = controlsCallback;
 
-    settingContents.callbackCallNeeded = false;
     settingContents.contentsList = &contents;
     settingContents.nbContents = 1;
 
@@ -196,11 +194,11 @@ static void ui_home_init(void) {
                                 &settingContents,
                                 &infosList,
                                 &actionContent,
-                                app_quit);
+                                app_exit);
 }
 
 /**
- * home page init
+ * @brief home page init
  *
  */
 void ui_init(void) {
@@ -212,14 +210,16 @@ void ui_init(void) {
 //  ------------------------ SLOT UX --------------------------
 //  -----------------------------------------------------------
 
+// clang-format off
 enum {
     TOKEN_SLOT_SELECT = FIRST_USER_TOKEN,
     TOKEN_SLOT_DEF,
     TOKEN_SLOT_BACK,
 };
+// clang-format on
 
 /**
- * Slot Action callback
+ * @brief Slot Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
@@ -248,7 +248,7 @@ static void slot_cb(int token, uint8_t index) {
 }
 
 /**
- * Slot Navigation callback
+ * @brief Slot Navigation callback
  *
  */
 static void ui_menu_slot_action(void) {
@@ -292,16 +292,12 @@ static void ui_menu_slot_action(void) {
 
 /* ------------------------------- TEMPLATE UX ------------------------------- */
 
+// clang-format off
 enum {
     TOKEN_TEMPLATE_SIG = FIRST_USER_TOKEN,
     TOKEN_TEMPLATE_DEC,
     TOKEN_TEMPLATE_AUT,
-    TOKEN_TEMPLATE_SET,
-    TOKEN_TEMPLATE_BACK
 };
-
-static const char* const keyNameTexts[] = {LABEL_SIG, LABEL_DEC, LABEL_AUT};
-
 enum {
     TOKEN_TYPE_RSA2048 = FIRST_USER_TOKEN,
     TOKEN_TYPE_RSA3072,
@@ -312,7 +308,12 @@ enum {
     TOKEN_TYPE_BACK
 };
 
-// clang-format off
+static uint8_t nb_elt_per_page = 0;
+
+const uint8_t tokens[KEY_NB] = {TOKEN_TEMPLATE_SIG, TOKEN_TEMPLATE_DEC, TOKEN_TEMPLATE_AUT};
+
+static const char* const keyNameTexts[] = {LABEL_SIG, LABEL_DEC, LABEL_AUT};
+
 static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_RSA3072,
                                            LABEL_RSA4096,
@@ -330,10 +331,9 @@ static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
 // clang-format on
 
 /**
- * Determine the selected key type from its attributes
+ * @brief Determine the selected key type from its attributes
  *
  * @param[in] key token describing the selected key
- *
  * @return token describing the selected key type
  *
  */
@@ -404,19 +404,20 @@ static uint32_t _getKeyType(const uint8_t key) {
 }
 
 /**
- * Key Template Action callback
+ * @brief Key Template Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
+ * @param[in] page index of the page
  *
  */
-static void template_key_cb(int token, uint8_t index) {
+static void template_key_cb(int token, uint8_t index, int page) {
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
     gpg_key_t* dest = NULL;
     static uint8_t* oid = NULL;
     uint32_t oid_len = 0;
     uint32_t size = 0;
-    uint8_t key_type = index + FIRST_USER_TOKEN;
+    uint8_t key_type = index + (page * nb_elt_per_page) + FIRST_USER_TOKEN;
 
     if (token != TOKEN_TYPE_BACK) {
         explicit_bzero(&attributes, sizeof(attributes));
@@ -501,104 +502,125 @@ static void template_key_cb(int token, uint8_t index) {
 }
 
 /**
- * Template Action callback
+ * @brief Template Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
+ * @param[in] page index of the page
  *
  */
-static void template_cb(int token, uint8_t index) {
+static void template_cb(int token, uint8_t index, int page) {
     UNUSED(index);
-    static nbgl_layoutRadioChoice_t choices = {0};
+    UNUSED(page);
+    static nbgl_content_t contents = {0};
+    static nbgl_genericContents_t settingContents = {0};
 
     switch (token) {
-        case TOKEN_TEMPLATE_BACK:
-            ui_home_init();
-            break;
         case TOKEN_TEMPLATE_SIG:
         case TOKEN_TEMPLATE_DEC:
         case TOKEN_TEMPLATE_AUT:
             G_gpg_vstate.ux_key = token;
-            ui_setting_header(keyNameTexts[token - FIRST_USER_TOKEN],
-                              TOKEN_TYPE_BACK,
-                              template_key_cb);
-
+            contents.type = CHOICES_LIST;
 #ifdef NO_DECRYPT_cv25519
             if (token == TOKEN_TEMPLATE_DEC) {
-                choices.names = (const char* const*) keyTypeDecTexts;
-                choices.nbChoices = ARRAYLEN(keyTypeDecTexts);
+                contents.content.choicesList.names = (const char* const*) keyTypeDecTexts;
+                contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeDecTexts);
             } else
 #endif
             {
-                choices.names = (const char* const*) keyTypeTexts;
-                choices.nbChoices = ARRAYLEN(keyTypeTexts);
+                contents.content.choicesList.names = (const char* const*) keyTypeTexts;
+                contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeTexts);
             }
-            choices.initChoice = _getKeyType(token) - FIRST_USER_TOKEN;
-            choices.token = token;
-            nbgl_layoutAddRadioChoice(layoutCtx, &choices);
+            contents.content.choicesList.initChoice = _getKeyType(token) - FIRST_USER_TOKEN;
+            contents.content.choicesList.token = token;
+#ifdef HAVE_PIEZO_SOUND
+            contents.content.choicesList.tuneId = TUNE_TAP_CASUAL;
+#endif
+            contents.contentActionCallback = template_key_cb;
 
-            nbgl_layoutDraw(layoutCtx);
+            settingContents.contentsList = &contents;
+            settingContents.nbContents = 1;
+            // Save nb radio choices per page to select the right one in the callback
+            nb_elt_per_page = nbgl_useCaseGetNbChoicesInPage(contents.content.choicesList.nbChoices,
+                                                             &contents.content.choicesList,
+                                                             0,
+                                                             false);
+
+            nbgl_useCaseGenericConfiguration(keyNameTexts[token - FIRST_USER_TOKEN],
+                                             0,
+                                             &settingContents,
+                                             ui_settings_template);
             break;
     }
 }
 
 /**
- * Template Settings menu
+ * @brief Template Settings menu
  *
  */
 static void ui_settings_template(void) {
-    nbgl_layoutBar_t bar = {0};
+    static nbgl_content_t contents = {0};
+    static nbgl_genericContents_t settingContents = {0};
+    static char* names[3] = {0};
+    static char text[3][64];
+    char* subText = NULL;
     uint32_t i;
 
-    G_gpg_vstate.ux_key = 0;
-
-    ui_setting_header("Keys templates", TOKEN_TEMPLATE_BACK, template_cb);
-
+    contents.type = BARS_LIST;
+    contents.content.barsList.nbBars = KEY_NB;
+    contents.content.barsList.barTexts = (const char* const*) names;
+    contents.content.barsList.tokens = tokens;
     for (i = 0; i < KEY_NB; i++) {
-        explicit_bzero(&bar, sizeof(nbgl_layoutBar_t));
         switch (_getKeyType(TOKEN_TEMPLATE_SIG + i)) {
             case TOKEN_TYPE_RSA2048:
-                bar.subText = PIC(LABEL_RSA2048);
+                subText = PIC(LABEL_RSA2048);
                 break;
             case TOKEN_TYPE_RSA3072:
-                bar.subText = PIC(LABEL_RSA3072);
+                subText = PIC(LABEL_RSA3072);
                 break;
             case TOKEN_TYPE_RSA4096:
-                bar.subText = PIC(LABEL_RSA4096);
+                subText = PIC(LABEL_RSA4096);
                 break;
             case TOKEN_TYPE_SECP256K1:
-                bar.subText = PIC(LABEL_SECP256K1);
+                subText = PIC(LABEL_SECP256K1);
                 break;
             case TOKEN_TYPE_SECP256R1:
-                bar.subText = PIC(LABEL_SECP256R1);
+                subText = PIC(LABEL_SECP256R1);
                 break;
             case TOKEN_TYPE_Ed25519:
-                bar.subText = PIC(LABEL_Ed25519);
+                subText = PIC(LABEL_Ed25519);
                 break;
             default:
                 break;
         }
-        bar.text = PIC(keyNameTexts[i]);
-        bar.iconRight = &RIGHT_ARROW_ICON;
-        bar.token = TOKEN_TEMPLATE_SIG + i;
-        bar.centered = false;
-        bar.tuneId = TUNE_TAP_CASUAL;
-        nbgl_layoutAddTouchableBar(layoutCtx, &bar);
-        nbgl_layoutAddSeparationLine(layoutCtx);
+        snprintf(text[i], sizeof(text[i]), "%s\n%s", (const char*) PIC(keyNameTexts[i]), subText);
+        names[i] = text[i];
     }
+#ifdef HAVE_PIEZO_SOUND
+    contents.content.barsList.tuneId = TUNE_TAP_CASUAL;
+#endif
+    contents.contentActionCallback = template_cb;
 
-    nbgl_layoutDraw(layoutCtx);
+    settingContents.contentsList = &contents;
+    settingContents.nbContents = 1;
+
+    nbgl_useCaseGenericConfiguration("Keys templates", 0, &settingContents, ui_home_init);
 }
 
 /* --------------------------------- SEED UX --------------------------------- */
 
+// clang-format off
 enum {
     TOKEN_SEED = FIRST_USER_TOKEN,
-    TOKEN_SEED_BACK,
 };
+enum {
+    SWITCH_SEED,
+    SWITCH_SEED_NB,
+};
+// clang-format on
 
 /**
- * Seed Mode Confirmation callback
+ * @brief Seed Mode Confirmation callback
  *
  * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
  *
@@ -614,17 +636,16 @@ void seed_confirm_cb(bool confirm) {
 }
 
 /**
- * Seed Action callback
+ * @brief Seed Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
+ * @param[in] page index of the page
  *
  */
-static void seed_cb(int token, uint8_t index) {
+static void seed_cb(int token, uint8_t index, int page) {
+    UNUSED(page);
     switch (token) {
-        case TOKEN_SEED_BACK:
-            ui_home_init();
-            break;
         case TOKEN_SEED:
             if (index == 0) {
                 nbgl_useCaseChoice(NULL,
@@ -633,43 +654,57 @@ static void seed_cb(int token, uint8_t index) {
                                    "Without such configuration, an OS or App update "
                                    "will cause your private key to be lost!\n"
                                    "Are you sure you want to disable SEED mode?",
-                                   "Deactivate",
+                                   "Yes, deactivate",
                                    "Cancel",
                                    seed_confirm_cb);
+            } else {
+                G_gpg_vstate.seed_mode = 1;
             }
             break;
     }
 }
 
 /**
- * Seed Settings menu
+ * @brief Seed Settings menu
  *
  */
 static void ui_settings_seed(void) {
-    static nbgl_layoutSwitch_t option = {0};
+    static nbgl_content_t contents = {0};
+    static nbgl_genericContents_t settingContents = {0};
+    static nbgl_contentSwitch_t switches[SWITCH_SEED_NB] = {0};
 
-    ui_setting_header("Seed mode", TOKEN_SEED_BACK, seed_cb);
+    // Initialize switches data
+    switches[SWITCH_SEED].initState = G_gpg_vstate.seed_mode ? ON_STATE : OFF_STATE;
+    switches[SWITCH_SEED].text = "Seed Mode";
+    switches[SWITCH_SEED].subText = "Key derivation from Master seed";
+    switches[SWITCH_SEED].token = TOKEN_SEED;
+#ifdef HAVE_PIEZO_SOUND
+    switches[SWITCH_SEED].tuneId = TUNE_TAP_CASUAL;
+#endif
 
-    option.initState = G_gpg_vstate.seed_mode;
-    option.text = "Seed Mode";
-    option.subText = "Key derivation from Master seed";
-    option.token = TOKEN_SEED;
-    option.tuneId = TUNE_TAP_CASUAL;
-    nbgl_layoutAddSwitch(layoutCtx, &option);
+    contents.type = SWITCHES_LIST;
+    contents.content.switchesList.nbSwitches = SWITCH_SEED_NB;
+    contents.content.switchesList.switches = switches;
+    contents.contentActionCallback = seed_cb;
 
-    nbgl_layoutDraw(layoutCtx);
+    settingContents.contentsList = &contents;
+    settingContents.nbContents = 1;
+
+    nbgl_useCaseGenericConfiguration("Seed mode", 0, &settingContents, ui_home_init);
 }
 
-/* --------------------------------- PIN UX ---------------------------------- */
+//* --------------------------------- PIN UX ---------------------------------- */
 
+// clang-format off
 enum {
     TOKEN_PIN_SET = FIRST_USER_TOKEN,
     TOKEN_PIN_DEF,
     TOKEN_PIN_BACK,
 };
+// clang-format on
 
 /**
- * Trust Mode Confirmation callback
+ * @brief Trust Mode Confirmation callback
  *
  * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
  *
@@ -684,7 +719,7 @@ void trust_cb(bool confirm) {
 }
 
 /**
- * Pin Action callback
+ * @brief Pin Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
@@ -747,7 +782,7 @@ static void pin_cb(int token, uint8_t index) {
 }
 
 /**
- * Pin Settings menu
+ * @brief Pin Settings menu
  *
  */
 static void ui_settings_pin(void) {
@@ -793,26 +828,32 @@ static void ui_settings_pin(void) {
 
 /* --------------------------------- UIF UX ---------------------------------- */
 
+// clang-format off
 enum {
     TOKEN_UIF_SIG = FIRST_USER_TOKEN,
     TOKEN_UIF_DEC,
     TOKEN_UIF_AUT,
-    TOKEN_UIF_BACK,
 };
+enum {
+    SWITCH_UIF_SIG,
+    SWITCH_UIF_DEC,
+    SWITCH_UIF_AUT,
+    SWITCH_UIF_NB,
+};
+// clang-format on
 
 /**
- * UIF Action callback
+ * @brief UIF Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
+ * @param[in] page index of the page
  *
  */
-static void uif_cb(int token, uint8_t index) {
+static void uif_cb(int token, uint8_t index, int page) {
+    UNUSED(page);
     unsigned char* uif = NULL;
     switch (token) {
-        case TOKEN_UIF_BACK:
-            ui_home_init();
-            break;
         case TOKEN_UIF_SIG:
             uif = &G_gpg_vstate.kslot->sig.UIF[0];
             break;
@@ -834,84 +875,59 @@ static void uif_cb(int token, uint8_t index) {
 }
 
 /**
- * UIF Settings menu
+ * @brief UIF Settings menu
  *
  */
 static void ui_settings_uif(void) {
-    static nbgl_layoutSwitch_t option = {0};
-    uint8_t nbOptions = 0;
+    static nbgl_content_t contents = {0};
+    static nbgl_genericContents_t settingContents = {0};
+    static nbgl_contentSwitch_t switches[SWITCH_UIF_NB] = {0};
 
-    ui_setting_header("User Interaction Flags", TOKEN_UIF_BACK, uif_cb);
+    // Initialize switches data
+    switches[SWITCH_UIF_SIG].initState = G_gpg_vstate.kslot->sig.UIF[0] ? ON_STATE : OFF_STATE;
+    switches[SWITCH_UIF_SIG].text = "User Interaction Flag";
+    switches[SWITCH_UIF_SIG].subText = "For signature";
+    switches[SWITCH_UIF_SIG].token = TOKEN_UIF_SIG;
+#ifdef HAVE_PIEZO_SOUND
+    switches[SWITCH_UIF_SIG].tuneId = TUNE_TAP_CASUAL;
+#endif
 
-    if (G_gpg_vstate.kslot->sig.UIF[0] != 2) {
-        explicit_bzero(&option, sizeof(nbgl_layoutSwitch_t));
-        option.initState = G_gpg_vstate.kslot->sig.UIF[0];
-        option.text = "UIF for Signature";
-        option.token = TOKEN_UIF_SIG;
-        option.tuneId = TUNE_TAP_CASUAL;
-        nbgl_layoutAddSwitch(layoutCtx, &option);
-        nbOptions++;
-    }
+    switches[SWITCH_UIF_DEC].initState = G_gpg_vstate.kslot->dec.UIF[0] ? ON_STATE : OFF_STATE;
+    switches[SWITCH_UIF_DEC].text = "User Interaction Flag";
+    switches[SWITCH_UIF_DEC].subText = "For decryption";
+    switches[SWITCH_UIF_DEC].token = TOKEN_UIF_DEC;
+#ifdef HAVE_PIEZO_SOUND
+    switches[SWITCH_UIF_DEC].tuneId = TUNE_TAP_CASUAL;
+#endif
 
-    if (G_gpg_vstate.kslot->dec.UIF[0] != 2) {
-        explicit_bzero(&option, sizeof(nbgl_layoutSwitch_t));
-        option.initState = G_gpg_vstate.kslot->dec.UIF[0];
-        option.text = "UIF for Decryption";
-        option.token = TOKEN_UIF_DEC;
-        option.tuneId = TUNE_TAP_CASUAL;
-        nbgl_layoutAddSwitch(layoutCtx, &option);
-        nbOptions++;
-    }
+    switches[SWITCH_UIF_AUT].initState = G_gpg_vstate.kslot->aut.UIF[0] ? ON_STATE : OFF_STATE;
+    switches[SWITCH_UIF_AUT].text = "User Interaction Flag";
+    switches[SWITCH_UIF_AUT].subText = "For authentication";
+    switches[SWITCH_UIF_AUT].token = TOKEN_UIF_AUT;
+#ifdef HAVE_PIEZO_SOUND
+    switches[SWITCH_UIF_AUT].tuneId = TUNE_TAP_CASUAL;
+#endif
 
-    if (G_gpg_vstate.kslot->aut.UIF[0] != 2) {
-        explicit_bzero(&option, sizeof(nbgl_layoutSwitch_t));
-        option.initState = G_gpg_vstate.kslot->aut.UIF[0];
-        option.text = "UIF for Authentication";
-        option.token = TOKEN_UIF_AUT;
-        option.tuneId = TUNE_TAP_CASUAL;
-        nbgl_layoutAddSwitch(layoutCtx, &option);
-        nbOptions++;
-    }
-    if (nbOptions == 0) {
-        // UIF flags are all "Permanent Enable", just display for information
-        static const char* const infoTypes[] = {"UIF for Signature",
-                                                "UIF for Decryption",
-                                                "UIF for Authentication"};
-        static const char* const infoContents[] = {"Permanently Enabled",
-                                                   "Permanently Enabled",
-                                                   "Permanently Enabled"};
+    contents.type = SWITCHES_LIST;
+    contents.content.switchesList.nbSwitches = SWITCH_UIF_NB;
+    contents.content.switchesList.switches = switches;
+    contents.contentActionCallback = uif_cb;
 
-        for (nbOptions = 0; nbOptions < ARRAYLEN(infoTypes); nbOptions++) {
-            nbgl_layoutAddText(layoutCtx, infoTypes[nbOptions], infoContents[nbOptions]);
-            nbgl_layoutAddSeparationLine(layoutCtx);
-        }
-    }
+    settingContents.contentsList = &contents;
+    settingContents.nbContents = 1;
 
-    nbgl_layoutDraw(layoutCtx);
+    nbgl_useCaseGenericConfiguration("UIF mode", 0, &settingContents, ui_home_init);
 }
 
 /* -------------------------------- RESET UX --------------------------------- */
 
-enum { TOKEN_RESET = FIRST_USER_TOKEN, TOKEN_RESET_BACK };
-
-static void reset_cb(int token, uint8_t index) {
-    setting_initPage = 0;
-    switch (token) {
-        case TOKEN_RESET_BACK:
-            ui_home_init();
-            break;
-        case TOKEN_RESET:
-            switch (index) {
-                case 0:
-                    app_reset();
-                    ui_info("App Reset", "Done", ui_init, true);
-                    break;
-                case 1:
-                    ui_home_init();
-                    break;
-            }
-            break;
-    }
+/**
+ * @brief Reset callback
+ *
+ */
+static void reset_cb(void) {
+    app_reset();
+    nbgl_useCaseStatus("App Reset done", true, ui_home_init);
 }
 
 /**
@@ -919,32 +935,17 @@ static void reset_cb(int token, uint8_t index) {
  *
  */
 static void ui_reset(void) {
-    nbgl_contentCenteredInfo_t centeredInfo = {0};
-    nbgl_layoutChoiceButtons_t buttonInfo = {0};
-
-    ui_setting_header("Reset to Default", TOKEN_RESET_BACK, reset_cb);
-
-    centeredInfo.onTop = true;
-    centeredInfo.text1 = "This will reset the app to factory default,\nand delete ALL the keys!!!";
-    centeredInfo.text2 = "Are you sure you want to continue?";
-    centeredInfo.style = LARGE_CASE_BOLD_INFO;
-
-    nbgl_layoutAddCenteredInfo(layoutCtx, &centeredInfo);
-
-    buttonInfo.topText = "Reset";
-    buttonInfo.bottomText = "Cancel";
-    buttonInfo.token = TOKEN_RESET;
-    buttonInfo.style = BOTH_ROUNDED_STYLE;
-    buttonInfo.tuneId = TUNE_TAP_CASUAL;
-    nbgl_layoutAddChoiceButtons(layoutCtx, &buttonInfo);
-
-    nbgl_layoutDraw(layoutCtx);
+    nbgl_useCaseConfirm("This will reset the app to factory default, and delete ALL the keys!!!",
+                        "Are you sure you want to continue?",
+                        "Yes, reset",
+                        "Cancel",
+                        reset_cb);
 }
 
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
 
 /**
- * Pin Confirmation callback
+ * @brief Pin Confirmation callback
  *
  * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
  *
@@ -959,7 +960,7 @@ void pin_confirm_cb(bool confirm) {
 }
 
 /**
- * Pin Confirmation page display
+ * @brief Pin Confirmation page display
  *
  * @param[in] value PinCode ID to confirm
  *
@@ -975,14 +976,16 @@ void ui_menu_pinconfirm_display(unsigned int value) {
 
 /* ------------------------------ PIN ENTRY UX ----------------------------- */
 
+// clang-format off
 enum {
     TOKEN_PIN_ENTRY_BACK = FIRST_USER_TOKEN,
 };
+// clang-format on
 
 static void ui_menu_pinentry_cb(void);
 
 /**
- * Pin Entry Validation callback
+ * @brief Pin Entry Validation callback
  *
  * @param[in] value PinCode ID to confirm
  *
@@ -1083,7 +1086,7 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
 }
 
 /**
- * Pin Entry Action callback
+ * @brief Pin Entry Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
@@ -1100,7 +1103,7 @@ static void pinentry_cb(int token, uint8_t index) {
 }
 
 /**
- * Pin Entry page display
+ * @brief Pin Entry page display
  *
  * @param[in] step Pin Entry step
  *
@@ -1149,7 +1152,7 @@ void ui_menu_pinentry_display(unsigned int step) {
 }
 
 /**
- * Pin Entry Navigation callback
+ * @brief Pin Entry Navigation callback
  *
  */
 static void ui_menu_pinentry_cb(void) {
@@ -1165,7 +1168,7 @@ static void ui_menu_pinentry_cb(void) {
 /* ------------------------------ UIF CONFIRM UX ----------------------------- */
 
 /**
- * UIF Confirmation callback
+ * @brief UIF Confirmation callback
  *
  * @param[in] confirm indicate if the user press 'Confirm' or 'Cancel'
  *
@@ -1192,9 +1195,9 @@ void uif_confirm_cb(bool confirm) {
 }
 
 /**
- * UIF page display
+ * @brief UIF page display
  *
- * @param[in] step unused
+ * @param[in] value unused
  *
  */
 void ui_menu_uifconfirm_display(unsigned int value) {
