@@ -10,9 +10,8 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
-      - main
       - develop
+      - master
   pull_request:
 
 jobs:
@@ -22,4 +21,4 @@ jobs:
     with:
       source: './src'
       extensions: 'h,c'
-      version: 11
+      version: 12
