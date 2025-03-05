@@ -6,8 +6,8 @@
 
 GnuPG application for Ledger devices
 
-This application implements "The OpenPGP card" specification revision 3.3.
-This specification is available in *doc* directory and at <https://g10code.com/p-card.html>.
+This application implements "The OpenPGP smartcard" specification revision 3.3.
+This specification is available in *doc* directory and at <https://www.gnupg.org/ftp/specs/>.
 
 The application supports:
 
@@ -73,7 +73,7 @@ during the generation wizard to reproduce the same keys each time.
 
 ### On screen reset
 
-The application can be reset as if it was fresh installed. In settings, choose reset and confirm.
+The application can be reset as if it was fresh installed. In settings, choose *Reset* and confirm.
 
 ## Quick start guide
 
@@ -283,8 +283,8 @@ corresponding to different cases described in the document [Quick tests](doc/dev
 
 Several documents are available.
 
-Functional Specification of the OpenPGP Application available [here](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/specification/OpenPGP-smart-card-application.pdf>),
-but also at <https://g10code.com/p-card.html>.
+Functional Specification of the OpenPGP Application available [in doc](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/specification/OpenPGP-smart-card-application.pdf>),
+but also at <https://www.gnupg.org/ftp/specs/>.
 
 User documentation for the Ledger Application available here: [rst](doc/user/app-openpgp.rst),
 or [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/user/app-openpgp.pdf>)
@@ -325,8 +325,6 @@ It outputs 3 artifacts:
 
 ## Known limitations
 
-Today, the current App has some known limitations.
+Today, the current App has the following known limitation:
 
-- RSA4096 is disabled, because of an issue with the watchdog, resetting the device
-  during long prime number operation.
-- Using Ed25519 template, the decrypt doesn't output a correct result.
+- Using Ed25519 template, the decrypt operation doesn't work (given CRC error). Thus, it is currently disabled.
