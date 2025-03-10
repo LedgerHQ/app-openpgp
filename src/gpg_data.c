@@ -885,6 +885,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     gpg_key_t *keygpg = NULL;
     cx_rsa_private_key_t *key = NULL;
     unsigned int len = 0;
+    unsigned int k_len = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
     int sw = SW_UNKNOWN;
     unsigned int ksz = 0;
@@ -919,15 +920,15 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             switch (ksz) {
                 case 2048 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa2048;
-                    len = sizeof(cx_rsa_2048_private_key_t);
+                    k_len = sizeof(cx_rsa_2048_private_key_t);
                     break;
                 case 3072 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
-                    len = sizeof(cx_rsa_3072_private_key_t);
+                    k_len = sizeof(cx_rsa_3072_private_key_t);
                     break;
                 case 4096 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
-                    len = sizeof(cx_rsa_4096_private_key_t);
+                    k_len = sizeof(cx_rsa_4096_private_key_t);
                     break;
             }
 
@@ -941,10 +942,11 @@ int gpg_apdu_get_key_data(unsigned int ref) {
 
             // insert privkey
             gpg_io_mark();
+            len = GPG_IO_BUFFER_LENGTH - G_gpg_vstate.io_offset;
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_ENCRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
                                      (unsigned char *) key,
-                                     len,
+                                     k_len,
                                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                                      &len));
             gpg_io_inserted(len);
