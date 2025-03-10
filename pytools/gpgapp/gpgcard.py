@@ -336,7 +336,7 @@ class GPGCard() :
                 self.data.dec.fingerprint, self.data.dec.ca_fingerprint, self.data.dec.cert,
                 self.data.aut.key, self.data.aut.uif, self.data.aut.attribute, self.data.aut.date,
                 self.data.aut.fingerprint, self.data.aut.ca_fingerprint, self.data.aut.cert),
-                f, 2)
+                f, pickle.HIGHEST_PROTOCOL)
 
 
     def restore(self, file_name: str) -> None:
@@ -981,12 +981,13 @@ class GPGCard() :
         # d["Private key encrypted"] = key_data[offset:offset + size].hex()
         return d
 
-    def asymmetric_key(self, key: str, action: str) -> dict:
+    def asymmetric_key(self, key: str, action: str, seed: bool = False) -> dict:
         """Asymmetric key operation
 
         Args:
             key (str):    Key type (SIG, DC, AUT)
             action (str): Generate or Read
+            seed (bool):  Seed mode
 
         Return:
             Public key information:
@@ -1027,7 +1028,7 @@ class GPGCard() :
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Invalid key ID in attribute!")
 
         d = {}
-        tags = self._asym_key_pair(op, b_key)
+        tags = self._asym_key_pair(op, b_key, seed)
 
         if attributes[0] == PubkeyAlgo.RSA:
             d["ID"] = f"RSA-{self._get_int(attributes, offset=1)}"
@@ -1128,18 +1129,19 @@ class GPGCard() :
         return sw
 
 
-    def _asym_key_pair(self, op: int, key: int) -> dict:
+    def _asym_key_pair(self, op: int, key: int, seed: bool = False) -> dict:
         """Asymmetric key pair operation
 
         Args:
             op (int):  Operation to execute
             key (int): Key type
+            seed (bool): Seed mode
 
         Return:
             Public key decoded data bytes
         """
 
-        apdu = bytes.fromhex(f"0047{op:02x}0002{key:02x}00")
+        apdu = bytes.fromhex(f"0047{op:02x}{seed:02x}02{key:02x}00")
         resp, sw = self._exchange(apdu)
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Key operation error!")
