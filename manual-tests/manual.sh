@@ -24,7 +24,7 @@ help() {
   echo
   echo "Options:"
   echo
-  echo "  -c <init|reset|card|encrypt|decrypt|sign|verify|default>  : Requested command"
+  echo "  -c <init|reset|card|status|encrypt|decrypt|sign|verify|default>  : Requested command"
   echo "  -e     : Expert mode"
   echo "  -v     : Verbose mode"
   echo "  -h     : Displays this help"
@@ -85,6 +85,8 @@ init() {
     echo allow-admin
     echo enable-pinpad-varlen
     echo card-timeout 1
+    echo disable-ccid
+    echo pcsc-shared
   } > "${dir}/scdaemon.conf"
 
   if [[ ${EXPERT} == true ]]; then
@@ -100,7 +102,7 @@ init() {
 
 #===============================================================================
 #
-#     card - Show/edit the card status and configuration
+#     card - Edit the card status and configuration
 #
 #===============================================================================
 card() {
@@ -109,6 +111,15 @@ card() {
   [[ ${EXPERT} == true ]] && expert_mode="--expert"
 
   gpg --homedir "${gnupg_home_dir}" ${expert_mode} --card-edit
+}
+
+#===============================================================================
+#
+#     card - Show the card status and configuration
+#
+#===============================================================================
+status() {
+  gpg --homedir "${gnupg_home_dir}" --card-status
 }
 
 #===============================================================================
@@ -199,7 +210,7 @@ while getopts ":c:evh" opt; do
 
     c)
       case ${OPTARG} in
-        init|reset|card|encrypt|decrypt|sign|verify|default)
+        init|reset|card|status|encrypt|decrypt|sign|verify|default)
           CMD=${OPTARG}
           ;;
         *)
