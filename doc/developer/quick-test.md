@@ -104,7 +104,7 @@ Usage: ./manual.sh <options>
 
 Options:
 
-  -c <init|reset|card|encrypt|decrypt|sign|verify|default>  : Requested command
+  -c <init|reset|card|status|encrypt|decrypt|sign|verify|default>  : Requested command
   -e     : Expert mode
   -v     : Verbose mode
   -h     : Displays this help
@@ -125,7 +125,9 @@ The `reset` command just allows to kill running *scdaemon* or *gpg-agent* proces
 
 The `card` command is a shortcut to the `gpg --card-edit` command.
 
-The `default` command, used **after** keys creation, allows to configure the default keys for signature and decryption.
+The `status` command is a shortcut to the `gpg --card-status` command.
+
+The `default` command, used **after** keys creation, allows to configure the *default* keys for signature and decryption.
 The information is written in the file `manual-tests/gnupg/gpg.conf`.
 This step is very useful when playing with backup/restore to ensure the default key will be found.
 

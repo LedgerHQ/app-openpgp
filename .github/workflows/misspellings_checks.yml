@@ -8,9 +8,8 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
-      - main
       - develop
+      - master
   pull_request:
 
 jobs:
@@ -18,12 +17,12 @@ jobs:
     name: Check misspellings
     runs-on: ubuntu-latest
     steps:
-    - name: Clone
-      uses: actions/checkout@v4
+      - name: Clone
+        uses: actions/checkout@v4
 
-    - name: Check misspellings
-      uses: codespell-project/actions-codespell@v2
-      with:
-        builtin: clear,rare
-        check_filenames: true
-        ignore_words_list: ontop
+      - name: Check misspellings
+        uses: codespell-project/actions-codespell@v2
+        with:
+          builtin: clear,rare
+          check_filenames: true
+          ignore_words_list: ontop

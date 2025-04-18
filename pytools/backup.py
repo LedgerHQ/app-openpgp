@@ -36,14 +36,12 @@ def get_argparser() -> Namespace:
     parser.add_argument("--reader", type=str, default="Ledger",
                         help="PCSC reader name (default is '%(default)s') or 'speculos'")
 
+    parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
     parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")
 
-    parser.add_argument("--pinpad", action="store_true",
-                        help="PIN validation will be delegated to pinpad")
-    parser.add_argument("--adm-pin", metavar="PIN",
-                        help="Admin PIN (if pinpad not used)", required="--pinpad" not in sys.argv)
-    parser.add_argument("--user-pin", metavar="PIN",
-                        help="User PIN (if pinpad not used)", required="--pinpad" not in sys.argv)
+    parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
+    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
+    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
 
     parser.add_argument("--restore", action="store_true",
                        help="Perform a Restore instead of Backup")
@@ -70,9 +68,12 @@ def entrypoint() -> None:
     # Arguments checking
     # ------------------
     if not args.pinpad:
-        if not args.adm_pin or not args.user_pin:
-            print("If 'pinpad' is not use, 'userpin' and 'admpin' must be provided.")
-            sys.exit()
+        if not args.user_pin:
+            args.user_pin = "123456"
+            print(f"Using default 'userpin': {args.user_pin}")
+        if not args.adm_pin:
+            args.adm_pin = "12345678"
+            print(f"Using default 'admpin': {args.adm_pin}")
 
     if args.restore is False:
         if Path(args.file).is_file():
@@ -84,6 +85,7 @@ def entrypoint() -> None:
     try:
         print(f"Connect to card '{args.reader}'...")
         gpgcard: GPGCard = GPGCard()
+        gpgcard.log_apdu(args.apdu)
         gpgcard.connect(args.reader)
 
         if not gpgcard.verify_pin(PassWord.PW1, args.user_pin, args.pinpad) or \

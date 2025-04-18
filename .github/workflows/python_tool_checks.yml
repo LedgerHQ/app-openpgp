@@ -8,9 +8,8 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
-      - main
       - develop
+      - master
   pull_request:
 
 jobs:
@@ -18,28 +17,26 @@ jobs:
     name: Client linting
     runs-on: ubuntu-latest
     steps:
-    - name: Clone
-      uses: actions/checkout@v4
-    - name: Installing PIP dependencies
-      run: |
-        sudo apt-get update && sudo apt-get install -y libpcsclite-dev
-        pip install pylint
-        pip install -r pytools/requirements.txt
-    - name: Lint Python code
-      run: |
-        pylint --rc pytools/setup.cfg pytools/
+      - name: Clone
+        uses: actions/checkout@v4
+      - name: Installing PIP dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y libpcsclite-dev
+          pip install pylint
+          pip install -r pytools/requirements.txt
+      - name: Lint Python code
+        run: pylint --rc pytools/setup.cfg pytools/
 
   mypy:
     name: Type checking
     runs-on: ubuntu-latest
     steps:
-    - name: Clone
-      uses: actions/checkout@v4
-    - name: Installing PIP dependencies
-      run: |
-        sudo apt-get update && sudo apt-get install -y libpcsclite-dev
-        pip install mypy
-        pip install -r pytools/requirements.txt
-    - name: Mypy type checking
-      run: |
-        mypy pytools/
+      - name: Clone
+        uses: actions/checkout@v4
+      - name: Installing PIP dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y libpcsclite-dev
+          pip install mypy
+          pip install -r pytools/requirements.txt
+      - name: Mypy type checking
+        run: mypy pytools/
