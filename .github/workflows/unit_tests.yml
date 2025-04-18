@@ -39,7 +39,7 @@ jobs:
           path: unit-tests/coverage
 
       - name: Install codecov dependencies
-        run: apk update && apk add curl gpg
+        run: apt install --no-install-recommends -y curl gpg
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v5
