@@ -34,7 +34,7 @@ jobs:
           lcov --directory . -b "$(realpath build/)" --remove coverage.info '*/unit-tests/*' -o coverage.info && \
           genhtml coverage.info -o coverage
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: code-coverage
           path: unit-tests/coverage
