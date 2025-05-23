@@ -1,7 +1,7 @@
 from typing import Sequence
 import pytest
+from ledgered.devices import Device, DeviceType
 from ragger.backend import BackendInterface
-from ragger.firmware import Firmware
 from ragger.navigator import Navigator, NavInsID, NavIns
 from ragger.navigator.navigator import InstructionType
 
@@ -15,7 +15,7 @@ from utils import ROOT_SCREENSHOT_PATH
 # In this test we check the behavior of the Slot menu
 # The Navigations go and check:
 #  - Select slot / Slot 2 / (next page) / Set default
-def test_menu_slot(firmware: Firmware, backend: BackendInterface, navigator: Navigator, test_name: str) -> None:
+def test_menu_slot(device: Device, backend: BackendInterface, navigator: Navigator, test_name: str) -> None:
 
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
@@ -29,7 +29,7 @@ def test_menu_slot(firmware: Firmware, backend: BackendInterface, navigator: Nav
 
     # Navigate in the main menu
     instructions: Sequence[InstructionType]
-    if firmware.is_nano:
+    if device.is_nano:
         initial_instructions = [
             NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,    # Select slot
@@ -74,10 +74,10 @@ def test_menu_slot(firmware: Firmware, backend: BackendInterface, navigator: Nav
 #               UIF / Enable UIF for Signature
 #               (back)
 #               Reset / Long press 'Yes'
-def test_menu_settings(firmware: Firmware, backend: BackendInterface, navigator: Navigator, test_name: str) -> None:
+def test_menu_settings(device: Device, backend: BackendInterface, navigator: Navigator, test_name: str) -> None:
     # Navigate in the main menu
     instructions: Sequence[InstructionType]
-    if firmware == Firmware.NANOS:
+    if device.type == DeviceType.NANOS:
         # Use the app interface instead of raw interface
         client = CommandSender(backend)
 
@@ -151,7 +151,7 @@ def test_menu_settings(firmware: Firmware, backend: BackendInterface, navigator:
             NavInsID.BOTH_CLICK,    # Validate
         ]
 
-    elif firmware.is_nano:
+    elif device.is_nano:
         initial_instructions = [
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
@@ -212,7 +212,7 @@ def test_menu_settings(firmware: Firmware, backend: BackendInterface, navigator:
         initial_instructions = [
             NavInsID.USE_CASE_HOME_SETTINGS,    # Settings
         ]
-        if firmware == Firmware.STAX:
+        if device.type == DeviceType.STAX:
             instructions = [
                 NavIns(NavInsID.TOUCH, (350, 130)), # Key Template
                 NavIns(NavInsID.TOUCH, (350, 390)), # Authentication
