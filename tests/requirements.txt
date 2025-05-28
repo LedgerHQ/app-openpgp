@@ -1,2 +1,3 @@
 pytest
 ragger[speculos,ledgerwallet]
+ledgered

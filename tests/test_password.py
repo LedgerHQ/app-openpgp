@@ -4,11 +4,12 @@
 """
 This module provides Ragger tests for Password feature
 """
+
 from pathlib import Path
 import pytest
+from ledgered.devices import Device
 from ragger.error import ExceptionRAPDU
 from ragger.backend import BackendInterface
-from ragger.firmware import Firmware
 from ragger.navigator import Navigator
 
 from application_client.command_sender import CommandSender
@@ -65,7 +66,7 @@ def test_verify_wrong(backend: BackendInterface) -> None:
 
 
 # In this test we check the card Password verification with Pinpad
-def test_verify_confirm_accepted(firmware: Firmware,
+def test_verify_confirm_accepted(device: Device,
                                  backend: BackendInterface,
                                  navigator: Navigator,
                                  test_name: Path) -> None:
@@ -74,7 +75,7 @@ def test_verify_confirm_accepted(firmware: Firmware,
 
     # Send the APDU (Asynchronous)
     with client.send_verify_pw_with_confirmation(PassWord.PW1):
-        util_navigate(firmware, navigator, test_name, "Confirm_Yes")
+        util_navigate(device, navigator, test_name, "Confirm_Yes")
 
     # Check the status (Asynchronous)
     response = client.get_async_response()
@@ -82,7 +83,7 @@ def test_verify_confirm_accepted(firmware: Firmware,
 
 
 # In this test we check the Rejected card Password verification with Pinpad
-def test_verify_confirm_refused(firmware: Firmware,
+def test_verify_confirm_refused(device: Device,
                                 backend: BackendInterface,
                                 navigator: Navigator,
                                 test_name: Path) -> None:
@@ -92,7 +93,7 @@ def test_verify_confirm_refused(firmware: Firmware,
     # Send the APDU (Asynchronous)
     with pytest.raises(ExceptionRAPDU) as err:
         with client.send_verify_pw_with_confirmation(PassWord.PW1):
-            util_navigate(firmware, navigator, test_name, "Confirm_No")
+            util_navigate(device, navigator, test_name, "Confirm_No")
 
     # Assert we have received a refusal
     assert err.value.status == Errors.SW_CONDITIONS_NOT_SATISFIED

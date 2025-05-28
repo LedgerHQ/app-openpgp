@@ -10,9 +10,9 @@ import re
 from Crypto.PublicKey import RSA, ECC
 from Crypto.Util.number import bytes_to_long
 from Crypto.Signature import eddsa
+from ledgered.devices import Device, DeviceType
 
 from ragger.navigator import NavInsID, NavIns, Navigator
-from ragger.firmware import Firmware
 
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, PassWord, DataObject, PubkeyAlgo
@@ -33,7 +33,7 @@ SHA256_DIGEST_INFO = b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\
 
 
 def util_navigate(
-        firmware: Firmware,
+        device: Device,
         navigator: Navigator,
         test_name: Path,
         text: str = "",
@@ -43,7 +43,7 @@ def util_navigate(
     assert text
     valid_instr: list[NavIns | NavInsID] = []
 
-    if firmware == Firmware.NANOS:
+    if device.type == DeviceType.NANOS:
         text, txt_cfg = text.split("_")
         nav_inst = NavInsID.RIGHT_CLICK
         if txt_cfg == "Yes":
@@ -53,7 +53,7 @@ def util_navigate(
         else:
             raise ValueError(f'Wrong text "{text}"')
 
-    elif firmware.is_nano:
+    elif device.is_nano:
         text = text.split("_")[1]
         nav_inst = NavInsID.RIGHT_CLICK
         valid_instr.append(NavInsID.BOTH_CLICK)
