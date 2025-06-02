@@ -45,16 +45,11 @@ def get_argparser() -> Namespace:
     parser.add_argument("--reset", action="store_true",
                         help="Reset the application (all data will be erased)")
 
-    parser.add_argument("--pinpad", action="store_true",
-                        help="PIN validation will be delegated to pinpad")
-    parser.add_argument("--adm-pin", metavar="PIN",
-                        help="Admin PIN (if pinpad not used)", required="--pinpad" not in sys.argv)
-    parser.add_argument("--user-pin", metavar="PIN",
-                        help="User PIN (if pinpad not used)", required="--pinpad" not in sys.argv)
-    parser.add_argument("--new-user-pin", metavar="PIN",
-                        help="Change User PIN")
-    parser.add_argument("--new-adm-pin", metavar="PIN",
-                        help="Change Admin PIN")
+    parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
+    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
+    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
+    parser.add_argument("--new-user-pin", metavar="PIN", help="Change User PIN")
+    parser.add_argument("--new-adm-pin", metavar="PIN", help="Change Admin PIN")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--reset-code", help="Update 'PW1 Resetting Code'")
     group.add_argument("--reset-pw1", help="Reset the User PIN")
@@ -271,7 +266,7 @@ def set_templates(gpgcard: GPGCard, templates: str, key_type: KeyTypes | None = 
 # ===============================================================================
 #          Handle Asymmetric keys
 # ===============================================================================
-def handle_key(gpgcard: GPGCard, action: str, key_type: KeyTypes, file: str = "") -> None:
+def handle_key(gpgcard: GPGCard, action: str, key_type: KeyTypes, file: str = "", seed: bool = False) -> None:
     """Generate Key pair and/or Read Public key
 
     Args:
@@ -279,6 +274,7 @@ def handle_key(gpgcard: GPGCard, action: str, key_type: KeyTypes, file: str = ""
         action (str): Generate or Read
         key_type (KeyTypes): Key type selected
         file (str): Public key export file
+        seed (bool): Seed mode
     """
 
     if action not in KEY_OPERATIONS:
@@ -288,7 +284,7 @@ def handle_key(gpgcard: GPGCard, action: str, key_type: KeyTypes, file: str = ""
     for key in key_list:
         print(f"{action} '{key}' Key...")
         key_action = "Read" if action == "Export" else action
-        pubkey = gpgcard.asymmetric_key(key, key_action)
+        pubkey = gpgcard.asymmetric_key(key, key_action, seed)
         if action == "Export":
             if len(key_list) > 1:
                 filename = key + "_" + file
@@ -316,9 +312,12 @@ def entrypoint() -> None:
     # Arguments checking
     # ------------------
     if not args.pinpad:
-        if not args.adm_pin or not args.user_pin:
-            error(ErrorCodes.ERR_INTERNAL,
-                  "If 'pinpad' is not use, 'userpin' and 'admpin' must be provided")
+        if not args.user_pin:
+            args.user_pin = "123456"
+            print(f"Using default 'userpin': {args.user_pin}")
+        if not args.adm_pin:
+            args.adm_pin = "12345678"
+            print(f"Using default 'admpin': {args.adm_pin}")
 
     if args.serial and len(args.serial) != 8 :
         error(ErrorCodes.ERR_INTERNAL,
@@ -374,7 +373,7 @@ def entrypoint() -> None:
         if args.set_templates:
             set_templates(gpgcard, args.set_templates, args.key_type)
 
-        if args.seed_key:
+        if args.seed_key and not args.key_action:
             gpgcard.seed_key()
 
         if args.set_fingerprints:
@@ -384,7 +383,7 @@ def entrypoint() -> None:
             gpgcard.set_serial(args.serial)
 
         if args.key_action:
-            handle_key(gpgcard, args.key_action, args.key_type, args.file)
+            handle_key(gpgcard, args.key_action, args.key_type, args.file, args.seed_key)
 
         gpgcard.disconnect()
 

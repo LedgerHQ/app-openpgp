@@ -8,9 +8,8 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
-      - main
       - develop
+      - master
   pull_request:
 
 jobs:
@@ -18,26 +17,24 @@ jobs:
     name: Client linting
     runs-on: ubuntu-latest
     steps:
-    - name: Clone
-      uses: actions/checkout@v4
-    - name: Installing PIP dependencies
-      run: |
-        pip install pylint
-        pip install -r tests/requirements.txt
-    - name: Lint Python code
-      run: |
-        pylint --rc tests/setup.cfg tests/application_client/
+      - name: Clone
+        uses: actions/checkout@v4
+      - name: Installing PIP dependencies
+        run: |
+          pip install pylint
+          pip install -r tests/requirements.txt
+      - name: Lint Python code
+        run: pylint --rc tests/setup.cfg tests/application_client/
 
   mypy:
     name: Type checking
     runs-on: ubuntu-latest
     steps:
-    - name: Clone
-      uses: actions/checkout@v4
-    - name: Installing PIP dependencies
-      run: |
-        pip install mypy
-        pip install -r tests/requirements.txt
-    - name: Mypy type checking
-      run: |
-        mypy tests/application_client/
+      - name: Clone
+        uses: actions/checkout@v4
+      - name: Installing PIP dependencies
+        run: |
+          pip install mypy
+          pip install -r tests/requirements.txt
+      - name: Mypy type checking
+        run: mypy tests/application_client/

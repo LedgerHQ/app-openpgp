@@ -448,12 +448,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                         pkey_size = sizeof(cx_rsa_3072_private_key_t);
                         pq = G_gpg_vstate.work.rsa.public3072.n;
                         break;
-#ifdef WITH_SUPPORT_RSA4096
                     case 4096 / 8:
                         pkey_size = sizeof(cx_rsa_4096_private_key_t);
                         pq = G_gpg_vstate.work.rsa.public4096.n;
                         break;
-#endif
                     default:
                         break;
                 }
@@ -674,7 +672,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             switch (G_gpg_vstate.work.io_buffer[0]) {
                 case KEY_ID_RSA:
                     ksz = U2BE(G_gpg_vstate.work.io_buffer, 1);
-                    if ((ksz != 2048) && (ksz != 3072)) {
+                    if ((ksz != 2048) && (ksz != 3072) && (ksz != 4096)) {
                         sw = SW_WRONG_DATA;
                     } else {
                         sw = SW_OK;
@@ -887,6 +885,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     gpg_key_t *keygpg = NULL;
     cx_rsa_private_key_t *key = NULL;
     unsigned int len = 0;
+    unsigned int k_len = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
     int sw = SW_UNKNOWN;
     unsigned int ksz = 0;
@@ -921,18 +920,16 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             switch (ksz) {
                 case 2048 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa2048;
-                    len = sizeof(cx_rsa_2048_private_key_t);
+                    k_len = sizeof(cx_rsa_2048_private_key_t);
                     break;
                 case 3072 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
-                    len = sizeof(cx_rsa_3072_private_key_t);
+                    k_len = sizeof(cx_rsa_3072_private_key_t);
                     break;
-#ifdef WITH_SUPPORT_RSA4096
                 case 4096 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
-                    len = sizeof(cx_rsa_4096_private_key_t);
+                    k_len = sizeof(cx_rsa_4096_private_key_t);
                     break;
-#endif
             }
 
             if ((key == NULL) || (key->size != ksz)) {
@@ -945,10 +942,11 @@ int gpg_apdu_get_key_data(unsigned int ref) {
 
             // insert privkey
             gpg_io_mark();
+            len = GPG_IO_BUFFER_LENGTH - G_gpg_vstate.io_offset;
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_ENCRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
                                      (unsigned char *) key,
-                                     len,
+                                     k_len,
                                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                                      &len));
             gpg_io_inserted(len);
@@ -1060,12 +1058,10 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
                     len = sizeof(cx_rsa_3072_private_key_t);
                     break;
-#ifdef WITH_SUPPORT_RSA4096
                 case 4096 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
                     len = sizeof(cx_rsa_4096_private_key_t);
                     break;
-#endif
             }
 
             if ((key == NULL) || (key->size != ksz)) {

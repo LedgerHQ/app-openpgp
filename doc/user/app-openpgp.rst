@@ -1,6 +1,6 @@
 ..
     Ledger App OpenPGP.
-    (c) 2024 Ledger SAS.
+    (c) 2025 Ledger SAS.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ License
 =======
 
   |  Ledger App OpenPGP.
-  |  (c) 2024 Ledger SAS.
+  |  (c) 2025 Ledger SAS.
   |
   | Licensed under the Apache License, Version 2.0 (the "License");
   | you may not use this file except in compliance with the License.
@@ -45,12 +45,12 @@ Introduction
 
 GnuPG application for Ledger devices.
 
-This application implements "The OpenPGP card" specification revision 3.3.
-This specification is available in doc directory at [G10CODE]_.
+This application implements "The OpenPGP smartcard" specification revision 3.3.
+This specification is available in doc directory at [GPGSPECS]_.
 
 The application supports:
 
-- RSA with key up to 3072 bits
+- RSA with key up to 4096 bits
 - ECDSA with secp256R1 and secp256K1
 - EDDSA with Ed25519 curve
 - ECDH with secp256R1, secp256K1 and curve25519 curves
@@ -84,6 +84,8 @@ MAC
 
 Note: See https://developer.apple.com/library/content/documentation/Security/Conceptual/System_Integrity_Protection_Guide/ConfiguringSystemIntegrityProtection/ConfiguringSystemIntegrityProtection.html
 
+TBC...
+
 Windows
 ~~~~~~~
 
@@ -104,37 +106,39 @@ Thus, you must ensure (or add):
 - For Nanos:
 
   - ifdVendorID: 0x2C97
-  - ifdProductID: 0x1009
+  - ifdProductID: 0x1000
   - ifdFriendlyName: Ledger Nano S
 
 - For Nanox:
 
   - ifdVendorID: 0x2C97
-  - ifdProductID: 0x4009
+  - ifdProductID: 0x4000
   - ifdFriendlyName: Ledger Nano X
 
 - For Nanos+:
 
   - ifdVendorID: 0x2C97
-  - ifdProductID: 0x5009
+  - ifdProductID: 0x5000
   - ifdFriendlyName: Ledger Nano S Plus
 
 - for Stax:
 
   - ifdVendorID: 0x2C97
-  - ifdProductID: 0x6009
+  - ifdProductID: 0x6000
   - ifdFriendlyName: Ledger Stax
 
 - for Flex:
 
   - ifdVendorID: 0x2C97
-  - ifdProductID: 0x7009
+  - ifdProductID: 0x7000
   - ifdFriendlyName: Ledger Flex
 
 Notes:
 
 - The 3 entry nodes must be added for each device. It can be easier to add new ones at the end of each list.
 - A file `0001-plist.patch` is provided in this directory.
+- With Ubuntu 22.04, gpg default version is 2.2.27, which is announced End-of-Life by 2024-12-31. You may update to a newer version
+- gpg version 2.2.27 has some conflict with other smartcards like Yubikey. If needed, update to v2.4.0 using [this link](https://www.procustodibus.com/blog/2023/02/gpg-2-4-on-ubuntu-22-04/)
 
 
 OpenPGP Card application explained
@@ -160,6 +164,8 @@ The full menu layout is:
  |         Choose Type...
  |             RSA 2048
  |             RSA 3072
+ |             RSA 4096
+ |             SECP 256K1
  |             SECP 256R1
  |             ED25519
  |         Set Template
@@ -176,10 +182,6 @@ The full menu layout is:
  |        UIF for Authentication *ON/OFF*
  |     Reset
  | About
- |     \ *OpenPGP Card*
- |     \ *(c) Ledger SAS*
- |     \ *Spec 3.3.1*
- |     \ *App 1.5.4*
 
 | Emphasis entries are not selectable and just provide information.
 | A "**#**" after the entry label means default value on reset.
@@ -191,12 +193,11 @@ Device Info
 
 The *Device Info* provides current user and slot information. The format is:
 
- | ``<User: **name** / Serial: **s** / Slot: **n** >``
+ | ``<ID: **sn** / Slot: **n** >``
 
 with:
 
-- **name** is the one provided to ``gpg --card-edit``. See [GPGSC]_.
-- **s** is the 32 bits card serial number. Note that the last three bits always encode the current slot value.
+- **sn** is the serial number provided to ``gpg --card-edit``. See [GPGSC]_.
 - **n** is the current slot, see below.
 
 
@@ -348,7 +349,7 @@ device.
 
 **On Screen**
 
-The PIN is entered on the device screen. For entering the PIN choose the
+The PIN is entered on the device screen. For entering the PIN on Nano devices, choose the
 next digit by using the left or right button. When the digit you expect is displayed
 select it by pressing both buttons at the same time.
 
@@ -412,6 +413,8 @@ GPG
 The OpenGPG Card application need at least version 2.1.19 for full support.
 A version prior to 2.1.19 will fail when using ECC.
 
+As indicated in the introduction, best practice is to use at least version 2.4.0 of GnuPG.
+
 You should test with a test key and make a backup of your
 keyring before starting, except if your are sure about what you do.
 
@@ -425,6 +428,8 @@ Create or edit the file ``~/.gnupg/scdaemon.conf`` and add the following lines:
  | ``reader-port "Ledger Token"``
  | ``allow-admin``
  | ``enable-pinpad-varlen``
+ | ``disable-ccid``
+ | ``pcsc-shared``
 
 Note: ``enable-pinpad-varlen`` option is mandatory, else ``gpg`` could request
 the PIN on the *host*, which is not supported by Ledger App.
@@ -994,8 +999,8 @@ First, tell ``gpg-agent`` to enable ``ssh-auth`` feature by adding the following
 Starting with ``gpg`` is necessary to add some configuration options to make the *pinentry*
 work properly. Add the following line to ``~/.bashrc`` file:
 
- | ``export SSH_AUTH_SOCK=`gpgconf --list-dirs agent-ssh-socket```
- | ``export GPG_TTY=`tty```
+ | ``export SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket)``
+ | ``export GPG_TTY=$(tty)``
  | ``gpgconf --launch gpg-agent``
 
 It may be also necessary to setup the loopback pinentry options.
@@ -1109,7 +1114,7 @@ The *usage* field tells you each key purpose:
 The *card-no* field provides you with the serial number of the card on which the key are stored.
 You should have 3 or less keys with the same serial. These are the keys we want to restore.
 
-For each key you also have the key template (*rsa2048*, *rsa3072*, *ed2559*, *cv25519*) followed by the
+For each key you also have the key template (*rsa2048*, *rsa3072*, *rsa4096*, *ed2559*, *cv25519*) followed by the
 short fingerprint, e.g. ``ed25519/8451AAF7D43D1095``
 
 Please note the serial and the 3 key template names: ``FD6C11BE`` , ``ed25519:cv25519:ed25519``.
@@ -1405,7 +1410,7 @@ or simply get the information on the configuration and keys.
 Its usage is:
 
  | ``$ ./gpgcli.py --help``
- | ``usage: gpgcli.py [-h] [--info] [--reader READER] [--apdu] [--slot {1,2,3}] [--reset] [--pinpad] --adm-pin PIN --user-pin PIN [--new-user-pin PIN] [--new-adm-pin PIN] [--reset-code RESET_CODE | --reset-pw1 RESET_PW1] [--serial SERIAL]``
+ | ``usage: gpgcli.py [-h] [--info] [--reader READER] [--apdu] [--slot {1,2,3}] [--reset] [--pinpad] [--adm-pin PIN] [--user-pin PIN] [--new-user-pin PIN] [--new-adm-pin PIN] [--reset-code RESET_CODE | --reset-pw1 RESET_PW1] [--serial SERIAL]``
  |                 ``[--salutation {Male,Female}] [--name NAME] [--url URL] [--login LOGIN] [--lang LANG] [--key-type {SIG,DEC,AUT}] [--key-action {Export,Generate,Read}] [--set-fingerprints SIG:DEC:AUT] [--set-templates SIG:DEC:AUT] [--seed-key]``
  |                 ``[--file FILE]``
  |
@@ -1445,7 +1450,7 @@ Its usage is:
  |  ``--set-templates SIG:DEC:AUT``
  |                        ``Set template identifier for selected 'key-type'``
  |                        ``If 'key-type' is not specified, set for all keys (SIG:DEC:AUT)``
- |                        ``Valid values are rsa2048, rsa3072, nistp256, ed25519, cv25519``
+ |                        ``Valid values are rsa2048, rsa3072, rsa4096, nistp256, ed25519, cv25519``
  |  ``--seed-key            Regenerate all keys, based on seed mode``
  |  ``--file FILE           Public Key export file (default is 'pubkey')``
 
@@ -1697,5 +1702,5 @@ References
 
 .. [GPG]     *The GNU Privacy Guard*, https://gnupg.org/
 .. [GPGSC]   *The GnuPG Smartcard HOWTO*, https://gnupg.org/howtos/card-howto/en/smartcard-howto.html
-.. [G10CODE] *The OpenPGP card application*, https://g10code.com/p-card.html
+.. [GPGSPECS] *The OpenPGP card application*, https://www.gnupg.org/ftp/specs/
 .. [GPGADD]  *The OpenPGP card application add-on*, https://github.com/LedgerHQ/app-openpgp/blob/master/doc/developer/gpgcard-addon.rst
