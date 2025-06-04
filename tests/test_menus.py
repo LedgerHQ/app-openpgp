@@ -215,36 +215,36 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
         if device.type == DeviceType.STAX:
             instructions = [
                 NavIns(NavInsID.TOUCH, (350, 130)), # Key Template
-                NavIns(NavInsID.TOUCH, (350, 390)), # Authentication
-                NavIns(NavInsID.TOUCH, (350, 390)), # SECP 256K1
+                NavIns(NavInsID.TOUCH, (350, 330)), # Authentication
+                NavIns(NavInsID.TOUCH, (350, 420)), # SECP 256K1
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
                 NavIns(NavInsID.TOUCH, (350, 220)), # Seed mode
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (350, 300)), # PIN mode
-                NavIns(NavInsID.TOUCH, (350, 130)), # On Screen
+                NavIns(NavInsID.TOUCH, (350, 320)), # PIN mode
+                NavIns(NavInsID.TOUCH, (350, 140)), # On Screen
                 NavInsID.CENTERED_FOOTER_TAP,       # Set default
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (350, 390)), # UIF
+                NavIns(NavInsID.TOUCH, (350, 420)), # UIF
                 NavIns(NavInsID.TOUCH, (350, 130)), # UIF for Signature
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (350, 480)), # Reset
+                NavIns(NavInsID.TOUCH, (350, 510)), # Reset
                 NavInsID.USE_CASE_CHOICE_CONFIRM,   # Press 'Reset'
             ]
 
         else:
             instructions = [
                 NavIns(NavInsID.TOUCH, (430, 130)), # Key Template
-                NavIns(NavInsID.TOUCH, (430, 420)), # Authentication
-                NavIns(NavInsID.TOUCH, (430, 320)), # SECP 256K1
+                NavIns(NavInsID.TOUCH, (430, 320)), # Authentication
+                NavIns(NavInsID.TOUCH, (430, 410)), # SECP 256K1
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
                 NavIns(NavInsID.TOUCH, (430, 230)), # Seed mode
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
                 NavIns(NavInsID.TOUCH, (430, 325)), # PIN mode
                 NavIns(NavInsID.TOUCH, (430, 140)), # On Screen
-                NavInsID.EXIT_FOOTER_TAP,       # Set default
+                NavInsID.EXIT_FOOTER_TAP,           # Set default
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
                 NavIns(NavInsID.TOUCH, (430, 420)), # UIF
-                NavIns(NavInsID.TOUCH, (430, 130)), # UIF for Signature
+                NavIns(NavInsID.TOUCH, (430, 140)), # UIF for Signature
                 NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
                 NavInsID.USE_CASE_SETTINGS_NEXT,    # Next page
                 NavIns(NavInsID.TOUCH, (430, 130)), # Reset

@@ -29,8 +29,8 @@ APPNAME = OpenPGP
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 3
-APPVERSION_P = 1
+APPVERSION_N = 4
+APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 SPECVERSION:="3.3.1"
@@ -126,8 +126,6 @@ DISABLE_OS_IO_STACK_USE = 1
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_USB_CLASS_CCID
 DEFINES   += HAVE_RSA
-# Watchdog issue causing the device reset with long prime number computation
-# DEFINES   += WITH_SUPPORT_RSA4096
 # Limitation (maybe due to openpgp itself): no support of DEC operation with cv25519
 DEFINES   += NO_DECRYPT_cv25519
 

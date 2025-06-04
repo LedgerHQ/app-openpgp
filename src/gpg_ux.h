@@ -41,4 +41,6 @@ void ui_menu_pinconfirm_display(unsigned int value);
 void ui_menu_pinentry_display(unsigned int value);
 void ui_menu_uifconfirm_display(unsigned int value);
 
+extern void app_exit(void);
+
 #endif  // GPG_UX_H

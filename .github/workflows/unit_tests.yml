@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
-      - main
       - develop
+      - master
   pull_request:
 
 jobs:
@@ -39,10 +38,14 @@ jobs:
           name: code-coverage
           path: unit-tests/coverage
 
+      - name: Install codecov dependencies
+        run: apt install --no-install-recommends -y curl gpg
+
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./unit-tests/coverage.info
           flags: unittests
           name: codecov-app-openpgp
