@@ -127,7 +127,7 @@ DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_USB_CLASS_CCID
 DEFINES   += HAVE_RSA
 # Limitation (maybe due to openpgp itself): no support of DEC operation with cv25519
-DEFINES   += NO_DECRYPT_cv25519
+# DEFINES   += NO_DECRYPT_cv25519
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 DEFINES   += HAVE_UX_LEGACY
