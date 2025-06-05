@@ -271,6 +271,9 @@ int gpg_apdu_pso() {
             switch (pad_byte) {
                 case PAD_RSA:
                     if (G_gpg_vstate.mse_dec->attributes.value[0] != KEY_ID_RSA) {
+                        PRINTF("[PSO] - Wrong attribute %d != %d\n",
+                               G_gpg_vstate.mse_dec->attributes.value[0],
+                               KEY_ID_RSA);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -291,6 +294,7 @@ int gpg_apdu_pso() {
                     }
 
                     if ((rsa_key == NULL) || (rsa_key->size != ksz)) {
+                        PRINTF("[PSO] - Wrong RSA key size %d != %d\n", rsa_key->size, ksz);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -312,6 +316,9 @@ int gpg_apdu_pso() {
                 case PAD_AES:
                     aes_key = &G_gpg_vstate.kslot->AES_dec;
                     if (!(aes_key->size != CX_AES_128_KEY_LEN)) {
+                        PRINTF("[PSO] - Wrong AES key size %d != %d\n",
+                               aes_key->size,
+                               CX_AES_128_KEY_LEN);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -331,6 +338,9 @@ int gpg_apdu_pso() {
 
                 case PAD_ECDH:
                     if (G_gpg_vstate.mse_dec->attributes.value[0] != KEY_ID_ECDH) {
+                        PRINTF("[PSO] - PSO:DEC:ECDH - Wrong key type %d != %d\n",
+                               G_gpg_vstate.mse_dec->attributes.value[0],
+                               KEY_ID_ECDH);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -338,6 +348,9 @@ int gpg_apdu_pso() {
                     curve = gpg_oid2curve(G_gpg_vstate.mse_dec->attributes.value + 1,
                                           G_gpg_vstate.mse_dec->attributes.length - 1);
                     if (ecfp_key->curve != curve) {
+                        PRINTF("[PSO] - PSO:DEC:ECDH - Wrong curve %d != %d\n",
+                               ecfp_key->curve,
+                               curve);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -346,12 +359,14 @@ int gpg_apdu_pso() {
                     gpg_io_fetch_tl(&t, &l);
                     // TAG 0x7f49 announces a Public Key DO
                     if (t != 0x7f49) {
+                        PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x7f49);
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
                     gpg_io_fetch_tl(&t, &l);
                     // TAG 0x86 announces an External Public Key (with its length)
                     if (t != 0x86) {
+                        PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x86);
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
