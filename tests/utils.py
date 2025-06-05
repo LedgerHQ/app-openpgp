@@ -10,6 +10,7 @@ import re
 from Crypto.PublicKey import RSA, ECC
 from Crypto.Util.number import bytes_to_long
 from Crypto.Signature import eddsa
+from Crypto.Protocol import DH as ecdh
 from ledgered.devices import Device, DeviceType
 
 from ragger.navigator import NavInsID, NavIns, Navigator
@@ -145,6 +146,26 @@ def get_EDDSA_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
     print(f" OID[{len(oid)}]: {oid.hex()}")
     assert len(oid) == 32
     return eddsa.import_public_key(oid)
+
+
+def get_ECDH_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
+    """Read the Public Key and generate a EccKey object
+
+    Args:
+        client (CommandSender): Application object
+        key_tag (DataObject):   Tag identifying the key to read
+
+    Returns:
+        EccKey
+    """
+
+    # Extract Pub key parameters
+    data = _get_pub_key(client, key_tag)
+
+    oid = data[0x86]
+    print(f" OID[{len(oid)}]: {oid.hex()}")
+    assert len(oid) == 32
+    return ecdh.import_x25519_public_key(oid)
 
 
 def get_ECDSA_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
