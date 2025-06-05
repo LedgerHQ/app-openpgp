@@ -16,7 +16,7 @@ from ragger.backend import BackendInterface
 from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, DataObject, PassWord, PubkeyAlgo
 
-from utils import get_RSA_pub_key, get_ECDSA_pub_key, get_EDDSA_pub_key
+from utils import get_RSA_pub_key, get_ECDSA_pub_key, get_EDDSA_pub_key, get_ECDH_pub_key
 from utils import check_pincode, generate_key, get_key_attributes, KEY_TEMPLATES
 
 
@@ -41,6 +41,8 @@ def _gen_key(client: CommandSender, template: str) -> Union[RsaKey,EccKey]:
         return get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
     if key_algo == PubkeyAlgo.EDDSA:
         return get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
+    if key_algo == PubkeyAlgo.ECDH:
+        return get_ECDH_pub_key(client, DataObject.DO_SIG_KEY)
 
     raise ValueError
 
@@ -53,7 +55,7 @@ def _gen_key(client: CommandSender, template: str) -> Union[RsaKey,EccKey]:
         # pytest.param("rsa4096", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
         "nistp256",  # ECDSA
         "ed25519",   # EdDSA
-        # "cv25519",   # ECDH, SDK returns CX_EC_INVALID_CURVE
+        "cv25519",   # ECDH, SDK returns CX_EC_INVALID_CURVE
     ],
 )
 def test_seed_key(backend: BackendInterface, template: str) -> None:
