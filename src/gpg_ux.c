@@ -34,8 +34,8 @@ void ui_CCID_reset(void) {
  *
  */
 void app_quit(void) {
-    // exit app here
-    os_sched_exit(0);
+    // exit app here using standard app functionality
+    app_exit();
 }
 
 /**
