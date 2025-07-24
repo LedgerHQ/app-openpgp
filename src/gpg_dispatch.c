@@ -15,6 +15,7 @@
  *  limitations under the License.
  *****************************************************************************/
 
+#include "gpg_ux.h"
 #include "gpg_vars.h"
 
 /**
@@ -306,7 +307,7 @@ int gpg_dispatch() {
 
     switch (G_gpg_vstate.io_ins) {
         case INS_EXIT:
-            os_sched_exit(0);
+            app_quit();
             sw = SW_OK;
             break;
 
