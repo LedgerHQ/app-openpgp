@@ -127,6 +127,12 @@ Thus, you must ensure (or add):
   - ifdProductID: 0x7000
   - ifdFriendlyName: Ledger Flex
 
+- for Apex P:
+
+  - ifdVendorID: 0x2C97
+  - ifdProductID: 0x8000
+  - ifdFriendlyName: Ledger Apex P
+
 Notes:
 
 - The 3 entry nodes must be added for each device. It can be easier to add new ones at the end of each list.
@@ -197,8 +203,6 @@ with:
 
 Select Slot
 -------------
-
-This menu is not available on Nanos, limited to a single slot. It is available on all other devices.
 
 A Slot is a set of 3 key pairs *Signature, Decryption, Authentication* as defined by gnupg specification.
 

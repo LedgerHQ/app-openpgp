@@ -49,6 +49,7 @@ ICON_NANOX = icons/gpg_14px.gif
 ICON_NANOSP = icons/gpg_14px.gif
 ICON_STAX = icons/gpg_32px.gif
 ICON_FLEX = icons/gpg_40px.gif
+ICON_APEX_P = icons/gpg_32px_apex.png
 
 ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
     ICON_HOME_NANO = glyphs/home_gpg_14px.gif

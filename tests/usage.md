@@ -72,7 +72,7 @@ Standard useful pytest options
 Custom pytest options
 
 ```shell
-    --device={nanosp,nanox,flex,stax,all,all_nano,all_eink}
+    --device={nanosp,nanox,flex,stax,apex_p,apex_m,all,all_nano,all_eink}
     --backend={speculos,ledgercomm,ledgerwallet}
     --no-nav              Disable the navigation
     --display             Pops up a Qt interface displaying either the emulated device (Speculos backend) or the expected screens and actions (physical backend)

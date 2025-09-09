@@ -37,6 +37,8 @@
 #define ICON_APP C_gpg_14px
 #elif defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP C_gpg_64px
+#elif defined(TARGET_APEX)
+#define ICON_APP C_gpg_48px
 #endif
 
 void ui_CCID_reset(void);
