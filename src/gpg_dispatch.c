@@ -17,6 +17,7 @@
 
 #include "gpg_ux.h"
 #include "gpg_vars.h"
+#include "main_std_app.h"
 
 /**
  * Check INS access condition
@@ -26,25 +27,25 @@
  *
  */
 static int gpg_check_access_ins() {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     switch (G_gpg_vstate.io_ins) {
         case INS_EXIT:
             if (gpg_pin_is_verified(PIN_ID_PW2)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
         case INS_RESET_RETRY_COUNTER:
             if (gpg_pin_is_verified(PIN_ID_PW3) || gpg_pin_is_verified(PIN_ID_RC)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
         case INS_GEN_ASYM_KEYPAIR:
             if ((G_gpg_vstate.io_p1 == ((READ_ASYM_KEY >> 8) & 0xFF)) ||
                 (gpg_pin_is_verified(PIN_ID_PW3))) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
@@ -54,25 +55,25 @@ static int gpg_check_access_ins() {
                 if (N_gpg_pstate->PW_status[0] == 0) {
                     gpg_pin_set_verified(PIN_ID_PW1, 0);
                 }
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
                 break;
             }
             if (((G_gpg_vstate.io_p1p2 == PSO_DEC) || (G_gpg_vstate.io_p1p2 == PSO_ENC)) &&
                 gpg_pin_is_verified(PIN_ID_PW2)) {
                 // pso:dec/enc
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
         case INS_INTERNAL_AUTHENTICATE:
             if (gpg_pin_is_verified(PIN_ID_PW2)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
         case INS_TERMINATE_DF:
             if (gpg_pin_is_verified(PIN_ID_PW3)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
@@ -90,11 +91,11 @@ static int gpg_check_access_ins() {
         case INS_MSE:
         case INS_GET_CHALLENGE:
         case INS_ACTIVATE_FILE:
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         default:
-            sw = SW_INS_NOT_SUPPORTED;
+            sw = SWO_INVALID_INS;
             break;
     }
     return sw;
@@ -108,7 +109,7 @@ static int gpg_check_access_ins() {
  *
  */
 static int gpg_check_access_read_DO() {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     switch (G_gpg_vstate.io_p1p2) {
             // ALWAYS
@@ -152,13 +153,13 @@ static int gpg_check_access_read_DO() {
         case 0x00D6:
         case 0x00D7:
         case 0x00D8:
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             // PW2
         case 0x0103:
             if (gpg_pin_is_verified(PIN_ID_PW2)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
@@ -168,11 +169,11 @@ static int gpg_check_access_read_DO() {
         case 0x00B8:
         case 0x0104:
             if (gpg_pin_is_verified(PIN_ID_PW3)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
         default:
-            sw = SW_CONDITIONS_NOT_SATISFIED;
+            sw = SWO_CONDITIONS_NOT_SATISFIED;
             break;
     }
     return sw;
@@ -186,7 +187,7 @@ static int gpg_check_access_read_DO() {
  *
  */
 static int gpg_check_access_write_DO() {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     switch (G_gpg_vstate.io_p1p2) {
         // PW2
@@ -194,7 +195,7 @@ static int gpg_check_access_write_DO() {
         case 0x0103:
         case 0x01F2:
             if (gpg_pin_is_verified(PIN_ID_PW2)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
 
@@ -240,11 +241,11 @@ static int gpg_check_access_write_DO() {
         case 0x00D7:
         case 0x00D8:
             if (gpg_pin_is_verified(PIN_ID_PW3)) {
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             break;
         default:
-            sw = SW_CONDITIONS_NOT_SATISFIED;
+            sw = SWO_CONDITIONS_NOT_SATISFIED;
             break;
     }
     return sw;
@@ -258,11 +259,11 @@ static int gpg_check_access_write_DO() {
  */
 int gpg_dispatch() {
     unsigned int tag, t, l;
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     if ((G_gpg_vstate.io_cla != CLA_APP_DEF) && (G_gpg_vstate.io_cla != CLA_APP_CHAIN) &&
         (G_gpg_vstate.io_cla != CLA_APP_APDU_PIN)) {
-        return SW_CLA_NOT_SUPPORTED;
+        return SWO_INVALID_CLA;
     }
 
     switch (G_gpg_vstate.io_ins) {
@@ -270,7 +271,7 @@ int gpg_dispatch() {
         case INS_GET_LOG:
             gpg_io_discard(1);
             gpg_io_insert(G_gpg_vstate.log_buffer, sizeof(G_gpg_vstate.log_buffer));
-            return SW_OK;
+            return SWO_SUCCESS;
 #endif
 
             /* --- SELECT --- */
@@ -283,32 +284,32 @@ int gpg_dispatch() {
             if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] == STATE_TERMINATE) {
                 gpg_install(STATE_ACTIVATE);
             }
-            return SW_OK;
+            return SWO_SUCCESS;
 
         case INS_TERMINATE_DF:
             gpg_io_discard(0);
             if (gpg_pin_is_verified(PIN_ID_PW3) || (N_gpg_pstate->PW3.counter == 0)) {
                 gpg_install(STATE_TERMINATE);
-                return SW_OK;
+                return SWO_SUCCESS;
             }
-            return SW_CONDITIONS_NOT_SATISFIED;
+            return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
     /* Other commands allowed if not terminated */
     if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] != STATE_ACTIVATE) {
-        return SW_STATE_TERMINATED;
+        return SWO_NO_INPUT_DATA_AVAILABLE;
     }
 
     /* Process */
     sw = gpg_check_access_ins();
-    if (sw != SW_OK) {
+    if (sw != SWO_SUCCESS) {
         return sw;
     }
 
     switch (G_gpg_vstate.io_ins) {
         case INS_EXIT:
-            app_quit();
-            sw = SW_OK;
+            app_exit();
+            sw = SWO_SUCCESS;
             break;
 
             /* --- CHALLENGE --- */
@@ -320,17 +321,17 @@ int gpg_dispatch() {
 
         case INS_SELECT_DATA:
             if ((G_gpg_vstate.io_p1 > SELECT_MAX_INSTANCE) || (G_gpg_vstate.io_p2 != SELECT_SKIP)) {
-                sw = SW_WRONG_P1P2;
+                sw = SWO_WRONG_P1_P2;
                 break;
             }
             gpg_io_fetch_tl(&t, &l);
             if (t != 0x60) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             gpg_io_fetch_tl(&t, &l);
             if (t != 0x5C) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             if (l == 1) {
@@ -338,16 +339,16 @@ int gpg_dispatch() {
             } else if (l == 2) {
                 tag = gpg_io_fetch_u16();
             } else {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             gpg_apdu_select_data(tag, G_gpg_vstate.io_p1);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         case INS_GET_DATA:
             sw = gpg_check_access_read_DO();
-            if (sw != SW_OK) {
+            if (sw != SWO_SUCCESS) {
                 break;
             }
             switch (G_gpg_vstate.io_p1p2) {
@@ -364,7 +365,7 @@ int gpg_dispatch() {
 
         case INS_GET_NEXT_DATA:
             sw = gpg_check_access_read_DO();
-            if (sw != SW_OK) {
+            if (sw != SWO_SUCCESS) {
                 break;
             }
             sw = gpg_apdu_get_next_data(G_gpg_vstate.io_p1p2);
@@ -373,7 +374,7 @@ int gpg_dispatch() {
         case INS_PUT_DATA_ODD:
         case INS_PUT_DATA:
             sw = gpg_check_access_write_DO();
-            if (sw != SW_OK) {
+            if (sw != SWO_SUCCESS) {
                 break;
             }
             switch (G_gpg_vstate.io_p1p2) {
@@ -395,7 +396,7 @@ int gpg_dispatch() {
                 sw = gpg_apdu_verify();
                 break;
             }
-            sw = SW_WRONG_P1P2;
+            sw = SWO_WRONG_P1_P2;
             break;
 
         case INS_CHANGE_REFERENCE_DATA:
@@ -403,7 +404,7 @@ int gpg_dispatch() {
                 sw = gpg_apdu_change_ref_data();
                 break;
             }
-            sw = SW_WRONG_P1P2;
+            sw = SWO_WRONG_P1_P2;
             break;
 
         case INS_RESET_RETRY_COUNTER:
@@ -413,7 +414,7 @@ int gpg_dispatch() {
                 sw = gpg_apdu_reset_retry_counter();
                 break;
             }
-            sw = SW_WRONG_P1P2;
+            sw = SWO_WRONG_P1_P2;
             break;
 
             /* --- Key Management --- */
@@ -436,7 +437,7 @@ int gpg_dispatch() {
             break;
 
         default:
-            sw = SW_INS_NOT_SUPPORTED;
+            sw = SWO_INVALID_INS;
             break;
     }
     return sw;

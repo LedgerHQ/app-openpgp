@@ -954,7 +954,7 @@ void pin_confirm_cb(bool confirm) {
     gpg_pin_set_verified(G_gpg_vstate.io_p2, confirm);
 
     gpg_io_discard(0);
-    gpg_io_insert_u16(confirm ? SW_OK : SW_CONDITIONS_NOT_SATISFIED);
+    gpg_io_insert_u16(confirm ? SWO_SUCCESS : SWO_CONDITIONS_NOT_SATISFIED);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
 }
@@ -991,7 +991,7 @@ static void ui_menu_pinentry_cb(void);
  *
  */
 static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
-    unsigned int sw = SW_UNKNOWN;
+    unsigned int sw = SWO_UNKNOWN;
     unsigned int len1 = 0;
     unsigned char* pin1 = NULL;
     gpg_pin_t* pin = NULL;
@@ -1001,12 +1001,12 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
             pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
             sw = gpg_pin_check(pin, G_gpg_vstate.io_p2, pinentry, length);
             gpg_io_discard(1);
-            if (sw == SW_PIN_BLOCKED) {
+            if (sw == SWO_AUTH_METHOD_BLOCKED) {
                 gpg_io_insert_u16(sw);
                 gpg_io_do(IO_RETURN_AFTER_TX);
                 ui_info(PIN_LOCKED, EMPTY, ui_init, false);
                 break;
-            } else if (sw != SW_OK) {
+            } else if (sw != SWO_SUCCESS) {
                 snprintf(G_gpg_vstate.line,
                          sizeof(G_gpg_vstate.line),
                          "%d tries remaining",
@@ -1030,12 +1030,12 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
                     pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
                     sw = gpg_pin_check(pin, G_gpg_vstate.io_p2, pinentry, length);
                     gpg_io_discard(1);
-                    if (sw == SW_PIN_BLOCKED) {
+                    if (sw == SWO_AUTH_METHOD_BLOCKED) {
                         gpg_io_insert_u16(sw);
                         gpg_io_do(IO_RETURN_AFTER_TX);
                         ui_info(PIN_LOCKED, EMPTY, ui_init, false);
                         break;
-                    } else if (sw != SW_OK) {
+                    } else if (sw != SWO_SUCCESS) {
                         snprintf(G_gpg_vstate.line,
                                  sizeof(G_gpg_vstate.line),
                                  " %d tries remaining",
@@ -1064,7 +1064,7 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
                         gpg_io_discard(1);
                         gpg_io_insert_u16(sw);
                         gpg_io_do(IO_RETURN_AFTER_TX);
-                        if (sw != SW_OK) {
+                        if (sw != SWO_SUCCESS) {
                             ui_info("Process Error", EMPTY, ui_init, false);
                         } else {
                             snprintf(G_gpg_vstate.line,
@@ -1096,7 +1096,7 @@ static void pinentry_cb(int token, uint8_t index) {
     UNUSED(index);
     if (token == TOKEN_PIN_ENTRY_BACK) {
         gpg_io_discard(0);
-        gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
+        gpg_io_insert_u16(SWO_CONDITIONS_NOT_SATISFIED);
         gpg_io_do(IO_RETURN_AFTER_TX);
         ui_init();
     }
@@ -1174,7 +1174,7 @@ static void ui_menu_pinentry_cb(void) {
  *
  */
 void uif_confirm_cb(bool confirm) {
-    unsigned int sw = SW_SECURITY_UIF_ISSUE;
+    unsigned int sw = SWO_SECURITY_ISSUE;
 
     if (confirm) {
         G_gpg_vstate.UIF_flags = 1;

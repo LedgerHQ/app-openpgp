@@ -20,10 +20,8 @@
 
 #include "lcx_sha3.h"
 #include "usbd_ccid_if.h"
-#include "bolos_target.h"
-#ifdef HAVE_NBGL
+#include "status_words.h"
 #include "nbgl_layout.h"
-#endif
 
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
@@ -344,31 +342,6 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define INS_PUT_DATA              0xda
 #define INS_PUT_DATA_ODD          0xdb
 #define INS_TERMINATE_DF          0xe6
-
-/* ---  Error constants  --- */
-// #define SW_LOGICAL_CHANNEL_NOT_SUPPORTED  0x6881
-// #define SW_SECURE_MESSAGING_NOT_SUPPORTED 0x6882
-// #define SW_COMMAND_CHAINING_NOT_SUPPORTED 0x6884
-// #define SW_SM_DATA_MISSING                0x6987
-// #define SW_SM_DATA_INCORRECT              0x6988
-#define SW_STATE_TERMINATED              0x6285
-#define SW_PWD_NOT_CHECKED               0x63c0
-#define SW_MEMORY_FAILURE                0x6581
-#define SW_SECURITY_UIF_ISSUE            0x6600
-#define SW_WRONG_LENGTH                  0x6700
-#define SW_LAST_COMMAND_CHAIN_EXPECTED   0x6883
-#define SW_SECURITY_STATUS_NOT_SATISFIED 0x6982
-#define SW_PIN_BLOCKED                   0x6983
-#define SW_CONDITIONS_NOT_SATISFIED      0x6985
-#define SW_WRONG_DATA                    0x6a80
-#define SW_FILE_NOT_FOUND                0x6a82
-#define SW_REFERENCED_DATA_NOT_FOUND     0x6a88
-#define SW_WRONG_P1P2                    0x6b00
-#define SW_INS_NOT_SUPPORTED             0x6d00
-#define SW_CLA_NOT_SUPPORTED             0x6e00
-#define SW_UNKNOWN                       0x6f00
-#define SW_CORRECT_BYTES_AVAILABLE       0x6100
-#define SW_OK                            0x9000
 
 /* ---  P1/P2 constants  --- */
 #define GEN_ASYM_KEY          0x8000

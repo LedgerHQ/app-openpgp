@@ -42,7 +42,7 @@ end:
     if (error != CX_OK) {
         return error;
     }
-    return SW_OK;
+    return SWO_SUCCESS;
 }
 
 /**
@@ -83,7 +83,7 @@ end:
     if (error != CX_OK) {
         return error;
     }
-    return SW_OK;
+    return SWO_SUCCESS;
 }
 
 /**
@@ -100,7 +100,7 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
     cx_rsa_private_key_t *rsa_priv = NULL;
     uint8_t *pq = NULL;
     uint32_t ksz = 0, reset_cnt = 0, pkey_size = 0;
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     cx_err_t error = CX_INTERNAL_ERROR;
     uint8_t seed[66] = {0};
 
@@ -121,7 +121,7 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
             break;
     }
     if (pkey_size == 0) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
 
     if ((G_gpg_vstate.io_p2 == SEEDED_MODE) || (G_gpg_vstate.seed_mode)) {
@@ -129,15 +129,15 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
         unsigned int size;
         size = ksz >> 1;
         sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
-        if (sw != SW_OK) {
+        if (sw != SWO_SUCCESS) {
             return sw;
         }
         sw = gpg_pso_derive_key_seed(seed, name, 1, pq, size);
-        if (sw != SW_OK) {
+        if (sw != SWO_SUCCESS) {
             return sw;
         }
         sw = gpg_pso_derive_key_seed(seed, name, 2, pq + size, size);
-        if (sw != SW_OK) {
+        if (sw != SWO_SUCCESS) {
             return sw;
         }
         *pq |= 0x80;
@@ -159,7 +159,7 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
 
     nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
     gpg_io_clear();
-    return SW_OK;
+    return SWO_SUCCESS;
 
 end:
     return error;
@@ -183,28 +183,28 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
     switch (ksz) {
         case 2048 / 8:
             if (keygpg->priv_key.rsa2048.size == 0) {
-                return SW_REFERENCED_DATA_NOT_FOUND;
+                return SWO_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa2048.n);
             break;
         case 3072 / 8:
             if (keygpg->priv_key.rsa3072.size == 0) {
-                return SW_REFERENCED_DATA_NOT_FOUND;
+                return SWO_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa3072.n);
             break;
         case 4096 / 8:
             if (keygpg->priv_key.rsa4096.size == 0) {
-                return SW_REFERENCED_DATA_NOT_FOUND;
+                return SWO_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa4096.n);
             break;
         default:
-            return SW_REFERENCED_DATA_NOT_FOUND;
+            return SWO_REFERENCED_DATA_NOT_FOUND;
     }
     gpg_io_insert_tlv(0x82, 4, keygpg->pub_key.rsa);
 
-    return SW_OK;
+    return SWO_SUCCESS;
 }
 
 /**
@@ -219,22 +219,22 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
 static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
     uint32_t curve = 0, keepprivate = 0;
     uint32_t ksz = 0, reset_cnt = 0;
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     cx_err_t error = CX_INTERNAL_ERROR;
     uint8_t seed[66] = {0};
 
     curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
     if (curve == CX_CURVE_NONE) {
-        return SW_REFERENCED_DATA_NOT_FOUND;
+        return SWO_REFERENCED_DATA_NOT_FOUND;
     }
     if ((G_gpg_vstate.io_p2 == SEEDED_MODE) || (G_gpg_vstate.seed_mode)) {
         ksz = gpg_curve2domainlen(curve);
         sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
-        if (sw != SW_OK) {
+        if (sw != SWO_SUCCESS) {
             return sw;
         }
         sw = gpg_pso_derive_key_seed(seed, name, 1, seed, ksz);
-        if (sw != SW_OK) {
+        if (sw != SWO_SUCCESS) {
             return sw;
         }
         CX_CHECK(
@@ -253,7 +253,7 @@ static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
 
     nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
     gpg_io_clear();
-    error = SW_OK;
+    error = SWO_SUCCESS;
 
 end:
     return error;
@@ -273,7 +273,7 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     cx_err_t error = CX_INTERNAL_ERROR;
 
     if (keygpg->pub_key.ecfp.W_len == 0) {
-        return SW_REFERENCED_DATA_NOT_FOUND;
+        return SWO_REFERENCED_DATA_NOT_FOUND;
     }
     gpg_io_discard(1);
     gpg_io_mark();
@@ -298,7 +298,7 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
                           keygpg->pub_key.ecfp.W_len,
                           (unsigned char *) &keygpg->pub_key.ecfp.W);
     }
-    error = SW_OK;
+    error = SWO_SUCCESS;
 
 end:
     return error;
@@ -314,7 +314,7 @@ int gpg_apdu_gen() {
     uint32_t t, l;
     gpg_key_t *keygpg = NULL;
     uint8_t *name = NULL;
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     switch (G_gpg_vstate.io_p1p2) {
         case GEN_ASYM_KEY:
@@ -322,11 +322,11 @@ int gpg_apdu_gen() {
         case READ_ASYM_KEY:
             break;
         default:
-            return SW_WRONG_P1P2;
+            return SWO_WRONG_P1_P2;
     }
 
     if (G_gpg_vstate.io_lc != 2) {
-        return SW_WRONG_LENGTH;
+        return SWO_WRONG_LENGTH;
     }
 
     gpg_io_fetch_tl(&t, &l);
@@ -348,7 +348,7 @@ int gpg_apdu_gen() {
             break;
     }
     if (keygpg == NULL) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
 
     switch (G_gpg_vstate.io_p1p2) {
@@ -358,14 +358,14 @@ int gpg_apdu_gen() {
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 sw = gpg_gen_rsa_kyey(keygpg, name);
-                if (sw != SW_OK) {
+                if (sw != SWO_SUCCESS) {
                     break;
                 }
             } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
                        (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
                        (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
                 sw = gpg_gen_ecc_kyey(keygpg, name);
-                if (sw != SW_OK) {
+                if (sw != SWO_SUCCESS) {
                     break;
                 }
             }

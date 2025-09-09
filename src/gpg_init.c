@@ -16,7 +16,7 @@
  *****************************************************************************/
 
 #include "gpg_vars.h"
-#include "usbd_ccid_if.h"
+#include "ccid_cmd.h"
 #include "ox_ec.h"
 
 #define SHORT(x) ((x) >> 8) & 0xFF, (x) &0xFF

@@ -27,7 +27,7 @@
 void app_main(void) {
     unsigned int io_flags = 0;
     io_flags = 0;
-    volatile unsigned short sw = SW_UNKNOWN;
+    volatile unsigned short sw = SWO_UNKNOWN;
 
     // start communication with MCU
     ui_CCID_reset();
@@ -50,7 +50,7 @@ void app_main(void) {
         sw = gpg_dispatch();
         if (sw) {
             PRINTF("[MAIN] - FINALLY INSERT sw=0x%x\n", sw);
-            if ((sw != SW_OK) && ((sw & 0xFF00) != SW_CORRECT_BYTES_AVAILABLE)) {
+            if ((sw != SWO_SUCCESS) && ((sw & 0xFF00) != SWO_RESPONSE_BYTES_AVAILABLE)) {
                 gpg_io_discard(1);
             }
             gpg_io_insert_u16(sw);
