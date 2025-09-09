@@ -11,7 +11,7 @@ from Crypto.PublicKey import RSA, ECC
 from Crypto.Util.number import bytes_to_long
 from Crypto.Signature import eddsa
 from Crypto.Protocol import DH as ecdh
-from ledgered.devices import Device, DeviceType
+from ledgered.devices import Device
 
 from ragger.navigator import NavInsID, NavIns, Navigator
 
@@ -44,17 +44,7 @@ def util_navigate(
     assert text
     valid_instr: list[NavIns | NavInsID] = []
 
-    if device.type == DeviceType.NANOS:
-        text, txt_cfg = text.split("_")
-        nav_inst = NavInsID.RIGHT_CLICK
-        if txt_cfg == "Yes":
-            valid_instr.append(NavInsID.RIGHT_CLICK)
-        elif txt_cfg == "No":
-            valid_instr.append(NavInsID.LEFT_CLICK)
-        else:
-            raise ValueError(f'Wrong text "{text}"')
-
-    elif device.is_nano:
+    if device.is_nano:
         text = text.split("_")[1]
         nav_inst = NavInsID.RIGHT_CLICK
         valid_instr.append(NavInsID.BOTH_CLICK)

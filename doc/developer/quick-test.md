@@ -213,7 +213,7 @@ Then on the device, go to:
   settings -> PIN mode, and select ‘Set as default’
 ```
 
-unplug and replug the nanos, relaunch the Application, and check:
+Unplug and replug the device, relaunch the Application, and check:
 
 ```text
   settings -> PIN mode, you should have ‘On Screen # +’ (DASH and PLUS)

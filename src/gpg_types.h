@@ -43,11 +43,7 @@
 #define AID_LENGTH         16
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
-#ifdef TARGET_NANOS
-#define GPG_KEYS_SLOTS 1
-#else
-#define GPG_KEYS_SLOTS 3
-#endif
+#define GPG_KEYS_SLOTS     3
 
 #define GPG_KEY_ATTRIBUTES_LENGTH 12
 
@@ -272,10 +268,6 @@ struct gpg_v_state_s {
     unsigned char ux_pinLen;
     unsigned int ux_key;
     unsigned int ux_type;
-
-#ifdef TARGET_NANOS
-    ux_menu_entry_t ui_dogsays[2];
-#endif
 
 #if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
     char ux_buff1[32];

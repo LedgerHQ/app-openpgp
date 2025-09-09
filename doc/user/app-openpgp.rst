@@ -103,12 +103,6 @@ Remember there are 3 important nodes in this xml file, and the lines must be coh
 
 Thus, you must ensure (or add):
 
-- For Nanos:
-
-  - ifdVendorID: 0x2C97
-  - ifdProductID: 0x1000
-  - ifdFriendlyName: Ledger Nano S
-
 - For Nanox:
 
   - ifdVendorID: 0x2C97

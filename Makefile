@@ -46,7 +46,6 @@ INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
 # Application icons following guidelines:
 # https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
-ICON_NANOS = icons/gpg_16px.gif
 ICON_NANOX = icons/gpg_14px.gif
 ICON_NANOSP = icons/gpg_14px.gif
 ICON_STAX = icons/gpg_32px.gif
@@ -127,10 +126,6 @@ DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA
 # Limitation (maybe due to openpgp itself): no support of DEC operation with cv25519
 DEFINES   += NO_DECRYPT_cv25519
-
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES   += HAVE_UX_LEGACY
-endif
 
 #########################
 

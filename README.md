@@ -26,7 +26,7 @@ The GnuPG application implements the following addon:
 
 - Serial modification
 - On screen reset
-- 3 independent key slots (except for Nanos, where we have only a single slot)
+- 3 independent key slots
 - Seeded key generation
 
 Technical specification is available in [rst](doc/developer/gpgcard-addon.rst), or in [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/developer/gpgcard-addon.pdf>)
@@ -159,7 +159,6 @@ make DEBUG=1  # compile optionally with PRINTF
 
 You can choose which device to compile and load for by setting the `BOLOS_SDK` environment variable to the following values:
 
-- `BOLOS_SDK=$NANOS_SDK`
 - `BOLOS_SDK=$NANOX_SDK`
 - `BOLOS_SDK=$NANOSP_SDK`
 - `BOLOS_SDK=$STAX_SDK`
@@ -239,16 +238,16 @@ pip install -r tests/requirements.txt
 
 Then you can:
 
-Run the functional tests (here for nanos but available for any device once you have built the binaries):
+Run the functional tests (here for stax but available for any device once you have built the binaries):
 
 ```shell
-pytest tests/ --tb=short -v --device nanos
+pytest tests/ --tb=short -v --device stax
 ```
 
 Or run your app directly with Speculos
 
 ```shell
-speculos --model nanos build/nanos/bin/app.elf
+speculos build/stax/bin/app.elf
 ```
 
 #### macOS / Windows
@@ -292,7 +291,7 @@ or [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/user/app-openp
 Developer documentation related to the Ledger Add-ons available here: [rst](doc/developer/gpgcard-addon.rst),
 or [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/developer/gpgcard-addon.pdf>)
 
-A Quick Test document to perform `Manual Tests` available [here](doc/developer/quick-test.md)
+A Quick Test document to perform `Manual Tests` available here: [quick-test](doc/developer/quick-test.md)
 
 The pdf documentation for **User** and **Developer** are available, and can be generated from
 the corresponding `.rst` files (in the same respective directories) using this command:
