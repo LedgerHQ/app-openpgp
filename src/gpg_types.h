@@ -269,17 +269,9 @@ struct gpg_v_state_s {
     unsigned int ux_key;
     unsigned int ux_type;
 
-#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
-    char ux_buff1[32];
-    char ux_buff2[32];
-    char ux_buff3[32];
-#endif
-
-#ifdef HAVE_NBGL
     char line[112];
     unsigned int ux_step;
     nbgl_layout_t *layoutCtx;
-#endif
 
 #ifdef GPG_LOG
     unsigned char log_buffer[256];
@@ -300,10 +292,15 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define PIN_ID_PW3 0x83
 #define PIN_ID_RC  0x84
 
-// PIN_MODE_HOST not supported by Ledger App
-#define PIN_MODE_SCREEN  0
-#define PIN_MODE_CONFIRM 1
-#define PIN_MODE_TRUST   2
+// clang-format off
+typedef enum {
+    PIN_MODE_SCREEN = 0,
+    PIN_MODE_CONFIRM,
+    PIN_MODE_TRUST,
+    // PIN_MODE_HOST,  // Not supported by Ledger App
+    PIN_MODE_MAX
+} gpg_pin_mode_t;
+// clang-format on
 
 /* ---  CLA  --- */
 #define CLA_APP_DEF      0x00

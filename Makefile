@@ -19,7 +19,7 @@ ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
-include $(BOLOS_SDK)/Makefile.defines
+include $(BOLOS_SDK)/Makefile.target
 
 ########################################
 #        Mandatory configuration       #
@@ -29,12 +29,11 @@ APPNAME = OpenPGP
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 4
-APPVERSION_P = 1
+APPVERSION_N = 5
+APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
-SPECVERSION:="3.3.1"
-DEFINES   += SPEC_VERSION=$(SPECVERSION)
+DEFINES += SPEC_VERSION='"3.3.1"'
 
 # Application source files
 APP_SOURCE_PATH += src
@@ -50,6 +49,10 @@ ICON_NANOX = icons/gpg_14px.gif
 ICON_NANOSP = icons/gpg_14px.gif
 ICON_STAX = icons/gpg_32px.gif
 ICON_FLEX = icons/gpg_40px.gif
+
+ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
+    ICON_HOME_NANO = glyphs/home_gpg_14px.gif
+endif
 
 # Application allowed derivation curves.
 # Possibles curves are: secp256k1, secp256r1, ed25519 and bls12381g1
@@ -99,6 +102,7 @@ VARIANT_VALUES = OpenPGP
 #ENABLE_NBGL_QRCODE = 1
 #ENABLE_NBGL_KEYBOARD = 1
 ENABLE_NBGL_KEYPAD = 1
+ENABLE_NBGL_FOR_NANO_DEVICES = 1
 
 ########################################
 #          Features disablers          #
@@ -112,7 +116,6 @@ ENABLE_NBGL_KEYPAD = 1
 #DISABLE_STANDARD_USB = 1
 DISABLE_STANDARD_WEBUSB = 1
 DISABLE_STANDARD_U2F = 1
-#DISABLE_STANDARD_BAGL_UX_FLOW = 1
 #DISABLE_DEBUG_LEDGER_ASSERT = 1
 #DISABLE_DEBUG_THROW = 1
 ENABLE_USB_CCID = 1

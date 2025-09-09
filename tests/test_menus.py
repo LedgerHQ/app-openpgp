@@ -85,21 +85,15 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
         ]
         instructions = [
             NavInsID.BOTH_CLICK,    # Key Template
-            NavInsID.BOTH_CLICK,    # Choose Key
             NavInsID.RIGHT_CLICK,   # Decryption
             NavInsID.RIGHT_CLICK,   # Authentication
             NavInsID.BOTH_CLICK,    # Key Authentication
             NavInsID.RIGHT_CLICK,   # Choose Type
-            NavInsID.BOTH_CLICK,    # (Select)
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,    # SECP 256R1
             NavInsID.RIGHT_CLICK,   # Type SECP 256R1
-            NavInsID.BOTH_CLICK,    # Set Template
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,    # (Back)
 
             NavInsID.RIGHT_CLICK,
@@ -130,6 +124,7 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
 
             NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,    # Reset
+            NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,    # Validate
         ]

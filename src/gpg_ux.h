@@ -33,6 +33,12 @@
 #define LABEL_SECP256R1 "SECP 256R1"
 #define LABEL_Ed25519   "Ed25519"
 
+#if defined(TARGET_NANOS2) || defined(TARGET_NANOX)
+#define ICON_APP C_gpg_14px
+#elif defined(TARGET_STAX) || defined(TARGET_FLEX)
+#define ICON_APP C_gpg_64px
+#endif
+
 void ui_CCID_reset(void);
 void app_reset(void);
 void ui_init(void);
