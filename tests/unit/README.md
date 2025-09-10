@@ -13,7 +13,7 @@ and for code coverage generation:
 
 ## Overview
 
-In `unit-tests` folder, compile with:
+In `tests/unit` folder, compile with:
 
 ```shell
 cmake -Bbuild -H. && make -C build
@@ -39,7 +39,7 @@ CTEST_OUTPUT_ON_FAILURE=1 build/test_io
 
 ## Generate code coverage
 
-Just execute in `unit-tests` folder:
+Just execute in `tests/unit` folder:
 
 ```shell
 ./gen_coverage.sh

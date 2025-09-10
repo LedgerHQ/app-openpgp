@@ -21,27 +21,27 @@ jobs:
 
       - name: Build unit tests
         run: |
-          cd unit-tests/
+          cd tests/unit
           cmake -Bbuild -H. && make -C build
 
       - name: Run the tests
         run: |
-          cd unit-tests/
+          cd tests/unit
           make -C build test
 
       - name: Generate code coverage
         run: |
-          cd unit-tests/
+          cd tests/unit
           lcov --directory . -b "$(realpath build/)" --capture --initial -o coverage.base
           lcov --rc lcov_branch_coverage=1 --directory . -b "$(realpath build/)" --capture -o coverage.capture
           lcov --directory . -b "$(realpath build/)" --add-tracefile coverage.base --add-tracefile coverage.capture -o coverage.info
-          lcov --directory . -b "$(realpath build/)" --remove coverage.info '*/unit-tests/*' -o coverage.info
+          lcov --directory . -b "$(realpath build/)" --remove coverage.info '*/tests/unit/*' -o coverage.info
           genhtml coverage.info -o coverage
 
       - uses: actions/upload-artifact@v4
         with:
           name: code-coverage
-          path: unit-tests/coverage
+          path: tests/unit/coverage
 
       - name: Install codecov dependencies
         run: apt install --no-install-recommends -y curl gpg
@@ -51,7 +51,7 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          files: ./unit-tests/coverage.info
+          files: ./tests/unit/coverage.info
           flags: unittests
           name: codecov-app-openpgp
           fail_ci_if_error: true

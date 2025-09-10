@@ -271,12 +271,12 @@ Or simply run the app on the Speculos emulator:
 
 ### Unit Tests
 
-Those tests are available in the directory `unit-tests`. Please see the corresponding [README](unit-tests/README.md)
+Those tests are available in the directory `tests/unit`. Please see the corresponding [README](tests/unit/README.md)
 to compile and run them.
 
 ### Manual Tests
 
-Those tests are available in the directory `manual-tests`. This consists in a helper script (`manual.sh`)
+Those tests are available in the directory `tests/manual`. This consists in a helper script (`manual.sh`)
 corresponding to different cases described in the document [Quick tests](doc/developer/quick-test.md).
 
 ## Documentation
@@ -312,7 +312,7 @@ The flow processed in [GitHub Actions](https://github.com/features/actions) is t
   in the repository [ledger-app-workflow](https://github.com/LedgerHQ/ledger-app-workflows)
 - Code formatting with [clang-format](http://clang.llvm.org/docs/ClangFormat.html)
 - Compilation of the application for all Ledger hardware in [ledger-app-builder](https://github.com/LedgerHQ/ledger-app-builder)
-- Unit tests of C functions with [cmocka](https://cmocka.org/) (see [unit-tests/](unit-tests/))
+- Unit tests of C functions with [cmocka](https://cmocka.org/) (see [tests/unit/](tests/unit/))
 - End-to-end tests with [Speculos](https://github.com/LedgerHQ/speculos) emulator
   and [ragger](https://github.com/LedgerHQ/ragger) (see [tests/](tests/))
 - Code coverage with [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html)/[lcov](http://ltp.sourceforge.net/coverage/lcov.php)

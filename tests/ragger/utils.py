@@ -304,7 +304,7 @@ def decode_tlv(tlv: bytes) -> dict:
 def _read_makefile() -> List[str]:
     """Read lines from the parent Makefile """
 
-    parent = Path(ROOT_SCREENSHOT_PATH).parent.resolve()
+    parent = Path(ROOT_SCREENSHOT_PATH).parent.parent.resolve()
     makefile = f"{parent}/Makefile"
     print(f"Analyzing {makefile}...")
     with open(makefile, "r", encoding="utf-8") as f_p:

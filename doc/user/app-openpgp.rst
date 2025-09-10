@@ -1242,10 +1242,10 @@ and follow through the prompts to create your user ID.
  |   ``"testkey"``
  |
  | ``Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit?`` O
- | ``gpg: xxxx/manual-tests/gnupg/trustdb.gpg: trustdb created``
+ | ``gpg: xxxx/tests/manual/gnupg/trustdb.gpg: trustdb created``
  | ``gpg: key 05DC472DA6F6A13B marked as ultimately trusted``
- | ``gpg: directory 'xxxx/manual-tests/gnupg/openpgp-revocs.d' created``
- | ``gpg: revocation certificate stored as 'xxxx/manual-tests/gnupg/openpgp-revocs.d/FE936FEC13BEBDAAA0C63E7205DC472DA6F6A13B.rev'``
+ | ``gpg: directory 'xxxx/tests/manual/gnupg/openpgp-revocs.d' created``
+ | ``gpg: revocation certificate stored as 'xxxx/tests/manual/gnupg/openpgp-revocs.d/FE936FEC13BEBDAAA0C63E7205DC472DA6F6A13B.rev'``
  | ``public and secret key created and signed.``
  |
  | ``Note that this key cannot be used for encryption.  You may want to use``
@@ -1369,7 +1369,7 @@ Note: Please ensure the creation date is the same, or update the command line ac
 Now you should be able to see your imported key by running this command:
 
  | ``$ gpg --list-secret-keys --with-keygrip``
- | ``xxxx/manual-tests/gnupg/pubring.kbx``
+ | ``xxxx/tests/manual/gnupg/pubring.kbx``
  | ``-------------------------------------------------------------------``
  | ``sec>  rsa2048 2024-01-18 [SC]``
  |        ``FE936FEC13BEBDAAA0C63E7205DC472DA6F6A13B``

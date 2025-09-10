@@ -94,10 +94,10 @@ Please take care, the different lists are ordered in the same way. Do not insert
 
 ### Manual Tests
 
-Jump into the directory `manual-tests`. There is a helper script to perform some of the following described operations.
+Jump into the directory `tests/manual`. There is a helper script to perform some of the following described operations.
 
 ```shell
-cd manual-tests/
+cd tests/manual
 $ ./manual.sh -h
 
 Usage: ./manual.sh <options>
@@ -113,7 +113,7 @@ Options:
 > Note: This script allows to automatically use a test gpg directory, like setting `GNUGPGHOME`
 
 The `init` command allows to prepare a local `gnupg` home directory, with the default minimal config file for *scdaemon*.
-For further investigations, you can also add in the file `manual-tests/gnupg/scdaemon.conf` the following lines:
+For further investigations, you can also add in the file `tests/manual/gnupg/scdaemon.conf` the following lines:
 
 ```shell
 debug-level expert
@@ -128,7 +128,7 @@ The `card` command is a shortcut to the `gpg --card-edit` command.
 The `status` command is a shortcut to the `gpg --card-status` command.
 
 The `default` command, used **after** keys creation, allows to configure the *default* keys for signature and decryption.
-The information is written in the file `manual-tests/gnupg/gpg.conf`.
+The information is written in the file `tests/manual/gnupg/gpg.conf`.
 This step is very useful when playing with backup/restore to ensure the default key will be found.
 
 The other commands are shortcuts allowing basic operations to test the key.
@@ -142,7 +142,7 @@ Now, on the PC, inside a terminal:
 ```shell
 $ killall scdaemon gpg-agent
 $ gpg --homedir $(pwd)/gnupg --card-edit
-gpg: keybox 'xxxx/manual-tests/gnupg/pubring.kbx' created
+gpg: keybox 'xxxx/tests/manual/gnupg/pubring.kbx' created
 
 Reader ...........: Ledger Nano S Plus [Nano S Plus] (0001) 01 00
 Application ID ...: D2760001240103032C97B7DA92860000
@@ -221,14 +221,14 @@ Unplug and replug the device, relaunch the Application, and check:
 
 ## Step 5: Create RSA keys
 
-Back in the terminal window, in `manual-tests` directory.
+Back in the terminal window, in `tests/manual` directory.
 
 > Note: During this phase PIN has to be validate on the device.
 
 ```shell
 $ killall scdaemon gpg-agent
 $ gpg --homedir $(pwd)/gnupg --card-edit
-gpg: keybox 'xxxx/manual-tests/gnupg/pubring.kbx' created
+gpg: keybox 'xxxx/tests/manual/gnupg/pubring.kbx' created
 
 Reader ...........: Ledger Nano S Plus [Nano S Plus] (0001) 01 00
 Application ID ...: D2760001240103032C97B7DA92860000
@@ -286,10 +286,10 @@ You selected this USER-ID:
       "testkey"
 
 Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit? O
-gpg: xxxx/manual-tests/gnupg/trustdb.gpg: trustdb created
+gpg: xxxx/tests/manual/gnupg/trustdb.gpg: trustdb created
 gpg: key 5ED17DF289C757A2 marked as ultimately trusted
-gpg: directory 'xxxx/manual-tests/gnupg/openpgp-revocs.d' created
-gpg: revocation certificate stored as 'xxxx/manual-tests/gnupg/openpgp-revocs.d/7FDC3D2FCD3558CB06631EAB5ED17DF289C757A2.rev'
+gpg: directory 'xxxx/tests/manual/gnupg/openpgp-revocs.d' created
+gpg: revocation certificate stored as 'xxxx/tests/manual/gnupg/openpgp-revocs.d/7FDC3D2FCD3558CB06631EAB5ED17DF289C757A2.rev'
 public and secret key created and signed.
 
 gpg/card> quit
