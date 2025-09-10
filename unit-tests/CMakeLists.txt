@@ -39,14 +39,17 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}
 set(APP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(MOCK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mocks")
+set(SDK_DIR "$ENV{BOLOS_SDK}")
 
 add_compile_definitions(TEST)
 
 include_directories(
   ${MOCK_DIR}
   ${APP_DIR}
+  ${SDK_DIR}/io/include
+  ${SDK_DIR}/lib_nbgl/include
+  ${SDK_DIR}/include
 )
-# include_directories($ENV{BOLOS_SDK}/lib_standard_app)
 
 add_executable(test_io
     ${SRC_DIR}/test_io.c
