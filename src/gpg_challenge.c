@@ -38,10 +38,10 @@ int gpg_apdu_get_challenge() {
             olen = G_gpg_vstate.io_p2;
             break;
         default:
-            return SW_WRONG_P1P2;
+            return SWO_WRONG_P1_P2;
     }
     if (olen == 0 || olen > GPG_EXT_CHALLENGE_LENTH) {
-        return SW_WRONG_LENGTH;
+        return SWO_WRONG_LENGTH;
     }
 
     if (G_gpg_vstate.io_p1 == SEEDED_MODE) {
@@ -91,5 +91,5 @@ end:
     }
     gpg_io_discard(0);
     gpg_io_inserted(olen);
-    return SW_OK;
+    return SWO_SUCCESS;
 }

@@ -101,13 +101,13 @@ static int gpg_sign(gpg_key_t *sigkey) {
                     break;
             }
             if ((rsa_key == NULL) || (rsa_key->size != ksz)) {
-                error = SW_CONDITIONS_NOT_SATISFIED;
+                error = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
 
             // sign
             if (ksz < G_gpg_vstate.io_length) {
-                error = SW_WRONG_LENGTH;
+                error = SWO_WRONG_LENGTH;
                 break;
             }
             l = ksz - G_gpg_vstate.io_length;
@@ -129,7 +129,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
             gpg_io_discard(0);
             gpg_io_inserted(ksz);
             gpg_pso_reset_PW1();
-            error = SW_OK;
+            error = SWO_SUCCESS;
             break;
 
 #define RS (G_gpg_vstate.work.io_buffer + (GPG_IO_BUFFER_LENGTH - 256))
@@ -137,7 +137,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
             ecfp_key = &sigkey->priv_key.ecfp;
             ksz = (unsigned int) gpg_curve2domainlen(ecfp_key->curve);
             if ((ksz == 0) || (ecfp_key->d_len != ksz)) {
-                error = SW_CONDITIONS_NOT_SATISFIED;
+                error = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
             s_len = 256;
@@ -166,7 +166,7 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 rs_len = rs[1];
                 rs += 2;
             }
-            error = SW_OK;
+            error = SWO_SUCCESS;
             break;
 
         case KEY_ID_EDDSA:
@@ -182,12 +182,12 @@ static int gpg_sign(gpg_key_t *sigkey) {
             ksz *= 2;
             gpg_io_discard(0);
             gpg_io_insert(RS, ksz);
-            error = SW_OK;
+            error = SWO_SUCCESS;
             break;
 
         default:
             // --- PSO:CDS NOT SUPPORTED
-            error = SW_REFERENCED_DATA_NOT_FOUND;
+            error = SWO_REFERENCED_DATA_NOT_FOUND;
             break;
     }
 
@@ -248,7 +248,7 @@ int gpg_apdu_pso() {
         case PSO_ENC:
             aes_key = &G_gpg_vstate.kslot->AES_dec;
             if (!(aes_key->size != CX_AES_128_KEY_LEN)) {
-                return SW_CONDITIONS_NOT_SATISFIED;
+                return SWO_CONDITIONS_NOT_SATISFIED;
             }
             msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
             ksz = GPG_IO_BUFFER_LENGTH - 1;
@@ -262,7 +262,7 @@ int gpg_apdu_pso() {
             gpg_io_discard(0);
             G_gpg_vstate.work.io_buffer[0] = PAD_AES;
             gpg_io_inserted(1 + ksz);
-            error = SW_OK;
+            error = SWO_SUCCESS;
             break;
 
         case PSO_DEC:
@@ -271,7 +271,7 @@ int gpg_apdu_pso() {
             switch (pad_byte) {
                 case PAD_RSA:
                     if (G_gpg_vstate.mse_dec->attributes.value[0] != KEY_ID_RSA) {
-                        error = SW_CONDITIONS_NOT_SATISFIED;
+                        error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
                     ksz = U2BE(G_gpg_vstate.mse_dec->attributes.value, 1) >> 3;
@@ -291,7 +291,7 @@ int gpg_apdu_pso() {
                     }
 
                     if ((rsa_key == NULL) || (rsa_key->size != ksz)) {
-                        error = SW_CONDITIONS_NOT_SATISFIED;
+                        error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
                     msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
@@ -306,13 +306,13 @@ int gpg_apdu_pso() {
                     // send
                     gpg_io_discard(0);
                     gpg_io_inserted(ksz);
-                    error = SW_OK;
+                    error = SWO_SUCCESS;
                     break;
 
                 case PAD_AES:
                     aes_key = &G_gpg_vstate.kslot->AES_dec;
                     if (!(aes_key->size != CX_AES_128_KEY_LEN)) {
-                        error = SW_CONDITIONS_NOT_SATISFIED;
+                        error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
                     msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
@@ -326,19 +326,19 @@ int gpg_apdu_pso() {
                     // send
                     gpg_io_discard(0);
                     gpg_io_inserted(ksz);
-                    error = SW_OK;
+                    error = SWO_SUCCESS;
                     break;
 
                 case PAD_ECDH:
                     if (G_gpg_vstate.mse_dec->attributes.value[0] != KEY_ID_ECDH) {
-                        error = SW_CONDITIONS_NOT_SATISFIED;
+                        error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
                     ecfp_key = &G_gpg_vstate.mse_dec->priv_key.ecfp;
                     curve = gpg_oid2curve(G_gpg_vstate.mse_dec->attributes.value + 1,
                                           G_gpg_vstate.mse_dec->attributes.length - 1);
                     if (ecfp_key->curve != curve) {
-                        error = SW_CONDITIONS_NOT_SATISFIED;
+                        error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
                     // Check APDU content tags
@@ -346,13 +346,13 @@ int gpg_apdu_pso() {
                     gpg_io_fetch_tl(&t, &l);
                     // TAG 0x7f49 announces a Public Key DO
                     if (t != 0x7f49) {
-                        error = SW_WRONG_DATA;
+                        error = SWO_INCORRECT_DATA;
                         break;
                     }
                     gpg_io_fetch_tl(&t, &l);
                     // TAG 0x86 announces an External Public Key (with its length)
                     if (t != 0x86) {
-                        error = SW_WRONG_DATA;
+                        error = SWO_INCORRECT_DATA;
                         break;
                     }
 
@@ -364,14 +364,14 @@ int gpg_apdu_pso() {
 
                         if (l != 32) {
                             PRINTF("[PSO] - PSO:DEC:ECDH - Wrong Ext Pub Key size %d\n", l);
-                            error = SW_WRONG_DATA;
+                            error = SWO_INCORRECT_DATA;
                             break;
                         }
 
                         CX_CHECK(cx_ecdomain_parameters_length(ecfp_key->curve, &ksz));
                         if (ksz != 32) {
                             PRINTF("[PSO] - PSO:DEC:ECDH - Wrong curve Key size %d\n", ksz);
-                            error = SW_WRONG_DATA;
+                            error = SWO_INCORRECT_DATA;
                             break;
                         }
                         // Reverse key bytes order
@@ -413,19 +413,19 @@ int gpg_apdu_pso() {
                     // send
                     gpg_io_discard(0);
                     gpg_io_insert(G_gpg_vstate.work.io_buffer + 128, ksz);
-                    error = SW_OK;
+                    error = SWO_SUCCESS;
                     break;
 
                 // --- PSO:DEC:xx NOT SUPPORTED
                 default:
-                    error = SW_REFERENCED_DATA_NOT_FOUND;
+                    error = SWO_REFERENCED_DATA_NOT_FOUND;
                     break;
             }
             break;
 
         //--- PSO:yy NOT SUPPORTED ---
         default:
-            error = SW_REFERENCED_DATA_NOT_FOUND;
+            error = SWO_REFERENCED_DATA_NOT_FOUND;
             break;
     }
 end:
@@ -450,7 +450,7 @@ int gpg_apdu_internal_authenticate() {
 
     if (G_gpg_vstate.mse_aut->attributes.value[0] == KEY_ID_RSA) {
         if (G_gpg_vstate.io_length > U2BE(G_gpg_vstate.mse_aut->attributes.value, 1) * 40 / 100) {
-            return SW_WRONG_LENGTH;
+            return SWO_WRONG_LENGTH;
         }
     }
     return gpg_sign(G_gpg_vstate.mse_aut);

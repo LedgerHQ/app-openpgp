@@ -22,9 +22,9 @@ jobs:
       - name: Installing PIP dependencies
         run: |
           pip install pylint
-          pip install -r tests/requirements.txt
+          pip install -r tests/ragger/requirements.txt
       - name: Lint Python code
-        run: pylint --rc tests/setup.cfg tests/application_client/
+        run: pylint --rc tests/ragger/setup.cfg tests/ragger/application_client/
 
   mypy:
     name: Type checking
@@ -35,6 +35,6 @@ jobs:
       - name: Installing PIP dependencies
         run: |
           pip install mypy
-          pip install -r tests/requirements.txt
+          pip install -r tests/ragger/requirements.txt
       - name: Mypy type checking
-        run: mypy tests/application_client/
+        run: mypy tests/ragger/application_client/

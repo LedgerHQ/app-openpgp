@@ -20,10 +20,8 @@
 
 #include "lcx_sha3.h"
 #include "usbd_ccid_if.h"
-#include "bolos_target.h"
-#ifdef HAVE_NBGL
+#include "status_words.h"
 #include "nbgl_layout.h"
-#endif
 
 /* cannot send more that F0 bytes in CCID, why? do not know for now
  *  So set up length to F0 minus 2 bytes for SW
@@ -45,11 +43,7 @@
 #define AID_LENGTH         16
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
-#ifdef TARGET_NANOS
-#define GPG_KEYS_SLOTS 1
-#else
-#define GPG_KEYS_SLOTS 3
-#endif
+#define GPG_KEYS_SLOTS     3
 
 #define GPG_KEY_ATTRIBUTES_LENGTH 12
 
@@ -275,21 +269,9 @@ struct gpg_v_state_s {
     unsigned int ux_key;
     unsigned int ux_type;
 
-#ifdef TARGET_NANOS
-    ux_menu_entry_t ui_dogsays[2];
-#endif
-
-#if defined(TARGET_NANOX) || defined(TARGET_NANOS2)
-    char ux_buff1[32];
-    char ux_buff2[32];
-    char ux_buff3[32];
-#endif
-
-#ifdef HAVE_NBGL
     char line[112];
     unsigned int ux_step;
     nbgl_layout_t *layoutCtx;
-#endif
 
 #ifdef GPG_LOG
     unsigned char log_buffer[256];
@@ -310,10 +292,15 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define PIN_ID_PW3 0x83
 #define PIN_ID_RC  0x84
 
-// PIN_MODE_HOST not supported by Ledger App
-#define PIN_MODE_SCREEN  0
-#define PIN_MODE_CONFIRM 1
-#define PIN_MODE_TRUST   2
+// clang-format off
+typedef enum {
+    PIN_MODE_SCREEN = 0,
+    PIN_MODE_CONFIRM,
+    PIN_MODE_TRUST,
+    // PIN_MODE_HOST,  // Not supported by Ledger App
+    PIN_MODE_MAX
+} gpg_pin_mode_t;
+// clang-format on
 
 /* ---  CLA  --- */
 #define CLA_APP_DEF      0x00
@@ -344,31 +331,6 @@ typedef struct gpg_v_state_s gpg_v_state_t;
 #define INS_PUT_DATA              0xda
 #define INS_PUT_DATA_ODD          0xdb
 #define INS_TERMINATE_DF          0xe6
-
-/* ---  Error constants  --- */
-// #define SW_LOGICAL_CHANNEL_NOT_SUPPORTED  0x6881
-// #define SW_SECURE_MESSAGING_NOT_SUPPORTED 0x6882
-// #define SW_COMMAND_CHAINING_NOT_SUPPORTED 0x6884
-// #define SW_SM_DATA_MISSING                0x6987
-// #define SW_SM_DATA_INCORRECT              0x6988
-#define SW_STATE_TERMINATED              0x6285
-#define SW_PWD_NOT_CHECKED               0x63c0
-#define SW_MEMORY_FAILURE                0x6581
-#define SW_SECURITY_UIF_ISSUE            0x6600
-#define SW_WRONG_LENGTH                  0x6700
-#define SW_LAST_COMMAND_CHAIN_EXPECTED   0x6883
-#define SW_SECURITY_STATUS_NOT_SATISFIED 0x6982
-#define SW_PIN_BLOCKED                   0x6983
-#define SW_CONDITIONS_NOT_SATISFIED      0x6985
-#define SW_WRONG_DATA                    0x6a80
-#define SW_FILE_NOT_FOUND                0x6a82
-#define SW_REFERENCED_DATA_NOT_FOUND     0x6a88
-#define SW_WRONG_P1P2                    0x6b00
-#define SW_INS_NOT_SUPPORTED             0x6d00
-#define SW_CLA_NOT_SUPPORTED             0x6e00
-#define SW_UNKNOWN                       0x6f00
-#define SW_CORRECT_BYTES_AVAILABLE       0x6100
-#define SW_OK                            0x9000
 
 /* ---  P1/P2 constants  --- */
 #define GEN_ASYM_KEY          0x8000

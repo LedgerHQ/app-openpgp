@@ -5,17 +5,20 @@ build/
 bin/
 debug/
 
-# Temporary directory with snapshots taken during test runs
-tests/snapshots-tmp/
+# Nano NBGL reversed icon for Home Screen
+glyphs/home_gpg_14px.gif
 
-# manual-tests
-manual-tests/foo*
-manual-tests/gnupg
+# Temporary directory with snapshots taken during test runs
+tests/ragger/snapshots-tmp/
+
+# manual tests
+tests/manual/foo*
+tests/manual/gnupg
 
 # Unit tests and code coverage
-unit-tests/build/
-unit-tests/coverage/
-unit-tests/coverage.info
+tests/unit/build/
+tests/unit/coverage/
+tests/unit/coverage.info
 
 # Fuzzing
 fuzzing/build/

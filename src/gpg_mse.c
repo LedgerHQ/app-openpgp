@@ -64,20 +64,20 @@ int gpg_apdu_mse() {
 
     if ((G_gpg_vstate.io_p1 != MSE_SET) ||
         ((G_gpg_vstate.io_p2 != KEY_AUT) && (G_gpg_vstate.io_p2 != KEY_DEC))) {
-        return SW_WRONG_P1P2;
+        return SWO_WRONG_P1_P2;
     }
 
     crt = gpg_io_fetch_u16();
     if (crt != 0x8301) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
 
     ref = gpg_io_fetch_u8();
     if ((ref != 0x02) && (ref != 0x03)) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
 
     gpg_mse_set(G_gpg_vstate.io_p2, ref);
     gpg_io_discard(1);
-    return SW_OK;
+    return SWO_SUCCESS;
 }

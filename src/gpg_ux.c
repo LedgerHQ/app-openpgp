@@ -18,7 +18,7 @@
 
 #include "gpg_vars.h"
 #include "gpg_ux.h"
-#include "usbd_ccid_if.h"
+#include "ccid_cmd.h"
 
 /**
  * Reset CCID
@@ -27,15 +27,6 @@
 void ui_CCID_reset(void) {
     io_usb_ccid_set_card_inserted(0);
     io_usb_ccid_set_card_inserted(1);
-}
-
-/**
- * Exit app
- *
- */
-void app_quit(void) {
-    // exit app here using standard app functionality
-    app_exit();
 }
 
 /**

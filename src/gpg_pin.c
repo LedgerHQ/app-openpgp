@@ -76,7 +76,7 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, 
     cx_err_t error = CX_INTERNAL_ERROR;
 
     if (pin->counter == 0) {
-        return SW_PIN_BLOCKED;
+        return SWO_AUTH_METHOD_BLOCKED;
     }
 
     counter = pin->counter - 1;
@@ -88,10 +88,10 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, 
                               G_gpg_vstate.work.md.H,
                               sizeof(G_gpg_vstate.work.md.H)));
     if (memcmp(G_gpg_vstate.work.md.H, pin->value, 32)) {
-        error = (counter == 0) ? SW_PIN_BLOCKED : SW_SECURITY_STATUS_NOT_SATISFIED;
+        error = (counter == 0) ? SWO_AUTH_METHOD_BLOCKED : SWO_SECURITY_CONDITION_NOT_SATISFIED;
     } else {
         counter = 3;
-        error = SW_OK;
+        error = SWO_SUCCESS;
     }
 
 end:
@@ -112,10 +112,10 @@ end:
  *
  */
 int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len) {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     gpg_pin_set_verified(pinID, 0);
     sw = gpg_pin_check_internal(pin, pin_val, pin_len);
-    if (sw == SW_OK) {
+    if (sw == SWO_SUCCESS) {
         gpg_pin_set_verified(pinID, 1);
     }
     return sw;
@@ -146,7 +146,7 @@ end:
     if (error != CX_OK) {
         return error;
     }
-    return SW_OK;
+    return SWO_SUCCESS;
 }
 
 /**
@@ -200,18 +200,18 @@ int gpg_pin_is_blocked(gpg_pin_t *pin) {
  *
  */
 int gpg_apdu_verify() {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     gpg_pin_t *pin;
 
     pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
     if (pin == NULL) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
 
     // PINPAD
     if (G_gpg_vstate.io_cla == CLA_APP_APDU_PIN) {
         if (gpg_pin_is_blocked(pin)) {
-            return SW_PIN_BLOCKED;
+            return SWO_AUTH_METHOD_BLOCKED;
         }
 
         switch (G_gpg_vstate.pinmode) {
@@ -233,7 +233,7 @@ int gpg_apdu_verify() {
                 sw = 0;
                 break;
             default:
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
         }
         return sw;
@@ -242,7 +242,7 @@ int gpg_apdu_verify() {
     // NORMAL CHECK
     if ((G_gpg_vstate.io_p1 == PIN_VERIFY) && G_gpg_vstate.io_length) {
         if (gpg_pin_is_blocked(pin)) {
-            return SW_PIN_BLOCKED;
+            return SWO_AUTH_METHOD_BLOCKED;
         }
         sw = gpg_pin_check(pin,
                            G_gpg_vstate.io_p2,
@@ -257,18 +257,18 @@ int gpg_apdu_verify() {
     // STATUS REQUEST
     if ((G_gpg_vstate.io_p1 == PIN_VERIFY) && G_gpg_vstate.io_length == 0) {
         if (gpg_pin_is_verified(G_gpg_vstate.io_p2)) {
-            return SW_OK;
+            return SWO_SUCCESS;
         }
-        return SW_PWD_NOT_CHECKED | pin->counter;
+        return SWO_VERIFY_FAILED | pin->counter;
     }
 
     // RESET REQUEST
     if ((G_gpg_vstate.io_p1 == PIN_NOT_VERIFIED) && G_gpg_vstate.io_length == 0) {
         gpg_pin_set_verified(G_gpg_vstate.io_p2, 0);
-        return SW_OK;
+        return SWO_SUCCESS;
     }
 
-    return SW_WRONG_DATA;
+    return SWO_INCORRECT_DATA;
 }
 
 /**
@@ -278,20 +278,20 @@ int gpg_apdu_verify() {
  *
  */
 int gpg_apdu_change_ref_data() {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     gpg_pin_t *pin;
     int len, newlen;
 
     pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
     if (pin == NULL) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
 
     gpg_pin_set_verified(pin->ref, 0);
 
     // --- PW1/PW3 pin ---
     if (gpg_pin_is_blocked(pin)) {
-        return SW_PIN_BLOCKED;
+        return SWO_AUTH_METHOD_BLOCKED;
     }
     // avoid any-overflow without giving info
     if (G_gpg_vstate.io_length == 0) {
@@ -303,7 +303,7 @@ int gpg_apdu_change_ref_data() {
 
     len = MIN(G_gpg_vstate.io_length, pin->length);
     sw = gpg_pin_check(pin, pin->ref, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
-    if (sw != SW_OK) {
+    if (sw != SWO_SUCCESS) {
         return sw;
     }
 
@@ -311,7 +311,7 @@ int gpg_apdu_change_ref_data() {
     if ((newlen > GPG_MAX_PW_LENGTH) ||
         ((pin->ref == PIN_ID_PW1) && (newlen < GPG_MIN_PW1_LENGTH)) ||
         ((pin->ref == PIN_ID_PW3) && (newlen < GPG_MIN_PW3_LENGTH))) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
     sw = gpg_pin_set(pin, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + len, newlen);
     gpg_io_discard(1);
@@ -325,7 +325,7 @@ int gpg_apdu_change_ref_data() {
  *
  */
 int gpg_apdu_reset_retry_counter() {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     gpg_pin_t *pin_pw1;
     gpg_pin_t *pin_rc;
     int rc_len, pw1_len;
@@ -336,7 +336,7 @@ int gpg_apdu_reset_retry_counter() {
     if (G_gpg_vstate.io_p1 == RESET_RETRY_WITH_PW3) {
         // PW3 must be verified, and the data contain the new PW1
         if (!gpg_pin_is_verified(PIN_ID_PW3)) {
-            return SW_SECURITY_STATUS_NOT_SATISFIED;
+            return SWO_SECURITY_CONDITION_NOT_SATISFIED;
         }
         rc_len = 0;
         pw1_len = G_gpg_vstate.io_length;
@@ -349,13 +349,13 @@ int gpg_apdu_reset_retry_counter() {
                            pin_rc->ref,
                            G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                            rc_len);
-        if (sw != SW_OK) {
+        if (sw != SWO_SUCCESS) {
             return sw;
         }
     }
 
     if ((pw1_len > GPG_MAX_PW_LENGTH) || (pw1_len < GPG_MIN_PW1_LENGTH)) {
-        return SW_WRONG_DATA;
+        return SWO_INCORRECT_DATA;
     }
     sw = gpg_pin_set(pin_pw1,
                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + rc_len,
