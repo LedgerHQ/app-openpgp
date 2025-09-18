@@ -14,29 +14,12 @@ on:
 
 jobs:
   lint:
-    name: Client linting
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-      - name: Installing PIP dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y libpcsclite-dev
-          pip install pylint
-          pip install -r pytools/requirements.txt
-      - name: Lint Python code
-        run: pylint --rc pytools/setup.cfg pytools/
-
-  mypy:
-    name: Type checking
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-      - name: Installing PIP dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y libpcsclite-dev
-          pip install mypy
-          pip install -r pytools/requirements.txt
-      - name: Mypy type checking
-        run: mypy pytools/
+    name: Call Ledger Python linters
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_python_checks.yml@v1
+    with:
+      run_linter: pylint
+      run_type_check: true
+      src_directory: .
+      setup_directory: pytools
+      req_directory: pytools
+      additional_packages: libpcsclite-dev
