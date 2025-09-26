@@ -16,9 +16,6 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include "bolos_target.h"
-#if defined(HAVE_NBGL) && (defined(TARGET_STAX) || defined(TARGET_FLEX))
-
 #include "os.h"
 #include "glyphs.h"
 #include "nbgl_use_case.h"
@@ -31,16 +28,31 @@
 /* ----------------------------------------------------------------------- */
 /* ---                        NBGL  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
+static void ui_home_init(void);
 static void ui_menu_slot_action();
 static void ui_settings_template(void);
 static void ui_settings_seed(void);
 static void ui_settings_pin(void);
-static void ui_settings_uif(void);
+static void ui_settings_uif(uint8_t page);
 static void ui_reset(void);
 
+#ifdef SCREEN_SIZE_WALLET
 // context for background and modal pages
 static nbgl_layout_t layoutCtx = {0};
+#else   // SCREEN_SIZE_WALLET
+// Slot setting page to display
+static uint8_t slot_initPage;
+// Pin setting page to display
+static uint8_t pin_initPage;
+#endif  // SCREEN_SIZE_WALLET
+// Keys setting page to display
+static uint8_t keys_initPage;
+// Setting page to display
 static uint8_t setting_initPage;
+
+static nbgl_content_t contents;
+static nbgl_genericContents_t settingContents;
+static nbgl_contentSwitch_t switches[5];  // 5 should be enough for all switches
 
 /* ------------------------------- Helpers  UX ------------------------------- */
 
@@ -57,6 +69,7 @@ static void ui_info(const char* msg1, const char* msg2, nbgl_callback_t cb, bool
     nbgl_useCaseStatus((const char*) G_gpg_vstate.menu, isSuccess, cb);
 };
 
+#ifdef SCREEN_SIZE_WALLET
 /**
  * @brief Display Setting page header
  *
@@ -78,12 +91,11 @@ static void ui_setting_header(const char* title,
     headerDesc.type = HEADER_BACK_AND_TEXT;
     headerDesc.backAndText.text = PIC(title);
     headerDesc.backAndText.token = back_token;
-#ifdef HAVE_PIEZO_SOUND
     headerDesc.backAndText.tuneId = TUNE_TAP_CASUAL;
-#endif
     nbgl_layoutAddHeader(layoutCtx, &headerDesc);
     nbgl_layoutAddSeparationLine(layoutCtx);
 }
+#endif  // SCREEN_SIZE_WALLET
 
 //  -----------------------------------------------------------
 //  ----------------------- HOME PAGE -------------------------
@@ -112,6 +124,7 @@ static void controlsCallback(int token, uint8_t index, int page) {
     setting_initPage = page;
     switch (token) {
         case TOKEN_SETTINGS_TEMPLATE:
+            keys_initPage = 0;
             ui_settings_template();
             break;
         case TOKEN_SETTINGS_SEED:
@@ -121,7 +134,7 @@ static void controlsCallback(int token, uint8_t index, int page) {
             ui_settings_pin();
             break;
         case TOKEN_SETTINGS_UIF:
-            ui_settings_uif();
+            ui_settings_uif(0);
             break;
         case TOKEN_SETTINGS_RESET:
             ui_reset();
@@ -129,16 +142,19 @@ static void controlsCallback(int token, uint8_t index, int page) {
     }
 }
 
+#ifdef SCREEN_SIZE_NANO
+#define COMBINED_VERSION APPVERSION "\n(Spec: " SPEC_VERSION ")"
+#else
+#define COMBINED_VERSION APPVERSION " (Spec: " SPEC_VERSION ")"
+#endif
 /**
  * @brief home page display
  *
  */
 static void ui_home_init(void) {
     static nbgl_contentInfoList_t infosList = {0};
-    static nbgl_content_t contents = {0};
-    static nbgl_genericContents_t settingContents = {0};
-    static const char* const infoTypes[] = {"Version", "Specifications", "Developer"};
-    static const char* const infoContents[] = {APPVERSION, XSTR(SPEC_VERSION), "(c) 2025 Ledger"};
+    static const char* const infoTypes[] = {"Version", "Developer", "Copyright"};
+    static const char* const infoContents[] = {COMBINED_VERSION, "Ledger", "Ledger (c) 2025"};
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
 
@@ -163,7 +179,7 @@ static void ui_home_init(void) {
     infosList.infoTypes = (const char**) infoTypes;
     infosList.infoContents = (const char**) infoContents;
 
-    static const char* const barTexts[] = {"Key Template",
+    static const char* const barTexts[] = {"Keys Templates",
                                            "Seed mode",
                                            "Pin mode",
                                            "UIF mode",
@@ -177,7 +193,9 @@ static void ui_home_init(void) {
     contents.content.barsList.barTexts = barTexts;
     contents.content.barsList.tokens = barTokens;
     contents.content.barsList.nbBars = ARRAYLEN(barTexts);
+#ifdef HAVE_PIEZO_SOUND
     contents.content.barsList.tuneId = TUNE_TAP_CASUAL;
+#endif
     contents.contentActionCallback = controlsCallback;
 
     settingContents.contentsList = &contents;
@@ -187,8 +205,14 @@ static void ui_home_init(void) {
     actionContent.text = "Select Slot";
     actionContent.callback = ui_menu_slot_action;
 
+#ifdef SCREEN_SIZE_NANO
+    actionContent.icon = &C_icon_certificate;
+    slot_initPage = 0;
+    pin_initPage = 0;
+#endif
+
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &C_gpg_64px,
+                                &ICON_APP,
                                 G_gpg_vstate.menu,
                                 setting_initPage,
                                 &settingContents,
@@ -203,6 +227,11 @@ static void ui_home_init(void) {
  */
 void ui_init(void) {
     setting_initPage = INIT_HOME_PAGE;
+#ifdef SCREEN_SIZE_NANO
+    slot_initPage = 0;
+    pin_initPage = 0;
+#endif
+    keys_initPage = 0;
     ui_home_init();
 }
 
@@ -236,6 +265,10 @@ static void slot_cb(int token, uint8_t index) {
                 G_gpg_vstate.kslot = (gpg_key_slot_t*) &N_gpg_pstate->keys[G_gpg_vstate.slot];
                 gpg_mse_reset();
                 ui_CCID_reset();
+#ifdef SCREEN_SIZE_NANO
+                slot_initPage = index;
+                ui_menu_slot_action();
+#endif
             }
             break;
         case TOKEN_SLOT_DEF:
@@ -247,11 +280,64 @@ static void slot_cb(int token, uint8_t index) {
     }
 }
 
+#ifdef SCREEN_SIZE_NANO
+/**
+ * @brief Slot Configuration callback
+ *
+ * @param[in] page index to fill
+ * @param[out] content of the page
+ *
+ */
+static bool slot_cfg_cb(uint8_t page, nbgl_pageContent_t* content) {
+    static char* names[GPG_KEYS_SLOTS] = {0};
+    static char text[GPG_KEYS_SLOTS][32];
+    uint32_t slot;
+
+    switch (page) {
+        case 0:
+            for (slot = 0; slot < GPG_KEYS_SLOTS; slot++) {
+                if (G_gpg_vstate.slot == slot) {
+                    snprintf(text[slot],
+                             sizeof(text[slot]),
+                             "[Slot %d]\n%s",
+                             (slot + 1),
+                             (N_gpg_pstate->config_slot[1] == slot) ? "(default)" : " ");
+                } else {
+                    snprintf(text[slot],
+                             sizeof(text[slot]),
+                             "Slot %d\n%s",
+                             (slot + 1),
+                             (N_gpg_pstate->config_slot[1] == slot) ? "(default)" : " ");
+                }
+                names[slot] = text[slot];
+            }
+
+            content->type = CHOICES_LIST;
+            content->choicesList.names = (const char* const*) names;
+            content->choicesList.token = TOKEN_SLOT_SELECT;
+            content->choicesList.nbChoices = GPG_KEYS_SLOTS;
+            content->choicesList.initChoice = G_gpg_vstate.slot;
+            break;
+        case 1:
+            snprintf(text[0], sizeof(text[0]), "Set Slot %d", (G_gpg_vstate.slot + 1));
+            content->type = INFO_BUTTON;
+            content->infoButton.text = "Set Default Slot";
+            content->infoButton.buttonText = text[0];
+            content->infoButton.buttonToken = TOKEN_SLOT_DEF;
+            break;
+        default:
+            return false;
+    }
+    return true;
+}
+#endif  // SCREEN_SIZE_NANO
+
 /**
  * @brief Slot Navigation callback
  *
  */
 static void ui_menu_slot_action(void) {
+#ifdef SCREEN_SIZE_WALLET
     nbgl_layoutRadioChoice_t choices = {0};
     nbgl_layoutButton_t buttonInfo = {0};
     static char* names[GPG_KEYS_SLOTS] = {0};
@@ -284,6 +370,14 @@ static void ui_menu_slot_action(void) {
     nbgl_layoutAddButton(layoutCtx, &buttonInfo);
 
     nbgl_layoutDraw(layoutCtx);
+#else   // SCREEN_SIZE_WALLET
+    nbgl_useCaseNavigableContent("Slots configuration",
+                                 slot_initPage,
+                                 2,
+                                 ui_home_init,
+                                 slot_cfg_cb,
+                                 slot_cb);
+#endif  // SCREEN_SIZE_WALLET
 }
 
 //  -----------------------------------------------------------
@@ -404,7 +498,7 @@ static uint32_t _getKeyType(const uint8_t key) {
 }
 
 /**
- * @brief Key Template Action callback
+ * @brief Keys Templates Action callback
  *
  * @param[in] token button Id pressed
  * @param[in] index widget index on the page
@@ -512,9 +606,10 @@ static void template_key_cb(int token, uint8_t index, int page) {
 static void template_cb(int token, uint8_t index, int page) {
     UNUSED(index);
     UNUSED(page);
-    static nbgl_content_t contents = {0};
-    static nbgl_genericContents_t settingContents = {0};
+    uint8_t page_index = 0;
 
+    explicit_bzero(&contents, sizeof(contents));
+    explicit_bzero(&settingContents, sizeof(settingContents));
     switch (token) {
         case TOKEN_TEMPLATE_SIG:
         case TOKEN_TEMPLATE_DEC:
@@ -546,8 +641,12 @@ static void template_cb(int token, uint8_t index, int page) {
                                                              0,
                                                              false);
 
+#ifdef SCREEN_SIZE_NANO
+            keys_initPage = page;
+            page_index = contents.content.choicesList.initChoice;
+#endif
             nbgl_useCaseGenericConfiguration(keyNameTexts[token - FIRST_USER_TOKEN],
-                                             0,
+                                             page_index,
                                              &settingContents,
                                              ui_settings_template);
             break;
@@ -559,13 +658,13 @@ static void template_cb(int token, uint8_t index, int page) {
  *
  */
 static void ui_settings_template(void) {
-    static nbgl_content_t contents = {0};
-    static nbgl_genericContents_t settingContents = {0};
     static char* names[3] = {0};
     static char text[3][64];
     char* subText = NULL;
     uint32_t i;
 
+    explicit_bzero(&contents, sizeof(contents));
+    explicit_bzero(&settingContents, sizeof(settingContents));
     contents.type = BARS_LIST;
     contents.content.barsList.nbBars = KEY_NB;
     contents.content.barsList.barTexts = (const char* const*) names;
@@ -604,7 +703,10 @@ static void ui_settings_template(void) {
     settingContents.contentsList = &contents;
     settingContents.nbContents = 1;
 
-    nbgl_useCaseGenericConfiguration("Keys templates", 0, &settingContents, ui_home_init);
+    nbgl_useCaseGenericConfiguration("Keys Templates",
+                                     keys_initPage,
+                                     &settingContents,
+                                     ui_home_init);
 }
 
 /* --------------------------------- SEED UX --------------------------------- */
@@ -618,6 +720,7 @@ enum {
     SWITCH_SEED_NB,
 };
 // clang-format on
+_Static_assert(SWITCH_SEED_NB < ARRAYLEN(switches), "Too small switches array");
 
 /**
  * @brief Seed Mode Confirmation callback
@@ -657,9 +760,10 @@ static void seed_cb(int token, uint8_t index, int page) {
                                    "Yes, deactivate",
                                    "Cancel",
                                    seed_confirm_cb);
-            } else {
-                G_gpg_vstate.seed_mode = 1;
+                break;
             }
+            G_gpg_vstate.seed_mode = 1;
+            switches[SWITCH_SEED].initState = G_gpg_vstate.seed_mode;
             break;
     }
 }
@@ -669,10 +773,9 @@ static void seed_cb(int token, uint8_t index, int page) {
  *
  */
 static void ui_settings_seed(void) {
-    static nbgl_content_t contents = {0};
-    static nbgl_genericContents_t settingContents = {0};
-    static nbgl_contentSwitch_t switches[SWITCH_SEED_NB] = {0};
-
+    explicit_bzero(&contents, sizeof(contents));
+    explicit_bzero(&settingContents, sizeof(settingContents));
+    explicit_bzero(&switches, sizeof(switches));
     // Initialize switches data
     switches[SWITCH_SEED].initState = G_gpg_vstate.seed_mode ? ON_STATE : OFF_STATE;
     switches[SWITCH_SEED].text = "Seed Mode";
@@ -727,6 +830,7 @@ void trust_cb(bool confirm) {
  */
 static void pin_cb(int token, uint8_t index) {
     const char* err = NULL;
+    G_gpg_vstate.pinmode_req = 0xFF;
     switch (token) {
         case TOKEN_PIN_BACK:
             ui_home_init();
@@ -753,6 +857,9 @@ static void pin_cb(int token, uint8_t index) {
                 ui_info(err, NOT_VERIFIED, ui_settings_pin, false);
                 break;
             }
+#ifdef SCREEN_SIZE_NANO
+            pin_initPage = index;
+#endif
             if ((G_gpg_vstate.pinmode != PIN_MODE_TRUST) && (index == PIN_MODE_TRUST)) {
                 G_gpg_vstate.pinmode_req = index;
                 nbgl_useCaseChoice(NULL,
@@ -760,11 +867,14 @@ static void pin_cb(int token, uint8_t index) {
                                    "This mode won't request any more PINs "
                                    "or validation before operations!\n"
                                    "Are you sure you want to select TRUST mode?",
-                                   "Select",
+                                   "Yes, select",
                                    "Cancel",
                                    trust_cb);
             } else {
                 G_gpg_vstate.pinmode = index;
+#ifdef SCREEN_SIZE_NANO
+                ui_settings_pin();
+#endif
             }
             break;
         case TOKEN_PIN_DEF:
@@ -781,36 +891,91 @@ static void pin_cb(int token, uint8_t index) {
     }
 }
 
+static const char* const PinNameTexts[PIN_MODE_MAX] = {
+    "On Screen",
+    "Confirm Only",
+    "Trust",
+};
+#ifdef SCREEN_SIZE_NANO
+/**
+ * @brief Pin Configuration callback
+ *
+ * @param[in] page index to fill
+ * @param[out] content of the page
+ *
+ */
+static bool pin_cfg_cb(uint8_t page, nbgl_pageContent_t* content) {
+    static char* names[PIN_MODE_MAX] = {0};
+    static char text[PIN_MODE_MAX][32];
+    uint32_t pin;
+
+    switch (page) {
+        case 0:
+            for (pin = 0; pin < PIN_MODE_MAX; pin++) {
+                if (G_gpg_vstate.pinmode == pin) {
+                    snprintf(text[pin],
+                             sizeof(text[pin]),
+                             "[%s]\n%s",
+                             (const char*) PIC(PinNameTexts[pin]),
+                             (N_gpg_pstate->config_pin[0] == pin) ? "(default)" : " ");
+                } else {
+                    snprintf(text[pin],
+                             sizeof(text[pin]),
+                             "%s\n%s",
+                             (const char*) PIC(PinNameTexts[pin]),
+                             (N_gpg_pstate->config_pin[0] == pin) ? "(default)" : " ");
+                }
+                names[pin] = text[pin];
+            }
+
+            content->type = CHOICES_LIST;
+            content->choicesList.names = (const char* const*) names;
+            content->choicesList.token = TOKEN_PIN_SET;
+            content->choicesList.nbChoices = PIN_MODE_MAX;
+            content->choicesList.initChoice = G_gpg_vstate.pinmode;
+            break;
+        case 1:
+            snprintf(text[0],
+                     sizeof(text[0]),
+                     "Set %s",
+                     (const char*) PIC(PinNameTexts[G_gpg_vstate.pinmode]));
+            content->type = INFO_BUTTON;
+            content->infoButton.text = "Set Default Mode";
+            content->infoButton.buttonText = text[0];
+            content->infoButton.buttonToken = TOKEN_PIN_DEF;
+            break;
+        default:
+            return false;
+    }
+    return true;
+}
+#endif  // SCREEN_SIZE_NANO
+
 /**
  * @brief Pin Settings menu
  *
  */
 static void ui_settings_pin(void) {
+#ifdef SCREEN_SIZE_WALLET
     static nbgl_layoutRadioChoice_t choices = {0};
     nbgl_layoutButton_t buttonInfo = {0};
-    static char* names[3] = {0};
-    static char text[3][64];
-    uint32_t i;
-
-    static const char* const PinNameTexts[] = {
-        "On Screen",
-        "Confirm Only",
-        "Trust",
-    };
+    static char* names[PIN_MODE_MAX] = {0};
+    static char text[PIN_MODE_MAX][32];
+    uint32_t pin;
 
     ui_setting_header("PIN mode", TOKEN_PIN_BACK, pin_cb);
 
-    for (i = 0; i < ARRAYLEN(PinNameTexts); i++) {
-        snprintf(text[i],
-                 sizeof(text[i]),
+    for (pin = 0; pin < PIN_MODE_MAX; pin++) {
+        snprintf(text[pin],
+                 sizeof(text[pin]),
                  "%s %s",
-                 (const char*) PIC(PinNameTexts[i]),
-                 (N_gpg_pstate->config_pin[0] == i) ? "[default]" : "");
-        names[i] = text[i];
+                 (const char*) PIC(PinNameTexts[pin]),
+                 (N_gpg_pstate->config_pin[0] == pin) ? "[default]" : "");
+        names[pin] = text[pin];
     }
     choices.names = (const char* const*) names;
     choices.localized = false;
-    choices.nbChoices = ARRAYLEN(PinNameTexts);
+    choices.nbChoices = PIN_MODE_MAX;
     choices.initChoice = G_gpg_vstate.pinmode;
     choices.token = TOKEN_PIN_SET;
     nbgl_layoutAddRadioChoice(layoutCtx, &choices);
@@ -824,6 +989,9 @@ static void ui_settings_pin(void) {
     nbgl_layoutAddButton(layoutCtx, &buttonInfo);
 
     nbgl_layoutDraw(layoutCtx);
+#else   // SCREEN_SIZE_WALLET
+    nbgl_useCaseNavigableContent("PIN mode", pin_initPage, 2, ui_home_init, pin_cfg_cb, pin_cb);
+#endif  // SCREEN_SIZE_WALLET
 }
 
 /* --------------------------------- UIF UX ---------------------------------- */
@@ -841,6 +1009,7 @@ enum {
     SWITCH_UIF_NB,
 };
 // clang-format on
+_Static_assert(SWITCH_UIF_NB < ARRAYLEN(switches), "Too small switches array");
 
 /**
  * @brief UIF Action callback
@@ -852,7 +1021,8 @@ enum {
  */
 static void uif_cb(int token, uint8_t index, int page) {
     UNUSED(page);
-    unsigned char* uif = NULL;
+    uint8_t* uif = NULL;
+
     switch (token) {
         case TOKEN_UIF_SIG:
             uif = &G_gpg_vstate.kslot->sig.UIF[0];
@@ -869,23 +1039,31 @@ static void uif_cb(int token, uint8_t index, int page) {
     }
     if (uif[0] == 2) {
         ui_info(UIF_LOCKED, EMPTY, ui_home_init, false);
-    } else if (uif[0] != index) {
-        nvm_write(&uif[0], &index, 1);
+        return;
     }
+    nvm_write(&uif[0], &index, 1);
+
+    switches[token - FIRST_USER_TOKEN].initState = index;
 }
 
 /**
  * @brief UIF Settings menu
  *
+ * @param[in] page requested
+ *
  */
-static void ui_settings_uif(void) {
-    static nbgl_content_t contents = {0};
-    static nbgl_genericContents_t settingContents = {0};
-    static nbgl_contentSwitch_t switches[SWITCH_UIF_NB] = {0};
+static void ui_settings_uif(uint8_t page) {
+    explicit_bzero(&contents, sizeof(contents));
+    explicit_bzero(&settingContents, sizeof(settingContents));
+    explicit_bzero(&switches, sizeof(switches));
 
     // Initialize switches data
     switches[SWITCH_UIF_SIG].initState = G_gpg_vstate.kslot->sig.UIF[0] ? ON_STATE : OFF_STATE;
+#ifdef SCREEN_SIZE_WALLET
     switches[SWITCH_UIF_SIG].text = "User Interaction Flag";
+#else   // SCREEN_SIZE_WALLET
+    switches[SWITCH_UIF_SIG].text = "UIF";
+#endif  // SCREEN_SIZE_WALLET
     switches[SWITCH_UIF_SIG].subText = "For signature";
     switches[SWITCH_UIF_SIG].token = TOKEN_UIF_SIG;
 #ifdef HAVE_PIEZO_SOUND
@@ -893,7 +1071,11 @@ static void ui_settings_uif(void) {
 #endif
 
     switches[SWITCH_UIF_DEC].initState = G_gpg_vstate.kslot->dec.UIF[0] ? ON_STATE : OFF_STATE;
+#ifdef SCREEN_SIZE_WALLET
     switches[SWITCH_UIF_DEC].text = "User Interaction Flag";
+#else   // SCREEN_SIZE_WALLET
+    switches[SWITCH_UIF_DEC].text = "UIF";
+#endif  // SCREEN_SIZE_WALLET
     switches[SWITCH_UIF_DEC].subText = "For decryption";
     switches[SWITCH_UIF_DEC].token = TOKEN_UIF_DEC;
 #ifdef HAVE_PIEZO_SOUND
@@ -901,7 +1083,11 @@ static void ui_settings_uif(void) {
 #endif
 
     switches[SWITCH_UIF_AUT].initState = G_gpg_vstate.kslot->aut.UIF[0] ? ON_STATE : OFF_STATE;
+#ifdef SCREEN_SIZE_WALLET
     switches[SWITCH_UIF_AUT].text = "User Interaction Flag";
+#else   // SCREEN_SIZE_WALLET
+    switches[SWITCH_UIF_AUT].text = "UIF";
+#endif  // SCREEN_SIZE_WALLET
     switches[SWITCH_UIF_AUT].subText = "For authentication";
     switches[SWITCH_UIF_AUT].token = TOKEN_UIF_AUT;
 #ifdef HAVE_PIEZO_SOUND
@@ -916,7 +1102,7 @@ static void ui_settings_uif(void) {
     settingContents.contentsList = &contents;
     settingContents.nbContents = 1;
 
-    nbgl_useCaseGenericConfiguration("UIF mode", 0, &settingContents, ui_home_init);
+    nbgl_useCaseGenericConfiguration("UIF mode", page, &settingContents, ui_home_init);
 }
 
 /* -------------------------------- RESET UX --------------------------------- */
@@ -925,9 +1111,13 @@ static void ui_settings_uif(void) {
  * @brief Reset callback
  *
  */
-static void reset_cb(void) {
-    app_reset();
-    nbgl_useCaseStatus("App Reset done", true, ui_home_init);
+static void reset_cb(bool confirm) {
+    if (confirm) {
+        app_reset();
+        nbgl_useCaseStatus("App Reset done", true, ui_home_init);
+    } else {
+        ui_home_init();
+    }
 }
 
 /**
@@ -935,11 +1125,13 @@ static void reset_cb(void) {
  *
  */
 static void ui_reset(void) {
-    nbgl_useCaseConfirm("This will reset the app to factory default, and delete ALL the keys!!!",
-                        "Are you sure you want to continue?",
-                        "Yes, reset",
-                        "Cancel",
-                        reset_cb);
+    nbgl_useCaseChoice(NULL,
+                       "Factory Reset",
+                       "This will reset the app to factory default, and delete ALL keys!!!\n"
+                       "Are you sure you want to continue?",
+                       "Yes, reset",
+                       "Cancel",
+                       reset_cb);
 }
 
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
@@ -954,7 +1146,7 @@ void pin_confirm_cb(bool confirm) {
     gpg_pin_set_verified(G_gpg_vstate.io_p2, confirm);
 
     gpg_io_discard(0);
-    gpg_io_insert_u16(confirm ? SW_OK : SW_CONDITIONS_NOT_SATISFIED);
+    gpg_io_insert_u16(confirm ? SWO_SUCCESS : SWO_CONDITIONS_NOT_SATISFIED);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
 }
@@ -991,7 +1183,7 @@ static void ui_menu_pinentry_cb(void);
  *
  */
 static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
-    unsigned int sw = SW_UNKNOWN;
+    unsigned int sw = SWO_UNKNOWN;
     unsigned int len1 = 0;
     unsigned char* pin1 = NULL;
     gpg_pin_t* pin = NULL;
@@ -1001,12 +1193,12 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
             pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
             sw = gpg_pin_check(pin, G_gpg_vstate.io_p2, pinentry, length);
             gpg_io_discard(1);
-            if (sw == SW_PIN_BLOCKED) {
+            if (sw == SWO_AUTH_METHOD_BLOCKED) {
                 gpg_io_insert_u16(sw);
                 gpg_io_do(IO_RETURN_AFTER_TX);
                 ui_info(PIN_LOCKED, EMPTY, ui_init, false);
                 break;
-            } else if (sw != SW_OK) {
+            } else if (sw != SWO_SUCCESS) {
                 snprintf(G_gpg_vstate.line,
                          sizeof(G_gpg_vstate.line),
                          "%d tries remaining",
@@ -1030,12 +1222,12 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
                     pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
                     sw = gpg_pin_check(pin, G_gpg_vstate.io_p2, pinentry, length);
                     gpg_io_discard(1);
-                    if (sw == SW_PIN_BLOCKED) {
+                    if (sw == SWO_AUTH_METHOD_BLOCKED) {
                         gpg_io_insert_u16(sw);
                         gpg_io_do(IO_RETURN_AFTER_TX);
                         ui_info(PIN_LOCKED, EMPTY, ui_init, false);
                         break;
-                    } else if (sw != SW_OK) {
+                    } else if (sw != SWO_SUCCESS) {
                         snprintf(G_gpg_vstate.line,
                                  sizeof(G_gpg_vstate.line),
                                  " %d tries remaining",
@@ -1064,7 +1256,7 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
                         gpg_io_discard(1);
                         gpg_io_insert_u16(sw);
                         gpg_io_do(IO_RETURN_AFTER_TX);
-                        if (sw != SW_OK) {
+                        if (sw != SWO_SUCCESS) {
                             ui_info("Process Error", EMPTY, ui_init, false);
                         } else {
                             snprintf(G_gpg_vstate.line,
@@ -1086,6 +1278,18 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
 }
 
 /**
+ * @brief Pin Back button callback
+ *
+ */
+static void pinback_cb(void) {
+    gpg_io_discard(0);
+    gpg_io_insert_u16(SWO_CONDITIONS_NOT_SATISFIED);
+    gpg_io_do(IO_RETURN_AFTER_TX);
+    ui_init();
+}
+
+#ifdef SCREEN_SIZE_WALLET
+/**
  * @brief Pin Entry Action callback
  *
  * @param[in] token button Id pressed
@@ -1095,12 +1299,10 @@ static void pinentry_validate_cb(const uint8_t* pinentry, uint8_t length) {
 static void pinentry_cb(int token, uint8_t index) {
     UNUSED(index);
     if (token == TOKEN_PIN_ENTRY_BACK) {
-        gpg_io_discard(0);
-        gpg_io_insert_u16(SW_CONDITIONS_NOT_SATISFIED);
-        gpg_io_do(IO_RETURN_AFTER_TX);
-        ui_init();
+        pinback_cb();
     }
 }
+#endif  // SCREEN_SIZE_WALLET
 
 /**
  * @brief Pin Entry page display
@@ -1141,6 +1343,7 @@ void ui_menu_pinentry_display(unsigned int step) {
 
     minLen = (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? GPG_MIN_PW3_LENGTH : GPG_MIN_PW1_LENGTH;
     // Draw the keypad
+#ifdef SCREEN_SIZE_WALLET
     nbgl_useCaseKeypadPIN(G_gpg_vstate.menu,
                           minLen,
                           GPG_MAX_PW_LENGTH,
@@ -1149,6 +1352,14 @@ void ui_menu_pinentry_display(unsigned int step) {
                           TUNE_TAP_CASUAL,
                           pinentry_validate_cb,
                           pinentry_cb);
+#else   // SCREEN_SIZE_WALLET
+    nbgl_useCaseKeypadPIN(G_gpg_vstate.menu,
+                          minLen,
+                          GPG_MAX_PW_LENGTH,
+                          false,
+                          pinentry_validate_cb,
+                          pinback_cb);
+#endif  // SCREEN_SIZE_WALLET
 }
 
 /**
@@ -1174,7 +1385,7 @@ static void ui_menu_pinentry_cb(void) {
  *
  */
 void uif_confirm_cb(bool confirm) {
-    unsigned int sw = SW_SECURITY_UIF_ISSUE;
+    unsigned int sw = SWO_SECURITY_ISSUE;
 
     if (confirm) {
         G_gpg_vstate.UIF_flags = 1;
@@ -1230,5 +1441,3 @@ void ui_menu_uifconfirm_display(unsigned int value) {
     }
     nbgl_useCaseChoice(NULL, "Confirm operation", G_gpg_vstate.menu, "Yes", "No", uif_confirm_cb);
 }
-
-#endif  // defined(HAVE_NBGL) && (defined(TARGET_STAX) || defined(TARGET_FLEX))

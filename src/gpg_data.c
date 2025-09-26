@@ -41,14 +41,14 @@ void gpg_apdu_select_data(unsigned int ref, int record) {
  *
  */
 int gpg_apdu_get_data(unsigned int ref) {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     if (G_gpg_vstate.DO_current != ref) {
         G_gpg_vstate.DO_current = ref;
         G_gpg_vstate.DO_reccord = 0;
         G_gpg_vstate.DO_offset = 0;
     }
-    sw = SW_OK;
+    sw = SWO_SUCCESS;
 
     gpg_io_discard(1);
     switch (ref) {
@@ -200,7 +200,7 @@ int gpg_apdu_get_data(unsigned int ref) {
                                   G_gpg_vstate.kslot->sig.CA.length);
                     break;
                 default:
-                    sw = SW_FILE_NOT_FOUND;
+                    sw = SWO_FILE_NOT_FOUND;
             }
             break;
 
@@ -219,7 +219,7 @@ int gpg_apdu_get_data(unsigned int ref) {
 
         default:
             /* WAT */
-            sw = SW_REFERENCED_DATA_NOT_FOUND;
+            sw = SWO_REFERENCED_DATA_NOT_FOUND;
             break;
     }
 
@@ -235,13 +235,13 @@ int gpg_apdu_get_data(unsigned int ref) {
  *
  */
 int gpg_apdu_get_next_data(unsigned int ref) {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     if ((ref != 0x7F21) || (G_gpg_vstate.DO_current != 0x7F21)) {
-        return SW_CONDITIONS_NOT_SATISFIED;
+        return SWO_CONDITIONS_NOT_SATISFIED;
     }
     sw = gpg_apdu_get_data(ref);
-    if (sw == SW_OK) {
+    if (sw == SWO_SUCCESS) {
         G_gpg_vstate.DO_reccord++;
     }
     return sw;
@@ -290,73 +290,73 @@ int gpg_apdu_put_data(unsigned int ref) {
             goto WRITE_PRIVATE_DO;
         WRITE_PRIVATE_DO:
             if (G_gpg_vstate.io_length > GPG_EXT_PRIVATE_DO_LENGTH) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write(ptr_v,
                       G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                       G_gpg_vstate.io_length);
             nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
             /*  ----------------- Config key slot ----------------- */
         case 0x01F1:
             if (G_gpg_vstate.io_length != 3) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             if ((G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 0] != GPG_KEYS_SLOTS) ||
                 (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 1] >= GPG_KEYS_SLOTS) ||
                 (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 2] > 3)) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             nvm_write((void *) N_gpg_pstate->config_slot,
                       G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                       3);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         case 0x01F2:
             if ((N_gpg_pstate->config_slot[2] & 1) == 0) {
-                sw = SW_CONDITIONS_NOT_SATISFIED;
+                sw = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
             if ((G_gpg_vstate.io_length != 1) ||
                 (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] >= GPG_KEYS_SLOTS)) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             G_gpg_vstate.slot = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
             G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
             gpg_mse_reset();
             ui_CCID_reset();
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         /* ----------------- Config RSA exponent ----------------- */
         case 0x01F8: {
             unsigned int e;
             if (G_gpg_vstate.io_length != 4) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             e = gpg_io_fetch_u32();
             nvm_write((void *) &N_gpg_pstate->default_RSA_exponent, &e, sizeof(unsigned int));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
         }
 
             /* ----------------- Serial -----------------*/
         case 0x4f:
             if (G_gpg_vstate.io_length != 4) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write(G_gpg_vstate.kslot->serial,
                       &G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset],
                       4);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- Extended Header list -----------------*/
@@ -367,7 +367,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             // fecth 4D
             gpg_io_fetch_tl(&t, &l);
             if (t != 0x4D) {
-                sw = SW_REFERENCED_DATA_NOT_FOUND;
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
             // fecth B8/B6/A4
@@ -388,13 +388,13 @@ int gpg_apdu_put_data(unsigned int ref) {
                     break;
             }
             if (keygpg == NULL) {
-                sw = SW_REFERENCED_DATA_NOT_FOUND;
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
             // fecth 7f78
             gpg_io_fetch_tl(&t, &l);
             if (t != 0x7f48) {
-                sw = SW_REFERENCED_DATA_NOT_FOUND;
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
             len_e = 0;
@@ -420,13 +420,13 @@ int gpg_apdu_put_data(unsigned int ref) {
                     case 0x99:
                         break;
                     default:
-                        return SW_REFERENCED_DATA_NOT_FOUND;
+                        return SWO_REFERENCED_DATA_NOT_FOUND;
                 }
             }
             // fecth 5f78
             gpg_io_fetch_tl(&t, &l);
             if (t != 0x5f48) {
-                sw = SW_REFERENCED_DATA_NOT_FOUND;
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
 
@@ -456,7 +456,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                         break;
                 }
                 if (pkey_size == 0) {
-                    sw = SW_WRONG_DATA;
+                    sw = SWO_INCORRECT_DATA;
                     break;
                 }
                 ksz = ksz >> 1;
@@ -479,13 +479,13 @@ int gpg_apdu_put_data(unsigned int ref) {
                         break;
                 }
                 if (e == 0) {
-                    sw = SW_WRONG_DATA;
+                    sw = SWO_INCORRECT_DATA;
                     break;
                 }
 
                 // move p,q over pub key, this only work because adr<rsa_pub> < adr<p>
                 if ((len_p > ksz) || (len_q > ksz)) {
-                    sw = SW_WRONG_DATA;
+                    sw = SWO_INCORRECT_DATA;
                     break;
                 }
                 p = G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset;
@@ -507,13 +507,13 @@ int gpg_apdu_put_data(unsigned int ref) {
                     reset_cnt = 0;
                     nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
                 }
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
                        (keygpg->attributes.value[0] == KEY_ID_ECDSA) ||
                        (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
                 curve = gpg_oid2curve(&keygpg->attributes.value[1], keygpg->attributes.length - 1);
                 if (curve == CX_CURVE_NONE) {
-                    sw = SW_WRONG_DATA;
+                    sw = SWO_INCORRECT_DATA;
                     break;
                 }
                 ksz = gpg_curve2domainlen(curve);
@@ -538,11 +538,11 @@ int gpg_apdu_put_data(unsigned int ref) {
                         nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
                     }
                 }
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             }
             // --- UNSUPPORTED KEY ---
             else {
-                sw = SW_REFERENCED_DATA_NOT_FOUND;
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
             }
             break;
         }  // endof of 3fff
@@ -551,7 +551,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             /* Name */
         case 0x5B:
             if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->name.value)) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write((void *) N_gpg_pstate->name.value,
@@ -560,12 +560,12 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) &N_gpg_pstate->name.length,
                       &G_gpg_vstate.io_length,
                       sizeof(unsigned int));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
             /* Login data */
         case 0x5E:
             if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->login.value)) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write((void *) N_gpg_pstate->login.value,
@@ -574,12 +574,12 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) &N_gpg_pstate->login.length,
                       &G_gpg_vstate.io_length,
                       sizeof(unsigned int));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
             /* Language preferences */
         case 0x5F2D:
             if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->lang.value)) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write((void *) N_gpg_pstate->lang.value,
@@ -588,23 +588,23 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) &N_gpg_pstate->lang.length,
                       &G_gpg_vstate.io_length,
                       sizeof(unsigned int));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
             /* salutation */
         case 0x5F35:
             if (G_gpg_vstate.io_length != sizeof(N_gpg_pstate->salutation)) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write((void *) N_gpg_pstate->salutation,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
             /* Uniform resource locator */
         case 0x5F50:
             if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->keys[G_gpg_vstate.slot].url.value)) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write((void *) N_gpg_pstate->keys[G_gpg_vstate.slot].url.value,
@@ -613,7 +613,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) &N_gpg_pstate->keys[G_gpg_vstate.slot].url.length,
                       &G_gpg_vstate.io_length,
                       sizeof(unsigned int));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- Cardholder certificate ----------------- */
@@ -636,16 +636,16 @@ int gpg_apdu_put_data(unsigned int ref) {
                     break;
             }
             if (ptr_v == NULL) {
-                sw = SW_REFERENCED_DATA_NOT_FOUND;
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
             if (G_gpg_vstate.io_length > GPG_EXT_CARD_HOLDER_CERT_LENTH) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
             nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- Algorithm attributes ----------------- */
@@ -666,16 +666,16 @@ int gpg_apdu_put_data(unsigned int ref) {
             goto WRITE_ATTRIBUTES;
         WRITE_ATTRIBUTES:
             if (G_gpg_vstate.io_length > 12) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             switch (G_gpg_vstate.work.io_buffer[0]) {
                 case KEY_ID_RSA:
                     ksz = U2BE(G_gpg_vstate.work.io_buffer, 1);
                     if ((ksz != 2048) && (ksz != 3072) && (ksz != 4096)) {
-                        sw = SW_WRONG_DATA;
+                        sw = SWO_INCORRECT_DATA;
                     } else {
-                        sw = SW_OK;
+                        sw = SWO_SUCCESS;
                     }
                     break;
                 case KEY_ID_ECDH:
@@ -685,22 +685,22 @@ int gpg_apdu_put_data(unsigned int ref) {
                         gpg_oid2curve(G_gpg_vstate.work.io_buffer + 1, G_gpg_vstate.io_length - 1);
 #ifdef NO_DECRYPT_cv25519
                     if ((decKey) && (curve == CX_CURVE_Curve25519)) {
-                        sw = SW_WRONG_DATA;
+                        sw = SWO_INCORRECT_DATA;
                         break;
                     }
 #endif
                     if (curve == CX_CURVE_NONE) {
-                        sw = SW_WRONG_DATA;
+                        sw = SWO_INCORRECT_DATA;
                     } else {
-                        sw = SW_OK;
+                        sw = SWO_SUCCESS;
                     }
                     break;
                 default:
-                    sw = SW_WRONG_DATA;
+                    sw = SWO_INCORRECT_DATA;
                     break;
             }
 
-            if (sw == SW_OK) {
+            if (sw == SWO_SUCCESS) {
                 nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
                 nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
             }
@@ -709,7 +709,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             /* ----------------- PWS status ----------------- */
         case 0xC4:
             gpg_io_fetch_nv((unsigned char *) N_gpg_pstate->PW_status, 1);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- Fingerprints ----------------- */
@@ -733,11 +733,11 @@ int gpg_apdu_put_data(unsigned int ref) {
             goto WRITE_FINGERPRINTS;
         WRITE_FINGERPRINTS:
             if (G_gpg_vstate.io_length != 20) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 20);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- Generation date/time ----------------- */
@@ -752,11 +752,11 @@ int gpg_apdu_put_data(unsigned int ref) {
             goto WRITE_DATE;
         WRITE_DATE:
             if (G_gpg_vstate.io_length != 4) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 4);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- AES key ----------------- */
@@ -774,7 +774,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                                               G_gpg_vstate.io_length,
                                               &aes_key));
             nvm_write(pkey, &aes_key, sizeof(cx_aes_key_t));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* AES key: one shot */
@@ -787,7 +787,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                                               G_gpg_vstate.io_length,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- RC ----------------- */
@@ -797,10 +797,10 @@ int gpg_apdu_put_data(unsigned int ref) {
             pin = gpg_pin_get_pin(PIN_ID_RC);
             if (G_gpg_vstate.io_length == 0) {
                 nvm_write(pin, NULL, sizeof(gpg_pin_t));
-                sw = SW_OK;
+                sw = SWO_SUCCESS;
             } else if ((G_gpg_vstate.io_length > GPG_MAX_PW_LENGTH) ||
                        (G_gpg_vstate.io_length < 8)) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
             } else {
                 sw = gpg_pin_set(pin,
                                  G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
@@ -821,16 +821,16 @@ int gpg_apdu_put_data(unsigned int ref) {
             goto WRITE_UIF;
         WRITE_UIF:
             if (G_gpg_vstate.io_length != 2) {
-                sw = SW_WRONG_LENGTH;
+                sw = SWO_WRONG_LENGTH;
                 break;
             }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 2);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
             /* ----------------- WAT ----------------- */
         default:
-            sw = SW_REFERENCED_DATA_NOT_FOUND;
+            sw = SWO_REFERENCED_DATA_NOT_FOUND;
             break;
     }
 
@@ -850,16 +850,16 @@ end:
  *
  */
 static int gpg_init_keyenc(cx_aes_key_t *keyenc) {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     unsigned char seed[32];
     cx_err_t error = CX_INTERNAL_ERROR;
 
     sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
-    if (sw != SW_OK) {
+    if (sw != SWO_SUCCESS) {
         return sw;
     }
     sw = gpg_pso_derive_key_seed(seed, (unsigned char *) PIC("key "), 1, seed, CX_AES_BLOCK_SIZE);
-    if (sw != SW_OK) {
+    if (sw != SWO_SUCCESS) {
         return sw;
     }
     CX_CHECK(cx_aes_init_key_no_throw(seed, CX_AES_BLOCK_SIZE, keyenc));
@@ -868,7 +868,7 @@ end:
     if (error != CX_OK) {
         return error;
     }
-    return SW_OK;
+    return SWO_SUCCESS;
 }
 
 /**
@@ -887,11 +887,11 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     unsigned int len = 0;
     unsigned int k_len = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     unsigned int ksz = 0;
 
     sw = gpg_init_keyenc(&keyenc);
-    if (sw != SW_OK) {
+    if (sw != SWO_SUCCESS) {
         return sw;
     }
     switch (ref) {
@@ -905,7 +905,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             keygpg = &G_gpg_vstate.kslot->aut;
             break;
         default:
-            return SW_WRONG_DATA;
+            return SWO_INCORRECT_DATA;
     }
 
     gpg_io_discard(1);
@@ -933,7 +933,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             }
 
             if ((key == NULL) || (key->size != ksz)) {
-                return SW_CONDITIONS_NOT_SATISFIED;
+                return SWO_CONDITIONS_NOT_SATISFIED;
             }
 
             // insert pubkey
@@ -953,7 +953,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             gpg_io_set_offset(IO_OFFSET_MARK);
             gpg_io_insert_u32(len);
             gpg_io_set_offset(IO_OFFSET_END);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         case KEY_ID_ECDH:
@@ -977,11 +977,11 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             gpg_io_set_offset(IO_OFFSET_MARK);
             gpg_io_insert_u32(len);
             gpg_io_set_offset(IO_OFFSET_END);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         default:
-            sw = SW_REFERENCED_DATA_NOT_FOUND;
+            sw = SWO_REFERENCED_DATA_NOT_FOUND;
             break;
     }
     return sw;
@@ -1005,11 +1005,11 @@ int gpg_apdu_put_key_data(unsigned int ref) {
     cx_rsa_private_key_t *key = NULL;
     unsigned int offset = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
     unsigned int ksz = 0;
 
     sw = gpg_init_keyenc(&keyenc);
-    if (sw != SW_OK) {
+    if (sw != SWO_SUCCESS) {
         return sw;
     }
     switch (ref) {
@@ -1023,7 +1023,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             keygpg = &G_gpg_vstate.kslot->aut;
             break;
         default:
-            return SW_WRONG_DATA;
+            return SWO_INCORRECT_DATA;
     }
 
     /* unsigned int target_id = */
@@ -1036,7 +1036,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             // insert pubkey
             len = gpg_io_fetch_u32();
             if (len != 4) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             gpg_io_fetch_nv(keygpg->pub_key.rsa, len);
@@ -1044,7 +1044,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             // insert privkey
             len = gpg_io_fetch_u32();
             if (len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             offset = G_gpg_vstate.io_offset;
@@ -1065,7 +1065,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             }
 
             if ((key == NULL) || (key->size != ksz)) {
-                sw = SW_CONDITIONS_NOT_SATISFIED;
+                sw = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
 
@@ -1077,11 +1077,11 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                                      G_gpg_vstate.work.io_buffer,
                                      &ksz));
             if (len != ksz) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             nvm_write((unsigned char *) key, G_gpg_vstate.work.io_buffer, len);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         case KEY_ID_ECDH:
@@ -1090,7 +1090,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             // insert pubkey
             len = gpg_io_fetch_u32();
             if (len != sizeof(cx_ecfp_640_public_key_t)) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             gpg_io_fetch_nv((unsigned char *) &keygpg->pub_key.ecfp640, len);
@@ -1098,7 +1098,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             // insert privkey
             len = gpg_io_fetch_u32();
             if (len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             offset = G_gpg_vstate.io_offset;
@@ -1112,17 +1112,17 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                                      G_gpg_vstate.work.io_buffer,
                                      &len));
             if (len != sizeof(cx_ecfp_640_private_key_t)) {
-                sw = SW_WRONG_DATA;
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             nvm_write((unsigned char *) &keygpg->priv_key.ecfp640,
                       G_gpg_vstate.work.io_buffer,
                       len);
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
             break;
 
         default:
-            sw = SW_REFERENCED_DATA_NOT_FOUND;
+            sw = SWO_REFERENCED_DATA_NOT_FOUND;
             break;
     }
     gpg_io_discard(1);

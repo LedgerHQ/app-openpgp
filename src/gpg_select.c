@@ -27,19 +27,19 @@ const unsigned char C_ATR[] = {0x2F, 0x02};
  *
  */
 int gpg_apdu_select() {
-    int sw = SW_UNKNOWN;
+    int sw = SWO_UNKNOWN;
 
     // MF
     if ((G_gpg_vstate.io_length == sizeof(C_MF)) &&
         (memcmp(G_gpg_vstate.work.io_buffer, C_MF, G_gpg_vstate.io_length) == 0)) {
         gpg_io_discard(0);
-        sw = SW_OK;
+        sw = SWO_SUCCESS;
     }
     // EF.ATR
     else if ((G_gpg_vstate.io_length == sizeof(C_ATR)) &&
              (memcmp(G_gpg_vstate.work.io_buffer, C_ATR, G_gpg_vstate.io_length) == 0)) {
         gpg_io_discard(0);
-        sw = SW_OK;
+        sw = SWO_SUCCESS;
     }
     // AID APP
     else if ((G_gpg_vstate.io_length == 6) && (memcmp(G_gpg_vstate.work.io_buffer,
@@ -58,14 +58,14 @@ int gpg_apdu_select() {
 
         gpg_io_discard(0);
         if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] != STATE_ACTIVATE) {
-            sw = SW_STATE_TERMINATED;
+            sw = SWO_NO_INPUT_DATA_AVAILABLE;
         } else {
-            sw = SW_OK;
+            sw = SWO_SUCCESS;
         }
     }
     // NOT FOUND
     else {
-        sw = SW_FILE_NOT_FOUND;
+        sw = SWO_FILE_NOT_FOUND;
     }
     return sw;
 }

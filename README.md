@@ -26,7 +26,7 @@ The GnuPG application implements the following addon:
 
 - Serial modification
 - On screen reset
-- 3 independent key slots (except for Nanos, where we have only a single slot)
+- 3 independent key slots
 - Seeded key generation
 
 Technical specification is available in [rst](doc/developer/gpgcard-addon.rst), or in [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/developer/gpgcard-addon.pdf>)
@@ -159,11 +159,11 @@ make DEBUG=1  # compile optionally with PRINTF
 
 You can choose which device to compile and load for by setting the `BOLOS_SDK` environment variable to the following values:
 
-- `BOLOS_SDK=$NANOS_SDK`
 - `BOLOS_SDK=$NANOX_SDK`
 - `BOLOS_SDK=$NANOSP_SDK`
 - `BOLOS_SDK=$STAX_SDK`
 - `BOLOS_SDK=$FLEX_SDK`
+- `BOLOS_SDK=$APEX_P_SDK`
 
 ### Loading on a physical device
 
@@ -239,16 +239,16 @@ pip install -r tests/requirements.txt
 
 Then you can:
 
-Run the functional tests (here for nanos but available for any device once you have built the binaries):
+Run the functional tests (here for stax but available for any device once you have built the binaries):
 
 ```shell
-pytest tests/ --tb=short -v --device nanos
+pytest tests/ --tb=short -v --device stax
 ```
 
 Or run your app directly with Speculos
 
 ```shell
-speculos --model nanos build/nanos/bin/app.elf
+speculos build/stax/bin/app.elf
 ```
 
 #### macOS / Windows
@@ -271,12 +271,12 @@ Or simply run the app on the Speculos emulator:
 
 ### Unit Tests
 
-Those tests are available in the directory `unit-tests`. Please see the corresponding [README](unit-tests/README.md)
+Those tests are available in the directory `tests/unit`. Please see the corresponding [README](tests/unit/README.md)
 to compile and run them.
 
 ### Manual Tests
 
-Those tests are available in the directory `manual-tests`. This consists in a helper script (`manual.sh`)
+Those tests are available in the directory `tests/manual`. This consists in a helper script (`manual.sh`)
 corresponding to different cases described in the document [Quick tests](doc/developer/quick-test.md).
 
 ## Documentation
@@ -292,7 +292,7 @@ or [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/user/app-openp
 Developer documentation related to the Ledger Add-ons available here: [rst](doc/developer/gpgcard-addon.rst),
 or [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/developer/gpgcard-addon.pdf>)
 
-A Quick Test document to perform `Manual Tests` available [here](doc/developer/quick-test.md)
+A Quick Test document to perform `Manual Tests` available here: [quick-test](doc/developer/quick-test.md)
 
 The pdf documentation for **User** and **Developer** are available, and can be generated from
 the corresponding `.rst` files (in the same respective directories) using this command:
@@ -312,7 +312,7 @@ The flow processed in [GitHub Actions](https://github.com/features/actions) is t
   in the repository [ledger-app-workflow](https://github.com/LedgerHQ/ledger-app-workflows)
 - Code formatting with [clang-format](http://clang.llvm.org/docs/ClangFormat.html)
 - Compilation of the application for all Ledger hardware in [ledger-app-builder](https://github.com/LedgerHQ/ledger-app-builder)
-- Unit tests of C functions with [cmocka](https://cmocka.org/) (see [unit-tests/](unit-tests/))
+- Unit tests of C functions with [cmocka](https://cmocka.org/) (see [tests/unit/](tests/unit/))
 - End-to-end tests with [Speculos](https://github.com/LedgerHQ/speculos) emulator
   and [ragger](https://github.com/LedgerHQ/ragger) (see [tests/](tests/))
 - Code coverage with [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html)/[lcov](http://ltp.sourceforge.net/coverage/lcov.php)
