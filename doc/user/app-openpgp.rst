@@ -75,16 +75,52 @@ Linux
 
 You have to add your devices to ``/etc/libccid_Info.plist``
 
-MAC
-~~~
+macOS
+~~~~~
 
-1. First it is necessary to disable SIP, that forbid editing files in ``/usr/``.
-2. You have to add your devices to ``/usr/libexec/SmartCardServices/drivers/ifd-ccid.bundle/Contents/Info.plist``
-3. Enable SIP
+Two supported approaches:
 
-Note: See https://developer.apple.com/library/content/documentation/Security/Conceptual/System_Integrity_Protection_Guide/ConfiguringSystemIntegrityProtection/ConfiguringSystemIntegrityProtection.html
+**A: Recommended: enable the bundled IFD CCID driver (no SIP required)**
 
-TBC...
+On recent macOS releases (Sonoma 14 and Sequoia 15), Apple ships both its own CCID driver and Ludovic Rousseau’s **IFD CCID** (included by Apple; 1.5.1 in current builds). If your Ledger is not detected or behaves oddly with the Apple driver, enable IFD CCID:
+
+.. code-block:: bash
+
+   # Enable IFD CCID system-wide
+   sudo defaults write /Library/Preferences/com.apple.security.smartcard useIFDCCID -bool yes
+
+Verify the setting (``1`` means IFD CCID is enabled; “does not exist” means Apple driver is used):
+
+.. code-block:: bash
+
+   defaults read /Library/Preferences/com.apple.security.smartcard.plist useIFDCCID
+
+To revert to the Apple driver later:
+
+.. code-block:: bash
+
+   sudo defaults delete /Library/Preferences/com.apple.security.smartcard useIFDCCID
+   # or
+   sudo defaults write /Library/Preferences/com.apple.security.smartcard useIFDCCID -bool no
+
+Unplug/replug the device after changing the setting. A reboot is rarely necessary.
+
+**B: Legacy: manual device list (advanced; may require disabling SIP)**
+
+Only if you must maintain a custom device list for IFD CCID. Edit:
+
+``/usr/libexec/SmartCardServices/drivers/ifd-ccid.bundle/Contents/Info.plist``
+
+.. warning::
+   Editing system files may be blocked by SIP (System Integrity Protection) and is discouraged unless strictly necessary.
+   Prefer the single-command switch above whenever possible.
+
+.. note::
+   If you need to disable/enable SIP to edit system files, see Apple’s documentation:
+   https://developer.apple.com/documentation/security/disabling-and-enabling-system-integrity-protection
+
+See the **Manual update of CCID** section below for the required XML keys (``ifdVendorID``, ``ifdProductID``, ``ifdFriendlyName``) and Ledger device values.
+We intentionally keep those details centralized in that section.
 
 Windows
 ~~~~~~~
