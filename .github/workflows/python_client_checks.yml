@@ -14,27 +14,11 @@ on:
 
 jobs:
   lint:
-    name: Client linting
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-      - name: Installing PIP dependencies
-        run: |
-          pip install pylint
-          pip install -r tests/ragger/requirements.txt
-      - name: Lint Python code
-        run: pylint --rc tests/ragger/setup.cfg tests/ragger/application_client/
-
-  mypy:
-    name: Type checking
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-      - name: Installing PIP dependencies
-        run: |
-          pip install mypy
-          pip install -r tests/ragger/requirements.txt
-      - name: Mypy type checking
-        run: mypy tests/ragger/application_client/
+    name: Call Ledger Python linters
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_python_checks.yml@v1
+    with:
+      run_linter: pylint
+      run_type_check: true
+      src_directory: application_client
+      setup_directory: tests/ragger
+      req_directory: tests/ragger
