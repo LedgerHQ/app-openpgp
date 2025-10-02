@@ -1,0 +1,35 @@
+--- libccid_Info.plist_org	2025-09-23 10:35:20.962252106 +0200
++++ libccid_Info.plist	2025-09-23 10:54:39.042011175 +0200
+@@ -499,6 +499,10 @@
+ 		<string>0x2C97</string>
+ 		<string>0x2C97</string>
+ 		<string>0x2C97</string>
++		<string>0x2C97</string>
++		<string>0x2C97</string>
++		<string>0x2C97</string>
++		<string>0x2C97</string>
+ 		<string>0x17EF</string>
+ 		<string>0x17EF</string>
+ 		<string>0x17EF</string>
+@@ -1096,6 +1100,10 @@
+ 		<string>0x1009</string>
+ 		<string>0x4009</string>
+ 		<string>0x5009</string>
++		<string>0x5000</string>
++		<string>0x6000</string>
++		<string>0x7000</string>
++		<string>0x8000</string>
+ 		<string>0x6007</string>
+ 		<string>0x6055</string>
+ 		<string>0x6111</string>
+@@ -1693,6 +1701,10 @@
+ 		<string>Ledger Nano S</string>
+ 		<string>Ledger Nano X</string>
+ 		<string>Ledger Nano S Plus</string>
++		<string>Ledger Nano S Plus Legacy</string>
++		<string>Ledger Flex</string>
++		<string>Ledger Stax</string>
++		<string>Ledger Apex P</string>
+ 		<string>Lenovo Lenovo USB Smartcard Keyboard</string>
+ 		<string>Lenovo Lenovo USB Smartcard Keyboard</string>
+ 		<string>Lenovo Lenovo Smartcard Wired Keyboard II</string>

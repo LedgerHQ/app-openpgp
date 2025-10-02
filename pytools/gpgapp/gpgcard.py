@@ -22,14 +22,13 @@ import pickle
 from hashlib import sha1
 from typing import Optional, Tuple
 from dataclasses import dataclass
+# pylint: disable=import-error
 from Crypto.PublicKey.RSA import construct
+from ledgercomm import Transport  # type: ignore
+# pylint: enable=import-error
 
 from gpgapp.gpgcmd import DataObject, ErrorCodes, KeyTypes, PassWord, PubkeyAlgo  # type: ignore
 from gpgapp.gpgcmd import KEY_OPERATIONS, KEY_TEMPLATES, USER_SALUTATION  # type: ignore
-
-# pylint: disable=import-error
-from ledgercomm import Transport  # type: ignore
-# pylint: enable=import-error
 
 APDU_MAX_SIZE: int = 0xFE
 APDU_CHAINING_MODE: int = 0x10

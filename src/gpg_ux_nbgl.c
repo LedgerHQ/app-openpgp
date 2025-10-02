@@ -1168,12 +1168,6 @@ void ui_menu_pinconfirm_display(unsigned int value) {
 
 /* ------------------------------ PIN ENTRY UX ----------------------------- */
 
-// clang-format off
-enum {
-    TOKEN_PIN_ENTRY_BACK = FIRST_USER_TOKEN,
-};
-// clang-format on
-
 static void ui_menu_pinentry_cb(void);
 
 /**
@@ -1288,22 +1282,6 @@ static void pinback_cb(void) {
     ui_init();
 }
 
-#ifdef SCREEN_SIZE_WALLET
-/**
- * @brief Pin Entry Action callback
- *
- * @param[in] token button Id pressed
- * @param[in] index widget index on the page
- *
- */
-static void pinentry_cb(int token, uint8_t index) {
-    UNUSED(index);
-    if (token == TOKEN_PIN_ENTRY_BACK) {
-        pinback_cb();
-    }
-}
-#endif  // SCREEN_SIZE_WALLET
-
 /**
  * @brief Pin Entry page display
  *
@@ -1343,23 +1321,13 @@ void ui_menu_pinentry_display(unsigned int step) {
 
     minLen = (G_gpg_vstate.io_p2 == PIN_ID_PW3) ? GPG_MIN_PW3_LENGTH : GPG_MIN_PW1_LENGTH;
     // Draw the keypad
-#ifdef SCREEN_SIZE_WALLET
-    nbgl_useCaseKeypadPIN(G_gpg_vstate.menu,
-                          minLen,
-                          GPG_MAX_PW_LENGTH,
-                          TOKEN_PIN_ENTRY_BACK,
-                          false,
-                          TUNE_TAP_CASUAL,
-                          pinentry_validate_cb,
-                          pinentry_cb);
-#else   // SCREEN_SIZE_WALLET
-    nbgl_useCaseKeypadPIN(G_gpg_vstate.menu,
-                          minLen,
-                          GPG_MAX_PW_LENGTH,
-                          false,
-                          pinentry_validate_cb,
-                          pinback_cb);
-#endif  // SCREEN_SIZE_WALLET
+    nbgl_useCaseKeypad(G_gpg_vstate.menu,
+                       minLen,
+                       GPG_MAX_PW_LENGTH,
+                       false,
+                       true,
+                       pinentry_validate_cb,
+                       pinback_cb);
 }
 
 /**
