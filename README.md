@@ -324,7 +324,4 @@ It outputs 3 artifacts:
 - `code-coverage` within HTML details of code coverage
 
 ## Known limitations
-
-Today, the current App has the following known limitation:
-
-- Using Ed25519 template, the decrypt operation doesn't work (given CRC error). Thus, it is currently disabled.
+Today, the current App has no documented limitations.
