@@ -128,8 +128,6 @@ DISABLE_OS_IO_STACK_USE = 1
 
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA
-# Limitation (maybe due to openpgp itself): no support of DEC operation with cv25519
-DEFINES   += NO_DECRYPT_cv25519
 
 #########################
 
