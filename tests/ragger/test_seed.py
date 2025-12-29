@@ -52,10 +52,10 @@ def _gen_key(client: CommandSender, template: str) -> Union[RsaKey,EccKey]:
     [
         "rsa2048",
         pytest.param("rsa3072", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
-        # pytest.param("rsa4096", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
+        pytest.param("rsa4096", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
         "nistp256",  # ECDSA
         "ed25519",   # EdDSA
-        "cv25519",   # ECDH, SDK returns CX_EC_INVALID_CURVE
+        "cv25519",   # ECDH
     ],
 )
 def test_seed_key(backend: BackendInterface, template: str) -> None:

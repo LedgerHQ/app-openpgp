@@ -307,8 +307,8 @@ Simple *Encrypt* and *Decrypt* test to use and check the generated keys.
 Start to create a dummy file to be encrypted and checked.
 
 ```shell
-$ killall scdaemon gpg-agent
-$ echo CLEAR > foo.txt
+killall scdaemon gpg-agent
+echo CLEAR > foo.txt
 ```
 
 ### Encrypt
@@ -325,7 +325,7 @@ gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
 Just kill the processes to force pin to be asked...
 
 ```shell
-$ killall gpg-agent scdaemon
+killall gpg-agent scdaemon
 ```
 
 ### Decrypt
@@ -347,8 +347,8 @@ Simple *Sign* and *Verify* test to use and check signature with the generated ke
 Start to create a dummy file to be signed and verified.
 
 ```shell
-$ killall scdaemon gpg-agent
-$ echo CLEAR > foo.txt
+killall scdaemon gpg-agent
+echo CLEAR > foo.txt
 ```
 
 ### Sign
@@ -356,13 +356,13 @@ $ echo CLEAR > foo.txt
 Use this command to sign. The generated file is the encrypted signature.
 
 ```shell
-$ gpg --homedir $(pwd)/gnupg --sign foo.txt
+gpg --homedir $(pwd)/gnupg --sign foo.txt
 ```
 
 Just kill the processes to force pin to be asked...
 
 ```shell
-$ killall gpg-agent scdaemon
+killall gpg-agent scdaemon
 ```
 
 ### Verify

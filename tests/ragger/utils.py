@@ -276,28 +276,32 @@ def decode_tlv(tlv: bytes) -> dict:
     """
 
     tags = {}
-    while len(tlv):
-        o = 0
-        l = 0
-        if (tlv[0] & 0x1F) == 0x1F:
-            t = (tlv[0] << 8) | tlv[1]
-            o = 2
+    offset = 0
+    while offset < len(tlv):
+        # Parse tag
+        if (tlv[offset] & 0x1F) == 0x1F:
+            tag = (tlv[offset] << 8) | tlv[offset + 1]
+            offset += 2
         else:
-            t = tlv[0]
-            o = 1
-        l = tlv[o]
-        if l & 0x80 :
-            if (l & 0x7f) == 1:
-                l = tlv[o + 1]
-                o += 2
-            if (l & 0x7f) == 2:
-                l = (tlv[o + 1] << 8) | tlv[o + 2]
-                o += 3
+            tag = tlv[offset]
+            offset += 1
+        # Parse length
+        length = tlv[offset]
+        if length & 0x80:
+            num_bytes = length & 0x7f
+            if num_bytes == 1:
+                length = tlv[offset + 1]
+                offset += 2
+            elif num_bytes == 2:
+                length = (tlv[offset + 1] << 8) | tlv[offset + 2]
+                offset += 3
+            else:
+                raise ValueError(f"Unsupported length encoding: {num_bytes} bytes")
         else:
-            o += 1
-        v = tlv[o:o + l]
-        tags[t] = v
-        tlv = tlv[o + l:]
+            offset += 1
+        # Extract value
+        tags[tag] = tlv[offset:offset + length]
+        offset += length
     return tags
 
 

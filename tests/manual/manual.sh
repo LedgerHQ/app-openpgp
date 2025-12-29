@@ -111,6 +111,8 @@ card() {
   [[ ${EXPERT} == true ]] && expert_mode="--expert"
 
   gpg --homedir "${gnupg_home_dir}" ${expert_mode} --card-edit
+  # Set default key name after card edit
+  default
 }
 
 #===============================================================================

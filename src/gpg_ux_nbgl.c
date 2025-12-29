@@ -17,13 +17,13 @@
  *****************************************************************************/
 
 #include "os.h"
-#include "glyphs.h"
 #include "nbgl_use_case.h"
 
 #include "gpg_vars.h"
 #include "gpg_ux_msg.h"
 #include "gpg_ux.h"
 #include "usbd_ccid_if.h"
+#include "os_io_seph_cmd.h"
 
 /* ----------------------------------------------------------------------- */
 /* ---                        NBGL  UI layout                          --- */
@@ -432,23 +432,29 @@ static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
  *
  */
 static uint32_t _getKeyType(const uint8_t key) {
+    gpg_key_t* keygpg = NULL;
     uint8_t* attributes = NULL;
     uint32_t token = 0;
+    uint32_t curve = 0;
+    unsigned int attr_len = 0;
 
     switch (key) {
         case TOKEN_TEMPLATE_SIG:
-            attributes = G_gpg_vstate.kslot->sig.attributes.value;
+            keygpg = &G_gpg_vstate.kslot->sig;
             break;
         case TOKEN_TEMPLATE_DEC:
-            attributes = G_gpg_vstate.kslot->dec.attributes.value;
+            keygpg = &G_gpg_vstate.kslot->dec;
             break;
         case TOKEN_TEMPLATE_AUT:
-            attributes = G_gpg_vstate.kslot->aut.attributes.value;
+            keygpg = &G_gpg_vstate.kslot->aut;
             break;
     }
-    if (attributes == NULL) {
+    if (keygpg == NULL) {
         return 0;
     }
+    attributes = keygpg->attributes.value;
+    attr_len = keygpg->attributes.length;
+
     switch (attributes[0]) {
         case KEY_ID_RSA:
             switch (U2BE(attributes, 1)) {
@@ -464,29 +470,20 @@ static uint32_t _getKeyType(const uint8_t key) {
             }
             break;
         case KEY_ID_ECDH:
-            switch (attributes[1]) {
-                case 0x2A:
-                    token = TOKEN_TYPE_SECP256R1;
-                    break;
-                case 0x2B:
-                    switch (attributes[2]) {
-                        case 0x06:
-                            token = TOKEN_TYPE_Ed25519;
-                            break;
-                        case 0x81:
-                            token = TOKEN_TYPE_SECP256K1;
-                            break;
-                    }
-                    break;
-            }
-            break;
         case KEY_ID_ECDSA:
-            switch (attributes[1]) {
-                case 0x2A:
+            // Use gpg_oid2curve to properly identify the curve
+            curve = gpg_oid2curve(attributes + 1, attr_len - 1);
+            switch (curve) {
+                case CX_CURVE_SECP256R1:
                     token = TOKEN_TYPE_SECP256R1;
                     break;
-                case 0x2B:
+                case CX_CURVE_SECP256K1:
                     token = TOKEN_TYPE_SECP256K1;
+                    break;
+                case CX_CURVE_Ed25519:
+                case CX_CURVE_Curve25519:
+                    // Both Ed25519 and Curve25519 are displayed as "Ed25519" in the UI
+                    token = TOKEN_TYPE_Ed25519;
                     break;
             }
             break;
