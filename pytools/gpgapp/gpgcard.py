@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 import pickle
 from hashlib import sha1
 from typing import Optional, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 # pylint: disable=import-error
 from Crypto.PublicKey.RSA import construct
 from ledgercomm import Transport  # type: ignore
@@ -95,9 +95,9 @@ class CardInfo:
     rsa_pub_exp: int = 0
     digital_counter: int = 0
 
-    sig: KeyInfo = KeyInfo()
-    dec: KeyInfo = KeyInfo()
-    aut: KeyInfo = KeyInfo()
+    sig: KeyInfo = field(default_factory=KeyInfo)
+    dec: KeyInfo = field(default_factory=KeyInfo)
+    aut: KeyInfo = field(default_factory=KeyInfo)
 
     #private info
     private_01: bytes = b""
@@ -415,19 +415,44 @@ class GPGCard() :
 
 
     def export_pub_key(self, pubkey: dict, file_name: str) -> None:
-        """Export a Public to file
+        """Export a Public key to file
 
         Args:
             pubkey (dict): Public key parameters
             file_name (str): Backup filename
         """
 
-        modulus = bytearray.fromhex(pubkey["Modulus"])
-        exponent = bytearray.fromhex(pubkey["Pub Exp"][2:])
-        key = construct((int.from_bytes(modulus, 'big'), int.from_bytes(exponent, 'big')))
-        public_key = key.publickey().export_key()
-        with open(file_name, mode="wb") as f:
-            f.write(public_key)
+        key_id = pubkey.get("ID", "")
+
+        # RSA key export
+        if key_id.startswith("RSA"):
+            modulus = bytearray.fromhex(pubkey["Modulus"])
+            exponent = bytearray.fromhex(pubkey["Pub Exp"][2:])
+            key = construct((int.from_bytes(modulus, 'big'), int.from_bytes(exponent, 'big')))
+            public_key = key.publickey().export_key()
+            with open(file_name, mode="wb", encoding="utf-8") as f:
+                f.write(public_key)
+
+        # ECDSA, ECDH, EDDSA key export
+        elif key_id in ["ECDSA", "ECDH", "EDDSA"]:
+            # For elliptic curve keys, export OID and public point in OpenPGP format
+            # The exact format depends on the curve and key type
+            with open(file_name, mode="w", encoding="utf-8") as f:
+                f.write(f"Key Type: {key_id}\n")
+                if "oid" in pubkey:
+                    f.write(f"OID: {pubkey['oid']}\n")
+                if "Fingerprint" in pubkey:
+                    f.write(f"Fingerprint: {pubkey['Fingerprint']}\n")
+                if "Creation date" in pubkey:
+                    f.write(f"Creation date: {pubkey['Creation date']}\n")
+                # Additional fields that might be present
+                for key, value in pubkey.items():
+                    if key not in ["ID", "oid", "Fingerprint", "Creation date"]:
+                        f.write(f"{key}: {value}\n")
+
+        else:
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL,
+                                   f"Unsupported key type for export: {key_id}")
 
 
     def seed_key(self) -> None:
