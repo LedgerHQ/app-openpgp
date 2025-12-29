@@ -29,8 +29,8 @@ APPNAME = OpenPGP
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 5
-APPVERSION_P = 1
+APPVERSION_N = 6
+APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 DEFINES += SPEC_VERSION='"3.3.1"'
@@ -128,8 +128,6 @@ DISABLE_OS_IO_STACK_USE = 1
 
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA
-# Limitation (maybe due to openpgp itself): no support of DEC operation with cv25519
-DEFINES   += NO_DECRYPT_cv25519
 
 #########################
 

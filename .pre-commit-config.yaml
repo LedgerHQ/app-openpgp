@@ -32,10 +32,10 @@ repos:
         types_or: [yaml]
         args: [-shellcheck='' -pyflakes='']
 
-  - repo: https://github.com/markdownlint/markdownlint
-    rev: v0.12.0
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.13.0
     hooks:
-      - id: markdownlint
+      - id: markdownlint-cli2
         types_or: [markdown]
 
   - repo: https://github.com/PyCQA/pylint
@@ -43,14 +43,13 @@ repos:
     hooks:
       - id: pylint
         name: Check python Client
-        language: system
         types: [python]
         args: ['--jobs=0', '--rcfile=tests/ragger/setup.cfg']
         files: '^tests\/.*$'
+        additional_dependencies: ['pytest', 'ragger[speculos,ledgerwallet]', 'ledgered']
 
       - id: pylint
         name: Check python Tool
-        language: system
         types: [python]
         args: ['--jobs=0', '--rcfile=pytools/setup.cfg']
         files: '^pytools\/.*$'

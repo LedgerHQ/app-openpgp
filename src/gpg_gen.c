@@ -269,8 +269,9 @@ end:
  */
 static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     uint32_t curve = 0;
-    uint32_t i, len;
+    uint32_t i = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
+    const unsigned char *x = NULL;
 
     if (keygpg->pub_key.ecfp.W_len == 0) {
         return SWO_REFERENCED_DATA_NOT_FOUND;
@@ -288,9 +289,18 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
         gpg_io_insert_tlv(0x86, 32,
                           G_gpg_vstate.work.io_buffer + 129);  // 129: discard 02
     } else if (curve == CX_CURVE_Curve25519) {
-        len = keygpg->pub_key.ecfp.W_len - 1;
-        for (i = 0; i <= len; i++) {
-            G_gpg_vstate.work.io_buffer[128 + i] = keygpg->pub_key.ecfp.W[len - i];
+        if ((keygpg->pub_key.ecfp.W_len == 65) && (keygpg->pub_key.ecfp.W[0] == 0x04)) {
+            x = keygpg->pub_key.ecfp.W + 1;
+        } else if ((keygpg->pub_key.ecfp.W_len == 33) && (keygpg->pub_key.ecfp.W[0] == 0x04)) {
+            x = keygpg->pub_key.ecfp.W + 1;
+        } else if (keygpg->pub_key.ecfp.W_len == 32) {
+            x = keygpg->pub_key.ecfp.W;
+        } else {
+            return SWO_INCORRECT_DATA;
+        }
+        // OpenPGP expects X25519 public keys as 32-byte little-endian.
+        for (i = 0; i < 32; i++) {
+            G_gpg_vstate.work.io_buffer[128 + i] = x[31 - i];
         }
         gpg_io_insert_tlv(0x86, 32, G_gpg_vstate.work.io_buffer + 128);
     } else {

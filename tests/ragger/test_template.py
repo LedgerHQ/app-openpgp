@@ -26,8 +26,8 @@ from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO
     [
         "rsa2048",
         pytest.param("rsa3072", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
-        # "rsa4096",   # Invalid signature?
-        # "nistp256",  # ECDSA, Pb with Pubkey generation?
+        pytest.param("rsa4096", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
+        "nistp256",  # ECDSA
         "ed25519",   # EdDSA
     ],
 )
@@ -73,8 +73,31 @@ def test_sign(backend: BackendInterface, template: str) -> None:
         rsaVerifier.verify(hash_obj, rapdu.data)
     elif key_algo == PubkeyAlgo.ECDSA:
         pubEcckey = get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
+        # OpenPGP card returns signature in MPI format (may have 0x00 padding for r and s)
+        sig_data = rapdu.data
+        # For P-256, r and s should be 32 bytes each
+        if len(sig_data) == 66:
+            # Format: 0x00 || r(32) || 0x00 || s(32)
+            r = sig_data[1:33]
+            s = sig_data[34:66]
+            sig_data = r + s
+        elif len(sig_data) == 65:
+            # One component has padding
+            if sig_data[0] == 0x00:
+                r = sig_data[1:33]
+                s = sig_data[33:65]
+            else:
+                r = sig_data[0:32]
+                s = sig_data[33:65]
+            sig_data = r + s
+        elif len(sig_data) == 64:
+            # No padding
+            pass
+        else:
+            # Try to extract last 64 bytes
+            sig_data = sig_data[-64:]
         verifier = DSS.new(pubEcckey, 'fips-186-3')
-        verifier.verify(hash_obj, rapdu.data[2:])
+        verifier.verify(hash_obj, sig_data)
     elif key_algo == PubkeyAlgo.EDDSA:
         pubEcckey = get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
         eddsaVerifier = eddsa.new(pubEcckey, 'rfc8032')
