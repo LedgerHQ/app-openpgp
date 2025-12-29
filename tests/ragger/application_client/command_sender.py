@@ -447,8 +447,8 @@ class CommandSender:
             try:
                 rapdu = self.backend.exchange_raw(data)
             except ExceptionRAPDU as err:
-                if (err.status & 0xFF00) != Errors.SW_CORRECT_LONG_RESPONSE:
-                    rapdu = RAPDU(err.status, err.data)
+                rapdu = RAPDU(err.status, err.data)
+                if (rapdu.status & 0xFF00) != Errors.SW_CORRECT_LONG_RESPONSE:
                     break
 
             rdata += rapdu.data
