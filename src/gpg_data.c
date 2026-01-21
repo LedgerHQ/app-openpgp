@@ -130,7 +130,9 @@ int gpg_apdu_get_data(unsigned int ref) {
             memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6,
                     G_gpg_vstate.kslot->serial,
                     4);
+#ifdef WITH_HISTO_BYTES_IN_ARD
             gpg_io_insert_tlv(0x5F52, HISTO_LENGTH, (const unsigned char *) N_gpg_pstate->histo);
+#endif
             gpg_io_insert_tlv(0x7F66, sizeof(C_ext_length), C_ext_length);
 
             gpg_io_mark();
