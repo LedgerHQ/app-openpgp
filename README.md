@@ -326,3 +326,14 @@ It outputs 3 artifacts:
 ## Known limitations
 
 Today, the current App has no documented limitations.
+
+But, we have removed the **Historical Bytes** from the initial `GET_DATA` command:
+
+> Issue: The application freezes during GPG initialization (command `GET_DATA` `0x6E`) when using a hybrid ECC key configuration.
+>
+> Root Cause: The response payload size (**246 bytes**) triggers a transport layer freeze on the physical device (T=0 protocol).
+> While technically within the Short APDU limit (256 bytes), sending a payload this close to the maximum size
+> causes the Host/Driver to fail capturing the Status Word correctly, resulting in a timeout.
+>
+> Fix: Reduced the 0x6E response size to ~**224 bytes** by omitting the optional **Historical Bytes** (Tag `5F 52`).
+> This "safe" size avoids the T=0 transport edge-case.
