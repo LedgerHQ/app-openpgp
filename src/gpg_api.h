@@ -128,6 +128,6 @@ void gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
 void gpg_io_fetch_nv(unsigned char *buffer, int len);
 int gpg_io_fetch(unsigned char *buffer, int len);
 
-void gpg_io_do(unsigned int io_flags);
+int gpg_io_do(unsigned int io_flags);
 
 #endif

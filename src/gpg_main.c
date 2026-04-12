@@ -46,8 +46,10 @@ void app_main(void) {
     // - send the ATR
     // - receive the first command
     for (;;) {
-        gpg_io_do(io_flags);
+        sw = gpg_io_do(io_flags);
+        if (sw == 0) {
         sw = gpg_dispatch();
+        }
         if (sw) {
             PRINTF("[MAIN] - FINALLY INSERT sw=0x%x\n", sw);
             if ((sw != SWO_SUCCESS) && ((sw & 0xFF00) != SWO_RESPONSE_BYTES_AVAILABLE)) {
