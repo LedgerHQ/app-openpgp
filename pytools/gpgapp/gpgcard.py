@@ -187,6 +187,14 @@ class GPGCard() :
         """
 
         if self.log:
+            # Redact APDUs that carry PINs or key material to avoid
+            # leaking secrets into terminal output or CI logs.
+            # INS bytes covered: VERIFY (0x20), CHANGE REFERENCE DATA (0x24),
+            # RESET RETRY COUNTER (0x2C), PUT DATA (0xDA).
+            _SENSITIVE_INS = {0x20, 0x24, 0x2C, 0xDA}
+            if mode == "send" and len(data) > 1 and data[1] in _SENSITIVE_INS:
+                print(f"{mode}: [REDACTED SENSITIVE APDU ins={data[1]:02x}]")
+                return
             sw_code = f" ({sw:04x})" if mode == "recv" else ""
             print(f"{mode}:{sw_code} {''.join([f'{b:02x}' for b in data])}")
 
