@@ -395,8 +395,8 @@ int gpg_apdu_put_data(unsigned int ref) {
             }
             // fecth 7f78
             gpg_io_fetch_tl(&t, &l);
-            if (t != 0x7f48) {
-                sw = SWO_REFERENCED_DATA_NOT_FOUND;
+            if ((t != 0x7f48) || (l > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset))) {
+                sw = SWO_INCORRECT_DATA;
                 break;
             }
             len_e = 0;
@@ -405,6 +405,9 @@ int gpg_apdu_put_data(unsigned int ref) {
             endof = G_gpg_vstate.io_offset + l;
             while (G_gpg_vstate.io_offset < endof) {
                 gpg_io_fetch_tl(&t, &l);
+                if (G_gpg_vstate.io_offset > endof) {
+                    return SWO_INCORRECT_DATA;
+                }
                 switch (t) {
                     case 0x91:
                         len_e = l;
