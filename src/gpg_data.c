@@ -1007,6 +1007,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
     cx_aes_key_t keyenc = {0};
     gpg_key_t *keygpg = NULL;
     unsigned int len = 0;
+    unsigned int enc_len = 0;
     cx_rsa_private_key_t *key = NULL;
     unsigned int offset = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
@@ -1047,8 +1048,8 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             gpg_io_fetch_nv(keygpg->pub_key.rsa, len);
 
             // insert privkey
-            len = gpg_io_fetch_u32();
-            if (len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+            enc_len = gpg_io_fetch_u32();
+            if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
@@ -1078,7 +1079,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
                                      G_gpg_vstate.work.io_buffer + offset,
-                                     len,
+                                     enc_len,
                                      G_gpg_vstate.work.io_buffer,
                                      &ksz));
             if (len != ksz) {
@@ -1101,28 +1102,29 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             gpg_io_fetch_nv((unsigned char *) &keygpg->pub_key.ecfp640, len);
 
             // insert privkey
-            len = gpg_io_fetch_u32();
-            if (len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+            enc_len = gpg_io_fetch_u32();
+            if ((enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) ||
+                (offset + enc_len > GPG_IO_BUFFER_LENGTH)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
             offset = G_gpg_vstate.io_offset;
             gpg_io_discard(0);
 
-            len = GPG_IO_BUFFER_LENGTH;
+            ksz = GPG_IO_BUFFER_LENGTH;
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
                                      G_gpg_vstate.work.io_buffer + offset,
-                                     len,
+                                     enc_len,
                                      G_gpg_vstate.work.io_buffer,
-                                     &len));
-            if (len != sizeof(cx_ecfp_640_private_key_t)) {
+                                     &ksz));
+            if (ksz != sizeof(cx_ecfp_640_private_key_t)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
             nvm_write((unsigned char *) &keygpg->priv_key.ecfp640,
                       G_gpg_vstate.work.io_buffer,
-                      len);
+                      ksz);
             sw = SWO_SUCCESS;
             break;
 
