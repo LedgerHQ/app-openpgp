@@ -147,6 +147,7 @@ class GPGCard() :
         self.slot_config: bytes = bytes(3)
         self.data: CardInfo = CardInfo()
         self.data.reset()
+        self._last_sent_was_key_read: bool = False
 
     def connect(self, device: str) -> None:
         """Connect to the selected Reader
@@ -193,9 +194,23 @@ class GPGCard() :
             # INS bytes covered: VERIFY (0x20), CHANGE REFERENCE DATA (0x24),
             # RESET RETRY COUNTER (0x2C), PUT DATA (0xDA).
             _SENSITIVE_INS = {0x20, 0x24, 0x2C, 0xDA}
-            if mode == "send" and len(data) > 1 and data[1] in _SENSITIVE_INS:
-                print(f"{mode}: [REDACTED SENSITIVE APDU ins={data[1]:02x}]")
-                return
+            # GET DATA (INS=0xCA) for private-key DOs B6/A4/B8 returns key
+            # material; redact the following recv response too (CWE-532).
+            _KEY_READ_DOS = {0xB6, 0xA4, 0xB8}
+            if mode == "send":
+                if len(data) > 1 and data[1] in _SENSITIVE_INS:
+                    print(f"{mode}: [REDACTED SENSITIVE APDU ins={data[1]:02x}]")
+                    return
+                self._last_sent_was_key_read = (
+                    len(data) >= 4 and data[1] == 0xCA
+                    and data[2] == 0x00 and data[3] in _KEY_READ_DOS
+                )
+            elif mode == "recv":
+                if self._last_sent_was_key_read:
+                    self._last_sent_was_key_read = False
+                    print(f"{mode}: [REDACTED KEY MATERIAL sw={sw:04x}]")
+                    return
+                self._last_sent_was_key_read = False
             sw_code = f" ({sw:04x})" if mode == "recv" else ""
             print(f"{mode}:{sw_code} {''.join([f'{b:02x}' for b in data])}")
 
