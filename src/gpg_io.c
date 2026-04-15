@@ -355,8 +355,12 @@ void gpg_io_fetch_tl(unsigned int *T, unsigned int *L) {
  *
  */
 void gpg_io_fetch_nv(unsigned char *buffer, int len) {
-    nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
-    G_gpg_vstate.io_offset += len;
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + len) <= (int) G_gpg_vstate.io_length, "Bad fetch!");
+    LEDGER_ASSERT(len >= 0, "Negative fetch length!");
+    if (buffer) {
+        nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+        G_gpg_vstate.io_offset += len;
+    }
 }
 
 /**
@@ -369,10 +373,11 @@ void gpg_io_fetch_nv(unsigned char *buffer, int len) {
  */
 int gpg_io_fetch(unsigned char *buffer, int len) {
     LEDGER_ASSERT((G_gpg_vstate.io_offset + len) <= (int) G_gpg_vstate.io_length, "Bad fetch!");
+    LEDGER_ASSERT(len >= 0, "Negative fetch length!");
     if (buffer) {
         memmove(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+        G_gpg_vstate.io_offset += len;
     }
-    G_gpg_vstate.io_offset += len;
     return len;
 }
 
