@@ -18,6 +18,7 @@
 
 import base64
 import binascii
+import os
 from datetime import datetime, timezone
 import json
 from hashlib import sha1
@@ -365,7 +366,8 @@ class GPGCard() :
             "dec":             _key_slot(self.data.dec),
             "aut":             _key_slot(self.data.aut),
         }
-        with open(file_name, mode="w", encoding="utf-8") as f:
+        fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, mode="w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
 
 
