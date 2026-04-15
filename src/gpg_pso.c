@@ -229,7 +229,7 @@ int gpg_apdu_pso() {
         // --- PSO:DEC ---
         case PSO_DEC:
         case PSO_ENC:
-            if (G_gpg_vstate.kslot->dec.UIF[0]) {
+            if (G_gpg_vstate.mse_dec->UIF[0]) {
                 if ((G_gpg_vstate.UIF_flags) == 0) {
                     ui_menu_uifconfirm_display(0);
                     return 0;
@@ -457,7 +457,7 @@ end:
  */
 int gpg_apdu_internal_authenticate() {
     // --- PSO:AUTH ---
-    if (G_gpg_vstate.kslot->aut.UIF[0]) {
+    if (G_gpg_vstate.mse_aut->UIF[0]) {
         if ((G_gpg_vstate.UIF_flags) == 0) {
             ui_menu_uifconfirm_display(0);
             return 0;
