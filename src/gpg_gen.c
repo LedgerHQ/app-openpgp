@@ -130,14 +130,17 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
         size = ksz >> 1;
         sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
         if (sw != SWO_SUCCESS) {
+            explicit_bzero(seed, sizeof(seed));
             return sw;
         }
         sw = gpg_pso_derive_key_seed(seed, name, 1, pq, size);
         if (sw != SWO_SUCCESS) {
+            explicit_bzero(seed, sizeof(seed));
             return sw;
         }
         sw = gpg_pso_derive_key_seed(seed, name, 2, pq + size, size);
         if (sw != SWO_SUCCESS) {
+            explicit_bzero(seed, sizeof(seed));
             return sw;
         }
         *pq |= 0x80;
@@ -159,9 +162,11 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
 
     nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
     gpg_io_clear();
+    explicit_bzero(seed, sizeof(seed));
     return SWO_SUCCESS;
 
 end:
+    explicit_bzero(seed, sizeof(seed));
     return error;
 }
 
@@ -231,10 +236,12 @@ static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
         ksz = gpg_curve2domainlen(curve);
         sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
         if (sw != SWO_SUCCESS) {
+            explicit_bzero(seed, sizeof(seed));
             return sw;
         }
         sw = gpg_pso_derive_key_seed(seed, name, 1, seed, ksz);
         if (sw != SWO_SUCCESS) {
+            explicit_bzero(seed, sizeof(seed));
             return sw;
         }
         CX_CHECK(
@@ -256,6 +263,7 @@ static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
     error = SWO_SUCCESS;
 
 end:
+    explicit_bzero(seed, sizeof(seed));
     return error;
 }
 
