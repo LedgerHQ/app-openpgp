@@ -921,7 +921,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     // encrypted part
     switch (keygpg->attributes.value[0]) {
         case KEY_ID_RSA:
-            ksz = U2BE(G_gpg_vstate.mse_dec->attributes.value, 1) >> 3;
+            ksz = U2BE(keygpg->attributes.value, 1) >> 3;
             switch (ksz) {
                 case 2048 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa2048;
@@ -1054,7 +1054,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 break;
             }
             offset = G_gpg_vstate.io_offset;
-            ksz = U2BE(G_gpg_vstate.mse_dec->attributes.value, 1) >> 3;
+            ksz = U2BE(keygpg->attributes.value, 1) >> 3;
             switch (ksz) {
                 case 2048 / 8:
                     key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa2048;
