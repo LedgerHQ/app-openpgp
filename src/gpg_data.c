@@ -19,6 +19,58 @@
 #include "gpg_ux.h"
 #include "cx_errors.h"
 
+static int gpg_apdu_data_available(unsigned int len) {
+    return (G_gpg_vstate.io_offset <= G_gpg_vstate.io_length) &&
+           (len <= (unsigned int) (G_gpg_vstate.io_length - G_gpg_vstate.io_offset));
+}
+
+static int gpg_apdu_fetch_t_safe(unsigned int *T) {
+    if (!gpg_apdu_data_available(1)) {
+        return 0;
+    }
+    *T = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset++];
+    if ((*T & 0x1F) == 0x1F) {
+        if (!gpg_apdu_data_available(1)) {
+            return 0;
+        }
+        *T = (*T << 8) | G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset++];
+    }
+    return 1;
+}
+
+static int gpg_apdu_fetch_l_safe(unsigned int *L) {
+    unsigned int n;
+
+    if (!gpg_apdu_data_available(1)) {
+        return 0;
+    }
+    *L = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset++];
+    if ((*L & 0x80) == 0) {
+        return 1;
+    }
+    n = *L & 0x7F;
+    if (n == 1) {
+        if (!gpg_apdu_data_available(1)) {
+            return 0;
+        }
+        *L = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset++];
+        return 1;
+    }
+    if (n == 2) {
+        if (!gpg_apdu_data_available(2)) {
+            return 0;
+        }
+        *L = U2BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
+        G_gpg_vstate.io_offset += 2;
+        return 1;
+    }
+    return 0;
+}
+
+static int gpg_apdu_fetch_tl_safe(unsigned int *T, unsigned int *L) {
+    return gpg_apdu_fetch_t_safe(T) && gpg_apdu_fetch_l_safe(L);
+}
+
 /**
  * Select a DO (Data Object) in the current template
  *
@@ -363,17 +415,31 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             /* ----------------- Extended Header list -----------------*/
         case 0x3FFF: {
-            unsigned int len_e, len_p, len_q;
+            unsigned int len_e, len_p, len_q, len_total, value_offset;
             unsigned int endof, reset_cnt;
             gpg_key_t *keygpg = NULL;
             // fecth 4D
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_apdu_fetch_tl_safe(&t, &l)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             if (t != 0x4D) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
+            if (l > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             // fecth B8/B6/A4
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_apdu_fetch_tl_safe(&t, &l)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
+            if (l > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             reset_cnt = 0;
             switch (t) {
                 case KEY_SIG:
@@ -394,7 +460,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 break;
             }
             // fecth 7f78
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_apdu_fetch_tl_safe(&t, &l)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             if ((t != 0x7f48) || (l > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset))) {
                 sw = SWO_INCORRECT_DATA;
                 break;
@@ -402,12 +471,19 @@ int gpg_apdu_put_data(unsigned int ref) {
             len_e = 0;
             len_p = 0;
             len_q = 0;
+            len_total = 0;
             endof = G_gpg_vstate.io_offset + l;
+            sw = SWO_SUCCESS;
             while (G_gpg_vstate.io_offset < endof) {
-                gpg_io_fetch_tl(&t, &l);
-                if (G_gpg_vstate.io_offset > endof) {
-                    return SWO_INCORRECT_DATA;
+                if (!gpg_apdu_fetch_tl_safe(&t, &l)) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
                 }
+                if (G_gpg_vstate.io_offset > endof) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
+                }
+                len_total += l;
                 switch (t) {
                     case 0x91:
                         len_e = l;
@@ -427,13 +503,24 @@ int gpg_apdu_put_data(unsigned int ref) {
                     default:
                         return SWO_REFERENCED_DATA_NOT_FOUND;
                 }
+                }
+            if (sw != SWO_SUCCESS) {
+                break;
             }
             // fecth 5f78
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_apdu_fetch_tl_safe(&t, &l)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             if (t != 0x5f48) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
+            if ((l > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) || (len_total != l)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
+            value_offset = G_gpg_vstate.io_offset;
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 unsigned int e = 0;
@@ -466,6 +553,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 }
                 ksz = ksz >> 1;
 
+                if (!gpg_apdu_data_available(len_e) ||
+                    (G_gpg_vstate.io_offset + len_e > value_offset + l)) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
+                }
+
                 // fetch e
                 switch (len_e) {
                     case 4:
@@ -490,6 +583,11 @@ int gpg_apdu_put_data(unsigned int ref) {
 
                 // move p,q over pub key, this only work because adr<rsa_pub> < adr<p>
                 if ((len_p > ksz) || (len_q > ksz)) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
+                }
+                if (!gpg_apdu_data_available(len_p + len_q) ||
+                    (G_gpg_vstate.io_offset + len_p + len_q > value_offset + l)) {
                     sw = SWO_INCORRECT_DATA;
                     break;
                 }
@@ -522,7 +620,15 @@ int gpg_apdu_put_data(unsigned int ref) {
                     break;
                 }
                 ksz = gpg_curve2domainlen(curve);
-                if (ksz == len_p) {
+                if (ksz != len_p) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
+                }
+                if (!gpg_apdu_data_available(ksz) ||
+                    (G_gpg_vstate.io_offset + ksz > value_offset + l)) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
+                }
                     G_gpg_vstate.work.ecfp.private.curve = curve;
                     G_gpg_vstate.work.ecfp.private.d_len = ksz;
                     memmove(G_gpg_vstate.work.ecfp.private.d,
@@ -541,7 +647,6 @@ int gpg_apdu_put_data(unsigned int ref) {
                     if (reset_cnt) {
                         reset_cnt = 0;
                         nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
-                    }
                 }
                 sw = SWO_SUCCESS;
             }
