@@ -1076,6 +1076,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             }
 
             gpg_io_discard(0);
+            ksz = len;
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
                                      G_gpg_vstate.work.io_buffer + offset,
@@ -1103,15 +1104,14 @@ int gpg_apdu_put_key_data(unsigned int ref) {
 
             // insert privkey
             enc_len = gpg_io_fetch_u32();
-            if ((enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) ||
-                (offset + enc_len > GPG_IO_BUFFER_LENGTH)) {
+            if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
             offset = G_gpg_vstate.io_offset;
             gpg_io_discard(0);
 
-            ksz = GPG_IO_BUFFER_LENGTH;
+            ksz = sizeof(cx_ecfp_640_private_key_t);
             CX_CHECK(cx_aes_no_throw(&keyenc,
                                      CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
                                      G_gpg_vstate.work.io_buffer + offset,
