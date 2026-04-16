@@ -503,7 +503,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                     default:
                         return SWO_REFERENCED_DATA_NOT_FOUND;
                 }
-                }
+            }
             if (sw != SWO_SUCCESS) {
                 break;
             }
@@ -629,24 +629,24 @@ int gpg_apdu_put_data(unsigned int ref) {
                     sw = SWO_INCORRECT_DATA;
                     break;
                 }
-                    G_gpg_vstate.work.ecfp.private.curve = curve;
-                    G_gpg_vstate.work.ecfp.private.d_len = ksz;
-                    memmove(G_gpg_vstate.work.ecfp.private.d,
-                            G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                            ksz);
-                    CX_CHECK(cx_ecfp_generate_pair_no_throw(curve,
-                                                            &G_gpg_vstate.work.ecfp.public,
-                                                            &G_gpg_vstate.work.ecfp.private,
-                                                            1));
-                    nvm_write(&keygpg->pub_key.ecfp,
-                              &G_gpg_vstate.work.ecfp.public,
-                              sizeof(cx_ecfp_public_key_t));
-                    nvm_write(&keygpg->priv_key.ecfp,
-                              &G_gpg_vstate.work.ecfp.private,
-                              sizeof(cx_ecfp_private_key_t));
-                    if (reset_cnt) {
-                        reset_cnt = 0;
-                        nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
+                G_gpg_vstate.work.ecfp.private.curve = curve;
+                G_gpg_vstate.work.ecfp.private.d_len = ksz;
+                memmove(G_gpg_vstate.work.ecfp.private.d,
+                        G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                        ksz);
+                CX_CHECK(cx_ecfp_generate_pair_no_throw(curve,
+                                                        &G_gpg_vstate.work.ecfp.public,
+                                                        &G_gpg_vstate.work.ecfp.private,
+                                                        1));
+                nvm_write(&keygpg->pub_key.ecfp,
+                          &G_gpg_vstate.work.ecfp.public,
+                          sizeof(cx_ecfp_public_key_t));
+                nvm_write(&keygpg->priv_key.ecfp,
+                          &G_gpg_vstate.work.ecfp.private,
+                          sizeof(cx_ecfp_private_key_t));
+                if (reset_cnt) {
+                    reset_cnt = 0;
+                    nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
                 }
                 sw = SWO_SUCCESS;
             }
