@@ -34,8 +34,10 @@ venv/
 gpg_backup
 
 # Doxygen
-doc/html
 doc/latex
+
+# Generated HTML documentation (sources index.html and style.css are tracked in doc/html/)
+doc/html/build/
 
 # Virtual env for sideload (macOS and Windows)
 ledger/
