@@ -105,8 +105,10 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 break;
             }
 
-            // sign
-            if (ksz < G_gpg_vstate.io_length) {
+            // sign — require at least 11 bytes of PKCS#1 v1.5 overhead (00 01
+            // [PS>=8] 00) so that l = ksz - io_length >= 11 and the write to
+            // io_buffer[l-1] is never out-of-bounds (CWE-787).
+            if (G_gpg_vstate.io_length > ksz - 11) {
                 error = SWO_WRONG_LENGTH;
                 break;
             }
@@ -227,7 +229,7 @@ int gpg_apdu_pso() {
         // --- PSO:DEC ---
         case PSO_DEC:
         case PSO_ENC:
-            if (G_gpg_vstate.kslot->dec.UIF[0]) {
+            if (G_gpg_vstate.mse_dec->UIF[0]) {
                 if ((G_gpg_vstate.UIF_flags) == 0) {
                     ui_menu_uifconfirm_display(0);
                     return 0;
@@ -455,7 +457,7 @@ end:
  */
 int gpg_apdu_internal_authenticate() {
     // --- PSO:AUTH ---
-    if (G_gpg_vstate.kslot->aut.UIF[0]) {
+    if (G_gpg_vstate.mse_aut->UIF[0]) {
         if ((G_gpg_vstate.UIF_flags) == 0) {
             ui_menu_uifconfirm_display(0);
             return 0;

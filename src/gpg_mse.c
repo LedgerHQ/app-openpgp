@@ -67,6 +67,13 @@ int gpg_apdu_mse() {
         return SWO_WRONG_P1_P2;
     }
 
+    // MSE data must carry at least 3 bytes: tag (2) + ref (1).  An APDU
+    // shorter than that would trigger LEDGER_ASSERT inside gpg_io_fetch_*
+    // causing an os_sched_exit on device (CWE-617).
+    if ((G_gpg_vstate.io_length - G_gpg_vstate.io_offset) < 3) {
+        return SWO_WRONG_LENGTH;
+    }
+
     crt = gpg_io_fetch_u16();
     if (crt != 0x8301) {
         return SWO_INCORRECT_DATA;

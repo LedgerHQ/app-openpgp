@@ -106,6 +106,7 @@ void gpg_io_clear() {
  */
 static void gpg_io_hole(unsigned int sz) {
     LEDGER_ASSERT((G_gpg_vstate.io_length + sz) <= GPG_IO_BUFFER_LENGTH, "Bad hole!");
+    LEDGER_ASSERT(G_gpg_vstate.io_offset <= G_gpg_vstate.io_length, "Bad offset in hole!");
     memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + sz,
             G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
             G_gpg_vstate.io_length - G_gpg_vstate.io_offset);
