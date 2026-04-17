@@ -525,12 +525,13 @@ class GPGCard() :
     def seed_key(self) -> None:
         """Regenerate keys, based on seed mode"""
 
-        apdu = binascii.unhexlify(b"0047800102B600")
-        self._exchange(apdu)
-        apdu = binascii.unhexlify(b"0047800102B800")
-        self._exchange(apdu)
-        apdu = binascii.unhexlify(b"0047800102A400")
-        self._exchange(apdu)
+        for apdu_hex, name in ((b"0047800102B600", "SIG"),
+                               (b"0047800102B800", "DEC"),
+                               (b"0047800102A400", "AUT")):
+            _, sw = self._exchange(binascii.unhexlify(apdu_hex))
+            assert sw == ErrorCodes.ERR_SUCCESS, \
+                f"{name} key generation failed (sw={sw:#06x})" \
+                " — check seed mode is ON and PIN is verified"
 
 
     ############### Information decoding ###############
