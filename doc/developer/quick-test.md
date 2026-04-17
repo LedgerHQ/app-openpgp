@@ -110,7 +110,7 @@ Options:
   -h     : Displays this help
 ```
 
-> Note: This script allows to automatically use a test gpg directory, like setting `GNUGPGHOME`
+> Note: This script allows to automatically use a test gpg directory, like setting `GNUPGHOME`
 
 The `init` command allows to prepare a local `gnupg` home directory, with the default minimal config file for *scdaemon*.
 For further investigations, you can also add in the file `tests/manual/gnupg/scdaemon.conf` the following lines:
@@ -297,7 +297,7 @@ pub   rsa2048 2017-10-03 [SC]
       7FDC3D2FCD3558CB06631EAB5ED17DF289C757A2
 uid                      testkey
 sub   rsa2048 2017-10-03 [A]
-sub   rsa2047 2017-10-03 [E]
+sub   rsa2048 2017-10-03 [E]
 ```
 
 ## Step 6: Encrypt/Decrypt
@@ -330,11 +330,11 @@ killall gpg-agent scdaemon
 
 ### Decrypt
 
-Use this command to encrypt. Here, no need to specify the key...
+Use this command to decrypt. Here, no need to specify the key...
 
 ```shell
 $ gpg --homedir $(pwd)/gnupg --decrypt foo.txt.gpg > foo_dec.txt
-gpg: encrypted with 2047-bit RSA key, ID 602FE5EB7BFA4B00, created 2017-10-03
+gpg: encrypted with 2048-bit RSA key, ID 602FE5EB7BFA4B00, created 2017-10-03
 "testkey"
 $ cat foo_dec.txt
 CLEAR

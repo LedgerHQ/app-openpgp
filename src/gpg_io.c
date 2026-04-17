@@ -106,6 +106,7 @@ void gpg_io_clear() {
  */
 static void gpg_io_hole(unsigned int sz) {
     LEDGER_ASSERT((G_gpg_vstate.io_length + sz) <= GPG_IO_BUFFER_LENGTH, "Bad hole!");
+    LEDGER_ASSERT(G_gpg_vstate.io_offset <= G_gpg_vstate.io_length, "Bad offset in hole!");
     memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + sz,
             G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
             G_gpg_vstate.io_length - G_gpg_vstate.io_offset);
@@ -235,6 +236,7 @@ void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V) {
  *
  */
 unsigned int gpg_io_fetch_u32() {
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + 4) <= G_gpg_vstate.io_length, "Bad fetch u32!");
     unsigned int v32;
     v32 = U4BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
     G_gpg_vstate.io_offset += 4;
@@ -248,6 +250,7 @@ unsigned int gpg_io_fetch_u32() {
  *
  */
 unsigned int gpg_io_fetch_u24() {
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + 3) <= G_gpg_vstate.io_length, "Bad fetch u24!");
     unsigned int v24;
     v24 = ((G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 0] << 16) |
            (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 1] << 8) |
@@ -263,6 +266,7 @@ unsigned int gpg_io_fetch_u24() {
  *
  */
 unsigned int gpg_io_fetch_u16() {
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + 2) <= G_gpg_vstate.io_length, "Bad fetch u16!");
     unsigned int v16;
     v16 = U2BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
     G_gpg_vstate.io_offset += 2;
@@ -276,6 +280,7 @@ unsigned int gpg_io_fetch_u16() {
  *
  */
 unsigned int gpg_io_fetch_u8() {
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch u8!");
     unsigned int v8;
     v8 = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
     G_gpg_vstate.io_offset += 1;
@@ -290,9 +295,11 @@ unsigned int gpg_io_fetch_u8() {
  *
  */
 void gpg_io_fetch_t(unsigned int *T) {
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch tag!");
     *T = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
     G_gpg_vstate.io_offset++;
     if ((*T & 0x1F) == 0x1F) {
+        LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch tag!");
         *T = (*T << 8) | G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
         G_gpg_vstate.io_offset++;
     }
@@ -306,14 +313,17 @@ void gpg_io_fetch_t(unsigned int *T) {
  *
  */
 void gpg_io_fetch_l(unsigned int *L) {
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch len!");
     *L = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
 
     if ((*L & 0x80) != 0) {
         *L &= 0x7F;
         if (*L == 1) {
+            LEDGER_ASSERT((G_gpg_vstate.io_offset + 2) <= G_gpg_vstate.io_length, "Bad fetch len!");
             *L = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 1];
             G_gpg_vstate.io_offset += 2;
         } else if (*L == 2) {
+            LEDGER_ASSERT((G_gpg_vstate.io_offset + 3) <= G_gpg_vstate.io_length, "Bad fetch len!");
             *L = U2BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset + 1);
             G_gpg_vstate.io_offset += 3;
         } else {
@@ -346,8 +356,12 @@ void gpg_io_fetch_tl(unsigned int *T, unsigned int *L) {
  *
  */
 void gpg_io_fetch_nv(unsigned char *buffer, int len) {
-    nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
-    G_gpg_vstate.io_offset += len;
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + len) <= (int) G_gpg_vstate.io_length, "Bad fetch!");
+    LEDGER_ASSERT(len >= 0, "Negative fetch length!");
+    if (buffer) {
+        nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+        G_gpg_vstate.io_offset += len;
+    }
 }
 
 /**
@@ -359,10 +373,12 @@ void gpg_io_fetch_nv(unsigned char *buffer, int len) {
  *
  */
 int gpg_io_fetch(unsigned char *buffer, int len) {
+    LEDGER_ASSERT((G_gpg_vstate.io_offset + len) <= (int) G_gpg_vstate.io_length, "Bad fetch!");
+    LEDGER_ASSERT(len >= 0, "Negative fetch length!");
     if (buffer) {
         memmove(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+        G_gpg_vstate.io_offset += len;
     }
-    G_gpg_vstate.io_offset += len;
     return len;
 }
 

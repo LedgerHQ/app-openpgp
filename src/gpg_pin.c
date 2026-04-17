@@ -134,8 +134,11 @@ int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsig
 int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     cx_sha256_t sha256;
     cx_err_t error = CX_INTERNAL_ERROR;
-    gpg_pin_t newpin;
+    gpg_pin_t newpin = {0};
 
+    // Preserve the logical PIN reference so that subsequent operations
+    // (length checks, verified-state indexing) stay consistent (CWE-457).
+    newpin.ref = pin->ref;
     cx_sha256_init(&sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &sha256, CX_LAST, pin_val, pin_len, newpin.value, 32));
     newpin.length = pin_len;
@@ -143,6 +146,7 @@ int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
 
     nvm_write(pin, &newpin, sizeof(gpg_pin_t));
 end:
+    explicit_bzero(&newpin, sizeof(newpin));
     if (error != CX_OK) {
         return error;
     }

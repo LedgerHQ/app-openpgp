@@ -220,8 +220,10 @@ The full menu layout is:
  | About
 
 | Emphasis entries are not selectable and just provide information.
-| A "**#**" after the entry label means default value on reset.
-| A "**+**" after the entry label means current value.
+
+*Nano:* A "**#**" suffix indicates the default value on reset; a "**+**" suffix indicates the current value.
+
+*Wallet (Stax, Flex):* The default value is indicated by a "**[default]**" label.
 
 
 Device Info
@@ -258,7 +260,7 @@ Settings
 Key Template
 ~~~~~~~~~~~~
 
-A key template is defined by the OpenGPG card application specification.
+A key template is defined by the OpenPGP card application specification.
 It describes the key to be generated with the ``generate`` command in ``gpg --card-edit``
 
 To set up a new ECC template you have three choices:
@@ -383,37 +385,57 @@ device.
 
 **On Screen**
 
-The PIN is entered on the device screen. For entering the PIN on Nano devices, choose the
-next digit by using the left or right button. When the digit you expect is displayed
-select it by pressing both buttons at the same time.
+The PIN is entered directly on the device screen.
+
+*Nano*
+
+Choose the next digit by using the left or right button. When the digit you expect is
+displayed, select it by pressing both buttons at the same time.
 
 .. image:: pin_entry.png
    :align: middle
 
-Once all digits are selected, validate the PIN by selecting the **'V'** (Validate)
-letter
+Once all digits are selected, validate the PIN by selecting the **'V'** (Validate) letter.
 
 .. image:: pin_validate.png
    :align: middle
 
-If you want to change the previous digit select the **'C'** (Cancel) letter.
+If you want to change the previous digit, select the **'C'** (Cancel) letter.
 
 .. image:: pin_cancel.png
    :align: middle
 
-Finally if you want to abort the PIN entry, select the **'A'** (Abort) letter.
+Finally, if you want to abort the PIN entry, select the **'A'** (Abort) letter.
 
 .. image:: pin_abort.png
+   :align: middle
+
+*Wallet (Stax, Flex, Apex)*
+
+Enter the PIN using the touch screen keyboard, then confirm.
+
+.. image:: pin_wallet.png
    :align: middle
 
 **Confirm only**
 
 The user is requested, on the device screen, to confirm the PIN validation.
-The PIN value is not required, the user just has to push the *REJECT* or *OK* button on the device.
+The PIN value is not required.
 
 This is the default mode after application installation.
 
+*Nano*
+
+Push the *REJECT* or *OK* button on the device.
+
 .. image:: pin_confirm.png
+   :align: middle
+
+*Wallet (Stax, Flex, Apex)*
+
+Tap the *REJECT* or *OK* button on the screen.
+
+.. image:: pin_confirm_wallet.png
    :align: middle
 
 **Trust**
@@ -427,7 +449,8 @@ UIF mode
 By activating UIF mode for either signature, decryption or authentication, a user validation
 will be ask by the device each time the related operation is performed.
 
-To activate or deactivate the UIF, select the operation to protect and press both button.
+To activate or deactivate the UIF, select the operation to protect and confirm on the device
+(press both buttons on Nano, or tap on Wallet devices).
 When activated, a '+' symbol appears after the operation name.
 
 Reset
@@ -444,7 +467,7 @@ OpenPGP Card application usage
 GPG
 ---
 
-The OpenGPG Card application need at least version 2.1.19 for full support.
+The OpenPGP Card application need at least version 2.1.19 for full support.
 A version prior to 2.1.19 will fail when using ECC.
 
 As indicated in the introduction, best practice is to use at least version 2.4.0 of GnuPG.
@@ -1148,7 +1171,7 @@ The *usage* field tells you each key purpose:
 The *card-no* field provides you with the serial number of the card on which the key are stored.
 You should have 3 or less keys with the same serial. These are the keys we want to restore.
 
-For each key you also have the key template (*rsa2048*, *rsa3072*, *rsa4096*, *ed2559*, *cv25519*) followed by the
+For each key you also have the key template (*rsa2048*, *rsa3072*, *rsa4096*, *ed25519*, *cv25519*) followed by the
 short fingerprint, e.g. ``ed25519/8451AAF7D43D1095``
 
 Please note the serial and the 3 key template names: ``FD6C11BE`` , ``ed25519:cv25519:ed25519``.
@@ -1180,7 +1203,7 @@ Plug your device and run the OpenPGP application.
 
 Finally run the following command:
 
- | ``python3 -m gpgcard.gpgcli --pinpad --set-template ed255519:cv25519:ed255519 --set-fingerprints``
+ | ``python3 -m gpgcard.gpgcli --pinpad --set-templates ed25519:cv25519:ed25519 --set-fingerprints``
  |   ``'2C688345BDDA0EDFB24DB4FB8451AAF7D43D1095:DF157BD4AC3BD1EE991099C80953D871FC4B9EA4:CEC59AE6A76614BC3C6D37D9C5A8FB078520ABBB'``
  |   ``--serial 'FD6C11BE' --seed-key``
 

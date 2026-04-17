@@ -16,9 +16,11 @@
 #  limitations under the License.
 #*****************************************************************************
 
+import base64
 import binascii
+import os
 from datetime import datetime, timezone
-import pickle
+import json
 from hashlib import sha1
 from typing import Optional, Tuple
 from dataclasses import dataclass, field
@@ -145,6 +147,7 @@ class GPGCard() :
         self.slot_config: bytes = bytes(3)
         self.data: CardInfo = CardInfo()
         self.data.reset()
+        self._last_sent_was_key_read: bool = False
 
     def connect(self, device: str) -> None:
         """Connect to the selected Reader
@@ -186,6 +189,28 @@ class GPGCard() :
         """
 
         if self.log:
+            # Redact APDUs that carry PINs or key material to avoid
+            # leaking secrets into terminal output or CI logs.
+            # INS bytes covered: VERIFY (0x20), CHANGE REFERENCE DATA (0x24),
+            # RESET RETRY COUNTER (0x2C), PUT DATA (0xDA).
+            _SENSITIVE_INS = {0x20, 0x24, 0x2C, 0xDA}
+            # GET DATA (INS=0xCA) for private-key DOs B6/A4/B8 returns key
+            # material; redact the following recv response too (CWE-532).
+            _KEY_READ_DOS = {0xB6, 0xA4, 0xB8}
+            if mode == "send":
+                if len(data) > 1 and data[1] in _SENSITIVE_INS:
+                    print(f"{mode}: [REDACTED SENSITIVE APDU ins={data[1]:02x}]")
+                    return
+                self._last_sent_was_key_read = (
+                    len(data) >= 4 and data[1] == 0xCA
+                    and data[2] == 0x00 and data[3] in _KEY_READ_DOS
+                )
+            elif mode == "recv":
+                if self._last_sent_was_key_read:
+                    self._last_sent_was_key_read = False
+                    print(f"{mode}: [REDACTED KEY MATERIAL sw={sw:04x}]")
+                    return
+                self._last_sent_was_key_read = False
             sw_code = f" ({sw:04x})" if mode == "recv" else ""
             print(f"{mode}:{sw_code} {''.join([f'{b:02x}' for b in data])}")
 
@@ -322,20 +347,43 @@ class GPGCard() :
             file_name (str): Backup filename
         """
 
+        def _b64(b: bytes) -> str:
+            return base64.b64encode(b).decode("ascii")
+
+        def _key_slot(slot) -> dict:
+            return {
+                "key":          _b64(slot.key),
+                "uif":          slot.uif,
+                "attribute":    _b64(slot.attribute),
+                "date":         str(slot.date),
+                "fingerprint":  _b64(slot.fingerprint),
+                "ca_fingerprint": _b64(slot.ca_fingerprint),
+                "cert":         slot.cert,
+            }
+
         self.get_all()
-        with open(file_name, mode="w+b") as f:
-            pickle.dump(
-                (self.data.AID, self.data.PW_status, self.data.rsa_pub_exp, self.data.digital_counter,
-                self.data.private_01, self.data.private_02,
-                self.data.private_03, self.data.private_04,
-                self.data.name, self.data.login, self.data.salutation, self.data.url, self.data.lang,
-                self.data.sig.key, self.data.sig.uif, self.data.sig.attribute, self.data.sig.date,
-                self.data.sig.fingerprint, self.data.sig.ca_fingerprint, self.data.sig.cert,
-                self.data.dec.key, self.data.dec.uif, self.data.dec.attribute, self.data.dec.date,
-                self.data.dec.fingerprint, self.data.dec.ca_fingerprint, self.data.dec.cert,
-                self.data.aut.key, self.data.aut.uif, self.data.aut.attribute, self.data.aut.date,
-                self.data.aut.fingerprint, self.data.aut.ca_fingerprint, self.data.aut.cert),
-                f, pickle.HIGHEST_PROTOCOL)
+        payload = {
+            "version":         1,
+            "AID":             self.data.AID,
+            "PW_status":       _b64(self.data.PW_status),
+            "rsa_pub_exp":     self.data.rsa_pub_exp,
+            "digital_counter": self.data.digital_counter,
+            "private_01":      _b64(self.data.private_01),
+            "private_02":      _b64(self.data.private_02),
+            "private_03":      _b64(self.data.private_03),
+            "private_04":      _b64(self.data.private_04),
+            "name":            self.data.name,
+            "login":           self.data.login,
+            "salutation":      self.data.salutation,
+            "url":             self.data.url,
+            "lang":            self.data.lang,
+            "sig":             _key_slot(self.data.sig),
+            "dec":             _key_slot(self.data.dec),
+            "aut":             _key_slot(self.data.aut),
+        }
+        fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, mode="w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
 
 
     def restore(self, file_name: str) -> None:
@@ -345,16 +393,35 @@ class GPGCard() :
             file_name (str): Backup filename
         """
 
-        with open(file_name, mode="r+b") as f:
-            (self.data.AID, self.data.PW_status, self.data.rsa_pub_exp, self.data.digital_counter,
-            self.data.private_01, self.data.private_02, self.data.private_03, self.data.private_04,
-            self.data.name, self.data.login, self.data.salutation, self.data.url, self.data.lang,
-            self.data.sig.key, self.data.sig.uif, self.data.sig.attribute, self.data.sig.date,
-            self.data.sig.fingerprint, self.data.sig.ca_fingerprint, self.data.sig.cert,
-            self.data.dec.key, self.data.dec.uif, self.data.dec.attribute, self.data.dec.date,
-            self.data.dec.fingerprint, self.data.dec.ca_fingerprint, self.data.dec.cert,
-            self.data.aut.key, self.data.aut.uif, self.data.aut.attribute, self.data.aut.date,
-            self.data.aut.fingerprint, self.data.aut.ca_fingerprint, self.data.aut.cert) = pickle.load(f)
+        def _fromb64(s: str) -> bytes:
+            return base64.b64decode(s)
+
+        with open(file_name, mode="r", encoding="utf-8") as f:
+            payload = json.load(f)
+
+        self.data.AID             = payload["AID"]
+        self.data.PW_status       = _fromb64(payload["PW_status"])
+        self.data.rsa_pub_exp     = int(payload["rsa_pub_exp"])
+        self.data.digital_counter = int(payload["digital_counter"])
+        self.data.private_01      = _fromb64(payload["private_01"])
+        self.data.private_02      = _fromb64(payload["private_02"])
+        self.data.private_03      = _fromb64(payload["private_03"])
+        self.data.private_04      = _fromb64(payload["private_04"])
+        self.data.name            = payload["name"]
+        self.data.login           = payload["login"]
+        self.data.salutation      = payload["salutation"]
+        self.data.url             = payload["url"]
+        self.data.lang            = payload["lang"]
+        for slot_name in ("sig", "dec", "aut"):
+            raw = payload[slot_name]
+            slot = getattr(self.data, slot_name)
+            slot.key            = _fromb64(raw["key"])
+            slot.uif            = int(raw["uif"])
+            slot.attribute      = _fromb64(raw["attribute"])
+            slot.date           = datetime.strptime(raw["date"], "%Y-%m-%d %H:%M:%S")
+            slot.fingerprint    = _fromb64(raw["fingerprint"])
+            slot.ca_fingerprint = _fromb64(raw["ca_fingerprint"])
+            slot.cert           = raw["cert"]
 
         self._put_data(DataObject.DO_AID,        bytes.fromhex(self.data.AID[20:28]))
         self._put_data(DataObject.DO_PW_STATUS,  self.data.PW_status)
@@ -458,12 +525,13 @@ class GPGCard() :
     def seed_key(self) -> None:
         """Regenerate keys, based on seed mode"""
 
-        apdu = binascii.unhexlify(b"0047800102B600")
-        self._exchange(apdu)
-        apdu = binascii.unhexlify(b"0047800102B800")
-        self._exchange(apdu)
-        apdu = binascii.unhexlify(b"0047800102A400")
-        self._exchange(apdu)
+        for apdu_hex, name in ((b"0047800102B600", "SIG"),
+                               (b"0047800102B800", "DEC"),
+                               (b"0047800102A400", "AUT")):
+            _, sw = self._exchange(binascii.unhexlify(apdu_hex))
+            assert sw == ErrorCodes.ERR_SUCCESS, \
+                f"{name} key generation failed (sw={sw:#06x})" \
+                " — check seed mode is ON and PIN is verified"
 
 
     ############### Information decoding ###############

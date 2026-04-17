@@ -77,7 +77,13 @@ Keys Slots
 
 To modify the keys slot, just select the corresponding menu from the screen.
 
+*Nano*
+
 .. image:: slots.png
+
+*Wallet (Stax, Flex)*
+
+.. image:: slots_wallet.png
 
 Random number generation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -235,8 +241,6 @@ The data payload is formatted as follow:
   +-------+--------------------------+
   | 4     | API Level                |
   +-------+--------------------------+
-  | 4     | compliance Level         |
-  +-------+--------------------------+
   | 4     | public key size          |
   +-------+--------------------------+
   | var   | public key               |
@@ -270,7 +274,7 @@ of *01F1*.
   | 3     | Allowed slot selection method    | R/W   |
   +-------+----------------------------------+-------+
 
-Byte 3 is endoced as follow:
+Byte 3 is encoded as follow:
 
   +----+----+----+----+----+----+----+----+-------------------------+
   | b8 | b7 | b6 | b5 | b4 | b3 | b2 | b1 | Meaning                 |

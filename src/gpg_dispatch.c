@@ -288,11 +288,11 @@ int gpg_dispatch() {
 
         case INS_TERMINATE_DF:
             gpg_io_discard(0);
-            if (gpg_pin_is_verified(PIN_ID_PW3) || (N_gpg_pstate->PW3.counter == 0)) {
-                gpg_install(STATE_TERMINATE);
-                return SWO_SUCCESS;
+            if (!gpg_pin_is_verified(PIN_ID_PW3)) {
+                return SWO_CONDITIONS_NOT_SATISFIED;
             }
-            return SWO_CONDITIONS_NOT_SATISFIED;
+            gpg_install(STATE_TERMINATE);
+            return SWO_SUCCESS;
     }
 
     /* Other commands allowed if not terminated */
