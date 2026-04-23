@@ -284,10 +284,24 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     if (keygpg->pub_key.ecfp.W_len == 0) {
         return SWO_REFERENCED_DATA_NOT_FOUND;
     }
+    // W_len comes from imported key material and is attacker-controlled: reject any
+    // value that would over-read the stored union or overflow the work IO buffer used
+    // as memmove destination below (offset 128).
+    if ((keygpg->pub_key.ecfp.W_len > sizeof(keygpg->pub_key.ecfp640.W)) ||
+        (keygpg->pub_key.ecfp.W_len > (GPG_IO_BUFFER_LENGTH - 128))) {
+        return SWO_INCORRECT_DATA;
+    }
     gpg_io_discard(1);
     gpg_io_mark();
     curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
     if (curve == CX_CURVE_Ed25519) {
+        // cx_edwards_compress_point_no_throw is called with a hardcoded length of 65
+        // (uncompressed SEC1 point: 0x04 || X(32) || Y(32)). Enforce that the imported
+        // key matches this exact format, otherwise the compression would consume
+        // uninitialized bytes from the IO buffer or a malformed point.
+        if ((keygpg->pub_key.ecfp.W_len != 65) || (keygpg->pub_key.ecfp.W[0] != 0x04)) {
+            return SWO_INCORRECT_DATA;
+        }
         memmove(G_gpg_vstate.work.io_buffer + 128,
                 keygpg->pub_key.ecfp.W,
                 keygpg->pub_key.ecfp.W_len);
