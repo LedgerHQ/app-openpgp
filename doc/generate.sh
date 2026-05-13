@@ -18,6 +18,7 @@ OPTIONS=(
     "--toc"
     "--number-sections"
     "--template=template.latex"
+    "--lua-filter=${SCRIPT_DIR}/admonitions.lua"
 )
 
 for name in "${NAMES[@]}"; do

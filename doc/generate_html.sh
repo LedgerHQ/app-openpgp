@@ -21,6 +21,7 @@ COMMON_OPTIONS=(
     "--to=html5"
     "--css=${CSS}"
     "--metadata=lang:en"
+    "--lua-filter=${SCRIPT_DIR}/admonitions.lua"
 )
 
 echo "Generating app-openpgp.html..."

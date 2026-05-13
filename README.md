@@ -16,6 +16,28 @@ The application supports:
 - EDDSA with Ed25519 curve
 - ECDH with secp256R1, secp256K1 and curve25519 curves
 
+> [!CAUTION]
+> **⚠️ Data loss on App or OS update.**
+>
+> All keys and metadata stored on the device are wiped whenever the App is reinstalled,
+> which happens during any App update and during any OS update.
+> A backup/restore script is provided, but it is **not trivial to use and does not work in every scenario**.
+> See [Known limitations](#known-limitations) before you generate keys you cannot afford to lose.
+
+## Table of Contents
+
+- [Installation and Usage](#installation-and-usage)
+- [Add-on](#add-on)
+  - [Key slot](#key-slot)
+  - [Seeded key generation](#seeded-key-generation)
+  - [On screen reset](#on-screen-reset)
+- [Quick start guide](#quick-start-guide)
+- [Compilation and load](#compilation-and-load)
+- [Tests](#tests)
+- [Documentation](#documentation)
+- [Continuous Integration](#continuous-integration)
+- [Known limitations](#known-limitations)
+
 ## Installation and Usage
 
 See the full doc in [rst](doc/user/app-openpgp.rst), or in [pdf](<https://github.com/LedgerHQ/app-openpgp/blob/master/doc/user/app-openpgp.pdf>)
@@ -52,7 +74,10 @@ In this mode, key material is generated from the global token seed.
 
 Also, a backup/restore mechanism is provided. Please report to the [Documentation](#documentation).
 
-> Warning: Without such configuration, an OS or App update will cause your private key to be lost!"
+> [!WARNING]
+> **⚠️ Without one of these mechanisms in place, an OS or App update will wipe your private keys.**
+>
+> See [Known limitations](#known-limitations) for the full picture.
 
 The following is a repeatable process that will generate the same keys and fingerprints
 (even with different card serial numbers).
@@ -325,9 +350,36 @@ It outputs 3 artifacts:
 
 ## Known limitations
 
-Today, the current App has no documented limitations.
+### Data loss on App or OS update
 
-But, we have removed the **Historical Bytes** from the initial `GET_DATA` command:
+> [!CAUTION]
+> **⚠️ On-device data is wiped on every App or OS update.**
+>
+> The OpenPGP App stores all keys and metadata in the App's own non-volatile memory.
+> Anything generated or imported on the device — private keys, fingerprints, key templates,
+> cardholder data, PIN counters, etc. — is **erased** whenever the App is reinstalled.
+> This happens in two common situations:
+>
+> - when the App itself is updated to a new version,
+> - when the device OS is updated, since the App is reinstalled as part of the OS update flow.
+>
+> A backup/restore script is shipped in [`pytools/`](pytools/) and documented in the
+> [user documentation](doc/user/app-openpgp.rst).
+> It is, however, **not trivial to operate and is not guaranteed to work in every scenario**
+> (in particular, private-key restore only works if **SEED mode** was enabled when the backup was taken).
+>
+> Until a permanent on-device storage mechanism is available, **using the OpenPGP App in production
+> requires that you are comfortable with this constraint**. Concretely:
+>
+> - enable **SEED mode** before generating any key, so keys can be regenerated deterministically,
+> - take a backup with the provided script **before every App or OS update**,
+> - never store on the device a key you cannot afford to lose or regenerate.
+>
+> This limitation is structural and is not specific to a given release.
+
+### Historical Bytes removed from `GET_DATA`
+
+We have removed the **Historical Bytes** from the initial `GET_DATA` command:
 
 > Issue: The application freezes during GPG initialization (command `GET_DATA` `0x6E`) when using a hybrid ECC key configuration.
 >
