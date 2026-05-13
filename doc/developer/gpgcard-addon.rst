@@ -101,6 +101,19 @@ Key Backup
 
 A full key backup mechanism is provided.
 
+.. danger::
+   **On-device data is wiped on every App or OS update.**
+
+   The OpenPGP App stores all keys and metadata in its own non-volatile memory. Anything
+   generated or imported on the device is erased whenever the App is reinstalled, which
+   happens during any App update and during any OS update.
+
+   The backup/restore mechanism described here (and the companion ``pytools`` script) is,
+   today, the only available mitigation. It is **not trivial to operate and not guaranteed
+   to work in every scenario** — private-key restore in particular only works when
+   **SEED mode** was enabled when the backup was taken. It remains a procedure reserved
+   to advanced users.
+
 
 Ledger OpenPGP Application
 ==========================

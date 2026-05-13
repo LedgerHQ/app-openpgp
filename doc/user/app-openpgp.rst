@@ -60,6 +60,31 @@ This release has known missing parts (see also [GPGADD]_):
 - Seed mode ON/OFF via apdu
 
 
+.. danger::
+   **On-device data is wiped on every App or OS update.**
+
+   All keys and metadata stored on the device — private keys, fingerprints, key templates,
+   cardholder data, PIN counters, etc. — are **erased** whenever the OpenPGP App is reinstalled.
+   This happens in two common situations:
+
+   - when the App itself is updated to a new version,
+   - when the device OS is updated, since the App is reinstalled as part of the OS update flow.
+
+   A backup/restore script is provided (see `Backup and Restore`_ and `Backup tool`_),
+   but it is **not trivial to operate and is not guaranteed to work in every scenario**.
+   In particular, private-key restore only works if **SEED mode** was enabled when the
+   backup was taken.
+
+   Until a permanent on-device storage mechanism is available, using the OpenPGP App in
+   production requires that you are comfortable with this constraint. Concretely:
+
+   - enable **SEED mode** before generating any key, so keys can be regenerated
+     deterministically,
+   - take a backup with the provided script **before every App or OS update**,
+   - never store on the device a key you cannot afford to lose or regenerate.
+
+   This limitation is structural and is not specific to a given release.
+
 
 How to install GPG Application
 ==============================
@@ -1119,6 +1144,12 @@ Introduction
 The OpenPGP card specification does not provide any mechanism for backuping you key.
 Thus if you generate your keys on device and loose it, you definitively loose you private key.
 
+.. danger::
+   The same data loss happens on **every App update and every OS update**: the OpenPGP App
+   is reinstalled in both cases, and all keys and metadata stored on the device are wiped.
+   You must take a backup (or rely on **SEED mode**) **before** any update, otherwise the
+   on-device material is gone for good.
+
 In order to avoid such extreme panic situation, a backup/restore mechanism is provided.
 At any time you can backup a snapshot of your device data, including your private keys.
 All public data are retrieve in clear form. The private key are stored
@@ -1127,6 +1158,11 @@ encrypted with a key derived from your seed, i.e. from your 24 BIP words.
 The backup/restore tool is located in ``pytools`` directory.
 
 See `Tools` later in this document for the tools details and usage.
+
+.. warning::
+   This backup/restore script is **not trivial to operate and is not guaranteed to work
+   in every scenario**. It is, today, the only available mitigation against data loss on
+   App or OS update, and remains a procedure reserved to advanced users.
 
 Note: The keys backup will work *only* if the SEED Mode is enabled!
 
