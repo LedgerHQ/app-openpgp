@@ -1,0 +1,13 @@
+# Codecov configuration — https://docs.codecov.com/docs/codecovyml-reference
+#
+# Paths excluded from Codecov's reports and PR comments (both the PR head and
+# the comparison base). This mirrors the exclusions applied to the lcov
+# tracefile by the unit-tests workflow, so the unit-test sources and the
+# vendored plugin SDK never show up on Codecov.
+#
+# Note: this only affects Codecov's view. The authoritative filtering happens in
+# the workflow (test directory is always removed; the SDK via the
+# `coverage_exclude_paths` input), which keeps these paths out of the coverage
+# artifact, the Cobertura report and the job summary as well.
+ignore:
+  - "tests"               # unit-test sources
