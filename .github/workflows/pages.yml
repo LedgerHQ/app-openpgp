@@ -37,7 +37,8 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          # Node >= 22.5: pnpm 11 loads node:sqlite, which older Node lacks.
+          node-version: '22'
 
       - name: Build the backup web UI
         working-directory: clients/wui
