@@ -20,4 +20,3 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_lint.yml@v1
     with:
       source: './src'
-      extensions: 'h,c'
