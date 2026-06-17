@@ -88,7 +88,10 @@ def entrypoint() -> None:
         gpgcard.log_apdu(args.apdu)
         gpgcard.connect(args.reader)
 
+        # PW2 (same value as PW1) is required to read/write the private DOs
+        # 0x0101 and 0x0103; verifying only PW1+PW3 silently loses them.
         if not gpgcard.verify_pin(PassWord.PW1, args.user_pin, args.pinpad) or \
+           not gpgcard.verify_pin(PassWord.PW2, args.user_pin, args.pinpad) or \
            not gpgcard.verify_pin(PassWord.PW3, args.adm_pin,  args.pinpad):
             raise GPGCardExcpetion(0, "PIN not verified")
 
