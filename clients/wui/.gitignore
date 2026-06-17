@@ -1,0 +1,18 @@
+# dependencies
+/node_modules
+
+# production
+/dist
+
+# local tooling
+.mcp.json
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+pnpm-debug.log*

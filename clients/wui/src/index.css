@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Lumen's Dialog uses the Tailwind v4 class `translate-[-50%]` which maps to
+   the CSS `translate` property.  This project runs Tailwind v3 where that
+   utility is not generated, so the dialog ends up positioned at 50%/50%
+   without the centering offset.  Polyfill it here. */
+.\-translate-x-1\/2.\-translate-y-1\/2,
+.translate-\[-50\%\] {
+  transform: translate(-50%, -50%);
+}

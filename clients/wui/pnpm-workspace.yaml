@@ -1,0 +1,7 @@
+# pnpm 11 reads settings from here (not the package.json "pnpm" field nor, for
+# these keys, .npmrc).
+
+# Dependencies whose postinstall build scripts are allowed to run. esbuild
+# needs to install its platform binary; the others are harmless to allow.
+allowBuilds:
+  esbuild: true
