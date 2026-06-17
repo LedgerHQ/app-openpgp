@@ -1,8 +1,8 @@
 #pragma once
 
-#define U2(hi, lo) ((((hi) &0xFFu) << 8) | ((lo) &0xFFu))
+#define U2(hi, lo) ((((hi) & 0xFFu) << 8) | ((lo) & 0xFFu))
 #define U4(hi3, hi2, lo1, lo0) \
-    ((((hi3) &0xFFu) << 24) | (((hi2) &0xFFu) << 16) | (((lo1) &0xFFu) << 8) | ((lo0) &0xFFu))
+    ((((hi3) & 0xFFu) << 24) | (((hi2) & 0xFFu) << 16) | (((lo1) & 0xFFu) << 8) | ((lo0) & 0xFFu))
 static inline uint16_t U2BE(const uint8_t *buf, size_t off) {
     return (buf[off] << 8) | buf[off + 1];
 }

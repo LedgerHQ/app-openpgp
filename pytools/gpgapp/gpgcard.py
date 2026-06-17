@@ -438,8 +438,10 @@ class GPGCard() :
         if len(self.data.salutation) == 0:
             self._put_data(DataObject.DO_CARD_SALUTATION, b'\x30')
         else:
+            # The salutation DO (ISO 5218) holds an ASCII digit ("1"/"2"), as
+            # written by set_salutation(); fromhex() here would raise.
             self._put_data(DataObject.DO_CARD_SALUTATION,
-                           bytes.fromhex(USER_SALUTATION[self.data.salutation]))
+                           USER_SALUTATION[self.data.salutation].encode("utf-8"))
 
         self._put_data(DataObject.DO_SIG_ATTR,   self.data.sig.attribute)
         self._put_data(DataObject.DO_DEC_ATTR,   self.data.dec.attribute)
@@ -449,7 +451,9 @@ class GPGCard() :
         self._put_data(DataObject.DO_UIF_DEC,    self.data.dec.uif.to_bytes(2, "little"))
         self._put_data(DataObject.DO_UIF_AUT,    self.data.aut.uif.to_bytes(2, "little"))
 
-        self._put_data(DataObject.DO_SIG_COUNT,  self.data.digital_counter.to_bytes(4, "big"))
+        # The digital signature counter (DO 0x93) is read-only on the card (no
+        # write access path in the firmware): kept in the backup for reference
+        # but not written back here.
         self._put_data(DataObject.CMD_RSA_EXP,   self.data.rsa_pub_exp.to_bytes(4, "little"))
 
         self._put_data(DataObject.DO_CERT, self.data.aut.cert.encode("utf-8"))
@@ -1301,7 +1305,7 @@ class GPGCard() :
                 if (l & 0x7f) == 1:
                     l = tlv[o + 1]
                     o += 2
-                if (l & 0x7f) == 2:
+                elif (l & 0x7f) == 2:
                     l = self._get_int(tlv, offset=o + 1)
                     o += 3
             else:

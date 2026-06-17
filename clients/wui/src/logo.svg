@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- OpenPGP app glyph: padlock with a smartcard chip (see glyphs/gpg_64px.gif) -->
+  <path d="M22 30 V23 a10 10 0 0 1 20 0 V30" fill="none" stroke="#41ccb4"
+        stroke-width="5" stroke-linecap="round" />
+  <rect x="15" y="29" width="34" height="26" rx="5" fill="#41ccb4" />
+  <g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round">
+    <rect x="25" y="35" width="14" height="14" rx="2.5" />
+    <rect x="29.5" y="39.5" width="5" height="5" rx="1" />
+    <path d="M32 35 V39.5 M32 44.5 V49 M25 42 H29.5 M34.5 42 H39" />
+  </g>
+</svg>

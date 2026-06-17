@@ -7,39 +7,43 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        args: ['--markdown-linebreak-ext=md']
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: check-added-large-files
+        exclude: 'pnpm-lock\.yaml$'
       - id: check-merge-conflict
       - id: check-case-conflict
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.2
     hooks:
       - id: codespell
         args: ['--ignore-words-list', 'ontop']
+        exclude: 'pnpm-lock\.yaml$'
 
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v14.0.6
+    rev: v21.1.8
     hooks:
       - id: clang-format
         types_or: [c]
 
   - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
-    rev: v1.7.7.24
+    rev: v1.7.12.24
     hooks:
       - id: actionlint
         types_or: [yaml]
         args: [-shellcheck='' -pyflakes='']
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.13.0
+    rev: v0.22.1
     hooks:
       - id: markdownlint-cli2
         types_or: [markdown]
+        exclude: CHANGELOG.md
 
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.3.8
+    rev: v4.0.5
     hooks:
       - id: pylint
         name: Check python Client
