@@ -24,7 +24,7 @@ help() {
   echo
   echo "Options:"
   echo
-  echo "  -c <init|reset|card|status|encrypt|decrypt|sign|verify|default>  : Requested command"
+  echo "  -c <init|reset|reset_all|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|default>  : Requested command"
   echo "  -e     : Expert mode"
   echo "  -v     : Verbose mode"
   echo "  -h     : Displays this help"
@@ -38,7 +38,19 @@ help() {
 #
 #===============================================================================
 reset() {
-  # Kill running process
+  # Kill the test homedir agent/scdaemon only, leaving the prod ~/.gnupg
+  # agent (and its cached passphrases) untouched.
+  gpgconf --homedir "${gnupg_home_dir}" --kill all 2>/dev/null
+}
+
+#===============================================================================
+#
+#     reset_all - Kill every gpg-agent/scdaemon on the machine
+#
+#===============================================================================
+reset_all() {
+  # Global kill, including the prod ~/.gnupg agent: useful to free the card
+  # reader when a backup/restore leaves a daemon holding the token.
   killall scdaemon gpg-agent 2>/dev/null
 }
 
@@ -96,6 +108,11 @@ init() {
       echo debug-all
     } >> "${dir}/scdaemon.conf"
   fi
+
+  # Enable ssh-agent emulation, needed to exercise the AUT key
+  {
+    echo enable-ssh-support
+  } > "${dir}/gpg-agent.conf"
 
   gpgconf --reload scdaemon
 }
@@ -199,6 +216,65 @@ verify() {
 
 #===============================================================================
 #
+#     sign_verify - Sign a file then verify its signature (SIG key roundtrip)
+#
+#===============================================================================
+sign_verify() {
+  sign
+  verify
+}
+
+#===============================================================================
+#
+#     encrypt_decrypt - Encrypt a file then decrypt it back (DEC key roundtrip)
+#
+#===============================================================================
+encrypt_decrypt() {
+  encrypt
+  decrypt
+}
+
+#===============================================================================
+#
+#     authenticate - Exercise the AUT key through gpg-agent ssh support
+#
+#===============================================================================
+authenticate() {
+  reset
+  rm -fr foo*
+
+  # gpg-agent must expose the card auth key on its ssh socket
+  export GNUPGHOME="${gnupg_home_dir}"
+  gpg-connect-agent updatestartuptty /bye >/dev/null
+  SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket)
+  export SSH_AUTH_SOCK
+
+  # Retrieve the public AUT key advertised by the card
+  if ! ssh-add -L > foo_auth.pub 2>/dev/null || [[ ! -s foo_auth.pub ]]; then
+    echo "No authentication key exposed by the card!"
+    echo "(check the card 'Authentication key' and that the AUT key is generated)"
+    rm -fr foo*
+    return 1
+  fi
+
+  [[ ${VERBOSE} == true ]] && cat foo_auth.pub
+
+  # Sign a file with the card AUT key (via the agent), then verify it
+  echo CLEAR > foo.txt
+  echo "test@ledger.fr $(cat foo_auth.pub)" > foo_allowed
+
+  ssh-keygen -Y sign -f foo_auth.pub -n file foo.txt
+
+  if ssh-keygen -Y verify -f foo_allowed -I test@ledger.fr -n file -s foo.txt.sig < foo.txt; then
+    echo "Success !"
+  else
+    echo "Authentication error!"
+  fi
+  rm -fr foo*
+}
+
+#===============================================================================
+#
 #     Parsing parameters
 #
 #===============================================================================
@@ -212,7 +288,7 @@ while getopts ":c:evh" opt; do
 
     c)
       case ${OPTARG} in
-        init|reset|card|status|encrypt|decrypt|sign|verify|default)
+        init|reset|reset_all|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|default)
           CMD=${OPTARG}
           ;;
         *)
