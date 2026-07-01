@@ -4,6 +4,7 @@
 """
 This module provides Ragger tests for Version check
 """
+
 from ragger.utils.misc import get_current_app_name_and_version
 from ragger.backend import BackendInterface
 

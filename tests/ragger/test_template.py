@@ -4,6 +4,7 @@
 """
 This module provides Ragger tests for Key Templates feature
 """
+
 import sys
 import pytest
 from Crypto.Hash import SHA256
@@ -25,10 +26,20 @@ from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO
     "template",
     [
         "rsa2048",
-        pytest.param("rsa3072", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
-        pytest.param("rsa4096", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
+        pytest.param(
+            "rsa3072",
+            marks=pytest.mark.skipif(
+                "--full" not in sys.argv, reason="skipping long test"
+            ),
+        ),
+        pytest.param(
+            "rsa4096",
+            marks=pytest.mark.skipif(
+                "--full" not in sys.argv, reason="skipping long test"
+            ),
+        ),
         "nistp256",  # ECDSA
-        "ed25519",   # EdDSA
+        "ed25519",  # EdDSA
     ],
 )
 def test_sign(backend: BackendInterface, template: str) -> None:
@@ -96,11 +107,11 @@ def test_sign(backend: BackendInterface, template: str) -> None:
         else:
             # Try to extract last 64 bytes
             sig_data = sig_data[-64:]
-        verifier = DSS.new(pubEcckey, 'fips-186-3')
+        verifier = DSS.new(pubEcckey, "fips-186-3")
         verifier.verify(hash_obj, sig_data)
     elif key_algo == PubkeyAlgo.EDDSA:
         pubEcckey = get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
-        eddsaVerifier = eddsa.new(pubEcckey, 'rfc8032')
+        eddsaVerifier = eddsa.new(pubEcckey, "rfc8032")
         eddsaVerifier.verify(plain, rapdu.data)
     else:
         raise ValueError

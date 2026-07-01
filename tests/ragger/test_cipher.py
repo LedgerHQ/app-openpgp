@@ -4,6 +4,7 @@
 """
 This module provides Ragger tests for Cipher feature
 """
+
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import ECC
@@ -124,18 +125,22 @@ def test_cv25519(backend: BackendInterface) -> None:
 
     # Generate Keypair
     privkey = ECC.generate(curve="Curve25519")
-    expected_secret = key_agreement(static_priv=privkey, static_pub=pubkey, kdf=lambda x:x)
+    expected_secret = key_agreement(
+        static_priv=privkey, static_pub=pubkey, kdf=lambda x: x
+    )
 
     # Compute ecdh
     pubkey2 = privkey.public_key()
-    exp_pubkey = pubkey2.export_key(format="raw", compress="True")
+    exp_pubkey = pubkey2.export_key(format="raw", compress=True)
     payload_len = len(exp_pubkey)
-    hdr1 = payload_len.to_bytes(1, byteorder='big')
-    hdr2 = bytes.fromhex("86") + hdr1 # tag_PubKey_ext
+    hdr1 = payload_len.to_bytes(1, byteorder="big")
+    hdr2 = bytes.fromhex("86") + hdr1  # tag_PubKey_ext
     payload_len += 2
-    hdr3 = bytes.fromhex("7f49") + payload_len.to_bytes(1, byteorder='big') + hdr2  # tag_PubKey_D0
+    hdr3 = (
+        bytes.fromhex("7f49") + payload_len.to_bytes(1, byteorder="big") + hdr2
+    )  # tag_PubKey_D0
     payload_len += 3
-    hdr = payload_len.to_bytes(1, byteorder='big') + hdr3
+    hdr = payload_len.to_bytes(1, byteorder="big") + hdr3
     secret = client.decrypt_asym(hdr + exp_pubkey, PubkeyAlgo.ECDH).data
 
     assert secret == expected_secret

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#*****************************************************************************
+# *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
 #
@@ -15,7 +15,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#*****************************************************************************
+# *****************************************************************************
 
 import sys
 from pathlib import Path
@@ -33,21 +33,37 @@ def get_argparser() -> Namespace:
 
     parser = ArgumentParser(
         description="Manage OpenPGP App on Ledger device",
-        formatter_class=RawTextHelpFormatter
+        formatter_class=RawTextHelpFormatter,
     )
-    parser.add_argument("--info", action="store_true",
-                        help="Get and display card information")
-    parser.add_argument("--reader", type=str, default="Ledger",
-                        help="PCSC reader name (default is '%(default)s') or 'speculos'")
+    parser.add_argument(
+        "--info", action="store_true", help="Get and display card information"
+    )
+    parser.add_argument(
+        "--reader",
+        type=str,
+        default="Ledger",
+        help="PCSC reader name (default is '%(default)s') or 'speculos'",
+    )
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
-    parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")
-    parser.add_argument("--reset", action="store_true",
-                        help="Reset the application (all data will be erased)")
+    parser.add_argument(
+        "--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)"
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Reset the application (all data will be erased)",
+    )
 
-    parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
-    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
-    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
+    parser.add_argument(
+        "--pinpad", action="store_true", help="PIN validation delegated to pinpad"
+    )
+    parser.add_argument(
+        "--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)"
+    )
+    parser.add_argument(
+        "--user-pin", metavar="PIN", help="User PIN (if pinpad not used)"
+    )
     parser.add_argument("--new-user-pin", metavar="PIN", help="Change User PIN")
     parser.add_argument("--new-adm-pin", metavar="PIN", help="Change Admin PIN")
     group = parser.add_mutually_exclusive_group()
@@ -55,30 +71,52 @@ def get_argparser() -> Namespace:
     group.add_argument("--reset-pw1", help="Reset the User PIN")
 
     parser.add_argument("--serial", help="Update the 'serial' data (4 bytes)")
-    parser.add_argument("--salutation",choices=list(USER_SALUTATION), help="Update 'salutation' data")
+    parser.add_argument(
+        "--salutation", choices=list(USER_SALUTATION), help="Update 'salutation' data"
+    )
     parser.add_argument("--name", help="Update 'name' data")
     parser.add_argument("--url", help="Update 'url' data")
-    parser.add_argument("--login",help="Update 'login' data")
+    parser.add_argument("--login", help="Update 'login' data")
     parser.add_argument("--lang", help="Update 'lang' data")
 
-    parser.add_argument("--key-type", type=KeyTypes, choices=[k.value for k in KeyTypes],
-                        help="Select key type SIG:DEC:AUT (default is all)")
+    parser.add_argument(
+        "--key-type",
+        type=KeyTypes,
+        choices=[k.value for k in KeyTypes],
+        help="Select key type SIG:DEC:AUT (default is all)",
+    )
 
-    parser.add_argument("--key-action",choices=list(KEY_OPERATIONS),
-                        help="Generate key pair or Read public key")
-    parser.add_argument("--set-fingerprints", metavar="SIG:DEC:AUT",
-                        help="Set fingerprints for selected 'key-type'\n" + \
-                        "If 'key-type' is not specified, set for all keys (SIG:DEC:AUT)\n" + \
-                        "Each fingerprint is 20 hex bytes long")
-    parser.add_argument("--set-templates", metavar="SIG:DEC:AUT",
-                        help="Set template identifier for selected 'key-type'\n" + \
-                        "If 'key-type' is not specified, set for all keys (SIG:DEC:AUT)\n" + \
-                        f"Valid values are {', '.join(list(KEY_TEMPLATES))}")
-    parser.add_argument("--seed-key", action="store_true",
-                        help="Regenerate all keys, based on seed mode")
+    parser.add_argument(
+        "--key-action",
+        choices=list(KEY_OPERATIONS),
+        help="Generate key pair or Read public key",
+    )
+    parser.add_argument(
+        "--set-fingerprints",
+        metavar="SIG:DEC:AUT",
+        help="Set fingerprints for selected 'key-type'\n"
+        + "If 'key-type' is not specified, set for all keys (SIG:DEC:AUT)\n"
+        + "Each fingerprint is 20 hex bytes long",
+    )
+    parser.add_argument(
+        "--set-templates",
+        metavar="SIG:DEC:AUT",
+        help="Set template identifier for selected 'key-type'\n"
+        + "If 'key-type' is not specified, set for all keys (SIG:DEC:AUT)\n"
+        + f"Valid values are {', '.join(list(KEY_TEMPLATES))}",
+    )
+    parser.add_argument(
+        "--seed-key",
+        action="store_true",
+        help="Regenerate all keys, based on seed mode",
+    )
 
-    parser.add_argument("--file", type=str, default="pubkey",
-                        help="Public Key export file (default is '%(default)s')")
+    parser.add_argument(
+        "--file",
+        type=str,
+        default="pubkey",
+        help="Public Key export file (default is '%(default)s')",
+    )
 
     return parser.parse_args()
 
@@ -115,9 +153,11 @@ def verify_pins(gpgcard: GPGCard, user_pin: str, adm_pin: str, pinpad: bool) -> 
     """
 
     print("Verify PINs...")
-    if not gpgcard.verify_pin(PassWord.PW1, user_pin, pinpad) or \
-       not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad) or \
-       not gpgcard.verify_pin(PassWord.PW3, adm_pin,  pinpad):
+    if (
+        not gpgcard.verify_pin(PassWord.PW1, user_pin, pinpad)
+        or not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad)
+        or not gpgcard.verify_pin(PassWord.PW3, adm_pin, pinpad)
+    ):
         error(ErrorCodes.ERR_INTERNAL, "PIN not verified")
 
 
@@ -140,7 +180,7 @@ def reset_app(gpgcard: GPGCard) -> None:
 # ===============================================================================
 #          Retrieve the OpenPGP Card information
 # ===============================================================================
-def get_info(gpgcard: GPGCard, display: bool=True) -> None:
+def get_info(gpgcard: GPGCard, display: bool = True) -> None:
     """Retrieve and display Card information
 
     Args:
@@ -205,7 +245,9 @@ def get_info(gpgcard: GPGCard, display: bool=True) -> None:
 # ===============================================================================
 #          Set fingerprints
 # ===============================================================================
-def set_fingerprints(gpgcard: GPGCard, fingerprints: str, key_type: KeyTypes | None = None) -> None:
+def set_fingerprints(
+    gpgcard: GPGCard, fingerprints: str, key_type: KeyTypes | None = None
+) -> None:
     """Set Key template
 
     Args:
@@ -218,7 +260,9 @@ def set_fingerprints(gpgcard: GPGCard, fingerprints: str, key_type: KeyTypes | N
     if key_type is None:
         # Consider all keys fingerprints are given
         try:
-            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = fingerprints.split(":")
+            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = (
+                fingerprints.split(":")
+            )
         except ValueError as err:
             raise GPGCardExcpetion(0, f"Wrong fingerprints arguments: {err}") from err
 
@@ -234,7 +278,9 @@ def set_fingerprints(gpgcard: GPGCard, fingerprints: str, key_type: KeyTypes | N
 # ===============================================================================
 #          Set Key Templates
 # ===============================================================================
-def set_templates(gpgcard: GPGCard, templates: str, key_type: KeyTypes | None = None) -> None:
+def set_templates(
+    gpgcard: GPGCard, templates: str, key_type: KeyTypes | None = None
+) -> None:
     """Set Key template
 
     Args:
@@ -247,7 +293,9 @@ def set_templates(gpgcard: GPGCard, templates: str, key_type: KeyTypes | None = 
     if key_type is None:
         # Consider all keys template are given
         try:
-            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = templates.split(":")
+            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = (
+                templates.split(":")
+            )
         except ValueError as err:
             raise GPGCardExcpetion(0, f"Wrong templates arguments: {err}") from err
     else:
@@ -266,7 +314,13 @@ def set_templates(gpgcard: GPGCard, templates: str, key_type: KeyTypes | None = 
 # ===============================================================================
 #          Handle Asymmetric keys
 # ===============================================================================
-def handle_key(gpgcard: GPGCard, action: str, key_type: KeyTypes, file: str = "", seed: bool = False) -> None:
+def handle_key(
+    gpgcard: GPGCard,
+    action: str,
+    key_type: KeyTypes,
+    file: str = "",
+    seed: bool = False,
+) -> None:
     """Generate Key pair and/or Read Public key
 
     Args:
@@ -319,13 +373,17 @@ def entrypoint() -> None:
             args.adm_pin = "12345678"
             print(f"Using default 'admpin': {args.adm_pin}")
 
-    if args.serial and len(args.serial) != 8 :
-        error(ErrorCodes.ERR_INTERNAL,
-              "Serial must be a 4 bytes hex string value (8 characters)")
+    if args.serial and len(args.serial) != 8:
+        error(
+            ErrorCodes.ERR_INTERNAL,
+            "Serial must be a 4 bytes hex string value (8 characters)",
+        )
 
     if args.reset_code and len(args.reset_code) != 8:
-        error(ErrorCodes.ERR_INTERNAL,
-              "Reset Code must be a 4 bytes hex string value (8 characters)")
+        error(
+            ErrorCodes.ERR_INTERNAL,
+            "Reset Code must be a 4 bytes hex string value (8 characters)",
+        )
 
     if args.key_action == "Export" and not args.file:
         error(ErrorCodes.ERR_INTERNAL, "Provide a file to export public key")
@@ -383,7 +441,9 @@ def entrypoint() -> None:
             gpgcard.set_serial(args.serial)
 
         if args.key_action:
-            handle_key(gpgcard, args.key_action, args.key_type, args.file, args.seed_key)
+            handle_key(
+                gpgcard, args.key_action, args.key_type, args.file, args.seed_key
+            )
 
         gpgcard.disconnect()
 
@@ -392,5 +452,4 @@ def entrypoint() -> None:
 
 
 if __name__ == "__main__":
-
     entrypoint()
