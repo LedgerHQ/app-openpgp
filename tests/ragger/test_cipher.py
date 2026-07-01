@@ -131,7 +131,7 @@ def test_cv25519(backend: BackendInterface) -> None:
 
     # Compute ecdh
     pubkey2 = privkey.public_key()
-    exp_pubkey = pubkey2.export_key(format="raw", compress="True")
+    exp_pubkey = pubkey2.export_key(format="raw", compress=True)
     payload_len = len(exp_pubkey)
     hdr1 = payload_len.to_bytes(1, byteorder="big")
     hdr2 = bytes.fromhex("86") + hdr1  # tag_PubKey_ext
