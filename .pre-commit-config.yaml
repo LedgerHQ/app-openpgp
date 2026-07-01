@@ -42,18 +42,13 @@ repos:
         types_or: [markdown]
         exclude: CHANGELOG.md
 
-  - repo: https://github.com/PyCQA/pylint
-    rev: v4.0.5
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
     hooks:
-      - id: pylint
-        name: Check python Client
-        types: [python]
-        args: ['--jobs=0', '--rcfile=tests/ragger/setup.cfg']
-        files: '^tests\/.*$'
-        additional_dependencies: ['pytest', 'ragger[speculos,ledgerwallet]', 'ledgered']
-
-      - id: pylint
-        name: Check python Tool
-        types: [python]
-        args: ['--jobs=0', '--rcfile=pytools/setup.cfg']
-        files: '^pytools\/.*$'
+      # Run the linter.
+      - id: ruff-check
+        types_or: [ python, pyi ]
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [ python, pyi ]
