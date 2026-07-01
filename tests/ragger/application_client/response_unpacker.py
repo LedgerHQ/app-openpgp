@@ -5,10 +5,11 @@
 This module provides Ragger tests Client application.
 It contains the response parsing part.
 """
+
 from typing import Tuple
 
 
-def _pop_sized_buf_from_buffer(buffer:bytes, size:int) -> Tuple[bytes, bytes]:
+def _pop_sized_buf_from_buffer(buffer: bytes, size: int) -> Tuple[bytes, bytes]:
     """Parse buffer and returns: remainder, data[size]"""
 
     return buffer[size:], buffer[0:size]
@@ -16,12 +17,12 @@ def _pop_sized_buf_from_buffer(buffer:bytes, size:int) -> Tuple[bytes, bytes]:
 
 def unpack_info_response(response: bytes) -> Tuple[str, str]:
     """Unpack response for AID:
-            RID (5)
-            Application (1)
-            Version (2)
-            Manufacturer (2)
-            Serial (4)
-            RFU (2)
+    RID (5)
+    Application (1)
+    Version (2)
+    Manufacturer (2)
+    Serial (4)
+    RFU (2)
     """
 
     assert len(response) == 16

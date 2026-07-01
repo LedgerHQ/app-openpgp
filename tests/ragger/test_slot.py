@@ -4,6 +4,7 @@
 """
 This module provides Ragger tests for Slots feature
 """
+
 import pytest
 
 from ragger.backend import BackendInterface
@@ -12,6 +13,7 @@ from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, DataObject, PassWord
 
 from utils import check_pincode, generate_key
+
 
 def test_slot(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#*****************************************************************************
+# *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
 #
@@ -15,12 +15,13 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#*****************************************************************************
+# *****************************************************************************
 
 import sys
 from pathlib import Path
 from argparse import ArgumentParser, RawTextHelpFormatter, Namespace
 from gpgapp.gpgcard import GPGCard, PassWord, GPGCardExcpetion
+
 
 # ===============================================================================
 #          Parse command line options
@@ -31,26 +32,46 @@ def get_argparser() -> Namespace:
     parser = ArgumentParser(
         description="Backup/Restore OpenPGP App configuration",
         epilog="Keys restore is only possible with SEED mode...",
-        formatter_class=RawTextHelpFormatter
+        formatter_class=RawTextHelpFormatter,
     )
-    parser.add_argument("--reader", type=str, default="Ledger",
-                        help="PCSC reader name (default is '%(default)s') or 'speculos'")
+    parser.add_argument(
+        "--reader",
+        type=str,
+        default="Ledger",
+        help="PCSC reader name (default is '%(default)s') or 'speculos'",
+    )
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
-    parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")
+    parser.add_argument(
+        "--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)"
+    )
 
-    parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
-    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
-    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
+    parser.add_argument(
+        "--pinpad", action="store_true", help="PIN validation delegated to pinpad"
+    )
+    parser.add_argument(
+        "--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)"
+    )
+    parser.add_argument(
+        "--user-pin", metavar="PIN", help="User PIN (if pinpad not used)"
+    )
 
-    parser.add_argument("--restore", action="store_true",
-                       help="Perform a Restore instead of Backup")
+    parser.add_argument(
+        "--restore", action="store_true", help="Perform a Restore instead of Backup"
+    )
 
-    parser.add_argument("--file", type=str, default="gpg_backup",
-                        help="Backup/Restore file (default is '%(default)s')")
+    parser.add_argument(
+        "--file",
+        type=str,
+        default="gpg_backup",
+        help="Backup/Restore file (default is '%(default)s')",
+    )
 
-    parser.add_argument("--seed-key", action="store_true",
-                        help="After Restore, regenerate all keys, based on seed mode")
+    parser.add_argument(
+        "--seed-key",
+        action="store_true",
+        help="After Restore, regenerate all keys, based on seed mode",
+    )
 
     return parser.parse_args()
 
@@ -90,9 +111,11 @@ def entrypoint() -> None:
 
         # PW2 (same value as PW1) is required to read/write the private DOs
         # 0x0101 and 0x0103; verifying only PW1+PW3 silently loses them.
-        if not gpgcard.verify_pin(PassWord.PW1, args.user_pin, args.pinpad) or \
-           not gpgcard.verify_pin(PassWord.PW2, args.user_pin, args.pinpad) or \
-           not gpgcard.verify_pin(PassWord.PW3, args.adm_pin,  args.pinpad):
+        if (
+            not gpgcard.verify_pin(PassWord.PW1, args.user_pin, args.pinpad)
+            or not gpgcard.verify_pin(PassWord.PW2, args.user_pin, args.pinpad)
+            or not gpgcard.verify_pin(PassWord.PW3, args.adm_pin, args.pinpad)
+        ):
             raise GPGCardExcpetion(0, "PIN not verified")
 
         if args.slot:
@@ -118,5 +141,4 @@ def entrypoint() -> None:
 
 
 if __name__ == "__main__":
-
     entrypoint()

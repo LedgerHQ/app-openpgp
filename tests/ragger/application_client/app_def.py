@@ -5,38 +5,42 @@
 This module provides Ragger tests Client application.
 It contains the applicatuion definitions.
 """
+
 from enum import IntEnum
 
 
 class ClaType(IntEnum):
     """Application ID definitions"""
+
     # Application CLA
-    CLA_APP        = 0x00
-    CLA_APP_CHAIN  = 0x10
+    CLA_APP = 0x00
+    CLA_APP_CHAIN = 0x10
     # Special CLA for Verify with pinpad
     CLA_APP_VERIFY = 0xEF
 
 
 class InsType(IntEnum):
     """Application Command ID definitions"""
-    INS_ACTIVATE_FILE    = 0x44
-    INS_SELECT           = 0xA4
-    INS_TERMINATE_DF     = 0xE6
-    INS_VERIFY           = 0x20
-    INS_CHANGE_REF_DATA  = 0x24
-    INS_RESET_RC         = 0x2C
-    INS_GET_DATA         = 0xCA
-    INS_PUT_DATA         = 0xDA
+
+    INS_ACTIVATE_FILE = 0x44
+    INS_SELECT = 0xA4
+    INS_TERMINATE_DF = 0xE6
+    INS_VERIFY = 0x20
+    INS_CHANGE_REF_DATA = 0x24
+    INS_RESET_RC = 0x2C
+    INS_GET_DATA = 0xCA
+    INS_PUT_DATA = 0xDA
     INS_GEN_ASYM_KEYPAIR = 0x47
-    INS_GET_RESPONSE     = 0xC0
-    INS_PSO              = 0x2A
+    INS_GET_RESPONSE = 0xC0
+    INS_PSO = 0x2A
     INS_INT_AUTHENTICATE = 0x88
-    INS_GET_CHALLENGE    = 0x84
-    INS_MSE              = 0x22
+    INS_GET_CHALLENGE = 0x84
+    INS_MSE = 0x22
 
 
 class PubkeyAlgo(IntEnum):
     """Public-Key Algorithm IDs definition"""
+
     # https://www.rfc-editor.org/rfc/rfc4880#section-9.1
 
     INVALID = 0
@@ -53,6 +57,7 @@ class PubkeyAlgo(IntEnum):
 
 class PassWord(IntEnum):
     """Password type definition"""
+
     # USER_PIN for only one PSO:CDS command
     PW1 = 0x81
     # USER_PIN for several attempts
@@ -63,31 +68,32 @@ class PassWord(IntEnum):
 
 class Errors(IntEnum):
     """Application Errors definitions"""
-    SW_STATE_TERMINATED               = 0x6285
-    SW_MEMORY                         = 0x6581
-    SW_SECURITY                       = 0x6600
-    SW_WRONG_LENGTH                   = 0x6700
-    SW_LOGICAL_CHANNEL_NOT_SUPPORTED  = 0x6881
+
+    SW_STATE_TERMINATED = 0x6285
+    SW_MEMORY = 0x6581
+    SW_SECURITY = 0x6600
+    SW_WRONG_LENGTH = 0x6700
+    SW_LOGICAL_CHANNEL_NOT_SUPPORTED = 0x6881
     SW_SECURE_MESSAGING_NOT_SUPPORTED = 0x6882
-    SW_LAST_COMMAND_EXPECTED          = 0x6883
+    SW_LAST_COMMAND_EXPECTED = 0x6883
     SW_COMMAND_CHAINING_NOT_SUPPORTED = 0x6884
-    SW_SECURITY_STATUS_NOT_SATISFIED  = 0x6982
-    SW_AUTH_METHOD_BLOCKED            = 0x6983
-    SW_DATA_INVALID                   = 0x6984
-    SW_CONDITIONS_NOT_SATISFIED       = 0x6985
-    SW_COMMAND_NOT_ALLOWED            = 0x6986
-    SW_EXPECTED_SM_MISSING            = 0x6987
-    SW_SM_DATA_INCORRECT              = 0x6988
-    SW_WRONG_DATA                     = 0x6a80
-    SW_FILE_NOT_FOUND                 = 0x6a82
-    SW_INCORRECT_P1P2                 = 0x6a86
-    SW_REFERENCED_DATA_NOT_FOUND      = 0x6a88
-    SW_WRONG_P1P2                     = 0x6b00
-    SW_INS_NOT_SUPPORTED              = 0x6d00
-    SW_CLA_NOT_SUPPORTED              = 0x6e00
-    SW_UNKNOWN                        = 0x6f00
-    SW_OK                             = 0x9000
-    SW_CORRECT_LONG_RESPONSE          = 0x6100
+    SW_SECURITY_STATUS_NOT_SATISFIED = 0x6982
+    SW_AUTH_METHOD_BLOCKED = 0x6983
+    SW_DATA_INVALID = 0x6984
+    SW_CONDITIONS_NOT_SATISFIED = 0x6985
+    SW_COMMAND_NOT_ALLOWED = 0x6986
+    SW_EXPECTED_SM_MISSING = 0x6987
+    SW_SM_DATA_INCORRECT = 0x6988
+    SW_WRONG_DATA = 0x6A80
+    SW_FILE_NOT_FOUND = 0x6A82
+    SW_INCORRECT_P1P2 = 0x6A86
+    SW_REFERENCED_DATA_NOT_FOUND = 0x6A88
+    SW_WRONG_P1P2 = 0x6B00
+    SW_INS_NOT_SUPPORTED = 0x6D00
+    SW_CLA_NOT_SUPPORTED = 0x6E00
+    SW_UNKNOWN = 0x6F00
+    SW_OK = 0x9000
+    SW_CORRECT_LONG_RESPONSE = 0x6100
 
 
 class DataObject(IntEnum):

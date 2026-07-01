@@ -35,7 +35,7 @@ def test_verify(backend: BackendInterface, pwd: PassWord, value: str) -> None:
     # Verify PW status - Not yet verified
     with pytest.raises(ExceptionRAPDU) as err:
         client.send_verify_pw(pwd)
-    assert err.value.status & 0xFFF0 == 0x63c0
+    assert err.value.status & 0xFFF0 == 0x63C0
 
     # Verify PW with its value
     rapdu = client.send_verify_pw(pwd, value)
@@ -52,7 +52,7 @@ def test_verify(backend: BackendInterface, pwd: PassWord, value: str) -> None:
     # Verify PW status - Not yet verified
     with pytest.raises(ExceptionRAPDU) as err:
         client.send_verify_pw(pwd)
-    assert err.value.status & 0xFFF0 == 0x63c0
+    assert err.value.status & 0xFFF0 == 0x63C0
 
 
 def test_verify_wrong(backend: BackendInterface) -> None:
@@ -66,10 +66,9 @@ def test_verify_wrong(backend: BackendInterface) -> None:
 
 
 # In this test we check the card Password verification with Pinpad
-def test_verify_confirm_accepted(device: Device,
-                                 backend: BackendInterface,
-                                 navigator: Navigator,
-                                 test_name: Path) -> None:
+def test_verify_confirm_accepted(
+    device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path
+) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -83,10 +82,9 @@ def test_verify_confirm_accepted(device: Device,
 
 
 # In this test we check the Rejected card Password verification with Pinpad
-def test_verify_confirm_refused(device: Device,
-                                backend: BackendInterface,
-                                navigator: Navigator,
-                                test_name: Path) -> None:
+def test_verify_confirm_refused(
+    device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path
+) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -104,11 +102,13 @@ def test_verify_confirm_refused(device: Device,
 @pytest.mark.parametrize(
     "pwd, actual, new",
     [
-        (PassWord.PW1, "123456",   "654321"),
+        (PassWord.PW1, "123456", "654321"),
         (PassWord.PW3, "12345678", "87654321"),
     ],
 )
-def test_change(backend: BackendInterface, pwd: PassWord, actual: str, new: str) -> None:
+def test_change(
+    backend: BackendInterface, pwd: PassWord, actual: str, new: str
+) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
