@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
@@ -18,9 +17,10 @@
 # *****************************************************************************
 
 import sys
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
-from argparse import ArgumentParser, RawTextHelpFormatter, Namespace
-from gpgapp.gpgcard import GPGCard, PassWord, GPGCardExcpetion
+
+from gpgapp.gpgcard import GPGCard, GPGCardExcpetion, PassWord
 
 
 # ===============================================================================
@@ -42,23 +42,13 @@ def get_argparser() -> Namespace:
     )
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
-    parser.add_argument(
-        "--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)"
-    )
+    parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")
 
-    parser.add_argument(
-        "--pinpad", action="store_true", help="PIN validation delegated to pinpad"
-    )
-    parser.add_argument(
-        "--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)"
-    )
-    parser.add_argument(
-        "--user-pin", metavar="PIN", help="User PIN (if pinpad not used)"
-    )
+    parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
+    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
+    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
 
-    parser.add_argument(
-        "--restore", action="store_true", help="Perform a Restore instead of Backup"
-    )
+    parser.add_argument("--restore", action="store_true", help="Perform a Restore instead of Backup")
 
     parser.add_argument(
         "--file",

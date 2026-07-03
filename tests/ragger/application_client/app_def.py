@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """

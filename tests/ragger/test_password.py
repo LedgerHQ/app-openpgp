@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
@@ -6,16 +5,14 @@ This module provides Ragger tests for Password feature
 """
 
 from pathlib import Path
+
 import pytest
-from ledgered.devices import Device
-from ragger.error import ExceptionRAPDU
-from ragger.backend import BackendInterface
-from ragger.navigator import Navigator
-
-from application_client.command_sender import CommandSender
 from application_client.app_def import Errors, PassWord
-
-
+from application_client.command_sender import CommandSender
+from ledgered.devices import Device
+from ragger.backend import BackendInterface
+from ragger.error import ExceptionRAPDU
+from ragger.navigator import Navigator
 from utils import util_navigate
 
 
@@ -66,9 +63,7 @@ def test_verify_wrong(backend: BackendInterface) -> None:
 
 
 # In this test we check the card Password verification with Pinpad
-def test_verify_confirm_accepted(
-    device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path
-) -> None:
+def test_verify_confirm_accepted(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -82,9 +77,7 @@ def test_verify_confirm_accepted(
 
 
 # In this test we check the Rejected card Password verification with Pinpad
-def test_verify_confirm_refused(
-    device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path
-) -> None:
+def test_verify_confirm_refused(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 
@@ -106,9 +99,7 @@ def test_verify_confirm_refused(
         (PassWord.PW3, "12345678", "87654321"),
     ],
 )
-def test_change(
-    backend: BackendInterface, pwd: PassWord, actual: str, new: str
-) -> None:
+def test_change(backend: BackendInterface, pwd: PassWord, actual: str, new: str) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
 

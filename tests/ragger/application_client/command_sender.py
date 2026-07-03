@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
@@ -6,20 +5,19 @@ This module provides Ragger tests Client application.
 It contains the command sending part.
 """
 
-from typing import Generator, Optional, Tuple
+import binascii
+from collections.abc import Generator
 from contextlib import contextmanager
 
-import binascii
-
-from ragger.backend.interface import BackendInterface, RAPDU
+from ragger.backend.interface import RAPDU, BackendInterface
 from ragger.error import ExceptionRAPDU
 
 from application_client.app_def import (
     ClaType,
+    DataObject,
+    Errors,
     InsType,
     PassWord,
-    Errors,
-    DataObject,
     PubkeyAlgo,
 )
 
@@ -39,9 +37,7 @@ class CommandSender:
         """
 
         data = binascii.unhexlify(b"06D27600012401")
-        return self.backend.exchange(
-            cla=ClaType.CLA_APP, ins=InsType.INS_SELECT, p1=0x04, data=data
-        )
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_SELECT, p1=0x04, data=data)
 
     def send_activate(self) -> RAPDU:
         """APDU Activate
@@ -74,9 +70,7 @@ class CommandSender:
 
         p1 = 0x00 if tag <= 0xFF else (tag >> 8) & 0xFF
         p2 = tag & 0xFF
-        return self.backend.exchange(
-            cla=ClaType.CLA_APP, ins=InsType.INS_GET_DATA, p1=p1, p2=p2
-        )
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_GET_DATA, p1=p1, p2=p2)
 
     def put_data(self, tag: DataObject, data: bytes) -> RAPDU:
         """APDU Put Data
@@ -91,9 +85,7 @@ class CommandSender:
 
         p1 = 0x00 if tag <= 0xFF else (tag >> 8) & 0xFF
         p2 = tag & 0xFF
-        return self.backend.exchange(
-            cla=ClaType.CLA_APP, ins=InsType.INS_PUT_DATA, p1=p1, p2=p2, data=data
-        )
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_PUT_DATA, p1=p1, p2=p2, data=data)
 
     ############### SLOT interface ###############
     def get_slot(self) -> int:
@@ -107,7 +99,7 @@ class CommandSender:
         assert rapdu.status == Errors.SW_OK
         return int.from_bytes(rapdu.data, "big")
 
-    def get_slot_config(self) -> Tuple[int, int]:
+    def get_slot_config(self) -> tuple[int, int]:
         """APDU Get Slot config
 
         Returns:
@@ -136,9 +128,7 @@ class CommandSender:
         return self.put_data(DataObject.CMD_SLOT_CUR, data)
 
     ############### PASSWORD interface ###############
-    def send_verify_pw(
-        self, pwd: PassWord, value: str = "", reset: bool = False
-    ) -> RAPDU:
+    def send_verify_pw(self, pwd: PassWord, value: str = "", reset: bool = False) -> RAPDU:
         """APDU Verify Pincode
 
         Args:
@@ -156,14 +146,10 @@ class CommandSender:
         else:
             data = b""
         p1 = 0xFF if reset else 0x00
-        return self.backend.exchange(
-            cla=ClaType.CLA_APP, ins=InsType.INS_VERIFY, p1=p1, p2=pwd, data=data
-        )
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_VERIFY, p1=p1, p2=pwd, data=data)
 
     @contextmanager
-    def send_verify_pw_with_confirmation(
-        self, pwd: PassWord
-    ) -> Generator[None, None, None]:
+    def send_verify_pw_with_confirmation(self, pwd: PassWord) -> Generator[None, None, None]:
         """APDU Verify Pincode - with confirmation
 
         Args:
@@ -173,9 +159,7 @@ class CommandSender:
             Response APDU
         """
 
-        with self.backend.exchange_async(
-            cla=ClaType.CLA_APP_VERIFY, ins=InsType.INS_VERIFY, p2=pwd
-        ) as response:
+        with self.backend.exchange_async(cla=ClaType.CLA_APP_VERIFY, ins=InsType.INS_VERIFY, p2=pwd) as response:
             yield response
 
     def send_change_pw(self, pwd: PassWord, actual: str, new: str) -> RAPDU:
@@ -193,9 +177,7 @@ class CommandSender:
         assert actual
         assert new
         data = actual.encode("utf-8") + new.encode("utf-8")
-        return self.backend.exchange(
-            cla=ClaType.CLA_APP, ins=InsType.INS_CHANGE_REF_DATA, p2=pwd, data=data
-        )
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_CHANGE_REF_DATA, p2=pwd, data=data)
 
     def send_reset_pw(self, value: str) -> RAPDU:
         """APDU Reset Retry Counter
@@ -259,9 +241,7 @@ class CommandSender:
         """
 
         data = b"\x83\x01" + bytes.fromhex(f"{ref:02x}")
-        return self.backend.exchange(
-            cla=ClaType.CLA_APP, ins=InsType.INS_MSE, p1=0x41, p2=key, data=data
-        )
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_MSE, p1=0x41, p2=key, data=data)
 
     def get_challenge(self, size: int) -> RAPDU:
         """APDU Get Challenge
@@ -401,11 +381,7 @@ class CommandSender:
                 cla = ClaType.CLA_APP
                 m_frame = frame[:d_len] + b"\x00"  # 0x00 suffix on the last message
 
-            data = (
-                bytes.fromhex(f"{cla:02x}{ins:02x}8086{d_len + len(pad_ind):02x}")
-                + pad_ind
-                + m_frame
-            )
+            data = bytes.fromhex(f"{cla:02x}{ins:02x}8086{d_len + len(pad_ind):02x}") + pad_ind + m_frame
             try:
                 rapdu = self.backend.exchange_raw(data)
                 frame = frame[d_len:]
@@ -446,7 +422,7 @@ class CommandSender:
             rdata += rapdu.data
         return RAPDU(rapdu.status, rdata)
 
-    def get_async_response(self) -> Optional[RAPDU]:
+    def get_async_response(self) -> RAPDU | None:
         """Asynchronous APDU response
 
         Returns:
@@ -469,11 +445,7 @@ class CommandSender:
         """
 
         cla = ClaType.CLA_APP
-        data = (
-            bytes.fromhex(f"{cla:02x}{ins:02x}{tag:04x}{len(frame):02x}")
-            + frame
-            + b"\x00"
-        )
+        data = bytes.fromhex(f"{cla:02x}{ins:02x}{tag:04x}{len(frame):02x}") + frame + b"\x00"
         try:
             rapdu = self.backend.exchange_raw(data)
         except ExceptionRAPDU as err:

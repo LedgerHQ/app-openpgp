@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
@@ -18,20 +17,27 @@
 
 import base64
 import binascii
-import os
-from datetime import datetime, timezone
 import json
-from hashlib import sha1
-from typing import Optional, Tuple
+import os
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from hashlib import sha1
 
 # pylint: disable=import-error
 from Crypto.PublicKey.RSA import construct
 from ledgercomm import Transport  # type: ignore
-# pylint: enable=import-error
 
-from gpgapp.gpgcmd import DataObject, ErrorCodes, KeyTypes, PassWord, PubkeyAlgo  # type: ignore
-from gpgapp.gpgcmd import KEY_OPERATIONS, KEY_TEMPLATES, USER_SALUTATION  # type: ignore
+# pylint: enable=import-error
+from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
+    KEY_OPERATIONS,
+    KEY_TEMPLATES,
+    USER_SALUTATION,
+    DataObject,
+    ErrorCodes,
+    KeyTypes,
+    PassWord,
+    PubkeyAlgo,
+)
 
 APDU_MAX_SIZE: int = 0xFE
 APDU_CHAINING_MODE: int = 0x10
@@ -157,9 +163,7 @@ class GPGCard:
         """
 
         if device == "speculos":
-            self.transport = Transport(
-                "tcp", server="127.0.0.1", port=9999, debug=False
-            )
+            self.transport = Transport("tcp", server="127.0.0.1", port=9999, debug=False)
         else:
             self.transport = Transport("hid")
         print("")
@@ -201,12 +205,7 @@ class GPGCard:
                 if len(data) > 1 and data[1] in _SENSITIVE_INS:
                     print(f"{mode}: [REDACTED SENSITIVE APDU ins={data[1]:02x}]")
                     return
-                self._last_sent_was_key_read = (
-                    len(data) >= 4
-                    and data[1] == 0xCA
-                    and data[2] == 0x00
-                    and data[3] in _KEY_READ_DOS
-                )
+                self._last_sent_was_key_read = len(data) >= 4 and data[1] == 0xCA and data[2] == 0x00 and data[3] in _KEY_READ_DOS
             elif mode == "recv":
                 if self._last_sent_was_key_read:
                     self._last_sent_was_key_read = False
@@ -246,7 +245,7 @@ class GPGCard:
         """Retrieve all Data Object values from the Card"""
 
         self.data.reset()
-        data: Optional[bytes] = b""
+        data: bytes | None = b""
         b_data: bytes = b""
         s_data: str = ""
 
@@ -391,7 +390,7 @@ class GPGCard:
         def _fromb64(s: str) -> bytes:
             return base64.b64decode(s)
 
-        with open(file_name, mode="r", encoding="utf-8") as f:
+        with open(file_name, encoding="utf-8") as f:
             payload = json.load(f)
 
         self.data.AID = payload["AID"]
@@ -451,40 +450,32 @@ class GPGCard:
         # The digital signature counter (DO 0x93) is read-only on the card (no
         # write access path in the firmware): kept in the backup for reference
         # but not written back here.
-        self._put_data(
-            DataObject.CMD_RSA_EXP, self.data.rsa_pub_exp.to_bytes(4, "little")
-        )
+        self._put_data(DataObject.CMD_RSA_EXP, self.data.rsa_pub_exp.to_bytes(4, "little"))
 
         self._put_data(DataObject.DO_CERT, self.data.aut.cert.encode("utf-8"))
         self._put_data(DataObject.DO_CERT, self.data.dec.cert.encode("utf-8"))
         self._put_data(DataObject.DO_CERT, self.data.sig.cert.encode("utf-8"))
 
-        self._put_data(
-            DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint
-        )
+        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_SIG, self.data.sig.fingerprint)
         date = str(self.data.sig.date)
-        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_SIG, bdate)
         self._put_data(DataObject.DO_SIG_KEY, self.data.sig.key)
 
-        self._put_data(
-            DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint
-        )
+        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
         date = str(self.data.dec.date)
-        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_DEC, bdate)
         self._put_data(DataObject.DO_DEC_KEY, self.data.dec.key)
 
-        self._put_data(
-            DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint
-        )
+        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
         date = str(self.data.aut.date)
-        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_AUT, bdate)
         self._put_data(DataObject.DO_AUT_KEY, self.data.aut.key)
@@ -503,9 +494,7 @@ class GPGCard:
         if key_id.startswith("RSA"):
             modulus = bytearray.fromhex(pubkey["Modulus"])
             exponent = bytearray.fromhex(pubkey["Pub Exp"][2:])
-            key = construct(
-                (int.from_bytes(modulus, "big"), int.from_bytes(exponent, "big"))
-            )
+            key = construct((int.from_bytes(modulus, "big"), int.from_bytes(exponent, "big")))
             public_key = key.publickey().export_key()
             with open(file_name, mode="wb", encoding="utf-8") as f:
                 f.write(public_key)
@@ -528,9 +517,7 @@ class GPGCard:
                         f.write(f"{key}: {value}\n")
 
         else:
-            raise GPGCardExcpetion(
-                ErrorCodes.ERR_INTERNAL, f"Unsupported key type for export: {key_id}"
-            )
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Unsupported key type for export: {key_id}")
 
     def seed_key(self) -> None:
         """Regenerate keys, based on seed mode"""
@@ -542,8 +529,7 @@ class GPGCard:
         ):
             _, sw = self._exchange(binascii.unhexlify(apdu_hex))
             assert sw == ErrorCodes.ERR_SUCCESS, (
-                f"{name} key generation failed (sw={sw:#06x})"
-                " — check seed mode is ON and PIN is verified"
+                f"{name} key generation failed (sw={sw:#06x}) — check seed mode is ON and PIN is verified"
             )
 
     ############### Information decoding ###############
@@ -796,9 +782,7 @@ class GPGCard:
         try:
             salutation_str = USER_SALUTATION[salutation].encode("utf-8")
         except KeyError as err:
-            raise GPGCardExcpetion(
-                ErrorCodes.ERR_INTERNAL, f"Invalid salutation value ({salutation})!"
-            ) from err
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Invalid salutation value ({salutation})!") from err
 
         self.data.salutation = salutation
         self._put_data(DataObject.DO_CARD_SALUTATION, salutation_str)
@@ -825,9 +809,7 @@ class GPGCard:
         if pinpad:
             apdu = bytes.fromhex(f"EF2000{pw:02x}00")
         else:
-            apdu = bytes.fromhex(f"002000{pw:02x}{len(value):02x}") + value.encode(
-                "utf-8"
-            )
+            apdu = bytes.fromhex(f"002000{pw:02x}{len(value):02x}") + value.encode("utf-8")
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -844,11 +826,7 @@ class GPGCard:
         """
 
         lc = len(cur_value) + len(new_value)
-        apdu = (
-            bytes.fromhex(f"002400{pw:02x}{lc:02x}")
-            + cur_value.encode("utf-8")
-            + new_value.encode("utf-8")
-        )
+        apdu = bytes.fromhex(f"002400{pw:02x}{lc:02x}") + cur_value.encode("utf-8") + new_value.encode("utf-8")
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -863,9 +841,7 @@ class GPGCard:
         """
 
         b_value = value.encode("utf-8")
-        return (
-            self._put_data(DataObject.DO_RESET_CODE, b_value) == ErrorCodes.ERR_SUCCESS
-        )
+        return self._put_data(DataObject.DO_RESET_CODE, b_value) == ErrorCodes.ERR_SUCCESS
 
     def reset_PW1(self, RC: str, value: str) -> bool:
         """Reset the User Password with Resetting Code
@@ -880,11 +856,7 @@ class GPGCard:
 
         p1 = 2 if len(RC) == 0 else 0
         lc = len(RC) + len(value)
-        apdu = (
-            bytes.fromhex(f"002C{p1:02x}81{lc:02x}")
-            + RC.encode("utf-8")
-            + value.encode("utf-8")
-        )
+        apdu = bytes.fromhex(f"002C{p1:02x}81{lc:02x}") + RC.encode("utf-8") + value.encode("utf-8")
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -959,9 +931,7 @@ class GPGCard:
         """
 
         if template not in KEY_TEMPLATES:
-            raise GPGCardExcpetion(
-                ErrorCodes.ERR_INTERNAL, f"Invalid template: {template}"
-            )
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Invalid template: {template}")
 
         data = binascii.unhexlify(KEY_TEMPLATES[template])
         if key == KeyTypes.KEY_SIG:
@@ -1067,9 +1037,7 @@ class GPGCard:
         offset: int = 0
         key_data = self._get_key_object(key).key
 
-        d["OS Target ID"] = (
-            f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):04x}"
-        )
+        d["OS Target ID"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):04x}"
         offset += 4
         d["API Level"] = str(int.from_bytes(key_data[offset : offset + 4], "big"))
         offset += 4
@@ -1077,9 +1045,7 @@ class GPGCard:
         # Should be Public key here from doc, but only Public Exp from the code
         d["Public exp size"] = str(size)
         offset += 4
-        d["Public exp"] = (
-            f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):06x}"
-        )
+        d["Public exp"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):06x}"
         offset += size
         size = int.from_bytes(key_data[offset : offset + 4], "big")
         d["Private key size"] = str(size)
@@ -1113,9 +1079,7 @@ class GPGCard:
         """
 
         if action not in KEY_OPERATIONS:
-            raise GPGCardExcpetion(
-                ErrorCodes.ERR_INTERNAL, f"Invalid Key operation: {action}"
-            )
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Invalid Key operation: {action}")
 
         op = KEY_OPERATIONS[action]
         attributes = None
@@ -1133,9 +1097,7 @@ class GPGCard:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Invalid key attribute!")
 
         if attributes[0] not in set(iter(PubkeyAlgo)):
-            raise GPGCardExcpetion(
-                ErrorCodes.ERR_INTERNAL, "Invalid key ID in attribute!"
-            )
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Invalid key ID in attribute!")
 
         d = {}
         tags = self._asym_key_pair(op, b_key, seed)
@@ -1160,9 +1122,7 @@ class GPGCard:
 
             # Get the generation date
             date = self.get_key_date(key)
-            dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(
-                tzinfo=timezone.utc
-            )
+            dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
             kdate = int(dt.timestamp())
             d["Creation date"] = date
 
@@ -1276,7 +1236,7 @@ class GPGCard:
 
         dt = datetime.utcnow().replace(microsecond=0)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
-        tag: Optional[DataObject] = None
+        tag: DataObject | None = None
         if key == KeyTypes.KEY_SIG:
             self.data.sig.date = dt
             tag = DataObject.DO_DATES_WR_SIG
@@ -1323,7 +1283,7 @@ class GPGCard:
             tlv = tlv[offset + length :]
         return tags
 
-    def _transmit(self, data: bytes, long_resp: bool = False) -> Tuple[bytes, int, int]:
+    def _transmit(self, data: bytes, long_resp: bool = False) -> tuple[bytes, int, int]:
         """Transmit data, and get the response
 
         Args:
@@ -1343,7 +1303,7 @@ class GPGCard:
             raise GPGCardExcpetion(sw, "")
         return resp, sw1, sw2
 
-    def _exchange(self, apdu: bytes, data: bytes = b"") -> Tuple[bytes, int]:
+    def _exchange(self, apdu: bytes, data: bytes = b"") -> tuple[bytes, int]:
         """Exchange APDU, and get the response
 
         Args:
@@ -1391,14 +1351,7 @@ class GPGCard:
         if size == 2:
             return (buffer[offset] << 8) | buffer[offset + 1]
         if size == 3:
-            return (
-                (buffer[offset] << 16) | (buffer[offset + 1] << 8) | buffer[offset + 2]
-            )
+            return (buffer[offset] << 16) | (buffer[offset + 1] << 8) | buffer[offset + 2]
         if size == 4:
-            return (
-                (buffer[offset] << 24)
-                | (buffer[offset + 1] << 16)
-                | (buffer[offset + 2] << 8)
-                | buffer[offset + 3]
-            )
+            return (buffer[offset] << 24) | (buffer[offset + 1] << 16) | (buffer[offset + 2] << 8) | buffer[offset + 3]
         return 0

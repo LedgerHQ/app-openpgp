@@ -1,23 +1,20 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
 This module provides Ragger tests utility functions
 """
 
-from pathlib import Path
-from typing import List, Tuple
 import re
-from Crypto.PublicKey import RSA, ECC
-from Crypto.Util.number import bytes_to_long
-from Crypto.Signature import eddsa
-from Crypto.Protocol import DH as ecdh
-from ledgered.devices import Device
+from pathlib import Path
 
-from ragger.navigator import NavInsID, NavIns, Navigator
-
+from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
-from application_client.app_def import Errors, PassWord, DataObject, PubkeyAlgo
+from Crypto.Protocol import DH as ecdh
+from Crypto.PublicKey import ECC, RSA
+from Crypto.Signature import eddsa
+from Crypto.Util.number import bytes_to_long
+from ledgered.devices import Device
+from ragger.navigator import Navigator, NavIns, NavInsID
 
 ROOT_SCREENSHOT_PATH = Path(__file__).parent.resolve()
 
@@ -31,9 +28,7 @@ KEY_TEMPLATES = {
 }
 
 # digestInfo header: https://www.rfc-editor.org/rfc/rfc8017#section-9.2
-SHA256_DIGEST_INFO = (
-    b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01\x05\x00\x04\x20"
-)
+SHA256_DIGEST_INFO = b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01\x05\x00\x04\x20"
 
 
 def util_navigate(
@@ -74,9 +69,7 @@ def util_navigate(
     )
 
 
-def generate_key(
-    client: CommandSender, key_tag: DataObject, seed: bool = False
-) -> None:
+def generate_key(client: CommandSender, key_tag: DataObject, seed: bool = False) -> None:
     """Generate a Asymmetric key
 
     Args:
@@ -93,7 +86,7 @@ def generate_key(
     assert rapdu.status == Errors.SW_OK
 
 
-def get_key_attributes(client: CommandSender, key_attr: int) -> Tuple[PubkeyAlgo, int]:
+def get_key_attributes(client: CommandSender, key_attr: int) -> tuple[PubkeyAlgo, int]:
     """Send and check the pincode
 
     Args:
@@ -186,9 +179,7 @@ def get_ECDSA_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
     print(f" X[{len(x)}]: {x.hex()}")
     print(f" Y[{len(y)}]: {y.hex()}")
     assert len(x) == len(y)
-    return ECC.construct(
-        curve="P-256", point_x=bytes_to_long(x), point_y=bytes_to_long(y)
-    )
+    return ECC.construct(curve="P-256", point_x=bytes_to_long(x), point_y=bytes_to_long(y))
 
 
 def get_RSA_pub_key(client: CommandSender, key_tag: DataObject) -> RSA.RsaKey:
@@ -210,9 +201,7 @@ def get_RSA_pub_key(client: CommandSender, key_tag: DataObject) -> RSA.RsaKey:
     print(f" Key Exponent: 0x{exponent.hex()}")
     print(f" Key Modulus[{len(modulus)}]: {modulus.hex()}")
 
-    return RSA.construct(
-        (int.from_bytes(modulus, "big"), int.from_bytes(exponent, "big"))
-    )
+    return RSA.construct((int.from_bytes(modulus, "big"), int.from_bytes(exponent, "big")))
 
 
 def check_pincode(client: CommandSender, pwd: PassWord) -> None:
@@ -316,13 +305,13 @@ def decode_tlv(tlv: bytes) -> dict:
     return tags
 
 
-def _read_makefile() -> List[str]:
+def _read_makefile() -> list[str]:
     """Read lines from the parent Makefile"""
 
     parent = Path(ROOT_SCREENSHOT_PATH).parent.parent.resolve()
     makefile = f"{parent}/Makefile"
     print(f"Analyzing {makefile}...")
-    with open(makefile, "r", encoding="utf-8") as f_p:
+    with open(makefile, encoding="utf-8") as f_p:
         lines = f_p.readlines()
 
     return lines

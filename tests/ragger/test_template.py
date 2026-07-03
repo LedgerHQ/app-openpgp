@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
@@ -6,20 +5,24 @@ This module provides Ragger tests for Key Templates feature
 """
 
 import sys
+
 import pytest
-from Crypto.Hash import SHA256
-from Crypto.Signature import pkcs1_15, eddsa
-from Crypto.Random import get_random_bytes
-from Crypto.Signature import DSS
-
-from ragger.backend import BackendInterface
-
+from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
-from application_client.app_def import Errors, DataObject, PassWord, PubkeyAlgo
-
-from utils import get_RSA_pub_key, get_ECDSA_pub_key, get_EDDSA_pub_key
-from utils import check_pincode, generate_key, get_key_attributes
-from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO
+from Crypto.Hash import SHA256
+from Crypto.Random import get_random_bytes
+from Crypto.Signature import DSS, eddsa, pkcs1_15
+from ragger.backend import BackendInterface
+from utils import (
+    KEY_TEMPLATES,
+    SHA256_DIGEST_INFO,
+    check_pincode,
+    generate_key,
+    get_ECDSA_pub_key,
+    get_EDDSA_pub_key,
+    get_key_attributes,
+    get_RSA_pub_key,
+)
 
 
 @pytest.mark.parametrize(
@@ -28,15 +31,11 @@ from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO
         "rsa2048",
         pytest.param(
             "rsa3072",
-            marks=pytest.mark.skipif(
-                "--full" not in sys.argv, reason="skipping long test"
-            ),
+            marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test"),
         ),
         pytest.param(
             "rsa4096",
-            marks=pytest.mark.skipif(
-                "--full" not in sys.argv, reason="skipping long test"
-            ),
+            marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test"),
         ),
         "nistp256",  # ECDSA
         "ed25519",  # EdDSA

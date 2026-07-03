@@ -1,23 +1,19 @@
-from typing import Sequence
+from collections.abc import Sequence
+
 import pytest
+from application_client.app_def import PassWord
+from application_client.command_sender import CommandSender
 from ledgered.devices import Device, DeviceType
 from ragger.backend import BackendInterface
-from ragger.navigator import Navigator, NavInsID, NavIns
+from ragger.navigator import Navigator, NavIns, NavInsID
 from ragger.navigator.navigator import InstructionType
-
-from application_client.command_sender import CommandSender
-from application_client.app_def import PassWord
-
-from utils import check_pincode
-from utils import ROOT_SCREENSHOT_PATH
+from utils import ROOT_SCREENSHOT_PATH, check_pincode
 
 
 # In this test we check the behavior of the Slot menu
 # The Navigations go and check:
 #  - Select slot / Slot 2 / (next page) / Set default
-def test_menu_slot(
-    device: Device, backend: BackendInterface, navigator: Navigator, test_name: str
-) -> None:
+def test_menu_slot(device: Device, backend: BackendInterface, navigator: Navigator, test_name: str) -> None:
 
     # Use the app interface instead of raw interface
     client = CommandSender(backend)
@@ -83,9 +79,7 @@ def test_menu_slot(
 #               UIF / Enable UIF for Signature
 #               (back)
 #               Reset / Long press 'Yes'
-def test_menu_settings(
-    device: Device, backend: BackendInterface, navigator: Navigator, test_name: str
-) -> None:
+def test_menu_settings(device: Device, backend: BackendInterface, navigator: Navigator, test_name: str) -> None:
     # Navigate in the main menu
     instructions: Sequence[InstructionType]
     if device.is_nano:
