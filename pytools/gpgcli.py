@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
@@ -18,11 +17,11 @@
 # *****************************************************************************
 
 import sys
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
-from argparse import ArgumentParser, RawTextHelpFormatter, Namespace
+
 from gpgapp.gpgcard import GPGCard, GPGCardExcpetion
-from gpgapp.gpgcmd import ErrorCodes, KeyTypes, PassWord
-from gpgapp.gpgcmd import KEY_OPERATIONS, KEY_TEMPLATES, USER_SALUTATION
+from gpgapp.gpgcmd import KEY_OPERATIONS, KEY_TEMPLATES, USER_SALUTATION, ErrorCodes, KeyTypes, PassWord
 
 
 # ===============================================================================
@@ -35,9 +34,7 @@ def get_argparser() -> Namespace:
         description="Manage OpenPGP App on Ledger device",
         formatter_class=RawTextHelpFormatter,
     )
-    parser.add_argument(
-        "--info", action="store_true", help="Get and display card information"
-    )
+    parser.add_argument("--info", action="store_true", help="Get and display card information")
     parser.add_argument(
         "--reader",
         type=str,
@@ -46,24 +43,16 @@ def get_argparser() -> Namespace:
     )
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
-    parser.add_argument(
-        "--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)"
-    )
+    parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")
     parser.add_argument(
         "--reset",
         action="store_true",
         help="Reset the application (all data will be erased)",
     )
 
-    parser.add_argument(
-        "--pinpad", action="store_true", help="PIN validation delegated to pinpad"
-    )
-    parser.add_argument(
-        "--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)"
-    )
-    parser.add_argument(
-        "--user-pin", metavar="PIN", help="User PIN (if pinpad not used)"
-    )
+    parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
+    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
+    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
     parser.add_argument("--new-user-pin", metavar="PIN", help="Change User PIN")
     parser.add_argument("--new-adm-pin", metavar="PIN", help="Change Admin PIN")
     group = parser.add_mutually_exclusive_group()
@@ -71,9 +60,7 @@ def get_argparser() -> Namespace:
     group.add_argument("--reset-pw1", help="Reset the User PIN")
 
     parser.add_argument("--serial", help="Update the 'serial' data (4 bytes)")
-    parser.add_argument(
-        "--salutation", choices=list(USER_SALUTATION), help="Update 'salutation' data"
-    )
+    parser.add_argument("--salutation", choices=list(USER_SALUTATION), help="Update 'salutation' data")
     parser.add_argument("--name", help="Update 'name' data")
     parser.add_argument("--url", help="Update 'url' data")
     parser.add_argument("--login", help="Update 'login' data")
@@ -245,9 +232,7 @@ def get_info(gpgcard: GPGCard, display: bool = True) -> None:
 # ===============================================================================
 #          Set fingerprints
 # ===============================================================================
-def set_fingerprints(
-    gpgcard: GPGCard, fingerprints: str, key_type: KeyTypes | None = None
-) -> None:
+def set_fingerprints(gpgcard: GPGCard, fingerprints: str, key_type: KeyTypes | None = None) -> None:
     """Set Key template
 
     Args:
@@ -260,9 +245,7 @@ def set_fingerprints(
     if key_type is None:
         # Consider all keys fingerprints are given
         try:
-            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = (
-                fingerprints.split(":")
-            )
+            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = fingerprints.split(":")
         except ValueError as err:
             raise GPGCardExcpetion(0, f"Wrong fingerprints arguments: {err}") from err
 
@@ -278,9 +261,7 @@ def set_fingerprints(
 # ===============================================================================
 #          Set Key Templates
 # ===============================================================================
-def set_templates(
-    gpgcard: GPGCard, templates: str, key_type: KeyTypes | None = None
-) -> None:
+def set_templates(gpgcard: GPGCard, templates: str, key_type: KeyTypes | None = None) -> None:
     """Set Key template
 
     Args:
@@ -293,9 +274,7 @@ def set_templates(
     if key_type is None:
         # Consider all keys template are given
         try:
-            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = (
-                templates.split(":")
-            )
+            d[KeyTypes.KEY_SIG], d[KeyTypes.KEY_DEC], d[KeyTypes.KEY_AUT] = templates.split(":")
         except ValueError as err:
             raise GPGCardExcpetion(0, f"Wrong templates arguments: {err}") from err
     else:
@@ -441,9 +420,7 @@ def entrypoint() -> None:
             gpgcard.set_serial(args.serial)
 
         if args.key_action:
-            handle_key(
-                gpgcard, args.key_action, args.key_type, args.file, args.seed_key
-            )
+            handle_key(gpgcard, args.key_action, args.key_type, args.file, args.seed_key)
 
         gpgcard.disconnect()
 

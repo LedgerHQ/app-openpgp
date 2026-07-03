@@ -1,26 +1,22 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
 This module provides Ragger tests for Signing feature
 """
 
+from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
+from application_client.command_sender import CommandSender
 from Crypto.Hash import SHA256
 from Crypto.PublicKey.RSA import RsaKey
-from Crypto.Signature import pkcs1_15
 from Crypto.Random import get_random_bytes
-
+from Crypto.Signature import pkcs1_15
 from ragger.backend import BackendInterface
-
-from application_client.command_sender import CommandSender
-from application_client.app_def import Errors, DataObject, PassWord, PubkeyAlgo
-
 from utils import (
+    SHA256_DIGEST_INFO,
     check_pincode,
+    generate_key,
     get_key_attributes,
     get_RSA_pub_key,
-    generate_key,
-    SHA256_DIGEST_INFO,
 )
 
 

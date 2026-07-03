@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
@@ -16,8 +15,8 @@
 #  limitations under the License.
 # *****************************************************************************
 
-from enum import Enum, IntEnum
-
+from enum import IntEnum, StrEnum
+from typing import ClassVar
 
 KEY_TEMPLATES = {
     "rsa2048": "010800002001",
@@ -42,7 +41,7 @@ USER_SALUTATION = {
 }
 
 
-class KeyTypes(str, Enum):
+class KeyTypes(StrEnum):
     """Key types definition
     OpenPGP Application manage four keys for cryptographic operation (PSO) plus two
     for secure channel.
@@ -95,7 +94,7 @@ class PassWord(IntEnum):
 class ErrorCodes:
     """Error codes definition"""
 
-    err_list = {
+    err_list: ClassVar[dict[int, str]] = {
         0x6285: "Selected file in termination state",
         0x6581: "Memory failure",
         0x6600: "Security-related issues (reserved for UIF in this application)",

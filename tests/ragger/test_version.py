@@ -1,18 +1,15 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
 This module provides Ragger tests for Version check
 """
 
-from ragger.utils.misc import get_current_app_name_and_version
-from ragger.backend import BackendInterface
-
+from application_client.app_def import DataObject, Errors, PassWord
 from application_client.command_sender import CommandSender
-from application_client.app_def import Errors, DataObject, PassWord
 from application_client.response_unpacker import unpack_info_response
-
-from utils import verify_name, verify_version, decode_tlv, check_pincode
+from ragger.backend import BackendInterface
+from ragger.utils.misc import get_current_app_name_and_version
+from utils import check_pincode, decode_tlv, verify_name, verify_version
 
 
 # In this test we check the App name and version
