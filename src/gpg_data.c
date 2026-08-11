@@ -556,7 +556,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             /* ----------------- User -----------------*/
             /* Name */
         case 0x5B:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->name.value)) {
+            if (G_gpg_vstate.io_length > GPG_NAME_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -570,7 +570,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Login data */
         case 0x5E:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->login.value)) {
+            if (G_gpg_vstate.io_length > GPG_EXT_PRIVATE_DO_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -584,7 +584,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Language preferences */
         case 0x5F2D:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->lang.value)) {
+            if (G_gpg_vstate.io_length > GPG_LANG_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -598,7 +598,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* salutation */
         case 0x5F35:
-            if (G_gpg_vstate.io_length != sizeof(N_gpg_pstate->salutation)) {
+            if (G_gpg_vstate.io_length != GPG_SALUTATION_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -609,7 +609,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Uniform resource locator */
         case 0x5F50:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->keys[G_gpg_vstate.slot].url.value)) {
+            if (G_gpg_vstate.io_length > GPG_EXT_PRIVATE_DO_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }

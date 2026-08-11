@@ -47,6 +47,10 @@
 
 #define GPG_KEY_ATTRIBUTES_LENGTH 12
 
+#define GPG_NAME_LENGTH       39
+#define GPG_LANG_LENGTH       8
+#define GPG_SALUTATION_LENGTH 1
+
 #define GPG_RSA_DEFAULT_PUB 0x00010001U
 
 #ifndef CX_AES_128_KEY_LEN
@@ -150,11 +154,11 @@ struct gpg_nv_state_s {
 
     /* -- Cardholder Related Data -- */
     /*  5B */
-    LV(name, 39);
+    LV(name, GPG_NAME_LENGTH);
     /*  5F2D */
-    LV(lang, 8);
+    LV(lang, GPG_LANG_LENGTH);
     /*  5F35 */
-    unsigned char salutation[1];
+    unsigned char salutation[GPG_SALUTATION_LENGTH];
 
     /* -- Application  Related Data -- */
     /*  4F */
