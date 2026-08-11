@@ -6,6 +6,7 @@ on:
       - develop
     paths:
       - 'doc/**'
+      - 'clients/wui/**'
   workflow_dispatch:
 
 concurrency:
@@ -21,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Pandoc
         run: |
@@ -30,6 +31,30 @@ jobs:
 
       - name: Generate HTML
         run: doc/generate_html.sh
+
+      # Build the backup/restore web UI and publish it under the same Pages
+      # site, at <pages-url>/wui/.
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          # Node >= 22.5: pnpm 11 loads node:sqlite, which older Node lacks.
+          node-version: '22'
+
+      - name: Build the backup web UI
+        working-directory: clients/wui
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          # pnpm is provisioned by corepack from the "packageManager" field.
+          corepack enable
+          # --frozen-lockfile: install exactly what pnpm-lock.yaml pins (fail on drift).
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Add the web UI to the Pages artifact
+        run: |
+          mkdir -p doc/html/build/wui
+          cp -r clients/wui/dist/. doc/html/build/wui/
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

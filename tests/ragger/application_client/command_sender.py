@@ -1,19 +1,25 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
 This module provides Ragger tests Client application.
 It contains the command sending part.
 """
-from typing import Generator, Optional, Tuple
-from contextlib import contextmanager
 
 import binascii
+from collections.abc import Generator
+from contextlib import contextmanager
 
-from ragger.backend.interface import BackendInterface, RAPDU
+from ragger.backend.interface import RAPDU, BackendInterface
 from ragger.error import ExceptionRAPDU
 
-from application_client.app_def import ClaType, InsType, PassWord, Errors, DataObject, PubkeyAlgo
+from application_client.app_def import (
+    ClaType,
+    DataObject,
+    Errors,
+    InsType,
+    PassWord,
+    PubkeyAlgo,
+)
 
 
 class CommandSender:
@@ -21,7 +27,6 @@ class CommandSender:
 
     def __init__(self, backend: BackendInterface) -> None:
         self.backend = backend
-
 
     ############### CARD interface ###############
     def send_select(self) -> RAPDU:
@@ -32,10 +37,7 @@ class CommandSender:
         """
 
         data = binascii.unhexlify(b"06D27600012401")
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_SELECT,
-                                    p1=0x04,
-                                    data=data)
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_SELECT, p1=0x04, data=data)
 
     def send_activate(self) -> RAPDU:
         """APDU Activate
@@ -44,8 +46,7 @@ class CommandSender:
             Response APDU
         """
 
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_ACTIVATE_FILE)
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_ACTIVATE_FILE)
 
     def send_terminate(self) -> RAPDU:
         """APDU Terminate
@@ -54,9 +55,7 @@ class CommandSender:
             Response APDU
         """
 
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_TERMINATE_DF)
-
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_TERMINATE_DF)
 
     ############### API interfaces ###############
     def get_data(self, tag: DataObject) -> RAPDU:
@@ -71,10 +70,7 @@ class CommandSender:
 
         p1 = 0x00 if tag <= 0xFF else (tag >> 8) & 0xFF
         p2 = tag & 0xFF
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_GET_DATA,
-                                    p1=p1,
-                                    p2=p2)
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_GET_DATA, p1=p1, p2=p2)
 
     def put_data(self, tag: DataObject, data: bytes) -> RAPDU:
         """APDU Put Data
@@ -89,12 +85,7 @@ class CommandSender:
 
         p1 = 0x00 if tag <= 0xFF else (tag >> 8) & 0xFF
         p2 = tag & 0xFF
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_PUT_DATA,
-                                    p1=p1,
-                                    p2=p2,
-                                    data=data)
-
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_PUT_DATA, p1=p1, p2=p2, data=data)
 
     ############### SLOT interface ###############
     def get_slot(self) -> int:
@@ -108,8 +99,7 @@ class CommandSender:
         assert rapdu.status == Errors.SW_OK
         return int.from_bytes(rapdu.data, "big")
 
-
-    def get_slot_config(self) -> Tuple[int, int]:
+    def get_slot_config(self) -> tuple[int, int]:
         """APDU Get Slot config
 
         Returns:
@@ -121,7 +111,6 @@ class CommandSender:
         nb_slots = rapdu.data[0]
         def_slot = rapdu.data[1]
         return nb_slots, def_slot
-
 
     def set_slot(self, slot: int) -> RAPDU:
         """APDU Set Slot
@@ -138,9 +127,8 @@ class CommandSender:
         data = slot.to_bytes(1, "big")
         return self.put_data(DataObject.CMD_SLOT_CUR, data)
 
-
     ############### PASSWORD interface ###############
-    def send_verify_pw(self, pwd: PassWord, value: str="", reset: bool=False) -> RAPDU:
+    def send_verify_pw(self, pwd: PassWord, value: str = "", reset: bool = False) -> RAPDU:
         """APDU Verify Pincode
 
         Args:
@@ -158,12 +146,7 @@ class CommandSender:
         else:
             data = b""
         p1 = 0xFF if reset else 0x00
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_VERIFY,
-                                    p1=p1,
-                                    p2=pwd,
-                                    data=data)
-
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_VERIFY, p1=p1, p2=pwd, data=data)
 
     @contextmanager
     def send_verify_pw_with_confirmation(self, pwd: PassWord) -> Generator[None, None, None]:
@@ -176,9 +159,7 @@ class CommandSender:
             Response APDU
         """
 
-        with self.backend.exchange_async(cla=ClaType.CLA_APP_VERIFY,
-                                    ins=InsType.INS_VERIFY,
-                                    p2=pwd) as response:
+        with self.backend.exchange_async(cla=ClaType.CLA_APP_VERIFY, ins=InsType.INS_VERIFY, p2=pwd) as response:
             yield response
 
     def send_change_pw(self, pwd: PassWord, actual: str, new: str) -> RAPDU:
@@ -196,10 +177,7 @@ class CommandSender:
         assert actual
         assert new
         data = actual.encode("utf-8") + new.encode("utf-8")
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_CHANGE_REF_DATA,
-                                    p2=pwd,
-                                    data=data)
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_CHANGE_REF_DATA, p2=pwd, data=data)
 
     def send_reset_pw(self, value: str) -> RAPDU:
         """APDU Reset Retry Counter
@@ -213,12 +191,13 @@ class CommandSender:
 
         assert value
         data = value.encode("utf-8")
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_RESET_RC,
-                                    p1=0x02,
-                                    p2=PassWord.PW1,
-                                    data=data)
-
+        return self.backend.exchange(
+            cla=ClaType.CLA_APP,
+            ins=InsType.INS_RESET_RC,
+            p1=0x02,
+            p2=PassWord.PW1,
+            data=data,
+        )
 
     ############### Key TEMPLATE interface ###############
     def set_template(self, key: DataObject, value: str):
@@ -235,7 +214,6 @@ class CommandSender:
         data = binascii.unhexlify(value)
         return self.put_data(key, data)
 
-
     ############### Perform Security Operation ###############
     def set_uif(self, tag: DataObject, uif: bool):
         """APDU Set User Interaction Flag
@@ -251,7 +229,6 @@ class CommandSender:
         data = value.to_bytes(2, "little")
         return self.put_data(tag, data)
 
-
     def manage_security_env(self, key: DataObject, ref: int) -> RAPDU:
         """APDU Manage Security Environment
 
@@ -264,12 +241,7 @@ class CommandSender:
         """
 
         data = b"\x83\x01" + bytes.fromhex(f"{ref:02x}")
-        return self.backend.exchange(cla=ClaType.CLA_APP,
-                                    ins=InsType.INS_MSE,
-                                    p1=0x41,
-                                    p2=key,
-                                    data=data)
-
+        return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_MSE, p1=0x41, p2=key, data=data)
 
     def get_challenge(self, size: int) -> RAPDU:
         """APDU Get Challenge
@@ -293,7 +265,6 @@ class CommandSender:
         # Receive long response
         return self.get_long_response(rapdu)
 
-
     def read_key(self, key: DataObject) -> RAPDU:
         """APDU Read Asymmetric Public Key
 
@@ -305,7 +276,6 @@ class CommandSender:
         """
 
         return self.__key(0x81, key, False)
-
 
     def generate_key(self, key: DataObject, seed: bool = False) -> RAPDU:
         """APDU Generate Asymmetric Key pair
@@ -319,7 +289,6 @@ class CommandSender:
         """
 
         return self.__key(0x80, key, seed)
-
 
     def authenticate(self, frame: bytes) -> RAPDU:
         """APDU Internal Authenticate
@@ -343,7 +312,7 @@ class CommandSender:
             Response APDU
         """
 
-        return self.__pso(InsType.INS_PSO, 0x9e9a, frame)
+        return self.__pso(InsType.INS_PSO, 0x9E9A, frame)
 
     def encrypt(self, frame: bytes) -> RAPDU:
         """APDU Encipher
@@ -408,9 +377,9 @@ class CommandSender:
                 cla = ClaType.CLA_APP_CHAIN
                 m_frame = frame[:d_len]
             else:
-                d_len = size # Remaining len
+                d_len = size  # Remaining len
                 cla = ClaType.CLA_APP
-                m_frame = frame[:d_len] + b"\x00" # 0x00 suffix on the last message
+                m_frame = frame[:d_len] + b"\x00"  # 0x00 suffix on the last message
 
             data = bytes.fromhex(f"{cla:02x}{ins:02x}8086{d_len + len(pad_ind):02x}") + pad_ind + m_frame
             try:
@@ -424,7 +393,6 @@ class CommandSender:
 
         # Return result
         return rapdu
-
 
     ############### Responses ###############
     def get_long_response(self, rapdu: RAPDU) -> RAPDU:
@@ -454,8 +422,7 @@ class CommandSender:
             rdata += rapdu.data
         return RAPDU(rapdu.status, rdata)
 
-
-    def get_async_response(self) -> Optional[RAPDU]:
+    def get_async_response(self) -> RAPDU | None:
         """Asynchronous APDU response
 
         Returns:
@@ -463,7 +430,6 @@ class CommandSender:
         """
 
         return self.backend.last_async_response
-
 
     ############### Internal functions ###############
     def __pso(self, ins: int, tag: int, frame: bytes) -> RAPDU:
@@ -488,7 +454,6 @@ class CommandSender:
         # Receive long response
         return self.get_long_response(rapdu)
 
-
     def __key(self, p1: int, key: DataObject, seed: bool = False) -> RAPDU:
         """APDU Asymmetric Key pair
 
@@ -504,11 +469,13 @@ class CommandSender:
         data = bytes.fromhex(f"{key:02x}00")
         p2 = 0x01 if seed else 0x00
         try:
-            rapdu = self.backend.exchange(cla=ClaType.CLA_APP,
-                                  ins=InsType.INS_GEN_ASYM_KEYPAIR,
-                                  p1=p1,
-                                  p2=p2,
-                                  data=data)
+            rapdu = self.backend.exchange(
+                cla=ClaType.CLA_APP,
+                ins=InsType.INS_GEN_ASYM_KEYPAIR,
+                p1=p1,
+                p2=p2,
+                data=data,
+            )
         except ExceptionRAPDU as err:
             rapdu = RAPDU(err.status, err.data)
 

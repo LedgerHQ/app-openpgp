@@ -1,15 +1,13 @@
-from typing import Sequence
+from collections.abc import Sequence
+
 import pytest
+from application_client.app_def import PassWord
+from application_client.command_sender import CommandSender
 from ledgered.devices import Device, DeviceType
 from ragger.backend import BackendInterface
-from ragger.navigator import Navigator, NavInsID, NavIns
+from ragger.navigator import Navigator, NavIns, NavInsID
 from ragger.navigator.navigator import InstructionType
-
-from application_client.command_sender import CommandSender
-from application_client.app_def import PassWord
-
-from utils import check_pincode
-from utils import ROOT_SCREENSHOT_PATH
+from utils import ROOT_SCREENSHOT_PATH, check_pincode
 
 
 # In this test we check the behavior of the Slot menu
@@ -32,38 +30,44 @@ def test_menu_slot(device: Device, backend: BackendInterface, navigator: Navigat
     if device.is_nano:
         initial_instructions = [
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # Select slot
+            NavInsID.BOTH_CLICK,  # Select slot
         ]
         instructions = [
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # Slot 2
+            NavInsID.BOTH_CLICK,  # Slot 2
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # (Set as default)
+            NavInsID.BOTH_CLICK,  # (Set as default)
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # (Back)
+            NavInsID.BOTH_CLICK,  # (Back)
         ]
 
     else:
         initial_instructions = [
-            NavInsID.USE_CASE_CHOICE_CONFIRM,    # Slots
+            NavInsID.USE_CASE_CHOICE_CONFIRM,  # Slots
         ]
         if device.type == DeviceType.APEX_P:
-            instructions = [NavIns(NavInsID.TOUCH, (270, 160))] # Slot 2
+            instructions = [NavIns(NavInsID.TOUCH, (270, 160))]  # Slot 2
         else:
-            instructions = [NavIns(NavInsID.TOUCH, (350, 220))] # Slot 2
-        instructions += [NavInsID.CENTERED_FOOTER_TAP] # Set default
+            instructions = [NavIns(NavInsID.TOUCH, (350, 220))]  # Slot 2
+        instructions += [NavInsID.CENTERED_FOOTER_TAP]  # Set default
 
     # Navigate to settings menu to avoid 1st screen with random serial no
-    navigator.navigate(initial_instructions,
-                        screen_change_before_first_instruction=False,
-                        screen_change_after_last_instruction=True)
+    navigator.navigate(
+        initial_instructions,
+        screen_change_before_first_instruction=False,
+        screen_change_after_last_instruction=True,
+    )
 
-    navigator.navigate_and_compare(ROOT_SCREENSHOT_PATH, test_name, instructions,
-                                   screen_change_before_first_instruction=False,
-                                   screen_change_after_last_instruction=False)
+    navigator.navigate_and_compare(
+        ROOT_SCREENSHOT_PATH,
+        test_name,
+        instructions,
+        screen_change_before_first_instruction=False,
+        screen_change_after_last_instruction=False,
+    )
 
 
 # In this test we check the behavior of the Setting menus
@@ -82,113 +86,109 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
         initial_instructions = [
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # Settings
+            NavInsID.BOTH_CLICK,  # Settings
         ]
         instructions = [
-            NavInsID.BOTH_CLICK,    # Key Template
-            NavInsID.RIGHT_CLICK,   # Decryption
-            NavInsID.RIGHT_CLICK,   # Authentication
-            NavInsID.BOTH_CLICK,    # Key Authentication
-            NavInsID.RIGHT_CLICK,   # Choose Type
+            NavInsID.BOTH_CLICK,  # Key Template
+            NavInsID.RIGHT_CLICK,  # Decryption
+            NavInsID.RIGHT_CLICK,  # Authentication
+            NavInsID.BOTH_CLICK,  # Key Authentication
+            NavInsID.RIGHT_CLICK,  # Choose Type
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # SECP 256R1
-            NavInsID.RIGHT_CLICK,   # Type SECP 256R1
-            NavInsID.BOTH_CLICK,    # (Back)
-
+            NavInsID.BOTH_CLICK,  # SECP 256R1
+            NavInsID.RIGHT_CLICK,  # Type SECP 256R1
+            NavInsID.BOTH_CLICK,  # (Back)
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # Seed mode ON
+            NavInsID.BOTH_CLICK,  # Seed mode ON
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # (Back to settings)
-
+            NavInsID.BOTH_CLICK,  # (Back to settings)
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # PIN mode
-            NavInsID.BOTH_CLICK,    # On Screen
+            NavInsID.BOTH_CLICK,  # PIN mode
+            NavInsID.BOTH_CLICK,  # On Screen
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # Set as default
+            NavInsID.BOTH_CLICK,  # Set as default
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # (Back to settings)
-
+            NavInsID.BOTH_CLICK,  # (Back to settings)
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # UIF
-            NavInsID.BOTH_CLICK,    # UIF for Signature
-            NavInsID.RIGHT_CLICK,
+            NavInsID.BOTH_CLICK,  # UIF
+            NavInsID.BOTH_CLICK,  # UIF for Signature
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # (Back to settings)
-
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # Reset
+            NavInsID.BOTH_CLICK,  # (Back to settings)
+            NavInsID.RIGHT_CLICK,
+            NavInsID.BOTH_CLICK,  # Reset
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,    # Validate
+            NavInsID.BOTH_CLICK,  # Validate
         ]
 
     else:
         initial_instructions = [
-            NavInsID.USE_CASE_HOME_SETTINGS,    # Settings
+            NavInsID.USE_CASE_HOME_SETTINGS,  # Settings
         ]
         if device.type == DeviceType.STAX:
             instructions = [
-                NavIns(NavInsID.TOUCH, (350, 130)), # Key Template
-                NavIns(NavInsID.TOUCH, (350, 330)), # Authentication
-                NavIns(NavInsID.TOUCH, (350, 420)), # SECP 256K1
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (350, 220)), # Seed mode
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (350, 320)), # PIN mode
-                NavIns(NavInsID.TOUCH, (350, 140)), # On Screen
-                NavInsID.CENTERED_FOOTER_TAP,       # Set default
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (350, 420)), # UIF
-                NavIns(NavInsID.TOUCH, (350, 130)), # UIF for Signature
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (350, 510)), # Reset
-                NavInsID.USE_CASE_CHOICE_CONFIRM,   # Press 'Reset'
+                NavIns(NavInsID.TOUCH, (350, 130)),  # Key Template
+                NavIns(NavInsID.TOUCH, (350, 330)),  # Authentication
+                NavIns(NavInsID.TOUCH, (350, 420)),  # SECP 256K1
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (350, 220)),  # Seed mode
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (350, 320)),  # PIN mode
+                NavIns(NavInsID.TOUCH, (350, 140)),  # On Screen
+                NavInsID.CENTERED_FOOTER_TAP,  # Set default
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (350, 420)),  # UIF
+                NavIns(NavInsID.TOUCH, (350, 130)),  # UIF for Signature
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (350, 510)),  # Reset
+                NavInsID.USE_CASE_CHOICE_CONFIRM,  # Press 'Reset'
             ]
         elif device.type == DeviceType.FLEX:
             instructions = [
-                NavIns(NavInsID.TOUCH, (430, 130)), # Key Template
-                NavIns(NavInsID.TOUCH, (430, 320)), # Authentication
-                NavIns(NavInsID.TOUCH, (430, 410)), # SECP 256K1
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (430, 230)), # Seed mode
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (430, 325)), # PIN mode
-                NavIns(NavInsID.TOUCH, (430, 140)), # On Screen
-                NavInsID.EXIT_FOOTER_TAP,           # Set default
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (430, 420)), # UIF
-                NavIns(NavInsID.TOUCH, (430, 140)), # UIF for Signature
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavInsID.USE_CASE_SETTINGS_NEXT,    # Next page
-                NavIns(NavInsID.TOUCH, (430, 130)), # Reset
-                NavInsID.USE_CASE_CHOICE_CONFIRM,   # Press 'Reset'
+                NavIns(NavInsID.TOUCH, (430, 130)),  # Key Template
+                NavIns(NavInsID.TOUCH, (430, 320)),  # Authentication
+                NavIns(NavInsID.TOUCH, (430, 410)),  # SECP 256K1
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (430, 230)),  # Seed mode
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (430, 325)),  # PIN mode
+                NavIns(NavInsID.TOUCH, (430, 140)),  # On Screen
+                NavInsID.EXIT_FOOTER_TAP,  # Set default
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (430, 420)),  # UIF
+                NavIns(NavInsID.TOUCH, (430, 140)),  # UIF for Signature
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavInsID.USE_CASE_SETTINGS_NEXT,  # Next page
+                NavIns(NavInsID.TOUCH, (430, 130)),  # Reset
+                NavInsID.USE_CASE_CHOICE_CONFIRM,  # Press 'Reset'
             ]
         else:
             instructions = [
                 NavIns(NavInsID.TOUCH, (270, 90)),  # Key Template
-                NavIns(NavInsID.TOUCH, (265, 230)), # Authentication
-                NavIns(NavInsID.TOUCH, (275, 300)), # SECP 256K1
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (270, 160)), # Seed mode
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (270, 235)), # PIN mode
+                NavIns(NavInsID.TOUCH, (265, 230)),  # Authentication
+                NavIns(NavInsID.TOUCH, (275, 300)),  # SECP 256K1
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (270, 160)),  # Seed mode
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (270, 235)),  # PIN mode
                 NavIns(NavInsID.TOUCH, (270, 90)),  # On Screen
-                NavInsID.EXIT_FOOTER_TAP,           # Set default
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavIns(NavInsID.TOUCH, (270, 300)), # UIF
+                NavInsID.EXIT_FOOTER_TAP,  # Set default
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavIns(NavInsID.TOUCH, (270, 300)),  # UIF
                 NavIns(NavInsID.TOUCH, (270, 90)),  # UIF for Signature
-                NavInsID.NAVIGATION_HEADER_TAP,     # (Back)
-                NavInsID.USE_CASE_SETTINGS_NEXT,    # Next page
+                NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
+                NavInsID.USE_CASE_SETTINGS_NEXT,  # Next page
                 NavIns(NavInsID.TOUCH, (270, 90)),  # Reset
-                NavInsID.USE_CASE_CHOICE_CONFIRM,   # Press 'Reset'
+                NavInsID.USE_CASE_CHOICE_CONFIRM,  # Press 'Reset'
             ]
 
     # Use the app interface instead of raw interface
@@ -197,10 +197,16 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
     check_pincode(client, PassWord.PW2)
 
     # Navigate to settings menu to avoid 1st screen with random serial no
-    navigator.navigate(initial_instructions,
-                        screen_change_before_first_instruction=False,
-                        screen_change_after_last_instruction=True)
+    navigator.navigate(
+        initial_instructions,
+        screen_change_before_first_instruction=False,
+        screen_change_after_last_instruction=True,
+    )
 
-    navigator.navigate_and_compare(ROOT_SCREENSHOT_PATH, test_name, instructions,
-                                   screen_change_before_first_instruction=False,
-                                   screen_change_after_last_instruction=False)
+    navigator.navigate_and_compare(
+        ROOT_SCREENSHOT_PATH,
+        test_name,
+        instructions,
+        screen_change_before_first_instruction=False,
+        screen_change_after_last_instruction=False,
+    )

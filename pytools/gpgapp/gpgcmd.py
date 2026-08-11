@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-#*****************************************************************************
+# *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
 #
@@ -14,47 +13,47 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#*****************************************************************************
+# *****************************************************************************
 
-from enum import Enum, IntEnum
-
+from enum import IntEnum, StrEnum
+from typing import ClassVar
 
 KEY_TEMPLATES = {
-    "rsa2048" : "010800002001",
-    "rsa3072" : "010C00002001",
-    "rsa4096" : "011000002001",
+    "rsa2048": "010800002001",
+    "rsa3072": "010C00002001",
+    "rsa4096": "011000002001",
     "nistp256": "132A8648CE3D030107",
-    "ed25519" : "162B06010401DA470F01",
-    "cv25519" : "122B060104019755010501"
+    "ed25519": "162B06010401DA470F01",
+    "cv25519": "122B060104019755010501",
 }
 
 
 KEY_OPERATIONS = {
-    "Export":   0x00, # Read and export a Public Key
-    "Generate": 0x80, # Generate a new Asymmetric key pair
-    "Read":     0x81, # Read Public Key
+    "Export": 0x00,  # Read and export a Public Key
+    "Generate": 0x80,  # Generate a new Asymmetric key pair
+    "Read": 0x81,  # Read Public Key
 }
 
 
 USER_SALUTATION = {
-    "Male":   "1",
+    "Male": "1",
     "Female": "2",
 }
 
 
-class KeyTypes(str, Enum):
+class KeyTypes(StrEnum):
     """Key types definition
-        OpenPGP Application manage four keys for cryptographic operation (PSO) plus two
-        for secure channel.
-        The first four keys are defined as follow:
-        - One asymmetric signature private key (RSA or EC), named 'sig'
-        - One asymmetric decryption private key (RSA or EC), named 'dec'
-        - One asymmetric authentication private key (RSA or EC), named 'aut'
-        - One symmetric decryption private key (AES), named 'sym0'
+    OpenPGP Application manage four keys for cryptographic operation (PSO) plus two
+    for secure channel.
+    The first four keys are defined as follow:
+    - One asymmetric signature private key (RSA or EC), named 'sig'
+    - One asymmetric decryption private key (RSA or EC), named 'dec'
+    - One asymmetric authentication private key (RSA or EC), named 'aut'
+    - One symmetric decryption private key (AES), named 'sym0'
 
-        The 3 first asymmetric keys can be either randomly generated on-card or
-        explicitly put from outside.
-        The fourth is put from outside.
+    The 3 first asymmetric keys can be either randomly generated on-card or
+    explicitly put from outside.
+    The fourth is put from outside.
     """
 
     # Asymmetric Signature Private Key (RSA or EC)
@@ -67,7 +66,8 @@ class KeyTypes(str, Enum):
 
 
 class PubkeyAlgo(IntEnum):
-    """ Public-Key Algorithm IDs definition """
+    """Public-Key Algorithm IDs definition"""
+
     # https://www.rfc-editor.org/rfc/rfc4880#section-9.1
 
     # RSA (Encrypt or Sign)
@@ -81,7 +81,7 @@ class PubkeyAlgo(IntEnum):
 
 
 class PassWord(IntEnum):
-    """ Password type definition """
+    """Password type definition"""
 
     # USER_PIN for only one PSO:CDS command
     PW1 = 0x81
@@ -92,9 +92,9 @@ class PassWord(IntEnum):
 
 
 class ErrorCodes:
-    """ Error codes definition """
+    """Error codes definition"""
 
-    err_list = {
+    err_list: ClassVar[dict[int, str]] = {
         0x6285: "Selected file in termination state",
         0x6581: "Memory failure",
         0x6600: "Security-related issues (reserved for UIF in this application)",
@@ -126,7 +126,7 @@ class ErrorCodes:
 
 
 class DataObject(IntEnum):
-    """ Data Objects definition """
+    """Data Objects definition"""
 
     # [Read/Write] Slot config
     CMD_SLOT_CFG = 0x01F1

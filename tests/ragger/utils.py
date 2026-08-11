@@ -1,32 +1,30 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
 This module provides Ragger tests utility functions
 """
-from pathlib import Path
-from typing import List, Tuple
+
 import re
-from Crypto.PublicKey import RSA, ECC
-from Crypto.Util.number import bytes_to_long
-from Crypto.Signature import eddsa
-from Crypto.Protocol import DH as ecdh
-from ledgered.devices import Device
+from pathlib import Path
 
-from ragger.navigator import NavInsID, NavIns, Navigator
-
+from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
-from application_client.app_def import Errors, PassWord, DataObject, PubkeyAlgo
+from Crypto.Protocol import DH as ecdh
+from Crypto.PublicKey import ECC, RSA
+from Crypto.Signature import eddsa
+from Crypto.Util.number import bytes_to_long
+from ledgered.devices import Device
+from ragger.navigator import Navigator, NavIns, NavInsID
 
 ROOT_SCREENSHOT_PATH = Path(__file__).parent.resolve()
 
 KEY_TEMPLATES = {
-    "rsa2048" : "010800002001",
-    "rsa3072" : "010C00002001",
-    "rsa4096" : "011000002001",
+    "rsa2048": "010800002001",
+    "rsa3072": "010C00002001",
+    "rsa4096": "011000002001",
     "nistp256": "132A8648CE3D030107",
-    "ed25519" : "162B06010401DA470F01",
-    "cv25519" : "122B060104019755010501"
+    "ed25519": "162B06010401DA470F01",
+    "cv25519": "122B060104019755010501",
 }
 
 # digestInfo header: https://www.rfc-editor.org/rfc/rfc8017#section-9.2
@@ -34,12 +32,12 @@ SHA256_DIGEST_INFO = b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\
 
 
 def util_navigate(
-        device: Device,
-        navigator: Navigator,
-        test_name: Path,
-        text: str = "",
+    device: Device,
+    navigator: Navigator,
+    test_name: Path,
+    text: str = "",
 ) -> None:
-    """Navigate in the menus with conditions """
+    """Navigate in the menus with conditions"""
 
     assert text
     valid_instr: list[NavIns | NavInsID] = []
@@ -61,12 +59,14 @@ def util_navigate(
             raise ValueError(f'Wrong text "{text}"')
 
     # Do not wait last screen change because home screen contain a "random" ID
-    navigator.navigate_until_text_and_compare(nav_inst,
-                                              valid_instr,
-                                              text,
-                                              ROOT_SCREENSHOT_PATH,
-                                              test_name,
-                                              screen_change_after_last_instruction=False)
+    navigator.navigate_until_text_and_compare(
+        nav_inst,
+        valid_instr,
+        text,
+        ROOT_SCREENSHOT_PATH,
+        test_name,
+        screen_change_after_last_instruction=False,
+    )
 
 
 def generate_key(client: CommandSender, key_tag: DataObject, seed: bool = False) -> None:
@@ -86,7 +86,7 @@ def generate_key(client: CommandSender, key_tag: DataObject, seed: bool = False)
     assert rapdu.status == Errors.SW_OK
 
 
-def get_key_attributes(client: CommandSender, key_attr: int) -> Tuple[PubkeyAlgo, int]:
+def get_key_attributes(client: CommandSender, key_attr: int) -> tuple[PubkeyAlgo, int]:
     """Send and check the pincode
 
     Args:
@@ -201,7 +201,7 @@ def get_RSA_pub_key(client: CommandSender, key_tag: DataObject) -> RSA.RsaKey:
     print(f" Key Exponent: 0x{exponent.hex()}")
     print(f" Key Modulus[{len(modulus)}]: {modulus.hex()}")
 
-    return RSA.construct((int.from_bytes(modulus, 'big'), int.from_bytes(exponent, 'big')))
+    return RSA.construct((int.from_bytes(modulus, "big"), int.from_bytes(exponent, "big")))
 
 
 def check_pincode(client: CommandSender, pwd: PassWord) -> None:
@@ -288,7 +288,7 @@ def decode_tlv(tlv: bytes) -> dict:
         # Parse length
         length = tlv[offset]
         if length & 0x80:
-            num_bytes = length & 0x7f
+            num_bytes = length & 0x7F
             if num_bytes == 1:
                 length = tlv[offset + 1]
                 offset += 2
@@ -300,18 +300,18 @@ def decode_tlv(tlv: bytes) -> dict:
         else:
             offset += 1
         # Extract value
-        tags[tag] = tlv[offset:offset + length]
+        tags[tag] = tlv[offset : offset + length]
         offset += length
     return tags
 
 
-def _read_makefile() -> List[str]:
-    """Read lines from the parent Makefile """
+def _read_makefile() -> list[str]:
+    """Read lines from the parent Makefile"""
 
     parent = Path(ROOT_SCREENSHOT_PATH).parent.parent.resolve()
     makefile = f"{parent}/Makefile"
     print(f"Analyzing {makefile}...")
-    with open(makefile, "r", encoding="utf-8") as f_p:
+    with open(makefile, encoding="utf-8") as f_p:
         lines = f_p.readlines()
 
     return lines

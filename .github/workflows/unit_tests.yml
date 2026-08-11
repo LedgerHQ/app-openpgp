@@ -12,6 +12,6 @@ jobs:
   job_unit_test:
     name: Call Ledger unit_test
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_unit_tests.yml@v1
-    secrets: inherit
-    with:
-      test_directory: tests/unit
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}

@@ -37,7 +37,7 @@ void app_reset(void) {
     unsigned char magic[MAGIC_LENGTH];
 
     explicit_bzero(magic, MAGIC_LENGTH);
-    nvm_write((void*) (N_gpg_pstate->magic), magic, MAGIC_LENGTH);
+    nvm_write((void *) (N_gpg_pstate->magic), magic, MAGIC_LENGTH);
     gpg_init();
     ui_CCID_reset();
 }

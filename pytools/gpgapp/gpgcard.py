@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-#*****************************************************************************
+# *****************************************************************************
 #   Ledger App OpenPGP.
 #   (c) 2024 Ledger SAS.
 #
@@ -14,23 +13,31 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#*****************************************************************************
+# *****************************************************************************
 
 import base64
 import binascii
-import os
-from datetime import datetime, timezone
 import json
-from hashlib import sha1
-from typing import Optional, Tuple
+import os
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from hashlib import sha1
+
 # pylint: disable=import-error
 from Crypto.PublicKey.RSA import construct
 from ledgercomm import Transport  # type: ignore
-# pylint: enable=import-error
 
-from gpgapp.gpgcmd import DataObject, ErrorCodes, KeyTypes, PassWord, PubkeyAlgo  # type: ignore
-from gpgapp.gpgcmd import KEY_OPERATIONS, KEY_TEMPLATES, USER_SALUTATION  # type: ignore
+# pylint: enable=import-error
+from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
+    KEY_OPERATIONS,
+    KEY_TEMPLATES,
+    USER_SALUTATION,
+    DataObject,
+    ErrorCodes,
+    KeyTypes,
+    PassWord,
+    PubkeyAlgo,
+)
 
 APDU_MAX_SIZE: int = 0xFE
 APDU_CHAINING_MODE: int = 0x10
@@ -65,20 +72,20 @@ class KeyInfo:
     def reset(self):
         """Reset the data to the initial value"""
 
-        self.attribute      = b""
-        self.fingerprint    = b""
+        self.attribute = b""
+        self.fingerprint = b""
         self.ca_fingerprint = b""
-        self.cert           = ""
-        self.date           = datetime.min
-        self.uif            = 0
-        self.key            = b""
+        self.cert = ""
+        self.date = datetime.min
+        self.uif = 0
+        self.key = b""
 
 
 @dataclass
 class CardInfo:
     """Card description information"""
 
-    #token info
+    # token info
     AID: str = ""
     ext_length: bytes = b""
     ext_capabilities: bytes = b""
@@ -86,14 +93,14 @@ class CardInfo:
     PW_status: bytes = b""
     hw_features: int = 0
 
-    #user info
+    # user info
     name: str = ""
     login: str = ""
     url: str = ""
     lang: str = ""
     salutation: str = ""
 
-    #keys info
+    # keys info
     rsa_pub_exp: int = 0
     digital_counter: int = 0
 
@@ -101,45 +108,44 @@ class CardInfo:
     dec: KeyInfo = field(default_factory=KeyInfo)
     aut: KeyInfo = field(default_factory=KeyInfo)
 
-    #private info
+    # private info
     private_01: bytes = b""
     private_02: bytes = b""
     private_03: bytes = b""
     private_04: bytes = b""
 
-
     def reset(self):
         """Reset the data to the initial value"""
 
-        #token info
-        self.AID              = ""
-        self.ext_length       = b""
+        # token info
+        self.AID = ""
+        self.ext_length = b""
         self.ext_capabilities = b""
-        self.histo_bytes      = b""
-        self.PW_status        = b""
+        self.histo_bytes = b""
+        self.PW_status = b""
 
-        #user info
-        self.name             = ""
-        self.login            = ""
-        self.url              = ""
-        self.lang             = ""
-        self.salutation       = ""
+        # user info
+        self.name = ""
+        self.login = ""
+        self.url = ""
+        self.lang = ""
+        self.salutation = ""
 
-        #keys info
-        self.rsa_pub_exp      = 0
-        self.digital_counter  = 0
+        # keys info
+        self.rsa_pub_exp = 0
+        self.digital_counter = 0
 
         self.sig.reset()
         self.dec.reset()
         self.aut.reset()
 
-        #private info
-        self.private_01          = b""
-        self.private_02          = b""
-        self.private_03          = b""
+        # private info
+        self.private_01 = b""
+        self.private_02 = b""
+        self.private_03 = b""
 
 
-class GPGCard() :
+class GPGCard:
     def __init__(self) -> None:
         self.log: bool = False
         self.transport: Transport = None
@@ -162,12 +168,10 @@ class GPGCard() :
             self.transport = Transport("hid")
         print("")
 
-
     def disconnect(self):
         """Connect from the selected Reader"""
 
         self.transport.close()
-
 
     ############### LOG interface ###############
     def log_apdu(self, log: bool) -> None:
@@ -201,10 +205,7 @@ class GPGCard() :
                 if len(data) > 1 and data[1] in _SENSITIVE_INS:
                     print(f"{mode}: [REDACTED SENSITIVE APDU ins={data[1]:02x}]")
                     return
-                self._last_sent_was_key_read = (
-                    len(data) >= 4 and data[1] == 0xCA
-                    and data[2] == 0x00 and data[3] in _KEY_READ_DOS
-                )
+                self._last_sent_was_key_read = len(data) >= 4 and data[1] == 0xCA and data[2] == 0x00 and data[3] in _KEY_READ_DOS
             elif mode == "recv":
                 if self._last_sent_was_key_read:
                     self._last_sent_was_key_read = False
@@ -214,7 +215,6 @@ class GPGCard() :
             sw_code = f" ({sw:04x})" if mode == "recv" else ""
             print(f"{mode}:{sw_code} {''.join([f'{b:02x}' for b in data])}")
 
-
     ############### CARD interface ###############
     def select(self):
         """Send SELECT APDU command"""
@@ -222,13 +222,11 @@ class GPGCard() :
         apdu = binascii.unhexlify(b"00A4040006D27600012401")
         return self._exchange(apdu)
 
-
     def activate(self):
         """Send ACTIVATE APDU command"""
 
         apdu = binascii.unhexlify(b"00440000")
         return self._exchange(apdu)
-
 
     def terminate(self):
         """Send TERMINATE APDU command"""
@@ -236,109 +234,106 @@ class GPGCard() :
         apdu = binascii.unhexlify(b"00E60000")
         return self._exchange(apdu)
 
-
     def get_log(self):
         """Send GET_LOG APDU command"""
 
         apdu = binascii.unhexlify(b"00040000")
         return self._exchange(apdu)
 
-
     ############### API interfaces ###############
     def get_all(self) -> None:
         """Retrieve all Data Object values from the Card"""
 
         self.data.reset()
-        data: Optional[bytes] = b""
+        data: bytes | None = b""
         b_data: bytes = b""
         s_data: str = ""
 
-        self.slot_current                     = self._get_data(DataObject.CMD_SLOT_CUR)
-        self.slot_config                      = self._get_data(DataObject.CMD_SLOT_CFG)
+        self.slot_current = self._get_data(DataObject.CMD_SLOT_CUR)
+        self.slot_config = self._get_data(DataObject.CMD_SLOT_CFG)
 
-        self.data.AID                         = self._get_data(DataObject.DO_AID).hex().upper()
-        self.data.login                       = self._get_data(DataObject.DO_LOGIN).decode("utf-8")
-        self.data.url                         = self._get_data(DataObject.DO_URL).decode("utf-8")
-        self.data.histo_bytes                 = self._get_data(DataObject.DO_HIST)
-        data                                  = self._get_data(DataObject.DO_GEN_FEATURES)
+        self.data.AID = self._get_data(DataObject.DO_AID).hex().upper()
+        self.data.login = self._get_data(DataObject.DO_LOGIN).decode("utf-8")
+        self.data.url = self._get_data(DataObject.DO_URL).decode("utf-8")
+        self.data.histo_bytes = self._get_data(DataObject.DO_HIST)
+        data = self._get_data(DataObject.DO_GEN_FEATURES)
         if data:
-            self.data.hw_features             = data[0]
+            self.data.hw_features = data[0]
 
-        data                                  = self._get_data(DataObject.DO_CARDHOLDER_DATA)
-        tags                                  = self._decode_tlv(data)
+        data = self._get_data(DataObject.DO_CARDHOLDER_DATA)
+        tags = self._decode_tlv(data)
         if DataObject.DO_CARD_NAME in tags:
-            self.data.name                    = tags[DataObject.DO_CARD_NAME].decode("utf-8")
+            self.data.name = tags[DataObject.DO_CARD_NAME].decode("utf-8")
         if DataObject.DO_CARD_SALUTATION in tags:
-            s_data                            = tags[DataObject.DO_CARD_SALUTATION].decode("utf-8")
-            for k,v in USER_SALUTATION.items():
+            s_data = tags[DataObject.DO_CARD_SALUTATION].decode("utf-8")
+            for k, v in USER_SALUTATION.items():
                 if v == s_data:
                     self.data.salutation = k
                     break
 
         if DataObject.DO_CARD_LANG in tags:
-            self.data.lang                    = tags[DataObject.DO_CARD_LANG].decode("utf-8")
+            self.data.lang = tags[DataObject.DO_CARD_LANG].decode("utf-8")
 
-        data                                  = self._get_data(DataObject.DO_APP_DATA)
-        tags                                  = self._decode_tlv(data)
+        data = self._get_data(DataObject.DO_APP_DATA)
+        tags = self._decode_tlv(data)
         if DataObject.DO_EXT_LEN in tags:
-            self.data.ext_length              = tags[DataObject.DO_EXT_LEN]
+            self.data.ext_length = tags[DataObject.DO_EXT_LEN]
         if DataObject.DO_DISCRET_DATA in tags:
-            b_data                            = tags[DataObject.DO_DISCRET_DATA]
-            tags                              = self._decode_tlv(b_data)
+            b_data = tags[DataObject.DO_DISCRET_DATA]
+            tags = self._decode_tlv(b_data)
             if DataObject.DO_EXT_CAP in tags:
-                self.data.ext_capabilities    = tags[DataObject.DO_EXT_CAP]
+                self.data.ext_capabilities = tags[DataObject.DO_EXT_CAP]
             if DataObject.DO_SIG_ATTR in tags:
-                self.data.sig.attribute       = tags[DataObject.DO_SIG_ATTR]
+                self.data.sig.attribute = tags[DataObject.DO_SIG_ATTR]
             if DataObject.DO_DEC_ATTR in tags:
-                self.data.dec.attribute       = tags[DataObject.DO_DEC_ATTR]
+                self.data.dec.attribute = tags[DataObject.DO_DEC_ATTR]
             if DataObject.DO_AUT_ATTR in tags:
-                self.data.aut.attribute       = tags[DataObject.DO_AUT_ATTR]
+                self.data.aut.attribute = tags[DataObject.DO_AUT_ATTR]
             if DataObject.DO_PW_STATUS in tags:
-                self.data.PW_status           = tags[DataObject.DO_PW_STATUS]
+                self.data.PW_status = tags[DataObject.DO_PW_STATUS]
 
-            data                              = tags.get(DataObject.DO_FINGERPRINTS)
+            data = tags.get(DataObject.DO_FINGERPRINTS)
             if data:
-                self.data.sig.fingerprint     = data[0:20]
-                self.data.dec.fingerprint     = data[20:40]
-                self.data.aut.fingerprint     = data[40:60]
-            data                              = tags.get(DataObject.DO_CA_FINGERPRINTS)
+                self.data.sig.fingerprint = data[0:20]
+                self.data.dec.fingerprint = data[20:40]
+                self.data.aut.fingerprint = data[40:60]
+            data = tags.get(DataObject.DO_CA_FINGERPRINTS)
             if data:
-                self.data.sig.ca_fingerprint  = data[0:20]
-                self.data.dec.ca_fingerprint  = data[20:40]
-                self.data.aut.ca_fingerprint  = data[40:60]
-            data                              = tags.get(DataObject.DO_KEY_DATES)
+                self.data.sig.ca_fingerprint = data[0:20]
+                self.data.dec.ca_fingerprint = data[20:40]
+                self.data.aut.ca_fingerprint = data[40:60]
+            data = tags.get(DataObject.DO_KEY_DATES)
             if data:
-                dates                         = tags[DataObject.DO_KEY_DATES]
+                dates = tags[DataObject.DO_KEY_DATES]
                 self._conv_date_from_bytes(KeyTypes.KEY_SIG, dates[0:4])
                 self._conv_date_from_bytes(KeyTypes.KEY_DEC, dates[4:8])
                 self._conv_date_from_bytes(KeyTypes.KEY_AUT, dates[8:12])
 
-        data                                  = self._get_data(DataObject.CMD_RSA_EXP)
-        self.data.rsa_pub_exp                 = self._get_int(data, 4)
-        self.data.aut.cert                    = self._get_data(DataObject.DO_CERT).decode("utf-8")
-        self.data.dec.cert                    = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
-        self.data.sig.cert                    = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
+        data = self._get_data(DataObject.CMD_RSA_EXP)
+        self.data.rsa_pub_exp = self._get_int(data, 4)
+        self.data.aut.cert = self._get_data(DataObject.DO_CERT).decode("utf-8")
+        self.data.dec.cert = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
+        self.data.sig.cert = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
 
-        self.data.sig.uif                     = int(self._get_data(DataObject.DO_UIF_SIG)[0])
-        self.data.dec.uif                     = int(self._get_data(DataObject.DO_UIF_DEC)[0])
-        self.data.aut.uif                     = int(self._get_data(DataObject.DO_UIF_AUT)[0])
+        self.data.sig.uif = int(self._get_data(DataObject.DO_UIF_SIG)[0])
+        self.data.dec.uif = int(self._get_data(DataObject.DO_UIF_DEC)[0])
+        self.data.aut.uif = int(self._get_data(DataObject.DO_UIF_AUT)[0])
 
-        data                                  = self._get_data(DataObject.DO_SEC_TEMPL)
-        tags                                  = self._decode_tlv(data)
+        data = self._get_data(DataObject.DO_SEC_TEMPL)
+        tags = self._decode_tlv(data)
         if DataObject.DO_SIG_COUNT in tags:
-            b_data                            = tags[DataObject.DO_SIG_COUNT]
-            self.data.digital_counter         = self._get_int(b_data, 3)
+            b_data = tags[DataObject.DO_SIG_COUNT]
+            self.data.digital_counter = self._get_int(b_data, 3)
 
         if self.data.ext_capabilities[0] & 0x08:
-            self.data.private_01              = self._get_data(DataObject.DO_PRIVATE_01)
-            self.data.private_02              = self._get_data(DataObject.DO_PRIVATE_02)
-            self.data.private_03              = self._get_data(DataObject.DO_PRIVATE_03)
-            self.data.private_04              = self._get_data(DataObject.DO_PRIVATE_04)
+            self.data.private_01 = self._get_data(DataObject.DO_PRIVATE_01)
+            self.data.private_02 = self._get_data(DataObject.DO_PRIVATE_02)
+            self.data.private_03 = self._get_data(DataObject.DO_PRIVATE_03)
+            self.data.private_04 = self._get_data(DataObject.DO_PRIVATE_04)
 
-        self.data.sig.key                     = self._get_data(DataObject.DO_SIG_KEY)
-        self.data.dec.key                     = self._get_data(DataObject.DO_DEC_KEY)
-        self.data.aut.key                     = self._get_data(DataObject.DO_AUT_KEY)
-
+        self.data.sig.key = self._get_data(DataObject.DO_SIG_KEY)
+        self.data.dec.key = self._get_data(DataObject.DO_DEC_KEY)
+        self.data.aut.key = self._get_data(DataObject.DO_AUT_KEY)
 
     def backup(self, file_name: str) -> None:
         """Backup data to backup file
@@ -352,39 +347,38 @@ class GPGCard() :
 
         def _key_slot(slot) -> dict:
             return {
-                "key":          _b64(slot.key),
-                "uif":          slot.uif,
-                "attribute":    _b64(slot.attribute),
-                "date":         str(slot.date),
-                "fingerprint":  _b64(slot.fingerprint),
+                "key": _b64(slot.key),
+                "uif": slot.uif,
+                "attribute": _b64(slot.attribute),
+                "date": str(slot.date),
+                "fingerprint": _b64(slot.fingerprint),
                 "ca_fingerprint": _b64(slot.ca_fingerprint),
-                "cert":         slot.cert,
+                "cert": slot.cert,
             }
 
         self.get_all()
         payload = {
-            "version":         1,
-            "AID":             self.data.AID,
-            "PW_status":       _b64(self.data.PW_status),
-            "rsa_pub_exp":     self.data.rsa_pub_exp,
+            "version": 1,
+            "AID": self.data.AID,
+            "PW_status": _b64(self.data.PW_status),
+            "rsa_pub_exp": self.data.rsa_pub_exp,
             "digital_counter": self.data.digital_counter,
-            "private_01":      _b64(self.data.private_01),
-            "private_02":      _b64(self.data.private_02),
-            "private_03":      _b64(self.data.private_03),
-            "private_04":      _b64(self.data.private_04),
-            "name":            self.data.name,
-            "login":           self.data.login,
-            "salutation":      self.data.salutation,
-            "url":             self.data.url,
-            "lang":            self.data.lang,
-            "sig":             _key_slot(self.data.sig),
-            "dec":             _key_slot(self.data.dec),
-            "aut":             _key_slot(self.data.aut),
+            "private_01": _b64(self.data.private_01),
+            "private_02": _b64(self.data.private_02),
+            "private_03": _b64(self.data.private_03),
+            "private_04": _b64(self.data.private_04),
+            "name": self.data.name,
+            "login": self.data.login,
+            "salutation": self.data.salutation,
+            "url": self.data.url,
+            "lang": self.data.lang,
+            "sig": _key_slot(self.data.sig),
+            "dec": _key_slot(self.data.dec),
+            "aut": _key_slot(self.data.aut),
         }
         fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, mode="w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
-
 
     def restore(self, file_name: str) -> None:
         """Restore data from backup file
@@ -396,61 +390,67 @@ class GPGCard() :
         def _fromb64(s: str) -> bytes:
             return base64.b64decode(s)
 
-        with open(file_name, mode="r", encoding="utf-8") as f:
+        with open(file_name, encoding="utf-8") as f:
             payload = json.load(f)
 
-        self.data.AID             = payload["AID"]
-        self.data.PW_status       = _fromb64(payload["PW_status"])
-        self.data.rsa_pub_exp     = int(payload["rsa_pub_exp"])
+        self.data.AID = payload["AID"]
+        self.data.PW_status = _fromb64(payload["PW_status"])
+        self.data.rsa_pub_exp = int(payload["rsa_pub_exp"])
         self.data.digital_counter = int(payload["digital_counter"])
-        self.data.private_01      = _fromb64(payload["private_01"])
-        self.data.private_02      = _fromb64(payload["private_02"])
-        self.data.private_03      = _fromb64(payload["private_03"])
-        self.data.private_04      = _fromb64(payload["private_04"])
-        self.data.name            = payload["name"]
-        self.data.login           = payload["login"]
-        self.data.salutation      = payload["salutation"]
-        self.data.url             = payload["url"]
-        self.data.lang            = payload["lang"]
+        self.data.private_01 = _fromb64(payload["private_01"])
+        self.data.private_02 = _fromb64(payload["private_02"])
+        self.data.private_03 = _fromb64(payload["private_03"])
+        self.data.private_04 = _fromb64(payload["private_04"])
+        self.data.name = payload["name"]
+        self.data.login = payload["login"]
+        self.data.salutation = payload["salutation"]
+        self.data.url = payload["url"]
+        self.data.lang = payload["lang"]
         for slot_name in ("sig", "dec", "aut"):
             raw = payload[slot_name]
             slot = getattr(self.data, slot_name)
-            slot.key            = _fromb64(raw["key"])
-            slot.uif            = int(raw["uif"])
-            slot.attribute      = _fromb64(raw["attribute"])
-            slot.date           = datetime.strptime(raw["date"], "%Y-%m-%d %H:%M:%S")
-            slot.fingerprint    = _fromb64(raw["fingerprint"])
+            slot.key = _fromb64(raw["key"])
+            slot.uif = int(raw["uif"])
+            slot.attribute = _fromb64(raw["attribute"])
+            slot.date = datetime.strptime(raw["date"], "%Y-%m-%d %H:%M:%S")
+            slot.fingerprint = _fromb64(raw["fingerprint"])
             slot.ca_fingerprint = _fromb64(raw["ca_fingerprint"])
-            slot.cert           = raw["cert"]
+            slot.cert = raw["cert"]
 
-        self._put_data(DataObject.DO_AID,        bytes.fromhex(self.data.AID[20:28]))
-        self._put_data(DataObject.DO_PW_STATUS,  self.data.PW_status)
+        self._put_data(DataObject.DO_AID, bytes.fromhex(self.data.AID[20:28]))
+        self._put_data(DataObject.DO_PW_STATUS, self.data.PW_status)
 
         self._put_data(DataObject.DO_PRIVATE_01, self.data.private_01)
         self._put_data(DataObject.DO_PRIVATE_02, self.data.private_02)
         self._put_data(DataObject.DO_PRIVATE_03, self.data.private_03)
         self._put_data(DataObject.DO_PRIVATE_04, self.data.private_04)
 
-        self._put_data(DataObject.DO_CARD_NAME,  self.data.name.encode("utf-8"))
-        self._put_data(DataObject.DO_LOGIN,      self.data.login.encode("utf-8"))
-        self._put_data(DataObject.DO_CARD_LANG,  self.data.lang.encode("utf-8"))
-        self._put_data(DataObject.DO_URL,        self.data.url.encode("utf-8"))
+        self._put_data(DataObject.DO_CARD_NAME, self.data.name.encode("utf-8"))
+        self._put_data(DataObject.DO_LOGIN, self.data.login.encode("utf-8"))
+        self._put_data(DataObject.DO_CARD_LANG, self.data.lang.encode("utf-8"))
+        self._put_data(DataObject.DO_URL, self.data.url.encode("utf-8"))
         if len(self.data.salutation) == 0:
-            self._put_data(DataObject.DO_CARD_SALUTATION, b'\x30')
+            self._put_data(DataObject.DO_CARD_SALUTATION, b"\x30")
         else:
-            self._put_data(DataObject.DO_CARD_SALUTATION,
-                           bytes.fromhex(USER_SALUTATION[self.data.salutation]))
+            # The salutation DO (ISO 5218) holds an ASCII digit ("1"/"2"), as
+            # written by set_salutation(); fromhex() here would raise.
+            self._put_data(
+                DataObject.DO_CARD_SALUTATION,
+                USER_SALUTATION[self.data.salutation].encode("utf-8"),
+            )
 
-        self._put_data(DataObject.DO_SIG_ATTR,   self.data.sig.attribute)
-        self._put_data(DataObject.DO_DEC_ATTR,   self.data.dec.attribute)
-        self._put_data(DataObject.DO_AUT_ATTR,   self.data.aut.attribute)
+        self._put_data(DataObject.DO_SIG_ATTR, self.data.sig.attribute)
+        self._put_data(DataObject.DO_DEC_ATTR, self.data.dec.attribute)
+        self._put_data(DataObject.DO_AUT_ATTR, self.data.aut.attribute)
 
-        self._put_data(DataObject.DO_UIF_SIG,    self.data.sig.uif.to_bytes(2, "little"))
-        self._put_data(DataObject.DO_UIF_DEC,    self.data.dec.uif.to_bytes(2, "little"))
-        self._put_data(DataObject.DO_UIF_AUT,    self.data.aut.uif.to_bytes(2, "little"))
+        self._put_data(DataObject.DO_UIF_SIG, self.data.sig.uif.to_bytes(2, "little"))
+        self._put_data(DataObject.DO_UIF_DEC, self.data.dec.uif.to_bytes(2, "little"))
+        self._put_data(DataObject.DO_UIF_AUT, self.data.aut.uif.to_bytes(2, "little"))
 
-        self._put_data(DataObject.DO_SIG_COUNT,  self.data.digital_counter.to_bytes(4, "big"))
-        self._put_data(DataObject.CMD_RSA_EXP,   self.data.rsa_pub_exp.to_bytes(4, "little"))
+        # The digital signature counter (DO 0x93) is read-only on the card (no
+        # write access path in the firmware): kept in the backup for reference
+        # but not written back here.
+        self._put_data(DataObject.CMD_RSA_EXP, self.data.rsa_pub_exp.to_bytes(4, "little"))
 
         self._put_data(DataObject.DO_CERT, self.data.aut.cert.encode("utf-8"))
         self._put_data(DataObject.DO_CERT, self.data.dec.cert.encode("utf-8"))
@@ -459,7 +459,7 @@ class GPGCard() :
         self._put_data(DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_SIG, self.data.sig.fingerprint)
         date = str(self.data.sig.date)
-        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_SIG, bdate)
         self._put_data(DataObject.DO_SIG_KEY, self.data.sig.key)
@@ -467,7 +467,7 @@ class GPGCard() :
         self._put_data(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
         date = str(self.data.dec.date)
-        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_DEC, bdate)
         self._put_data(DataObject.DO_DEC_KEY, self.data.dec.key)
@@ -475,11 +475,10 @@ class GPGCard() :
         self._put_data(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
         date = str(self.data.aut.date)
-        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_AUT, bdate)
         self._put_data(DataObject.DO_AUT_KEY, self.data.aut.key)
-
 
     def export_pub_key(self, pubkey: dict, file_name: str) -> None:
         """Export a Public key to file
@@ -495,7 +494,7 @@ class GPGCard() :
         if key_id.startswith("RSA"):
             modulus = bytearray.fromhex(pubkey["Modulus"])
             exponent = bytearray.fromhex(pubkey["Pub Exp"][2:])
-            key = construct((int.from_bytes(modulus, 'big'), int.from_bytes(exponent, 'big')))
+            key = construct((int.from_bytes(modulus, "big"), int.from_bytes(exponent, "big")))
             public_key = key.publickey().export_key()
             with open(file_name, mode="wb", encoding="utf-8") as f:
                 f.write(public_key)
@@ -518,41 +517,38 @@ class GPGCard() :
                         f.write(f"{key}: {value}\n")
 
         else:
-            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL,
-                                   f"Unsupported key type for export: {key_id}")
-
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Unsupported key type for export: {key_id}")
 
     def seed_key(self) -> None:
         """Regenerate keys, based on seed mode"""
 
-        for apdu_hex, name in ((b"0047800102B600", "SIG"),
-                               (b"0047800102B800", "DEC"),
-                               (b"0047800102A400", "AUT")):
+        for apdu_hex, name in (
+            (b"0047800102B600", "SIG"),
+            (b"0047800102B800", "DEC"),
+            (b"0047800102A400", "AUT"),
+        ):
             _, sw = self._exchange(binascii.unhexlify(apdu_hex))
-            assert sw == ErrorCodes.ERR_SUCCESS, \
-                f"{name} key generation failed (sw={sw:#06x})" \
-                " — check seed mode is ON and PIN is verified"
-
+            assert sw == ErrorCodes.ERR_SUCCESS, (
+                f"{name} key generation failed (sw={sw:#06x}) — check seed mode is ON and PIN is verified"
+            )
 
     ############### Information decoding ###############
     def decode_AID(self) -> dict:
         """Decode Application IDentity information"""
 
-        return  {
+        return {
             "AID": f"{self.data.AID}",
             "RID": f"{self.data.AID[0:10]}",
             "Application": f"{self.data.AID[10:12]}",
             "Version": f"{int(self.data.AID[12:14]):d}.{int(self.data.AID[14:16]):d}",
             "Manufacturer": f"{self.data.AID[16:20]}",
-            "Serial": f"{self.data.AID[20:28]}"
+            "Serial": f"{self.data.AID[20:28]}",
         }
 
     def decode_histo(self) -> dict:
         """Decode Historical Bytes information"""
 
-        return {
-            "historical bytes": self.data.histo_bytes.hex()
-        }
+        return {"historical bytes": self.data.histo_bytes.hex()}
 
     def decode_extlength(self) -> dict:
         """Decode Extended Length information"""
@@ -655,8 +651,8 @@ class GPGCard() :
                 fmt = "Format-2"
             else:
                 fmt = "UTF-8"
-            pwlen = self.data.PW_status[pw["format"]] & 0x7f
-            counter = self.data.PW_status[pw['counter']]
+            pwlen = self.data.PW_status[pw["format"]] & 0x7F
+            counter = self.data.PW_status[pw["counter"]]
             d[name] = f"{fmt} ({pwlen:d} bytes), Error Counter={counter:d}"
             if name == "PW1":
                 d[name] += f", Validity={validity}"
@@ -675,7 +671,6 @@ class GPGCard() :
         d["Touchscreen"] = "✓" if self.data.hw_features & 0x02 else "✗"
         d["Battery"] = "✓" if self.data.hw_features & 0x01 else "✗"
         return d
-
 
     ############### SLOT interface ###############
     def select_slot(self, slot: int) -> None:
@@ -703,7 +698,6 @@ class GPGCard() :
         d["Current"] = str(int.from_bytes(self.slot_current, "big") + 1)
         return d
 
-
     ############### USER interface ###############
     def set_serial(self, serial: str) -> None:
         """Set the Card serial number
@@ -717,7 +711,6 @@ class GPGCard() :
 
         self.data.AID = self.data.AID[0:20] + serial
         self._put_data(DataObject.DO_AID, bytes.fromhex(serial))
-
 
     def set_name(self, name: str) -> None:
         """Set the Card User name
@@ -734,7 +727,6 @@ class GPGCard() :
 
         return self.data.name
 
-
     def set_login(self, login: str) -> None:
         """Set the Card User login
 
@@ -749,7 +741,6 @@ class GPGCard() :
         """Get the Card User login"""
 
         return self.data.login
-
 
     def set_url(self, url: str) -> None:
         """Set the Card User URL
@@ -766,7 +757,6 @@ class GPGCard() :
 
         return self.data.url
 
-
     def set_lang(self, lang: str) -> None:
         """Set the Card User language
 
@@ -782,7 +772,6 @@ class GPGCard() :
 
         return self.data.lang
 
-
     def set_salutation(self, salutation: str) -> None:
         """Set the Card User salutation
 
@@ -793,8 +782,7 @@ class GPGCard() :
         try:
             salutation_str = USER_SALUTATION[salutation].encode("utf-8")
         except KeyError as err:
-            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL,
-                                   f"Invalid salutation value ({salutation})!") from err
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Invalid salutation value ({salutation})!") from err
 
         self.data.salutation = salutation
         self._put_data(DataObject.DO_CARD_SALUTATION, salutation_str)
@@ -803,7 +791,6 @@ class GPGCard() :
         """Get the Card User salutation"""
 
         return self.data.salutation
-
 
     ############### PASSWORD interface ###############
     def verify_pin(self, pw: PassWord, value: str, pinpad: bool = False) -> bool:
@@ -826,7 +813,6 @@ class GPGCard() :
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
-
     def change_pin(self, pw: PassWord, cur_value: str, new_value: str) -> bool:
         """Update the password
 
@@ -840,12 +826,9 @@ class GPGCard() :
         """
 
         lc = len(cur_value) + len(new_value)
-        apdu = bytes.fromhex(f"002400{pw:02x}{lc:02x}") + \
-                cur_value.encode("utf-8") + \
-                new_value.encode("utf-8")
+        apdu = bytes.fromhex(f"002400{pw:02x}{lc:02x}") + cur_value.encode("utf-8") + new_value.encode("utf-8")
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
-
 
     def set_RC(self, value: str) -> bool:
         """Set the User Password Resetting Code
@@ -859,7 +842,6 @@ class GPGCard() :
 
         b_value = value.encode("utf-8")
         return self._put_data(DataObject.DO_RESET_CODE, b_value) == ErrorCodes.ERR_SUCCESS
-
 
     def reset_PW1(self, RC: str, value: str) -> bool:
         """Reset the User Password with Resetting Code
@@ -877,7 +859,6 @@ class GPGCard() :
         apdu = bytes.fromhex(f"002C{p1:02x}81{lc:02x}") + RC.encode("utf-8") + value.encode("utf-8")
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
-
 
     ############### KEYS interface ###############
     def decode_key_uif(self, key: str) -> str:
@@ -990,7 +971,7 @@ class GPGCard() :
 
         fingerprint = self._get_key_object(key).fingerprint
         sdata = binascii.hexlify(fingerprint).decode("ascii")
-        return sdata if sdata != "0"*40 else "N/A"
+        return sdata if sdata != "0" * 40 else "N/A"
 
     def get_key_CA_fingerprint(self, key: str) -> str:
         """Get key CA fingerprint
@@ -1004,7 +985,7 @@ class GPGCard() :
 
         fingerprint = self._get_key_object(key).ca_fingerprint
         sdata = binascii.hexlify(fingerprint).decode("ascii")
-        return sdata if sdata != "0"*40 else "N/A"
+        return sdata if sdata != "0" * 40 else "N/A"
 
     def decode_attributes(self, key: str) -> str:
         """Decode key attribute
@@ -1042,7 +1023,6 @@ class GPGCard() :
             return "EDDSA"
         return ""
 
-
     def decode_key(self, key: str) -> dict:
         """Get key parameters
 
@@ -1057,17 +1037,17 @@ class GPGCard() :
         offset: int = 0
         key_data = self._get_key_object(key).key
 
-        d["OS Target ID"] = f"0x{int.from_bytes(key_data[offset:offset + 4], 'big'):04x}"
+        d["OS Target ID"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):04x}"
         offset += 4
-        d["API Level"] = str(int.from_bytes(key_data[offset:offset + 4], 'big'))
+        d["API Level"] = str(int.from_bytes(key_data[offset : offset + 4], "big"))
         offset += 4
-        size = int.from_bytes(key_data[offset:offset + 4], 'big')
+        size = int.from_bytes(key_data[offset : offset + 4], "big")
         # Should be Public key here from doc, but only Public Exp from the code
         d["Public exp size"] = str(size)
         offset += 4
-        d["Public exp"] = f"0x{int.from_bytes(key_data[offset:offset + 4], 'big'):06x}"
+        d["Public exp"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):06x}"
         offset += size
-        size = int.from_bytes(key_data[offset:offset + 4], 'big')
+        size = int.from_bytes(key_data[offset : offset + 4], "big")
         d["Private key size"] = str(size)
         # offset += 4
         # d["Private key encrypted"] = key_data[offset:offset + size].hex()
@@ -1142,14 +1122,14 @@ class GPGCard() :
 
             # Get the generation date
             date = self.get_key_date(key)
-            dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
             kdate = int(dt.timestamp())
             d["Creation date"] = date
 
             # Compute the fingerprint https://www.rfc-editor.org/rfc/rfc4880#section-12.2
             modulus: bytes = bytes.fromhex(d["Modulus"])
             ksize: int = self._get_int(attributes, offset=1)
-            size: int = int(ksize / 8) + 0x0D # len(header + tag + pub exp)
+            size: int = int(ksize / 8) + 0x0D  # len(header + tag + pub exp)
 
             header: bytes = bytes.fromhex(f"99{size:04x}04{kdate:08x}01{ksize:04x}")
             footer: bytes = bytes.fromhex("0011010001")
@@ -1163,7 +1143,6 @@ class GPGCard() :
                 self.set_key_fingerprint(key, result)
 
         return d
-
 
     # ===============================================================
     # Internal functions
@@ -1188,7 +1167,6 @@ class GPGCard() :
 
         raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Invalid key type {key}!")
 
-
     def _get_data(self, tag: int, bnext: bool = False) -> bytes:
         """Send APDU command to GET a specific Data Object
 
@@ -1204,7 +1182,6 @@ class GPGCard() :
         resp, _ = self._exchange(apdu)
         return resp
 
-
     def _put_data(self, tag: int, data: bytes) -> int:
         """Send APDU command to PUT a Data Object value
 
@@ -1219,7 +1196,6 @@ class GPGCard() :
         apdu = bytes.fromhex(f"00DA{tag:04x}")
         _, sw = self._exchange(apdu, data)
         return sw
-
 
     def _asym_key_pair(self, op: int, key: int, seed: bool = False) -> dict:
         """Asymmetric key pair operation
@@ -1240,7 +1216,6 @@ class GPGCard() :
         tags = self._decode_tlv(resp)
         return self._decode_tlv(tags[DataObject.DO_PUB_KEY])
 
-
     def _conv_date_from_bytes(self, key: str, data: bytes) -> None:
         """Convert date from bytes to datetime local dataclass
 
@@ -1252,7 +1227,6 @@ class GPGCard() :
         idate = int.from_bytes(data, "big")
         self._get_key_object(key).date = datetime.utcfromtimestamp(idate)
 
-
     def _set_key_date_now(self, key: str) -> None:
         """Set Key creation date
 
@@ -1262,7 +1236,7 @@ class GPGCard() :
 
         dt = datetime.utcnow().replace(microsecond=0)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
-        tag: Optional[DataObject] = None
+        tag: DataObject | None = None
         if key == KeyTypes.KEY_SIG:
             self.data.sig.date = dt
             tag = DataObject.DO_DATES_WR_SIG
@@ -1274,7 +1248,6 @@ class GPGCard() :
             tag = DataObject.DO_DATES_WR_DEC
         if tag:
             self._put_data(tag, bdate)
-
 
     def _decode_tlv(self, tlv: bytes) -> dict:
         """Decode TLV fields
@@ -1288,31 +1261,29 @@ class GPGCard() :
 
         tags = {}
         while len(tlv):
-            o = 0
-            l = 0
+            offset = 0
+            length = 0
             if (tlv[0] & 0x1F) == 0x1F:
-                t = self._get_int(tlv)
-                o = 2
+                tag = self._get_int(tlv)
+                offset = 2
             else:
-                t = tlv[0]
-                o = 1
-            l = tlv[o]
-            if l & 0x80 :
-                if (l & 0x7f) == 1:
-                    l = tlv[o + 1]
-                    o += 2
-                if (l & 0x7f) == 2:
-                    l = self._get_int(tlv, offset=o + 1)
-                    o += 3
+                tag = tlv[0]
+                offset = 1
+            length = tlv[offset]
+            if length & 0x80:
+                if (length & 0x7F) == 1:
+                    length = tlv[offset + 1]
+                    offset += 2
+                elif (length & 0x7F) == 2:
+                    length = self._get_int(tlv, offset=offset + 1)
+                    offset += 3
             else:
-                o += 1
-            v = tlv[o:o + l]
-            tags[t] = v
-            tlv = tlv[o + l:]
+                offset += 1
+            tags[tag] = tlv[offset : offset + length]
+            tlv = tlv[offset + length :]
         return tags
 
-
-    def _transmit(self, data: bytes, long_resp: bool = False) -> Tuple[bytes, int, int]:
+    def _transmit(self, data: bytes, long_resp: bool = False) -> tuple[bytes, int, int]:
         """Transmit data, and get the response
 
         Args:
@@ -1332,8 +1303,7 @@ class GPGCard() :
             raise GPGCardExcpetion(sw, "")
         return resp, sw1, sw2
 
-
-    def _exchange(self, apdu: bytes, data: bytes = b"") -> Tuple[bytes, int]:
+    def _exchange(self, apdu: bytes, data: bytes = b"") -> tuple[bytes, int]:
         """Exchange APDU, and get the response
 
         Args:
@@ -1344,7 +1314,7 @@ class GPGCard() :
             Response data bytes and the Status Word
         """
 
-        #send
+        # send
         apdux: bytes = b""
         resp: bytes = b""
         if len(data) > 0:
@@ -1359,14 +1329,13 @@ class GPGCard() :
 
         resp, sw1, sw2 = self._transmit(apdu, True)
 
-        #receive
+        # receive
         while sw1 == ErrorCodes.ERR_SW1_VALID:
             apdux = bytes.fromhex(f"00c00000{sw2:02x}")
             resp2, sw1, sw2 = self._transmit(apdux, True)
             resp += resp2
         sw = (sw1 << 8) | sw2
         return bytes(resp), sw
-
 
     def _get_int(self, buffer: bytes, size: int = 2, offset: int = 0) -> int:
         """Exchange APDU, and get the response
@@ -1384,6 +1353,5 @@ class GPGCard() :
         if size == 3:
             return (buffer[offset] << 16) | (buffer[offset + 1] << 8) | buffer[offset + 2]
         if size == 4:
-            return (buffer[offset] << 24) | (buffer[offset + 1] << 16) | \
-                    (buffer[offset + 2] << 8) | buffer[offset + 3]
+            return (buffer[offset] << 24) | (buffer[offset + 1] << 16) | (buffer[offset + 2] << 8) | buffer[offset + 3]
         return 0

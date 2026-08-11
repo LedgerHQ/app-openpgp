@@ -1,26 +1,30 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2023 Ledger SAS
 # SPDX-License-Identifier: LicenseRef-LEDGER
 """
 This module provides Ragger tests for Signing feature with SEED mode
 """
+
 import sys
-from typing import Union
+
 import pytest
-
-from Crypto.PublicKey.RSA import RsaKey
-from Crypto.PublicKey.ECC import EccKey
-
-from ragger.backend import BackendInterface
-
+from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
-from application_client.app_def import Errors, DataObject, PassWord, PubkeyAlgo
+from Crypto.PublicKey.ECC import EccKey
+from Crypto.PublicKey.RSA import RsaKey
+from ragger.backend import BackendInterface
+from utils import (
+    KEY_TEMPLATES,
+    check_pincode,
+    generate_key,
+    get_ECDH_pub_key,
+    get_ECDSA_pub_key,
+    get_EDDSA_pub_key,
+    get_key_attributes,
+    get_RSA_pub_key,
+)
 
-from utils import get_RSA_pub_key, get_ECDSA_pub_key, get_EDDSA_pub_key, get_ECDH_pub_key
-from utils import check_pincode, generate_key, get_key_attributes, KEY_TEMPLATES
 
-
-def _gen_key(client: CommandSender, template: str) -> Union[RsaKey,EccKey]:
+def _gen_key(client: CommandSender, template: str) -> RsaKey | EccKey:
 
     # Verify PW3 (Admin)
     check_pincode(client, PassWord.PW3)
@@ -34,7 +38,7 @@ def _gen_key(client: CommandSender, template: str) -> Union[RsaKey,EccKey]:
 
     key_algo, _ = get_key_attributes(client, DataObject.DO_SIG_ATTR)
 
-     # Read the SIG pub Key
+    # Read the SIG pub Key
     if key_algo == PubkeyAlgo.RSA:
         return get_RSA_pub_key(client, DataObject.DO_SIG_KEY)
     if key_algo == PubkeyAlgo.ECDSA:
@@ -51,11 +55,17 @@ def _gen_key(client: CommandSender, template: str) -> Union[RsaKey,EccKey]:
     "template",
     [
         "rsa2048",
-        pytest.param("rsa3072", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
-        pytest.param("rsa4096", marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test")),
+        pytest.param(
+            "rsa3072",
+            marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test"),
+        ),
+        pytest.param(
+            "rsa4096",
+            marks=pytest.mark.skipif("--full" not in sys.argv, reason="skipping long test"),
+        ),
         "nistp256",  # ECDSA
-        "ed25519",   # EdDSA
-        "cv25519",   # ECDH
+        "ed25519",  # EdDSA
+        "cv25519",  # ECDH
     ],
 )
 def test_seed_key(backend: BackendInterface, template: str) -> None:
