@@ -266,6 +266,8 @@ struct gpg_v_state_s {
     char menu[112];
     unsigned char ux_pinentry[GPG_MAX_PW_LENGTH];
     unsigned char ux_pinLen;
+    unsigned char ux_pinconfirm_p2;
+    unsigned char ui_pending;
     unsigned int ux_key;
     unsigned int ux_type;
 
