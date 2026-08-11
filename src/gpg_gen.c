@@ -187,19 +187,19 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
     gpg_io_mark();
     switch (ksz) {
         case 2048 / 8:
-            if (keygpg->priv_key.rsa2048.size == 0) {
+            if (keygpg->priv_key.rsa2048.size != ksz) {
                 return SWO_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa2048.n);
             break;
         case 3072 / 8:
-            if (keygpg->priv_key.rsa3072.size == 0) {
+            if (keygpg->priv_key.rsa3072.size != ksz) {
                 return SWO_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa3072.n);
             break;
         case 4096 / 8:
-            if (keygpg->priv_key.rsa4096.size == 0) {
+            if (keygpg->priv_key.rsa4096.size != ksz) {
                 return SWO_REFERENCED_DATA_NOT_FOUND;
             }
             gpg_io_insert_tlv(0x81, ksz, (unsigned char *) &keygpg->priv_key.rsa4096.n);
