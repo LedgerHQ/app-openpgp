@@ -5,3 +5,6 @@
 # needs to install its platform binary; the others are harmless to allow.
 allowBuilds:
   esbuild: true
+
+overrides:
+  undici: ">=7.29.0"

@@ -261,6 +261,7 @@ int gpg_apdu_put_data(unsigned int ref) {
     unsigned int t, l, sw;
     unsigned int *ptr_l = NULL;
     unsigned char *ptr_v = NULL;
+    gpg_key_t *ptr_key = NULL;
     void *pkey = NULL;
     cx_aes_key_t aes_key = {0};
     cx_err_t error = CX_INTERNAL_ERROR;
@@ -555,7 +556,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             /* ----------------- User -----------------*/
             /* Name */
         case 0x5B:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->name.value)) {
+            if (G_gpg_vstate.io_length > GPG_NAME_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -569,7 +570,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Login data */
         case 0x5E:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->login.value)) {
+            if (G_gpg_vstate.io_length > GPG_EXT_PRIVATE_DO_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -583,7 +584,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Language preferences */
         case 0x5F2D:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->lang.value)) {
+            if (G_gpg_vstate.io_length > GPG_LANG_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -597,7 +598,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* salutation */
         case 0x5F35:
-            if (G_gpg_vstate.io_length != sizeof(N_gpg_pstate->salutation)) {
+            if (G_gpg_vstate.io_length != GPG_SALUTATION_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -608,7 +609,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             break;
             /* Uniform resource locator */
         case 0x5F50:
-            if (G_gpg_vstate.io_length > sizeof(N_gpg_pstate->keys[G_gpg_vstate.slot].url.value)) {
+            if (G_gpg_vstate.io_length > GPG_EXT_PRIVATE_DO_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -657,10 +658,12 @@ int gpg_apdu_put_data(unsigned int ref) {
         case 0xC1:
             ptr_l = &G_gpg_vstate.kslot->sig.attributes.length;
             ptr_v = G_gpg_vstate.kslot->sig.attributes.value;
+            ptr_key = &G_gpg_vstate.kslot->sig;
             goto WRITE_ATTRIBUTES;
         case 0xC2:
             ptr_l = &G_gpg_vstate.kslot->dec.attributes.length;
             ptr_v = G_gpg_vstate.kslot->dec.attributes.value;
+            ptr_key = &G_gpg_vstate.kslot->dec;
 #ifdef NO_DECRYPT_cv25519
             decKey = true;
 #endif
@@ -668,6 +671,7 @@ int gpg_apdu_put_data(unsigned int ref) {
         case 0xC3:
             ptr_l = &G_gpg_vstate.kslot->aut.attributes.length;
             ptr_v = G_gpg_vstate.kslot->aut.attributes.value;
+            ptr_key = &G_gpg_vstate.kslot->aut;
             goto WRITE_ATTRIBUTES;
         WRITE_ATTRIBUTES:
             if (G_gpg_vstate.io_length > 12) {
@@ -706,6 +710,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             }
 
             if (sw == SWO_SUCCESS) {
+                nvm_write(ptr_key, NULL, sizeof(gpg_key_t));
                 nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
                 nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
             }

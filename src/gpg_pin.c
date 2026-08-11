@@ -222,12 +222,14 @@ int gpg_apdu_verify() {
             case PIN_MODE_SCREEN:
                 // Delegate pin check to ui
                 gpg_io_discard(1);
+                G_gpg_vstate.ux_pinconfirm_p2 = G_gpg_vstate.io_p2;
                 ui_menu_pinentry_display(0);
                 sw = 0;
                 break;
             case PIN_MODE_CONFIRM:
                 // Delegate pin check to ui
                 gpg_io_discard(1);
+                G_gpg_vstate.ux_pinconfirm_p2 = G_gpg_vstate.io_p2;
                 ui_menu_pinconfirm_display(G_gpg_vstate.io_p2);
                 sw = 0;
                 break;
@@ -301,6 +303,7 @@ int gpg_apdu_change_ref_data() {
     if (G_gpg_vstate.io_length == 0) {
         // Delegate pin change to ui
         gpg_io_discard(1);
+        G_gpg_vstate.ux_pinconfirm_p2 = G_gpg_vstate.io_p2;
         ui_menu_pinentry_display(0);
         return 0;
     }
