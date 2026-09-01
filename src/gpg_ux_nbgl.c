@@ -1350,6 +1350,22 @@ static void ui_menu_pinentry_cb(void) {
 
 /* ------------------------------ UIF CONFIRM UX ----------------------------- */
 
+/* Snapshot of the APDU presented to the user before the UIF prompt is shown.
+ * While the prompt is pending (IO_ASYNCH_REPLY), the host can overwrite the
+ * global APDU state with a different command.  Restoring from this snapshot
+ * in the callback ensures the operation executed is exactly what the user
+ * reviewed, not an attacker-substituted payload (V-102). */
+typedef struct {
+    unsigned char ins;
+    unsigned char p1;
+    unsigned char p2;
+    unsigned short p1p2;
+    unsigned short length;
+    unsigned char data[GPG_IO_BUFFER_LENGTH];
+} uif_snapshot_t;
+
+static uif_snapshot_t G_uif_snapshot;
+
 /**
  * @brief UIF Confirmation callback
  *
@@ -1360,6 +1376,15 @@ void uif_confirm_cb(bool confirm) {
     unsigned int sw = SWO_SECURITY_ISSUE;
 
     if (confirm) {
+        /* Restore the exact APDU state that was shown to the user, discarding
+         * any APDU the host may have sent while the prompt was pending. */
+        G_gpg_vstate.io_ins = G_uif_snapshot.ins;
+        G_gpg_vstate.io_p1 = G_uif_snapshot.p1;
+        G_gpg_vstate.io_p2 = G_uif_snapshot.p2;
+        G_gpg_vstate.io_p1p2 = G_uif_snapshot.p1p2;
+        G_gpg_vstate.io_length = G_uif_snapshot.length;
+        G_gpg_vstate.io_offset = 0;
+        memmove(G_gpg_vstate.work.io_buffer, G_uif_snapshot.data, G_uif_snapshot.length);
         G_gpg_vstate.UIF_flags = 1;
         if (G_gpg_vstate.io_ins == INS_PSO) {
             sw = gpg_apdu_pso();
@@ -1372,6 +1397,7 @@ void uif_confirm_cb(bool confirm) {
     } else {
         gpg_io_discard(1);
     }
+    explicit_bzero(&G_uif_snapshot, sizeof(G_uif_snapshot));
     gpg_io_insert_u16(sw);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
@@ -1411,5 +1437,15 @@ void ui_menu_uifconfirm_display(unsigned int value) {
     if (G_gpg_vstate.menu[0] == 0) {
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Please Cancel");
     }
+
+    /* Capture APDU state before entering async mode so the callback can
+     * restore it even if the host sends a new APDU while the prompt is up. */
+    G_uif_snapshot.ins = G_gpg_vstate.io_ins;
+    G_uif_snapshot.p1 = G_gpg_vstate.io_p1;
+    G_uif_snapshot.p2 = G_gpg_vstate.io_p2;
+    G_uif_snapshot.p1p2 = G_gpg_vstate.io_p1p2;
+    G_uif_snapshot.length = G_gpg_vstate.io_length;
+    memmove(G_uif_snapshot.data, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+
     nbgl_useCaseChoice(NULL, "Confirm operation", G_gpg_vstate.menu, "Yes", "No", uif_confirm_cb);
 }
