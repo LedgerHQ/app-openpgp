@@ -24,7 +24,10 @@ from datetime import UTC, datetime
 from hashlib import sha1
 
 # pylint: disable=import-error
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import scrypt
 from Crypto.PublicKey.RSA import construct
+from Crypto.Random import get_random_bytes
 from ledgercomm import Transport  # type: ignore
 
 # pylint: enable=import-error
@@ -55,6 +58,42 @@ class GPGCardExcpetion(Exception):
         self.code = code
         self.message = message
         super().__init__(self.message)
+
+
+# Encrypted backup file format: version(1) || salt(16) || nonce(12) || ciphertext || tag(16)
+# First byte of an unencrypted backup is '{' (0x7B); 0x01 is unambiguously the encrypted format.
+_BACKUP_ENC_VERSION = b"\x01"
+_SALT_LEN = 16
+_NONCE_LEN = 12
+_KEY_LEN = 32  # AES-256-GCM
+
+
+def _encrypt_backup(data: bytes, passphrase: str) -> bytes:
+    salt = get_random_bytes(_SALT_LEN)
+    key = scrypt(passphrase.encode("utf-8"), salt, _KEY_LEN, N=2**17, r=8, p=1)  # type: ignore[call-arg]
+    nonce = get_random_bytes(_NONCE_LEN)
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    ciphertext, tag = cipher.encrypt_and_digest(data)
+    return _BACKUP_ENC_VERSION + salt + nonce + ciphertext + tag
+
+
+def _decrypt_backup(data: bytes, passphrase: str) -> bytes:
+    min_len = 1 + _SALT_LEN + _NONCE_LEN + 16
+    if len(data) < min_len:
+        raise GPGCardExcpetion(0, "Encrypted backup file is truncated")
+    off = 1  # skip version byte
+    salt = data[off : off + _SALT_LEN]
+    off += _SALT_LEN
+    nonce = data[off : off + _NONCE_LEN]
+    off += _NONCE_LEN
+    ciphertext = data[off:-16]
+    tag = data[-16:]
+    key = scrypt(passphrase.encode("utf-8"), salt, _KEY_LEN, N=2**17, r=8, p=1)  # type: ignore[call-arg]
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    try:
+        return cipher.decrypt_and_verify(ciphertext, tag)
+    except ValueError as e:
+        raise GPGCardExcpetion(0, "Backup decryption failed (wrong passphrase or corrupted file)") from e
 
 
 @dataclass
@@ -352,11 +391,12 @@ class GPGCard:
         self.data.dec.key = self._get_data(DataObject.DO_DEC_KEY)
         self.data.aut.key = self._get_data(DataObject.DO_AUT_KEY)
 
-    def backup(self, file_name: str) -> None:
-        """Backup data to backup file
+    def backup(self, file_name: str, passphrase: str | None = None) -> None:
+        """Backup data to backup file.
 
         Args:
             file_name (str): Backup filename
+            passphrase (str | None): If provided, the file is encrypted with AES-256-GCM.
         """
 
         def _b64(b: bytes) -> str:
@@ -393,22 +433,35 @@ class GPGCard:
             "dec": _key_slot(self.data.dec),
             "aut": _key_slot(self.data.aut),
         }
+        raw = json.dumps(payload, indent=2).encode("utf-8")
+        if passphrase is not None:
+            raw = _encrypt_backup(raw, passphrase)
         fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, mode="w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
 
-    def restore(self, file_name: str) -> None:
-        """Restore data from backup file
+    def restore(self, file_name: str, passphrase: str | None = None, seed_key: bool = False) -> None:
+        """Restore data from backup file.
 
         Args:
             file_name (str): Backup filename
+            passphrase (str | None): Required when the file was encrypted with --file-passphrase.
+            seed_key (bool): When True, skip writing key blobs; caller must invoke seed_key()
+                             afterwards to regenerate keys from the device seed.
         """
 
         def _fromb64(s: str) -> bytes:
             return base64.b64decode(s)
 
-        with open(file_name, encoding="utf-8") as f:
-            payload = json.load(f)
+        with open(file_name, "rb") as f:
+            raw = f.read()
+
+        if raw[:1] == _BACKUP_ENC_VERSION:
+            if passphrase is None:
+                raise GPGCardExcpetion(0, "Backup file is encrypted; provide --file-passphrase")
+            raw = _decrypt_backup(raw, passphrase)
+
+        payload = json.loads(raw.decode("utf-8"))
 
         self.data.AID = payload["AID"]
         self.data.PW_status = _fromb64(payload["PW_status"])
@@ -479,7 +532,8 @@ class GPGCard:
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_SIG, bdate)
-        self._put_data(DataObject.DO_SIG_KEY, self.data.sig.key)
+        if not seed_key:
+            self._put_data(DataObject.DO_SIG_KEY, self.data.sig.key)
 
         self._put_data(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
@@ -487,7 +541,8 @@ class GPGCard:
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_DEC, bdate)
-        self._put_data(DataObject.DO_DEC_KEY, self.data.dec.key)
+        if not seed_key:
+            self._put_data(DataObject.DO_DEC_KEY, self.data.dec.key)
 
         self._put_data(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
         self._put_data(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
@@ -495,7 +550,8 @@ class GPGCard:
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
         self._put_data(DataObject.DO_DATES_WR_AUT, bdate)
-        self._put_data(DataObject.DO_AUT_KEY, self.data.aut.key)
+        if not seed_key:
+            self._put_data(DataObject.DO_AUT_KEY, self.data.aut.key)
 
     def export_pub_key(self, pubkey: dict, file_name: str) -> None:
         """Export a Public key to file
