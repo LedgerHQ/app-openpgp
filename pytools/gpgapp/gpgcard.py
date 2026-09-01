@@ -21,11 +21,10 @@ import json
 import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from hashlib import sha1
+from hashlib import pbkdf2_hmac, sha1
 
 # pylint: disable=import-error
 from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import scrypt
 from Crypto.PublicKey.RSA import construct
 from Crypto.Random import get_random_bytes
 from ledgercomm import Transport  # type: ignore
@@ -62,17 +61,22 @@ class GPGCardExcpetion(Exception):
 
 # Encrypted backup file format: version(1) || salt(16) || nonce(12) || ciphertext || tag(16)
 # First byte of an unencrypted backup is '{' (0x7B); 0x01 is unambiguously the encrypted format.
+# KDF: PBKDF2-SHA256, 600 000 iterations — matches the WUI (Web Crypto API).
 _BACKUP_ENC_VERSION = b"\x01"
+_PBKDF2_ITER = 600_000
 _SALT_LEN = 16
 _NONCE_LEN = 12
 _KEY_LEN = 32  # AES-256-GCM
 
 
+def _derive_key(passphrase: str, salt: bytes) -> bytes:
+    return pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, _PBKDF2_ITER, dklen=_KEY_LEN)
+
+
 def _encrypt_backup(data: bytes, passphrase: str) -> bytes:
     salt = get_random_bytes(_SALT_LEN)
-    key = scrypt(passphrase.encode("utf-8"), salt, _KEY_LEN, N=2**17, r=8, p=1)  # type: ignore[call-arg]
     nonce = get_random_bytes(_NONCE_LEN)
-    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    cipher = AES.new(_derive_key(passphrase, salt), AES.MODE_GCM, nonce=nonce)
     ciphertext, tag = cipher.encrypt_and_digest(data)
     return _BACKUP_ENC_VERSION + salt + nonce + ciphertext + tag
 
@@ -88,8 +92,7 @@ def _decrypt_backup(data: bytes, passphrase: str) -> bytes:
     off += _NONCE_LEN
     ciphertext = data[off:-16]
     tag = data[-16:]
-    key = scrypt(passphrase.encode("utf-8"), salt, _KEY_LEN, N=2**17, r=8, p=1)  # type: ignore[call-arg]
-    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    cipher = AES.new(_derive_key(passphrase, salt), AES.MODE_GCM, nonce=nonce)
     try:
         return cipher.decrypt_and_verify(ciphertext, tag)
     except ValueError as e:
