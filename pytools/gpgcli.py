@@ -369,9 +369,9 @@ def entrypoint() -> None:
 
     # Processing
     # ----------
+    gpgcard: GPGCard = GPGCard()
     try:
         print(f"Connect to card '{args.reader}'...")
-        gpgcard: GPGCard = GPGCard()
         gpgcard.log_apdu(args.apdu)
         gpgcard.connect(args.reader)
 
@@ -422,10 +422,15 @@ def entrypoint() -> None:
         if args.key_action:
             handle_key(gpgcard, args.key_action, args.key_type, args.file, args.seed_key)
 
-        gpgcard.disconnect()
-
     except GPGCardExcpetion as err:
         error(err.code, err.message)
+    finally:
+        if gpgcard.transport is not None:
+            try:
+                gpgcard.logout()
+            except GPGCardExcpetion:
+                pass
+            gpgcard.disconnect()
 
 
 if __name__ == "__main__":

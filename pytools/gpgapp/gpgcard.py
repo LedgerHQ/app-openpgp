@@ -168,6 +168,23 @@ class GPGCard:
             self.transport = Transport("hid")
         print("")
 
+    def logout(self) -> None:
+        """Clear PW1/PW2/PW3 verification state on the card.
+
+        Sends VERIFY with P1=0xFF for each password role, which instructs
+        the firmware to reset that role's verified flag without checking any
+        PIN value.  Must be called before closing the transport so that a
+        subsequent process cannot reuse residual authorization (V-181).
+        """
+        errors = []
+        for pw in (PassWord.PW1, PassWord.PW2, PassWord.PW3):
+            apdu = bytes([0x00, 0x20, 0xFF, int(pw), 0x00])
+            _, sw = self._exchange(apdu)
+            if sw != ErrorCodes.ERR_SUCCESS:
+                errors.append((pw, sw))
+        if errors:
+            raise GPGCardExcpetion(errors[0][1], "Failed to clear PIN session")
+
     def disconnect(self):
         """Connect from the selected Reader"""
 
