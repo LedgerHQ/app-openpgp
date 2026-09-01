@@ -32,7 +32,12 @@ import GpgManager from "./controller/GpgManager.js";
 import logo from "./logo.svg";
 
 const gpg = new GpgManager();
-listen((log) => console.log(log));
+if (import.meta.env.DEV) {
+  listen((event) => {
+    if (event?.type === "apdu") return;
+    console.debug(event);
+  });
+}
 
 async function saveJSON(payload, suggestedName) {
   const text = JSON.stringify(payload, null, 2);
