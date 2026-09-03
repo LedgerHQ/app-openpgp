@@ -28,11 +28,21 @@ import {
   CheckmarkCircleFill,
 } from "@ledgerhq/lumen-ui-react/symbols";
 import { listen } from "@ledgerhq/logs";
+import {
+  decryptBackup,
+  encryptBackup,
+  isEncryptedBackup,
+} from "./controller/backupFormat.js";
 import GpgManager from "./controller/GpgManager.js";
 import logo from "./logo.svg";
 
 const gpg = new GpgManager();
-listen((log) => console.log(log));
+if (import.meta.env.DEV) {
+  listen((event) => {
+    if (event?.type === "apdu") return;
+    console.debug(event);
+  });
+}
 
 async function saveJSON(payload, suggestedName) {
   const text = JSON.stringify(payload, null, 2);
@@ -68,10 +78,39 @@ async function saveJSON(payload, suggestedName) {
   return true;
 }
 
+async function saveBytes(bytes, suggestedName) {
+  if (window.showSaveFilePicker) {
+    let handle;
+    try {
+      handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: "OpenPGP backup", accept: { "application/octet-stream": [".json"] } }],
+      });
+    } catch (error) {
+      if (error.name === "AbortError") return false;
+      throw error;
+    }
+    const writable = await handle.createWritable();
+    await writable.write(bytes);
+    await writable.close();
+    return true;
+  }
+  const blob = new Blob([bytes], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = suggestedName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return true;
+}
+
 const PIN_DIALOG = {
-  backup: { title: "Backup", description: "Enter your PINs to read the card.", submit: "Backup", appearance: "accent", showUser: true, showRegen: false, showSlot: true },
-  restore: { title: "Restore", description: "This overwrites the current card configuration.", submit: "Restore", appearance: "accent", showUser: true, showRegen: true, showSlot: true },
-  factoryReset: { title: "Factory reset", description: "This erases all keys and resets the PINs to their defaults.", submit: "Erase", appearance: "red", showUser: false, showRegen: false, showSlot: false },
+  backup: { title: "Backup", description: "Enter your PINs to read the card.", submit: "Backup", appearance: "accent", showUser: true, showRegen: false, showSlot: true, showFilePass: true },
+  restore: { title: "Restore", description: "This overwrites the current card configuration.", submit: "Restore", appearance: "accent", showUser: true, showRegen: true, showSlot: true, showFilePass: true },
+  factoryReset: { title: "Factory reset", description: "This erases all keys and resets the PINs to their defaults.", submit: "Erase", appearance: "red", showUser: false, showRegen: false, showSlot: false, showFilePass: false },
 };
 
 export default function App() {
@@ -90,6 +129,8 @@ export default function App() {
 
   const [userPin, setUserPin] = useState("");
   const [adminPin, setAdminPin] = useState("");
+  const [filePassphrase, setFilePassphrase] = useState("");
+  const [isEncryptedFile, setIsEncryptedFile] = useState(false);
   const [regen, setRegen] = useState(true);
   const [slot, setSlot] = useState("1");
 
@@ -130,6 +171,8 @@ export default function App() {
     setPinAction(null);
     setUserPin("");
     setAdminPin("");
+    setFilePassphrase("");
+    setIsEncryptedFile(false);
     setSlot("1");
   }
 
@@ -170,11 +213,13 @@ export default function App() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      restoreContent.current = reader.result;
+      const bytes = new Uint8Array(reader.result);
+      restoreContent.current = bytes;
+      setIsEncryptedFile(isEncryptedBackup(bytes));
       setRegen(true);
       setPinAction("restore");
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }
 
   async function submitPin(event) {
@@ -185,14 +230,24 @@ export default function App() {
       if (pinAction === "backup") {
         const payload = await gpg.backup(userPin, adminPin, parseInt(slot, 10) - 1);
         closePin();
-        const saved = await saveJSON(payload, `gpg_backup_${serial || "openpgp"}.json`);
+        const name = `gpg_backup_${serial || "openpgp"}.json`;
+        let saved;
+        if (filePassphrase) {
+          const encrypted = await encryptBackup(payload, filePassphrase);
+          saved = await saveBytes(encrypted, name);
+        } else {
+          saved = await saveJSON(payload, name);
+        }
         setNotice(
           saved
             ? { appearance: "success", title: "Backup saved" }
             : { appearance: "info", title: "Backup cancelled" }
         );
       } else if (pinAction === "restore") {
-        const f = await gpg.restore(userPin, adminPin, restoreContent.current, regen, parseInt(slot, 10) - 1);
+        const content = isEncryptedFile
+          ? await decryptBackup(restoreContent.current, filePassphrase)
+          : new TextDecoder().decode(restoreContent.current);
+        const f = await gpg.restore(userPin, adminPin, content, regen, parseInt(slot, 10) - 1);
         closePin();
         restoreContent.current = null;
         setFailures(f);
@@ -228,7 +283,10 @@ export default function App() {
 
   const cfg = pinAction ? PIN_DIALOG[pinAction] : null;
   const canSubmit =
-    !busy && (!cfg?.showUser || userPin.length > 0) && adminPin.length > 0;
+    !busy &&
+    (!cfg?.showUser || userPin.length > 0) &&
+    adminPin.length > 0 &&
+    !(pinAction === "restore" && isEncryptedFile && filePassphrase.length === 0);
 
   return (
     <ThemeProvider colorScheme="dark">
@@ -449,6 +507,21 @@ export default function App() {
                   disabled={busy}
                   onChange={(e) => setAdminPin(e.target.value)}
                 />
+                {cfg?.showFilePass && (
+                  <TextInput
+                    label={
+                      pinAction === "restore" && isEncryptedFile
+                        ? "File passphrase (file is encrypted — required)"
+                        : "File passphrase (optional — encrypts the backup file)"
+                    }
+                    type="password"
+                    autoComplete="off"
+                    hideClearButton
+                    value={filePassphrase}
+                    disabled={busy}
+                    onChange={(e) => setFilePassphrase(e.target.value)}
+                  />
+                )}
                 {cfg?.showRegen && (
                   <label className="flex cursor-pointer items-start gap-12">
                     <Checkbox
