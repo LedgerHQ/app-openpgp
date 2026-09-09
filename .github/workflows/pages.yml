@@ -8,6 +8,12 @@ on:
     paths:
       - 'doc/**'
       - 'clients/wui/**'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'doc/**'
+      - 'clients/wui/**'
+      - '.github/workflows/pages.yml'
 
 concurrency:
   group: pages
