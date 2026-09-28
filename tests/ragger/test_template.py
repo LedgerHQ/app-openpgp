@@ -163,3 +163,46 @@ def test_rsa_exponent(backend: BackendInterface) -> None:
     assert rapdu.status == Errors.SW_OK
     generate_key(client, DataObject.DO_SIG_KEY)
     assert get_RSA_pub_key(client, DataObject.DO_SIG_KEY).e == 65537
+
+
+# In this test we check that a permanently enabled UIF cannot be changed by APDU
+def test_uif_permanent(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    uif_disabled, uif_enabled, uif_permanent = 0, 1, 2
+    button_feature = 0x20
+    uif_tags = (DataObject.DO_UIF_SIG, DataObject.DO_UIF_DEC, DataObject.DO_UIF_AUT)
+
+    check_pincode(client, PassWord.PW3)
+    for tag in uif_tags:
+        rapdu = client.put_data(tag, bytes([uif_permanent, button_feature]))
+        assert rapdu.status == Errors.SW_OK
+        for value in (uif_disabled, uif_enabled):
+            with pytest.raises(ExceptionRAPDU) as err:
+                client.put_data(tag, bytes([value, button_feature]))
+            assert err.value.status == Errors.SW_CONDITIONS_NOT_SATISFIED
+        rapdu = client.put_data(tag, bytes([uif_permanent, button_feature]))
+        assert rapdu.status == Errors.SW_OK
+        assert client.get_data(tag).data[0] == uif_permanent
+
+    # Only a card reset clears it
+    client.send_terminate()
+    client.send_activate()
+    check_pincode(client, PassWord.PW3)
+    for tag in uif_tags:
+        assert client.get_data(tag).data[0] == uif_disabled
+        rapdu = client.put_data(tag, bytes([uif_enabled, button_feature]))
+        assert rapdu.status == Errors.SW_OK
+
+
+# In this test we check that changing a key template keeps a permanently enabled UIF
+def test_uif_permanent_kept_on_template_change(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    uif_permanent, button_feature = 2, 0x20
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.put_data(DataObject.DO_UIF_SIG, bytes([uif_permanent, button_feature]))
+    assert rapdu.status == Errors.SW_OK
+
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["nistp256"])
+    assert rapdu.status == Errors.SW_OK
+    assert client.get_data(DataObject.DO_UIF_SIG).data == bytes([uif_permanent, button_feature])

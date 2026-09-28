@@ -863,7 +863,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             }
 
             if (sw == SWO_SUCCESS) {
-                nvm_write(ptr_key, NULL, sizeof(gpg_key_t));
+                gpg_key_erase(ptr_key);
                 nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
                 nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
             }
@@ -989,6 +989,11 @@ int gpg_apdu_put_data(unsigned int ref) {
         WRITE_UIF:
             if (G_gpg_vstate.io_length != 2) {
                 sw = SWO_WRONG_LENGTH;
+                break;
+            }
+            // a permanently enabled UIF can only be cleared by a card reset
+            if ((ptr_v[0] == 2) && (G_gpg_vstate.work.io_buffer[0] != 2)) {
+                sw = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 2);

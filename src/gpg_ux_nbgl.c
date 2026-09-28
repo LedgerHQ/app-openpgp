@@ -585,7 +585,7 @@ static void template_key_cb(int token, uint8_t index, int page) {
 
         if (dest && attributes.value[0] &&
             memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
-            nvm_write(dest, NULL, sizeof(gpg_key_t));
+            gpg_key_erase(dest);
             nvm_write(&dest->attributes, &attributes, sizeof(attributes));
         }
     }

@@ -144,6 +144,20 @@ bool gpg_rsa_exponent_is_valid(const unsigned char *e) {
 }
 
 /**
+ * Erase a key, keeping its User Interaction Flag
+ *
+ * @param[in]  key key to erase
+ *
+ */
+void gpg_key_erase(gpg_key_t *key) {
+    unsigned char uif[sizeof(key->UIF)];
+
+    memmove(uif, key->UIF, sizeof(uif));
+    nvm_write(key, NULL, sizeof(gpg_key_t));
+    nvm_write(key->UIF, uif, sizeof(uif));
+}
+
+/**
  * Generate a RSA key pair and writes it in NVRam
  *
  * @param[in]  keygpg pointer on key structure
