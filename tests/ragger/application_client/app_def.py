@@ -144,6 +144,8 @@ class DataObject(IntEnum):
     CMD_SLOT_CFG = 0x01F1
     # [Read/Write] Slot selection
     CMD_SLOT_CUR = 0x01F2
+    # [Read/Write] RSA public exponent used for key generation
+    CMD_RSA_EXP = 0x01F8
 
     # [Read/Write] Language preferences (according to ISO 639)
     DO_CARD_LANG = 0x5F2D

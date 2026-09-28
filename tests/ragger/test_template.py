@@ -13,6 +13,7 @@ from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import DSS, eddsa, pkcs1_15
 from ragger.backend import BackendInterface
+from ragger.error import ExceptionRAPDU
 from utils import (
     KEY_TEMPLATES,
     SHA256_DIGEST_INFO,
@@ -139,3 +140,26 @@ def test_ecdsa_digest_length(backend: BackendInterface) -> None:
         assert rapdu.status == Errors.SW_OK
         rapdu = client.authenticate(get_random_bytes(length))
         assert rapdu.status == Errors.SW_OK
+
+
+# In this test we check the RSA public exponent configuration used for key generation
+def test_rsa_exponent(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    # The exponent is written little-endian and read back big-endian
+    for exponent in (0, 1, 2, 65536):
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.put_data(DataObject.CMD_RSA_EXP, exponent.to_bytes(4, "little"))
+        assert err.value.status == Errors.SW_WRONG_DATA
+
+    for exponent in (3, 65537):
+        rapdu = client.put_data(DataObject.CMD_RSA_EXP, exponent.to_bytes(4, "little"))
+        assert rapdu.status == Errors.SW_OK
+        rapdu = client.get_data(DataObject.CMD_RSA_EXP)
+        assert rapdu.data == exponent.to_bytes(4, "big")
+
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+    assert get_RSA_pub_key(client, DataObject.DO_SIG_KEY).e == 65537

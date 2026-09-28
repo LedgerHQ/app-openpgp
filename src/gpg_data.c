@@ -469,7 +469,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
+            // stored in native byte order, then read back big-endian by key generation
             e = gpg_io_fetch_u32();
+            if (!gpg_rsa_exponent_is_valid((const unsigned char *) &e)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             nvm_write((void *) &N_gpg_pstate->default_RSA_exponent, &e, sizeof(unsigned int));
             sw = SWO_SUCCESS;
             break;

@@ -90,6 +90,19 @@ end:
 }
 
 /**
+ * Check a RSA public exponent
+ *
+ * @param[in]  e 4 bytes big-endian exponent
+ *
+ * @return true if the exponent is odd and at least 3
+ *
+ */
+bool gpg_rsa_exponent_is_valid(const unsigned char *e) {
+    uint32_t value = U4BE(e, 0);
+    return ((value & 1) != 0) && (value >= 3);
+}
+
+/**
  * Generate a RSA key pair and writes it in NVRam
  *
  * @param[in]  keygpg pointer on key structure
@@ -125,6 +138,9 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
     }
     if (pkey_size == 0) {
         return SWO_INCORRECT_DATA;
+    }
+    if (!gpg_rsa_exponent_is_valid((const unsigned char *) N_gpg_pstate->default_RSA_exponent)) {
+        return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
     if ((G_gpg_vstate.io_p2 == SEEDED_MODE) || (G_gpg_vstate.seed_mode)) {
