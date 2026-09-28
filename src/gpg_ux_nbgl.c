@@ -1278,7 +1278,7 @@ static void pinentry_validate_cb(const uint8_t *pinentry, uint8_t length) {
  */
 static void pinback_cb(void) {
     G_gpg_vstate.ui_pending = 0;
-    gpg_io_discard(0);
+    gpg_io_discard(1);
     gpg_io_insert_u16(SWO_CONDITIONS_NOT_SATISFIED);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
