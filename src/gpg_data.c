@@ -24,6 +24,7 @@
  * first byte of TARGET_ID (0x31 or 0x33 on Ledger devices), which is never
  * 0x01, so the first byte alone is an unambiguous version discriminant. */
 #define BACKUP_FORMAT_V1     ((unsigned char) 0x01)
+#define BACKUP_FORMAT_V2     ((unsigned char) 0x02)
 #define GPG_BACKUP_TAG_LEN   16
 #define GPG_BACKUP_NONCE_LEN 12
 
@@ -1048,9 +1049,7 @@ end:
     return error;
 }
 
-/* Build the deterministic 12-byte GCM nonce from slot and key reference.
- * The nonce is not stored in the blob; it is reconstructed identically on
- * restore from the same context, so it is never reused for a different key. */
+/* Rebuild the 12-byte GCM nonce of v1 backups from slot and key reference. */
 static void gpg_backup_nonce(unsigned int ref, unsigned char nonce[GPG_BACKUP_NONCE_LEN]) {
     explicit_bzero(nonce, GPG_BACKUP_NONCE_LEN);
     nonce[0] = (unsigned char) G_gpg_vstate.slot;
@@ -1092,12 +1091,12 @@ static int gpg_get_key_data(unsigned int ref, cx_aes_gcm_context_t *gcm_ctx) {
     }
 
     gpg_io_discard(1);
+    CX_CHECK(cx_get_random_bytes(nonce, sizeof(nonce)));
     // header authenticated by GCM tag (not encrypted)
-    gpg_io_insert_u8(BACKUP_FORMAT_V1);
+    gpg_io_insert_u8(BACKUP_FORMAT_V2);
     gpg_io_insert_u32(TARGET_ID);
     gpg_io_insert_u32(get_api_level());
-
-    gpg_backup_nonce(ref, nonce);
+    gpg_io_insert(nonce, sizeof(nonce));
 
     switch (keygpg->attributes.value[0]) {
         case KEY_ID_RSA:
@@ -1312,6 +1311,7 @@ end:
 int gpg_apdu_put_key_data(unsigned int ref) {
     gpg_key_t *keygpg = NULL;
     int sw = SWO_UNKNOWN;
+    unsigned char version;
 
     switch (ref) {
         case KEY_SIG:
@@ -1327,8 +1327,9 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             return SWO_INCORRECT_DATA;
     }
 
-    if (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] == BACKUP_FORMAT_V1) {
-        // v1: AES-GCM authenticated blob
+    version = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
+    if ((version == BACKUP_FORMAT_V1) || (version == BACKUP_FORMAT_V2)) {
+        // AES-GCM authenticated blob, with the nonce stored in the header from v2
         cx_aes_gcm_context_t gcm_ctx;
         unsigned char nonce[GPG_BACKUP_NONCE_LEN];
 
@@ -1337,11 +1338,14 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
             return sw;
         }
-        gpg_backup_nonce(ref, nonce);
-
         gpg_io_fetch_u8();   // version
         gpg_io_fetch_u32();  // TARGET_ID
         gpg_io_fetch_u32();  // api_level
+        if (version == BACKUP_FORMAT_V2) {
+            gpg_io_fetch(nonce, sizeof(nonce));
+        } else {
+            gpg_backup_nonce(ref, nonce);
+        }
 
         switch (keygpg->attributes.value[0]) {
             case KEY_ID_RSA:
@@ -1360,7 +1364,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
         }
         explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
     } else {
-        // legacy: AES-CBC blob (first byte is high byte of TARGET_ID, never 0x01)
+        // legacy: AES-CBC blob (first byte is high byte of TARGET_ID, never 0x01 nor 0x02)
         cx_aes_key_t keyenc = {0};
 
         sw = gpg_init_keyenc(&keyenc);
