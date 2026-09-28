@@ -560,6 +560,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
+            if (l > (unsigned int) (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 unsigned int e = 0;
@@ -615,7 +619,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 }
 
                 // move p,q over pub key, this only work because adr<rsa_pub> < adr<p>
-                if ((len_p > ksz) || (len_q > ksz)) {
+                if ((len_p > ksz) || (len_q > ksz) || ((len_e + len_p + len_q) > l)) {
                     sw = SWO_INCORRECT_DATA;
                     break;
                 }
@@ -648,6 +652,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                     break;
                 }
                 ksz = gpg_curve2domainlen(curve);
+                if (len_p > l) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
+                }
                 if (ksz == len_p) {
                     G_gpg_vstate.work.ecfp.private.curve = curve;
                     G_gpg_vstate.work.ecfp.private.d_len = ksz;

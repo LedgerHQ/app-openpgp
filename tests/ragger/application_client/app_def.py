@@ -151,3 +151,6 @@ class DataObject(IntEnum):
     DO_CARD_SALUTATION = 0x5F35
     # [Read/Write] Uniform resource locator (URL, as defined in RFC 1738)
     DO_URL = 0x5F50
+
+    # [Write] Extended Header list, private key import
+    DO_EXTENDED_HEADER_LIST = 0x3FFF
