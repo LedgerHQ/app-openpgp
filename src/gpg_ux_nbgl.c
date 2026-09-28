@@ -157,11 +157,12 @@ static void ui_home_init(void) {
     static const char *const infoContents[] = {COMBINED_VERSION, "Ledger", "Ledger (c) 2025"};
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
+    unsigned int name_len = MIN(N_gpg_pstate->name.length, sizeof(name) - 1);
 
     explicit_bzero(name, sizeof(name));
-    if (N_gpg_pstate->name.value[0] != 0) {
-        memmove(name, (void *) (N_gpg_pstate->name.value), sizeof(name) - 1);
-        for (uint8_t i = 0; i < sizeof(name) - 1; i++) {
+    if (name_len != 0) {
+        memmove(name, (void *) (N_gpg_pstate->name.value), name_len);
+        for (uint8_t i = 0; i < name_len; i++) {
             if ((name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
