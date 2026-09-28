@@ -1054,16 +1054,15 @@ static void gpg_backup_nonce(unsigned int ref, unsigned char nonce[GPG_BACKUP_NO
 }
 
 /**
- * Read a Key DO (Data Object) from the card
- * for Backup
+ * Encrypt a Key DO (Data Object) for Backup
  *
  * @param[in] ref DO tag
+ * @param[in] gcm_ctx AES-GCM context initialised with the backup key
  *
  * @return Status Word
  *
  */
-int gpg_apdu_get_key_data(unsigned int ref) {
-    cx_aes_gcm_context_t gcm_ctx;
+static int gpg_get_key_data(unsigned int ref, cx_aes_gcm_context_t *gcm_ctx) {
     gpg_key_t *keygpg = NULL;
     cx_rsa_private_key_t *key = NULL;
     unsigned int k_len = 0;
@@ -1073,10 +1072,6 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     unsigned int aad_len = 0;
     unsigned char nonce[GPG_BACKUP_NONCE_LEN];
 
-    sw = gpg_init_gcm(&gcm_ctx);
-    if (sw != SWO_SUCCESS) {
-        return sw;
-    }
     switch (ref) {
         case 0x00B6:
             keygpg = &G_gpg_vstate.kslot->sig;
@@ -1128,7 +1123,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
             // GCM produces no padding: ciphertext length == plaintext length
             gpg_io_insert_u32(k_len + GPG_BACKUP_TAG_LEN);
             CX_CHECK(cx_aes_gcm_encrypt_and_tag(
-                &gcm_ctx,
+                gcm_ctx,
                 (unsigned char *) key,
                 k_len,
                 nonce,
@@ -1154,7 +1149,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
 
             gpg_io_insert_u32(k_len + GPG_BACKUP_TAG_LEN);
             CX_CHECK(cx_aes_gcm_encrypt_and_tag(
-                &gcm_ctx,
+                gcm_ctx,
                 (unsigned char *) &keygpg->priv_key.ecfp640,
                 k_len,
                 nonce,
@@ -1175,6 +1170,27 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     return sw;
 end:
     return error;
+}
+
+/**
+ * Read a Key DO (Data Object) from the card
+ * for Backup
+ *
+ * @param[in] ref DO tag
+ *
+ * @return Status Word
+ *
+ */
+int gpg_apdu_get_key_data(unsigned int ref) {
+    cx_aes_gcm_context_t gcm_ctx;
+    int sw;
+
+    sw = gpg_init_gcm(&gcm_ctx);
+    if (sw == SWO_SUCCESS) {
+        sw = gpg_get_key_data(ref, &gcm_ctx);
+    }
+    explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
+    return sw;
 }
 
 /**
@@ -1313,6 +1329,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
 
         sw = gpg_init_gcm(&gcm_ctx);
         if (sw != SWO_SUCCESS) {
+            explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
             return sw;
         }
         gpg_backup_nonce(ref, nonce);
@@ -1336,12 +1353,14 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
         }
+        explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
     } else {
         // legacy: AES-CBC blob (first byte is high byte of TARGET_ID, never 0x01)
         cx_aes_key_t keyenc = {0};
 
         sw = gpg_init_keyenc(&keyenc);
         if (sw != SWO_SUCCESS) {
+            explicit_bzero(&keyenc, sizeof(keyenc));
             return sw;
         }
 
@@ -1363,6 +1382,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
         }
+        explicit_bzero(&keyenc, sizeof(keyenc));
     }
     gpg_io_discard(1);
     return sw;

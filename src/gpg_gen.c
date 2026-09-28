@@ -39,6 +39,7 @@ int gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
     CX_CHECK(os_derive_bip32_no_throw(CX_CURVE_SECP256K1, path, 2, seed, chain));
 
 end:
+    explicit_bzero(chain, sizeof(chain));
     if (error != CX_OK) {
         return error;
     }
