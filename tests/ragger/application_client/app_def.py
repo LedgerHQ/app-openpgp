@@ -127,6 +127,8 @@ class DataObject(IntEnum):
     DO_AUT_ATTR = 0xC3
     # [Write] AES symmetric key
     DO_KEY_AES = 0xD5
+    # [Write] Secure messaging ENC and MAC AES-128 keys, in one shot
+    DO_KEY_SM = 0xF4
 
     # [Read/Write] User Interaction Flag (UIF) for PSO:CDS
     DO_UIF_SIG = 0xD6

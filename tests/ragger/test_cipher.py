@@ -4,6 +4,7 @@
 This module provides Ragger tests for Cipher feature
 """
 
+import pytest
 from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
 from Crypto.Cipher import PKCS1_v1_5
@@ -11,6 +12,7 @@ from Crypto.Protocol.DH import key_agreement
 from Crypto.PublicKey import ECC
 from Crypto.Random import get_random_bytes
 from ragger.backend import BackendInterface
+from ragger.error import ExceptionRAPDU
 from utils import KEY_TEMPLATES, check_pincode, generate_key, get_ECDH_pub_key, get_RSA_pub_key
 
 
@@ -40,6 +42,24 @@ def test_AES(backend: BackendInterface) -> None:
     assert rapdu.status == Errors.SW_OK
 
     assert rapdu.data == plain
+
+
+# In this test we check the one-shot secure messaging keys import
+def test_SM_keys(backend: BackendInterface) -> None:
+    # Use the app interface instead of raw interface
+    client = CommandSender(backend)
+
+    # Verify PW3 (Admin)
+    check_pincode(client, PassWord.PW3)
+
+    aes128_len = 16
+    for wrong_len in (aes128_len, 2 * aes128_len - 1, 2 * aes128_len + 1):
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.put_data(DataObject.DO_KEY_SM, get_random_bytes(wrong_len))
+        assert err.value.status == Errors.SW_WRONG_LENGTH
+
+    rapdu = client.put_data(DataObject.DO_KEY_SM, get_random_bytes(2 * aes128_len))
+    assert rapdu.status == Errors.SW_OK
 
 
 # In this test we check the symmetric key encryption

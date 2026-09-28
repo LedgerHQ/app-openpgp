@@ -914,12 +914,16 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             /* AES key: one shot */
         case 0xF4:
+            if (G_gpg_vstate.io_length != 2 * CX_AES_128_KEY_LEN) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer,
-                                              G_gpg_vstate.io_length,
+                                              CX_AES_128_KEY_LEN,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
             CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer + CX_AES_128_KEY_LEN,
-                                              G_gpg_vstate.io_length,
+                                              CX_AES_128_KEY_LEN,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
             sw = SWO_SUCCESS;
