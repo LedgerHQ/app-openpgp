@@ -455,29 +455,35 @@ unsigned int gpg_io_do(unsigned int io_flags) {
                 xx = G_gpg_vstate.io_length - 2;
             }
             G_io_apdu_buffer[tx + 1] = xx;
-            io_exchange(CHANNEL_APDU, tx + 2);
-            // check get response APDU
-            if ((G_io_apdu_buffer[OFFSET_CLA] != CLA_APP_DEF) ||
+            rx = io_exchange(CHANNEL_APDU, tx + 2);
+            // Any command other than GET RESPONSE drops the pending response
+            if ((rx < 4) || (G_io_apdu_buffer[OFFSET_CLA] != CLA_APP_DEF) ||
                 (G_io_apdu_buffer[OFFSET_INS] != INS_GET_RESPONSE) ||
                 (G_io_apdu_buffer[OFFSET_P1] != GET_RESPONSE) ||
                 (G_io_apdu_buffer[OFFSET_P2] != GET_RESPONSE)) {
+                gpg_io_discard(1);
+                break;
+            }
+            rx = 0;
+        }
+        if (rx == 0) {
+            memmove(G_io_apdu_buffer,
+                    G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                    G_gpg_vstate.io_length);
+
+            if (io_flags & IO_RETURN_AFTER_TX) {
+                io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
                 return SWO_SUCCESS;
             }
-        }
-        memmove(G_io_apdu_buffer,
-                G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                G_gpg_vstate.io_length);
-
-        if (io_flags & IO_RETURN_AFTER_TX) {
-            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
+            rx = io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
+        } else if (io_flags & IO_RETURN_AFTER_TX) {
             return SWO_SUCCESS;
         }
-        rx = io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
     }
 
     //--- full in chaining ---
     if (rx < 4) {
-        return SWO_SUCCESS;
+        return gpg_io_reject(SWO_WRONG_LENGTH);
     }
     if (rx == 4) {
         G_io_apdu_buffer[OFFSET_LC] = 0;
