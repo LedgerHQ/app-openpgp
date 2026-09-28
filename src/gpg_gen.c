@@ -81,6 +81,8 @@ int gpg_pso_derive_key_seed(unsigned char *Sn,
     CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
 
 end:
+    explicit_bzero(h, sizeof(h));
+    explicit_bzero(&G_gpg_vstate.work.md.sha3, MAX(sizeof(cx_sha3_t), sizeof(cx_sha256_t)));
     if (error != CX_OK) {
         return error;
     }
