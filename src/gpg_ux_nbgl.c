@@ -1394,6 +1394,9 @@ void uif_confirm_cb(bool confirm) {
             gpg_io_discard(1);
         }
         G_gpg_vstate.UIF_flags = 0;
+        if ((sw != SWO_SUCCESS) && ((sw & 0xFF00) != SWO_RESPONSE_BYTES_AVAILABLE)) {
+            gpg_io_discard(1);
+        }
     } else {
         gpg_io_discard(1);
     }

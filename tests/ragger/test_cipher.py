@@ -4,16 +4,28 @@
 This module provides Ragger tests for Cipher feature
 """
 
+import struct
+from pathlib import Path
+
 import pytest
-from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
+from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.Protocol.DH import key_agreement
 from Crypto.PublicKey import ECC
 from Crypto.Random import get_random_bytes
+from ledgered.devices import Device
 from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
-from utils import KEY_TEMPLATES, check_pincode, generate_key, get_ECDH_pub_key, get_RSA_pub_key
+from ragger.navigator import Navigator
+from utils import (
+    KEY_TEMPLATES,
+    check_pincode,
+    generate_key,
+    get_ECDH_pub_key,
+    get_RSA_pub_key,
+    util_navigate,
+)
 
 
 # In this test we check the symmetric key encryption
@@ -155,3 +167,39 @@ def test_cv25519(backend: BackendInterface) -> None:
     secret = client.decrypt_asym(hdr + exp_pubkey, PubkeyAlgo.ECDH).data
 
     assert secret == expected_secret
+
+
+# In this test we check that a confirmed decryption failing on padding only returns a status word
+def test_uif_decrypt_invalid_padding(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
+    client = CommandSender(backend)
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_DEC_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_DEC_KEY)
+    rapdu = client.set_uif(DataObject.DO_UIF_DEC, True)
+    assert rapdu.status == Errors.SW_OK
+
+    check_pincode(client, PassWord.PW2)
+    pubkey = get_RSA_pub_key(client, DataObject.DO_DEC_KEY)
+
+    # Plaintext block without PKCS#1 v1.5 encryption padding
+    modulus_len = pubkey.size_in_bytes()
+    block = b"\x00\x05" + get_random_bytes(modulus_len - 2)
+    ciphertext = pow(int.from_bytes(block, "big"), pubkey.e, pubkey.n).to_bytes(modulus_len, "big")
+
+    pso_dec_p1, pso_dec_p2 = 0x80, 0x86
+    rsa_padding_indicator = b"\x00"
+    frame = rsa_padding_indicator + ciphertext
+    first, last = frame[: len(frame) // 2], frame[len(frame) // 2 :]
+    header = struct.pack(">BBBBB", ClaType.CLA_APP_CHAIN, InsType.INS_PSO, pso_dec_p1, pso_dec_p2, len(first))
+    rapdu = backend.exchange_raw(header + first)
+    assert rapdu.status == Errors.SW_OK
+
+    header = struct.pack(">BBBBB", ClaType.CLA_APP, InsType.INS_PSO, pso_dec_p1, pso_dec_p2, len(last))
+    with pytest.raises(ExceptionRAPDU) as err:
+        with backend.exchange_async_raw(header + last):
+            util_navigate(device, navigator, test_name, "Confirm_Yes")
+
+    assert err.value.status != Errors.SW_OK
+    assert len(err.value.data) == 0
