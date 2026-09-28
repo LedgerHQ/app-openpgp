@@ -47,7 +47,51 @@ end:
 }
 
 /**
+ * Derivate a sub-seed from the Generated Seed with SHAKE256
+ *
+ * @param[in]  Sn Seed for the selected slot
+ * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  idx sub-seed index
+ * @param[out] Ski generated sub_seed
+ * @param[in]  out_bits SHAKE256 output length, in bits
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_derive_shake(unsigned char *Sn,
+                            unsigned char *key_name,
+                            unsigned int idx,
+                            unsigned char *Ski,
+                            unsigned int out_bits) {
+    unsigned char h[32];
+    cx_err_t error = CX_INTERNAL_ERROR;
+    U2BE_ENCODE(h, 0, idx);
+
+    cx_sha256_init(&G_gpg_vstate.work.md.sha256);
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
+                              0,
+                              (unsigned char *) key_name,
+                              4,
+                              NULL,
+                              0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32));
+    CX_CHECK(cx_shake256_init_no_throw(&G_gpg_vstate.work.md.sha3, out_bits));
+    CX_CHECK(cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, 32));
+    CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
+
+end:
+    explicit_bzero(h, sizeof(h));
+    explicit_bzero(&G_gpg_vstate.work.md.sha3, MAX(sizeof(cx_sha3_t), sizeof(cx_sha256_t)));
+    if (error != CX_OK) {
+        return error;
+    }
+    return SWO_SUCCESS;
+}
+
+/**
  * Derivate the Key from the Generated Seed
+ * Only the first Ski_len / 8 bytes of Ski are derived, the others are left unchanged.
  *
  * @param[in]  Sn Seed for the selected slot
  * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
@@ -63,30 +107,27 @@ int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned int idx,
                             unsigned char *Ski,
                             unsigned int Ski_len) {
-    unsigned char h[32];
-    cx_err_t error = CX_INTERNAL_ERROR;
-    U2BE_ENCODE(h, 0, idx);
+    return gpg_derive_shake(Sn, key_name, idx, Ski, Ski_len);
+}
 
-    cx_sha256_init(&G_gpg_vstate.work.md.sha256);
-    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0));
-    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
-                              0,
-                              (unsigned char *) key_name,
-                              4,
-                              NULL,
-                              0));
-    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32));
-    CX_CHECK(cx_shake256_init_no_throw(&G_gpg_vstate.work.md.sha3, Ski_len));
-    CX_CHECK(cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, 32));
-    CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
-
-end:
-    explicit_bzero(h, sizeof(h));
-    explicit_bzero(&G_gpg_vstate.work.md.sha3, MAX(sizeof(cx_sha3_t), sizeof(cx_sha256_t)));
-    if (error != CX_OK) {
-        return error;
-    }
-    return SWO_SUCCESS;
+/**
+ * Derivate the Key from the Generated Seed, on its full length
+ *
+ * @param[in]  Sn Seed for the selected slot
+ * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  idx sub-seed index
+ * @param[out] Ski generated sub_seed
+ * @param[in]  Ski_len sub-seed length
+ *
+ * @return Status Word
+ *
+ */
+int gpg_pso_derive_key_seed_full(unsigned char *Sn,
+                                 unsigned char *key_name,
+                                 unsigned int idx,
+                                 unsigned char *Ski,
+                                 unsigned int Ski_len) {
+    return gpg_derive_shake(Sn, key_name, idx, Ski, Ski_len * 8);
 }
 
 /**

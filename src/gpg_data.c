@@ -1038,9 +1038,9 @@ end:
     return error;
 }
 
-/* Initialise an AES-GCM context with the slot-derived backup key.
+/* Initialise an AES-GCM context with the slot-derived backup key of the given format.
  * The raw key bytes are wiped from the stack before returning. */
-static int gpg_init_gcm(cx_aes_gcm_context_t *ctx) {
+static int gpg_init_gcm(cx_aes_gcm_context_t *ctx, unsigned char version) {
     unsigned char seed[32];
     cx_err_t error = CX_INTERNAL_ERROR;
     int sw;
@@ -1050,7 +1050,19 @@ static int gpg_init_gcm(cx_aes_gcm_context_t *ctx) {
         error = sw;
         goto end;
     }
-    sw = gpg_pso_derive_key_seed(seed, (unsigned char *) PIC("key "), 1, seed, CX_AES_BLOCK_SIZE);
+    if (version == BACKUP_FORMAT_V1) {
+        sw = gpg_pso_derive_key_seed(seed,
+                                     (unsigned char *) PIC("key "),
+                                     1,
+                                     seed,
+                                     CX_AES_BLOCK_SIZE);
+    } else {
+        sw = gpg_pso_derive_key_seed_full(seed,
+                                          (unsigned char *) PIC("key "),
+                                          1,
+                                          seed,
+                                          CX_AES_BLOCK_SIZE);
+    }
     if (sw != SWO_SUCCESS) {
         error = sw;
         goto end;
@@ -1203,7 +1215,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     cx_aes_gcm_context_t gcm_ctx;
     int sw;
 
-    sw = gpg_init_gcm(&gcm_ctx);
+    sw = gpg_init_gcm(&gcm_ctx, BACKUP_FORMAT_V2);
     if (sw == SWO_SUCCESS) {
         sw = gpg_get_key_data(ref, &gcm_ctx);
     }
@@ -1347,7 +1359,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
         cx_aes_gcm_context_t gcm_ctx;
         unsigned char nonce[GPG_BACKUP_NONCE_LEN];
 
-        sw = gpg_init_gcm(&gcm_ctx);
+        sw = gpg_init_gcm(&gcm_ctx, version);
         if (sw != SWO_SUCCESS) {
             explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
             return sw;

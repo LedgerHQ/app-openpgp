@@ -57,6 +57,11 @@ int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned int idx,
                             unsigned char *Ski,
                             unsigned int Ski_len);
+int gpg_pso_derive_key_seed_full(unsigned char *Sn,
+                                 unsigned char *key_name,
+                                 unsigned int idx,
+                                 unsigned char *Ski,
+                                 unsigned int Ski_len);
 bool gpg_rsa_exponent_is_valid(const unsigned char *e);
 int gpg_apdu_pso(void);
 int gpg_apdu_internal_authenticate(void);
