@@ -434,11 +434,6 @@ static bool gpg_io_check_lc(unsigned int rx) {
 unsigned int gpg_io_do(unsigned int io_flags) {
     unsigned int rx = 0;
 
-    // if pending input chaining
-    if (G_gpg_vstate.io_cla & CLA_APP_CHAIN) {
-        goto in_chaining;
-    }
-
     if (io_flags & IO_ASYNCH_REPLY) {
         // if IO_ASYNCH_REPLY has been set,
         //  io_exchange will return when IO_RETURN_AFTER_TX will set in ui
@@ -550,14 +545,15 @@ unsigned int gpg_io_do(unsigned int io_flags) {
         G_io_apdu_buffer[0] = ((SWO_SUCCESS >> 8) & 0xFF);
         G_io_apdu_buffer[1] = (SWO_SUCCESS & 0xFF);
         rx = io_exchange(CHANNEL_APDU, 2);
-    in_chaining:
-        if ((rx < 4) ||
-            ((G_io_apdu_buffer[OFFSET_CLA] & CLA_APP_APDU_PIN) !=
+        if (rx < 4) {
+            return gpg_io_reject(SWO_WRONG_LENGTH);
+        }
+        if (((G_io_apdu_buffer[OFFSET_CLA] & CLA_APP_APDU_PIN) !=
              (G_gpg_vstate.io_cla & CLA_APP_APDU_PIN)) ||
             (G_io_apdu_buffer[OFFSET_INS] != G_gpg_vstate.io_ins) ||
             (G_io_apdu_buffer[OFFSET_P1] != G_gpg_vstate.io_p1) ||
             (G_io_apdu_buffer[OFFSET_P2] != G_gpg_vstate.io_p2)) {
-            return SWO_SUCCESS;
+            return gpg_io_reject(SWO_LAST_COMMAND_OF_CHAIN_EXPECTED);
         }
         if (rx == 4) {
             G_io_apdu_buffer[OFFSET_LC] = 0;
@@ -567,7 +563,7 @@ unsigned int gpg_io_do(unsigned int io_flags) {
         G_gpg_vstate.io_cla = G_io_apdu_buffer[OFFSET_CLA];
         G_gpg_vstate.io_lc = G_io_apdu_buffer[OFFSET_LC];
         if ((G_gpg_vstate.io_length + G_gpg_vstate.io_lc) > GPG_IO_BUFFER_LENGTH) {
-            return SWO_SUCCESS;
+            return gpg_io_reject(SWO_WRONG_LENGTH);
         }
         PRINTF("[IO] - io_do: Next APDU=0x %02x.%02x.%02x.%02x - %d (0x%x)\n",
                G_gpg_vstate.io_cla,

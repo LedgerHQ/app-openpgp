@@ -77,3 +77,28 @@ def test_truncated_chained_apdu(backend: BackendInterface) -> None:
     assert rapdu.status == Errors.SW_OK
     rapdu = client.get_data(DataObject.DO_LOGIN)
     assert rapdu.data == first + last
+
+
+# In this test we send a chained APDU whose continuation does not match the first part
+def test_mismatched_chained_apdu(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    login = b"John.Doe"
+    rapdu = client.put_data(DataObject.DO_LOGIN, login)
+    assert rapdu.status == Errors.SW_OK
+
+    p1, p2 = DataObject.DO_LOGIN >> 8, DataObject.DO_LOGIN & 0xFF
+    first = b"Jane."
+    rapdu = backend.exchange_raw(_header(ClaType.CLA_APP_CHAIN, InsType.INS_PUT_DATA, p1, p2, len(first)) + first)
+    assert rapdu.status == Errors.SW_OK
+
+    url_p1, url_p2 = DataObject.DO_URL >> 8, DataObject.DO_URL & 0xFF
+    last = b"Doe"
+    with pytest.raises(ExceptionRAPDU) as err:
+        backend.exchange_raw(_header(ClaType.CLA_APP, InsType.INS_PUT_DATA, url_p1, url_p2, len(last)) + last)
+    assert err.value.status == Errors.SW_LAST_COMMAND_EXPECTED
+
+    # The partial command is not executed
+    rapdu = client.get_data(DataObject.DO_LOGIN)
+    assert rapdu.data == login

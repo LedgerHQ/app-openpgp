@@ -265,8 +265,7 @@ int gpg_dispatch() {
         return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
-    if ((G_gpg_vstate.io_cla != CLA_APP_DEF) && (G_gpg_vstate.io_cla != CLA_APP_CHAIN) &&
-        (G_gpg_vstate.io_cla != CLA_APP_APDU_PIN)) {
+    if ((G_gpg_vstate.io_cla != CLA_APP_DEF) && (G_gpg_vstate.io_cla != CLA_APP_APDU_PIN)) {
         return SWO_INVALID_CLA;
     }
 
