@@ -142,6 +142,11 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 error = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
+            // longer digests are truncated to the curve length
+            if (G_gpg_vstate.io_length < ksz) {
+                error = SWO_WRONG_LENGTH;
+                break;
+            }
             s_len = 256;
             CX_CHECK(cx_ecdsa_sign_no_throw(ecfp_key,
                                             CX_RND_TRNG,

@@ -114,3 +114,28 @@ def test_sign(backend: BackendInterface, template: str) -> None:
         eddsaVerifier.verify(plain, rapdu.data)
     else:
         raise ValueError
+
+
+# In this test we check that ECDSA operations reject digests shorter than the curve length
+def test_ecdsa_digest_length(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    for key_attr, key in ((DataObject.DO_SIG_ATTR, DataObject.DO_SIG_KEY), (DataObject.DO_AUT_ATTR, DataObject.DO_AUT_KEY)):
+        rapdu = client.set_template(key_attr, KEY_TEMPLATES["nistp256"])
+        assert rapdu.status == Errors.SW_OK
+        generate_key(client, key)
+
+    check_pincode(client, PassWord.PW1)
+    check_pincode(client, PassWord.PW2)
+    curve_len = 32
+    for length in (0, 1, curve_len - 1):
+        rapdu = client.sign(get_random_bytes(length))
+        assert rapdu.status == Errors.SW_WRONG_LENGTH
+        rapdu = client.authenticate(get_random_bytes(length))
+        assert rapdu.status == Errors.SW_WRONG_LENGTH
+
+    for length in (curve_len, 2 * curve_len):
+        rapdu = client.sign(get_random_bytes(length))
+        assert rapdu.status == Errors.SW_OK
+        rapdu = client.authenticate(get_random_bytes(length))
+        assert rapdu.status == Errors.SW_OK
