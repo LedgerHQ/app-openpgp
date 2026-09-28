@@ -22,6 +22,8 @@ P256_COORD_LEN = 32
 BACKUP_FORMAT_V2 = 0x02
 BACKUP_HEADER_LEN = 1 + 4 + 4
 GCM_NONCE_LEN = 12
+# Offset of the EC point in the v2 blob: header, nonce, public key length, curve and point length
+BACKUP_V2_EC_POINT_OFFSET = BACKUP_HEADER_LEN + GCM_NONCE_LEN + 4 + 4 + 4
 
 # v1 backup of the seeded NIST P-256 SIG key, exported on Speculos default seed before v2
 BACKUP_V1_P256_SIG = bytes.fromhex(
@@ -130,3 +132,17 @@ def test_restore_v1_backup(backend: BackendInterface) -> None:
     check_pincode(client, PassWord.PW1)
     hash_obj = SHA256.new(get_random_bytes(16))
     DSS.new(pubkey, "fips-186-3").verify(hash_obj, _sign_raw(client, hash_obj.digest()))
+
+
+# In this test we restore a backup whose authenticated public key has been modified
+def test_restore_tampered_public_key(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    pubkey = _gen_p256_sig_key(client)
+
+    backup = bytearray(_get_key_backup(backend, client, DataObject.DO_SIG_KEY))
+    backup[BACKUP_V2_EC_POINT_OFFSET + 1] ^= 0x01
+    with pytest.raises(ExceptionRAPDU):
+        _put_key_backup(backend, DataObject.DO_SIG_KEY, bytes(backup))
+
+    # The stored public key is left untouched
+    assert get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY) == pubkey

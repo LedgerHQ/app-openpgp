@@ -52,12 +52,13 @@ static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
     unsigned int len = 0;
     unsigned int ksz = 0;
     cx_rsa_private_key_t *key = NULL;
+    unsigned char pub_e[sizeof(keygpg->pub_key.rsa)];
 
     len = gpg_io_fetch_u32();
-    if (len != 4) {
+    if (len != sizeof(pub_e)) {
         return SWO_INCORRECT_DATA;
     }
-    gpg_io_fetch_nv(keygpg->pub_key.rsa, len);
+    gpg_io_fetch(pub_e, len);
     aad_len = G_gpg_vstate.io_offset;
 
     enc_len = gpg_io_fetch_u32();
@@ -105,6 +106,7 @@ static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
                                          GPG_BACKUP_TAG_LEN));
 
     nvm_write((unsigned char *) key, G_gpg_vstate.work.io_buffer, len);
+    nvm_write(keygpg->pub_key.rsa, pub_e, sizeof(pub_e));
     error = SWO_SUCCESS;
 end:
     explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
@@ -119,13 +121,17 @@ static int gpg_put_key_data_v1_ec(gpg_key_t *keygpg,
     unsigned int enc_len = 0;
     unsigned int ct_len = 0;
     unsigned int ct_offset = 0;
+    unsigned int pub_offset = 0;
     unsigned int len = 0;
+    unsigned char *priv = NULL;
 
     len = gpg_io_fetch_u32();
     if (len != sizeof(cx_ecfp_640_public_key_t)) {
         return SWO_INCORRECT_DATA;
     }
-    gpg_io_fetch_nv((unsigned char *) &keygpg->pub_key.ecfp640, len);
+    pub_offset = G_gpg_vstate.io_offset;
+    gpg_io_fetch(NULL, len);
+    G_gpg_vstate.io_offset += len;
     aad_len = G_gpg_vstate.io_offset;
 
     enc_len = gpg_io_fetch_u32();
@@ -139,6 +145,11 @@ static int gpg_put_key_data_v1_ec(gpg_key_t *keygpg,
     if (ct_len != sizeof(cx_ecfp_640_private_key_t)) {
         return SWO_INCORRECT_DATA;
     }
+    // Decrypt past the blob so that the authenticated public key stays in place
+    if ((ct_offset + enc_len + ct_len) > GPG_IO_BUFFER_LENGTH) {
+        return SWO_WRONG_LENGTH;
+    }
+    priv = G_gpg_vstate.work.io_buffer + ct_offset + enc_len;
 
     CX_CHECK(cx_aes_gcm_decrypt_and_auth(gcm_ctx,
                                          G_gpg_vstate.work.io_buffer + ct_offset,
@@ -147,11 +158,14 @@ static int gpg_put_key_data_v1_ec(gpg_key_t *keygpg,
                                          GPG_BACKUP_NONCE_LEN,
                                          G_gpg_vstate.work.io_buffer,
                                          aad_len,
-                                         G_gpg_vstate.work.io_buffer,
+                                         priv,
                                          G_gpg_vstate.work.io_buffer + ct_offset + ct_len,
                                          GPG_BACKUP_TAG_LEN));
 
-    nvm_write((unsigned char *) &keygpg->priv_key.ecfp640, G_gpg_vstate.work.io_buffer, ct_len);
+    nvm_write((unsigned char *) &keygpg->priv_key.ecfp640, priv, ct_len);
+    nvm_write((unsigned char *) &keygpg->pub_key.ecfp640,
+              G_gpg_vstate.work.io_buffer + pub_offset,
+              sizeof(cx_ecfp_640_public_key_t));
     error = SWO_SUCCESS;
 end:
     explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
