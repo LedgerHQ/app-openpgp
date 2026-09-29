@@ -11,6 +11,7 @@ from application_client.app_def import ClaType, DataObject, Errors, InsType, Pas
 from application_client.command_sender import CommandSender
 from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
+from ragger.utils import RAPDU
 from utils import KEY_TEMPLATES, check_pincode, generate_key
 
 
@@ -188,3 +189,36 @@ def test_empty_pw_status(backend: BackendInterface) -> None:
     rapdu = client.put_data(DataObject.DO_PW_STATUS, struct.pack(">B", pw1_multiple_use))
     assert rapdu.status == Errors.SW_OK
     assert client.get_data(DataObject.DO_PW_STATUS).data[0] == pw1_multiple_use
+
+
+def _put_data_chained(backend: BackendInterface, tag: DataObject, data: bytes) -> RAPDU:
+    chunk_len = 0xFE
+    chunks = [data[i : i + chunk_len] for i in range(0, len(data), chunk_len)]
+    for idx, chunk in enumerate(chunks):
+        cla = ClaType.CLA_APP if idx == len(chunks) - 1 else ClaType.CLA_APP_CHAIN
+        rapdu = backend.exchange_raw(_header(cla, InsType.INS_PUT_DATA, tag >> 8, tag & 0xFF, len(chunk)) + chunk)
+    return rapdu
+
+
+# In this test we write cardholder certificates up to the size that can be read back
+def test_cardholder_certificate_size(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    tag = DataObject.DO_CARDHOLDER_CERT
+    max_cert_len = 1512 - 2
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        _put_data_chained(backend, tag, bytes(max_cert_len + 1))
+    assert err.value.status == Errors.SW_WRONG_LENGTH
+
+    cert = bytes(i & 0xFF for i in range(max_cert_len))
+    rapdu = _put_data_chained(backend, tag, cert)
+    assert rapdu.status == Errors.SW_OK
+
+    try:
+        rapdu = backend.exchange_raw(_header(ClaType.CLA_APP, InsType.INS_GET_DATA, tag >> 8, tag & 0xFF, 0))
+    except ExceptionRAPDU as err:
+        rapdu = RAPDU(err.status, err.data)
+    rapdu = client.get_long_response(rapdu)
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == cert

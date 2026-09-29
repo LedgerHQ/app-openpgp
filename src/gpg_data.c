@@ -28,6 +28,10 @@
 #define GPG_BACKUP_TAG_LEN   16
 #define GPG_BACKUP_NONCE_LEN 12
 
+/* Largest cardholder certificate that can be read back with its status word */
+#define GPG_CARD_HOLDER_CERT_MAX_LENGTH \
+    MIN(GPG_EXT_CARD_HOLDER_CERT_LENTH, GPG_IO_BUFFER_LENGTH - 2)
+
 /**
  * Select a DO (Data Object) in the current template
  *
@@ -798,7 +802,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
-            if (G_gpg_vstate.io_length > GPG_EXT_CARD_HOLDER_CERT_LENTH) {
+            if (G_gpg_vstate.io_length > GPG_CARD_HOLDER_CERT_MAX_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }

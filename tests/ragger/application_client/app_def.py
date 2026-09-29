@@ -141,6 +141,8 @@ class DataObject(IntEnum):
 
     # [Read/Write] Asymmetric Key Pair
     DO_PUB_KEY = 0x7F49
+    # [Read/Write] Cardholder certificate
+    DO_CARDHOLDER_CERT = 0x7F21
 
     # [Read/Write] Slot config
     CMD_SLOT_CFG = 0x01F1
