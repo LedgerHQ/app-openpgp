@@ -165,3 +165,20 @@ def test_reset_clears_verified_pins(backend: BackendInterface) -> None:
         with pytest.raises(ExceptionRAPDU) as err:
             client.send_verify_pw(pwd)
         assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
+
+
+# In this test we check that resetting PW1 revokes the sessions opened with the previous value
+def test_reset_revokes_pw1_sessions(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    for pwd in (PassWord.PW1, PassWord.PW2, PassWord.PW3):
+        check_pincode(client, pwd)
+
+    rapdu = client.send_reset_pw("654321")
+    assert rapdu.status == Errors.SW_OK
+
+    for pwd in (PassWord.PW1, PassWord.PW2):
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.send_verify_pw(pwd)
+        assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
+    rapdu = client.send_verify_pw(PassWord.PW3)
+    assert rapdu.status == Errors.SW_OK

@@ -367,6 +367,11 @@ int gpg_apdu_reset_retry_counter() {
     sw = gpg_pin_set(pin_pw1,
                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + rc_len,
                      pw1_len);
+    if (sw == SWO_SUCCESS) {
+        // sessions opened with the previous PW1 are revoked
+        gpg_pin_set_verified(PIN_ID_PW1, 0);
+        gpg_pin_set_verified(PIN_ID_PW2, 0);
+    }
     gpg_io_discard(1);
     return sw;
 }
