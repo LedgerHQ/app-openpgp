@@ -431,11 +431,12 @@ int gpg_apdu_gen() {
             return SWO_WRONG_P1_P2;
     }
 
-    if (G_gpg_vstate.io_lc != 2) {
+    // Control Reference Template: a single byte tag and an empty value
+    if (G_gpg_vstate.io_length != 2) {
         return SWO_WRONG_LENGTH;
     }
 
-    gpg_io_fetch_tl(&t, &l);
+    t = G_gpg_vstate.work.io_buffer[0];
     gpg_io_discard(1);
     switch (t) {
         case KEY_SIG:

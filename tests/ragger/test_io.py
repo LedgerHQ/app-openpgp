@@ -144,3 +144,31 @@ def test_long_response_aborted(backend: BackendInterface) -> None:
 
     rapdu = client.get_data(DataObject.DO_LOGIN)
     assert rapdu.data == login
+
+
+# In this test we read a public key with malformed Control Reference Templates
+def test_gen_key_malformed_crt(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    read_pubkey = 0x81
+
+    for crt, status in (
+        (struct.pack(">H", DataObject.DO_PUB_KEY), Errors.SW_WRONG_DATA),
+        (struct.pack(">B", DataObject.DO_SIG_KEY), Errors.SW_WRONG_LENGTH),
+        (struct.pack(">BBB", DataObject.DO_SIG_KEY, 0, 0), Errors.SW_WRONG_LENGTH),
+    ):
+        header = _header(ClaType.CLA_APP, InsType.INS_GEN_ASYM_KEYPAIR, read_pubkey, 0, len(crt))
+        with pytest.raises(ExceptionRAPDU) as err:
+            backend.exchange_raw(header + crt)
+        assert err.value.status == status
+
+    # A long form length byte is not parsed
+    crt = struct.pack(">BB", DataObject.DO_SIG_KEY, 0x81)
+    header = _header(ClaType.CLA_APP, InsType.INS_GEN_ASYM_KEYPAIR, read_pubkey, 0, len(crt))
+    try:
+        backend.exchange_raw(header + crt)
+    except ExceptionRAPDU:
+        pass
+
+    # The app is still running
+    rapdu = client.get_data(DataObject.DO_AID)
+    assert rapdu.status == Errors.SW_OK
