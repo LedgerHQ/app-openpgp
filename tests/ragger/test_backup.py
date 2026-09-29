@@ -164,3 +164,29 @@ def test_restore_key_on_other_curve(backend: BackendInterface) -> None:
     check_pincode(client, PassWord.PW1)
     rapdu = client.sign(get_random_bytes(P256_COORD_LEN))
     assert rapdu.status == Errors.SW_CONDITIONS_NOT_SATISFIED
+
+
+def _put_key_backup_status(backend: BackendInterface, key: DataObject, data: bytes) -> int:
+    header = struct.pack(">BBBB", ClaType.CLA_APP, InsType.INS_PUT_DATA, 0, key)
+    try:
+        if len(data) <= APDU_CHUNK_LEN:
+            return backend.exchange_raw(header + struct.pack(">B", len(data)) + data if data else header).status
+        _put_key_backup(backend, key, data)
+        return Errors.SW_OK
+    except (ExceptionRAPDU, AssertionError) as err:
+        return getattr(err, "status", Errors.SW_UNKNOWN)
+
+
+# In this test we restore empty and truncated backups
+def test_restore_truncated_backup(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    _gen_p256_sig_key(client)
+    backup = _get_key_backup(backend, client, DataObject.DO_SIG_KEY)
+    legacy_header = struct.pack(">I", 0x33300004)
+
+    blobs = [b"", backup[:1], backup[:BACKUP_HEADER_LEN], backup[: BACKUP_HEADER_LEN + GCM_NONCE_LEN]]
+    blobs += [backup[: BACKUP_HEADER_LEN + GCM_NONCE_LEN + 4], backup[:-1], legacy_header, legacy_header + bytes(6)]
+    for blob in blobs:
+        assert _put_key_backup_status(backend, DataObject.DO_SIG_KEY, blob) != Errors.SW_OK
+        # The application is still running
+        assert client.get_data(DataObject.DO_AID).status == Errors.SW_OK
