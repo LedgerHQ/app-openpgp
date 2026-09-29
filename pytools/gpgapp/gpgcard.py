@@ -1322,7 +1322,7 @@ class GPGCard:
         """
 
         dt = datetime.utcnow().replace(microsecond=0)
-        bdate = int(dt.timestamp()).to_bytes(4, "big")
+        bdate = int(dt.replace(tzinfo=UTC).timestamp()).to_bytes(4, "big")
         tag: DataObject | None = None
         if key == KeyTypes.KEY_SIG:
             self.data.sig.date = dt
