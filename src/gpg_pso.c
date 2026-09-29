@@ -191,7 +191,8 @@ static int gpg_sign(gpg_key_t *sigkey) {
         case KEY_ID_ECDSA:
             ecfp_key = &sigkey->priv_key.ecfp;
             ksz = (unsigned int) gpg_curve2domainlen(ecfp_key->curve);
-            if ((ksz == 0) || (ecfp_key->d_len != ksz)) {
+            if ((ksz == 0) || (ecfp_key->d_len != ksz) ||
+                !gpg_key_curve_matches_attributes(sigkey, ecfp_key->curve)) {
                 error = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
@@ -231,6 +232,10 @@ static int gpg_sign(gpg_key_t *sigkey) {
 
         case KEY_ID_EDDSA:
             ecfp_key = &sigkey->priv_key.ecfp;
+            if (!gpg_key_curve_matches_attributes(sigkey, ecfp_key->curve)) {
+                error = SWO_CONDITIONS_NOT_SATISFIED;
+                break;
+            }
             ksz = 256;
             // the message must not overlap the signature output area
             if (G_gpg_vstate.io_length > GPG_IO_BUFFER_LENGTH - ksz) {

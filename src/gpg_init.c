@@ -141,6 +141,21 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
 }
 
 /**
+ * Check that a curve is the one of the key attributes
+ *
+ * @param[in]  key key whose attributes are checked
+ * @param[in]  curve curve of the stored key material
+ *
+ * @return true if the curves match
+ *
+ */
+bool gpg_key_curve_matches_attributes(const gpg_key_t *key, unsigned int curve) {
+    unsigned int attr_curve =
+        gpg_oid2curve((unsigned char *) key->attributes.value + 1, key->attributes.length - 1);
+    return (attr_curve != CX_CURVE_NONE) && (attr_curve == curve);
+}
+
+/**
  * Retrieve OID of the selected Curve
  *
  * @param[in]  cv Selected Curve as a reference

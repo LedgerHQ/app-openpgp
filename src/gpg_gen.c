@@ -350,7 +350,6 @@ end:
  *
  */
 static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
-    uint32_t curve = 0;
     uint32_t i = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
     const unsigned char *x = NULL;
@@ -367,8 +366,11 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     }
     gpg_io_discard(1);
     gpg_io_mark();
-    curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
-    if (curve == CX_CURVE_Ed25519) {
+    // the stored key must be on the curve advertised by the key attributes
+    if (!gpg_key_curve_matches_attributes(keygpg, keygpg->pub_key.ecfp.curve)) {
+        return SWO_CONDITIONS_NOT_SATISFIED;
+    }
+    if (keygpg->pub_key.ecfp.curve == CX_CURVE_Ed25519) {
         // cx_edwards_compress_point_no_throw is called with a hardcoded length of 65
         // (uncompressed SEC1 point: 0x04 || X(32) || Y(32)). Enforce that the imported
         // key matches this exact format, otherwise the compression would consume
@@ -384,7 +386,7 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
                                                     65));
         gpg_io_insert_tlv(0x86, 32,
                           G_gpg_vstate.work.io_buffer + 129);  // 129: discard 02
-    } else if (curve == CX_CURVE_Curve25519) {
+    } else if (keygpg->pub_key.ecfp.curve == CX_CURVE_Curve25519) {
         if ((keygpg->pub_key.ecfp.W_len == 65) && (keygpg->pub_key.ecfp.W[0] == 0x04)) {
             x = keygpg->pub_key.ecfp.W + 1;
         } else if ((keygpg->pub_key.ecfp.W_len == 33) && (keygpg->pub_key.ecfp.W[0] == 0x04)) {

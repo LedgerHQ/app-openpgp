@@ -146,3 +146,21 @@ def test_restore_tampered_public_key(backend: BackendInterface) -> None:
 
     # The stored public key is left untouched
     assert get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY) == pubkey
+
+
+# In this test we restore a key whose curve differs from the current key attributes
+def test_restore_key_on_other_curve(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    _gen_p256_sig_key(client)
+    backup = _get_key_backup(backend, client, DataObject.DO_SIG_KEY)
+
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["secp256k1"])
+    assert rapdu.status == Errors.SW_OK
+    _put_key_backup(backend, DataObject.DO_SIG_KEY, backup)
+
+    # The P-256 key is neither used nor advertised under secp256k1 attributes
+    rapdu = client.read_key(DataObject.DO_SIG_KEY)
+    assert rapdu.status == Errors.SW_CONDITIONS_NOT_SATISFIED
+    check_pincode(client, PassWord.PW1)
+    rapdu = client.sign(get_random_bytes(P256_COORD_LEN))
+    assert rapdu.status == Errors.SW_CONDITIONS_NOT_SATISFIED
