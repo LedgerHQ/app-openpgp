@@ -11,11 +11,11 @@ from application_client.app_def import ClaType, DataObject, Errors, InsType, Pas
 from application_client.command_sender import CommandSender
 from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
-from Crypto.Signature import DSS
+from Crypto.Signature import DSS, pkcs1_15
 from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
 from ragger.utils import RAPDU
-from utils import KEY_TEMPLATES, check_pincode, generate_key, get_ECDSA_pub_key
+from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO, check_pincode, generate_key, get_ECDSA_pub_key, get_RSA_pub_key
 
 APDU_CHUNK_LEN = 0xFE
 P256_COORD_LEN = 32
@@ -190,3 +190,26 @@ def test_restore_truncated_backup(backend: BackendInterface) -> None:
         assert _put_key_backup_status(backend, DataObject.DO_SIG_KEY, blob) != Errors.SW_OK
         # The application is still running
         assert client.get_data(DataObject.DO_AID).status == Errors.SW_OK
+
+
+# In this test we restore a RSA key after its attributes have been written again, as a full restore does
+def test_backup_restore_rsa(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+    pubkey = get_RSA_pub_key(client, DataObject.DO_SIG_KEY)
+    backup = _get_key_backup(backend, client, DataObject.DO_SIG_KEY)
+
+    # Writing the key attributes erases the key
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    _put_key_backup(backend, DataObject.DO_SIG_KEY, backup)
+    assert get_RSA_pub_key(client, DataObject.DO_SIG_KEY).n == pubkey.n
+
+    check_pincode(client, PassWord.PW1)
+    hash_obj = SHA256.new(get_random_bytes(16))
+    rapdu = client.sign(SHA256_DIGEST_INFO + hash_obj.digest())
+    assert rapdu.status == Errors.SW_OK
+    pkcs1_15.new(pubkey).verify(hash_obj, rapdu.data)

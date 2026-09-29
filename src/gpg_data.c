@@ -106,7 +106,7 @@ static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
             return SWO_INCORRECT_DATA;
     }
 
-    if ((key == NULL) || (key->size != ksz) || (ct_len != len)) {
+    if ((key == NULL) || (ct_len != len)) {
         return SWO_INCORRECT_DATA;
     }
 
@@ -123,6 +123,11 @@ static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
                                          G_gpg_vstate.work.io_buffer,
                                          G_gpg_vstate.work.io_buffer + ct_offset + ct_len,
                                          GPG_BACKUP_TAG_LEN));
+    // the restored key must have the size of the key attributes
+    if (((cx_rsa_private_key_t *) G_gpg_vstate.work.io_buffer)->size != ksz) {
+        error = SWO_INCORRECT_DATA;
+        goto end;
+    }
 
     nvm_write((unsigned char *) key, G_gpg_vstate.work.io_buffer, len);
     nvm_write(keygpg->pub_key.rsa, pub_e, sizeof(pub_e));
@@ -1315,7 +1320,7 @@ static int gpg_put_key_data_legacy_rsa(gpg_key_t *keygpg, cx_aes_key_t *keyenc) 
             return SWO_INCORRECT_DATA;
     }
 
-    if ((key == NULL) || (key->size != ksz)) {
+    if (key == NULL) {
         return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
@@ -1327,7 +1332,9 @@ static int gpg_put_key_data_legacy_rsa(gpg_key_t *keygpg, cx_aes_key_t *keyenc) 
                              enc_len,
                              G_gpg_vstate.work.io_buffer,
                              &ksz));
-    if (len != ksz) {
+    // the restored key must have the size of the key attributes
+    if ((len != ksz) || (((cx_rsa_private_key_t *) G_gpg_vstate.work.io_buffer)->size !=
+                         (unsigned int) (U2BE(keygpg->attributes.value, 1) >> 3))) {
         error = SWO_INCORRECT_DATA;
         goto end;
     }
