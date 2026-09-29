@@ -129,6 +129,8 @@ class DataObject(IntEnum):
     # [Read/Write] PW Status Bytes
     DO_PW_STATUS = 0xC4
     # [Write] AES symmetric key
+    # [Write] Resetting Code
+    DO_RESET_CODE = 0xD3
     DO_KEY_AES = 0xD5
     # [Write] Secure messaging ENC and MAC AES-128 keys, in one shot
     DO_KEY_SM = 0xF4

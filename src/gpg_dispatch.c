@@ -37,7 +37,9 @@ static int gpg_check_access_ins() {
             break;
 
         case INS_RESET_RETRY_COUNTER:
-            if (gpg_pin_is_verified(PIN_ID_PW3) || gpg_pin_is_verified(PIN_ID_RC)) {
+            // with the Resetting Code, the command checks it from its own data
+            if ((G_gpg_vstate.io_p1 == RESET_RETRY_WITH_CODE) || gpg_pin_is_verified(PIN_ID_PW3) ||
+                gpg_pin_is_verified(PIN_ID_RC)) {
                 sw = SWO_SUCCESS;
             }
             break;

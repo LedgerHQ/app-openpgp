@@ -7,7 +7,7 @@ This module provides Ragger tests for Password feature
 from pathlib import Path
 
 import pytest
-from application_client.app_def import Errors, PassWord
+from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord
 from application_client.command_sender import CommandSender
 from ledgered.devices import Device
 from ragger.backend import BackendInterface
@@ -195,3 +195,45 @@ def test_change_revokes_pw2_session(backend: BackendInterface) -> None:
     with pytest.raises(ExceptionRAPDU) as err:
         client.send_verify_pw(PassWord.PW2)
     assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
+
+
+# In this test we unblock PW1 with the Resetting Code
+def test_reset_with_resetting_code(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    resetting_code, new_pin = b"87654321", b"654321"
+    reset_with_code = 0x00
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.put_data(DataObject.DO_RESET_CODE, resetting_code)
+    assert rapdu.status == Errors.SW_OK
+    rapdu = client.send_verify_pw(PassWord.PW3, reset=True)
+    assert rapdu.status == Errors.SW_OK
+
+    # Block PW1
+    for _ in range(3):
+        with pytest.raises(ExceptionRAPDU):
+            client.send_verify_pw(PassWord.PW1, "000000")
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.send_verify_pw(PassWord.PW1, "123456")
+    assert err.value.status == Errors.SW_AUTH_METHOD_BLOCKED
+
+    # A wrong Resetting Code is refused
+    with pytest.raises(ExceptionRAPDU):
+        backend.exchange(
+            cla=ClaType.CLA_APP,
+            ins=InsType.INS_RESET_RC,
+            p1=reset_with_code,
+            p2=PassWord.PW1,
+            data=b"00000000" + new_pin,
+        )
+
+    rapdu = backend.exchange(
+        cla=ClaType.CLA_APP,
+        ins=InsType.INS_RESET_RC,
+        p1=reset_with_code,
+        p2=PassWord.PW1,
+        data=resetting_code + new_pin,
+    )
+    assert rapdu.status == Errors.SW_OK
+    rapdu = client.send_verify_pw(PassWord.PW1, new_pin.decode())
+    assert rapdu.status == Errors.SW_OK
