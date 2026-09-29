@@ -29,6 +29,7 @@ unsigned int gpg_curve2domainlen(unsigned int cv);
 
 void gpg_init(void);
 void gpg_install(unsigned char app_state);
+void gpg_init_session(void);
 
 /* ----------------------------------------------------------------------- */
 /* ---                            DISPATCH                            ---- */

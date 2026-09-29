@@ -286,6 +286,7 @@ int gpg_dispatch() {
             gpg_io_discard(0);
             if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] == STATE_TERMINATE) {
                 gpg_install(STATE_ACTIVATE);
+                gpg_init_session();
             }
             return SWO_SUCCESS;
 
@@ -295,6 +296,7 @@ int gpg_dispatch() {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
             gpg_install(STATE_TERMINATE);
+            gpg_init_session();
             return SWO_SUCCESS;
     }
 

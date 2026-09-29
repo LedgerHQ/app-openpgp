@@ -69,6 +69,7 @@ class Errors(IntEnum):
     """Application Errors definitions"""
 
     SW_STATE_TERMINATED = 0x6285
+    SW_VERIFY_FAILED = 0x63C0
     SW_MEMORY = 0x6581
     SW_SECURITY = 0x6600
     SW_WRONG_LENGTH = 0x6700

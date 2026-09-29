@@ -368,6 +368,23 @@ const unsigned char C_sha256_PW2[] = {
 /* ----------------------------------------------------------------------- */
 
 /**
+ * Reset the session state from the persistent configuration
+ * PINs are no longer verified
+ *
+ */
+void gpg_init_session() {
+    explicit_bzero(G_gpg_vstate.verified_pin, sizeof(G_gpg_vstate.verified_pin));
+    // key conf
+    G_gpg_vstate.slot = N_gpg_pstate->config_slot[1];
+    G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
+    gpg_mse_reset();
+    // pin conf
+    G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
+    // seed conf
+    G_gpg_vstate.seed_mode = 1;
+}
+
+/**
  * App global config
  *
  */
@@ -379,14 +396,7 @@ void gpg_init() {
         explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     }
 
-    // key conf
-    G_gpg_vstate.slot = N_gpg_pstate->config_slot[1];
-    G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
-    gpg_mse_reset();
-    // pin conf
-    G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
-    // seed conf
-    G_gpg_vstate.seed_mode = 1;
+    gpg_init_session();
     // ux conf
     G_gpg_vstate.ux_type = -1;
     G_gpg_vstate.ux_key = -1;

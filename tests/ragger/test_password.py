@@ -13,7 +13,7 @@ from ledgered.devices import Device
 from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import Navigator
-from utils import util_navigate
+from utils import check_pincode, util_navigate
 
 
 # In this test we check the card Password verification
@@ -147,3 +147,21 @@ def test_challenge(backend: BackendInterface) -> None:
     rapdu = client.get_challenge(32)
     assert rapdu.status == Errors.SW_OK
     print(f"Random: {rapdu.data.hex()}")
+
+
+# In this test we check that a card reset clears the verified PINs
+def test_reset_clears_verified_pins(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    pins = (PassWord.PW1, PassWord.PW2, PassWord.PW3)
+    for pwd in pins:
+        check_pincode(client, pwd)
+
+    rapdu = client.send_terminate()
+    assert rapdu.status == Errors.SW_OK
+    rapdu = client.send_activate()
+    assert rapdu.status == Errors.SW_OK
+
+    for pwd in pins:
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.send_verify_pw(pwd)
+        assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
