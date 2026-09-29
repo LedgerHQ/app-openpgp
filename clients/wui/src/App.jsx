@@ -457,9 +457,14 @@ export default function App() {
         </div>
 
         {/* PIN Dialog */}
-        <Dialog open={pinAction !== null} onOpenChange={(open) => !open && closePin()}>
+        {/* The dialog cannot be dismissed while its operation is running */}
+        <Dialog open={pinAction !== null} onOpenChange={(open) => !open && !busy && closePin()}>
           <DialogContent>
-            <DialogHeader title={cfg?.title} description={cfg?.description} onClose={closePin} />
+            <DialogHeader
+              title={cfg?.title}
+              description={cfg?.description}
+              onClose={busy ? undefined : closePin}
+            />
             <DialogBody>
               {busy && (
                 <div className="flex flex-col items-center gap-12 py-24 text-center">
