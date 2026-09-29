@@ -770,8 +770,11 @@ class GPGCard:
             slot (int): slot id to select (0 to 3)
         """
 
-        self.slot_current = slot.to_bytes(1, "big")
-        self._put_data(DataObject.CMD_SLOT_CUR, self.slot_current)
+        slot_id = slot.to_bytes(1, "big")
+        sw = self._put_data(DataObject.CMD_SLOT_CUR, slot_id)
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, f"Failed to select slot {slot + 1}")
+        self.slot_current = slot_id
 
     def decode_slot(self) -> dict:
         """Decode Slots information
