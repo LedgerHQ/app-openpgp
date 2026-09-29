@@ -447,7 +447,9 @@ class GPGCard:
         raw = json.dumps(payload, indent=2).encode("utf-8")
         if passphrase is not None:
             raw = _encrypt_backup(raw, passphrase)
-        fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        # never reuse an existing path, nor follow a link created in its place
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(file_name, flags, 0o600)
         with os.fdopen(fd, "wb") as f:
             f.write(raw)
 
