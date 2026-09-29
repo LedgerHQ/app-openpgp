@@ -56,6 +56,14 @@ describe("exchange", () => {
     await expect(exchange(t, "00CA004F00")).rejects.toThrow("Truncated");
   });
 
+  test("stops a command chain on a refused intermediate frame", async () => {
+    const payload = Buffer.alloc(600, 0x77);
+    const t = new MockTransport([Buffer.from([0x67, 0x00])]);
+    const sw = await putData(t, 0xb6, payload);
+    expect(sw).toBe(0x6700);
+    expect(t.sent.length).toBe(1);
+  });
+
   test("command-chains outgoing data larger than APDU_MAX_SIZE", async () => {
     const payload = Buffer.alloc(300, 0x77); // > 254
     const t = new MockTransport([
