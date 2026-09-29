@@ -478,6 +478,8 @@ int gpg_apdu_put_data(unsigned int ref) {
             G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
             gpg_mse_reset();
             ui_CCID_reset();
+            // leave any settings page bound to the previous slot, and show the new one
+            ui_init();
             sw = SWO_SUCCESS;
             break;
 
