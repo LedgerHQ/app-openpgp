@@ -320,18 +320,18 @@ class GPGCard:
         b_data: bytes = b""
         s_data: str = ""
 
-        self.slot_current = self._get_data(DataObject.CMD_SLOT_CUR)
-        self.slot_config = self._get_data(DataObject.CMD_SLOT_CFG)
+        self.slot_current = self._read_data(DataObject.CMD_SLOT_CUR)
+        self.slot_config = self._read_data(DataObject.CMD_SLOT_CFG)
 
-        self.data.AID = self._get_data(DataObject.DO_AID).hex().upper()
-        self.data.login = self._get_data(DataObject.DO_LOGIN).decode("utf-8")
-        self.data.url = self._get_data(DataObject.DO_URL).decode("utf-8")
-        self.data.histo_bytes = self._get_data(DataObject.DO_HIST)
-        data = self._get_data(DataObject.DO_GEN_FEATURES)
+        self.data.AID = self._read_data(DataObject.DO_AID).hex().upper()
+        self.data.login = self._read_data(DataObject.DO_LOGIN).decode("utf-8")
+        self.data.url = self._read_data(DataObject.DO_URL).decode("utf-8")
+        self.data.histo_bytes = self._read_data(DataObject.DO_HIST)
+        data = self._read_data(DataObject.DO_GEN_FEATURES)
         if data:
             self.data.hw_features = data[0]
 
-        data = self._get_data(DataObject.DO_CARDHOLDER_DATA)
+        data = self._read_data(DataObject.DO_CARDHOLDER_DATA)
         tags = self._decode_tlv(data)
         if DataObject.DO_CARD_NAME in tags:
             self.data.name = tags[DataObject.DO_CARD_NAME].decode("utf-8")
@@ -345,7 +345,7 @@ class GPGCard:
         if DataObject.DO_CARD_LANG in tags:
             self.data.lang = tags[DataObject.DO_CARD_LANG].decode("utf-8")
 
-        data = self._get_data(DataObject.DO_APP_DATA)
+        data = self._read_data(DataObject.DO_APP_DATA)
         tags = self._decode_tlv(data)
         if DataObject.DO_EXT_LEN in tags:
             self.data.ext_length = tags[DataObject.DO_EXT_LEN]
@@ -380,31 +380,31 @@ class GPGCard:
                 self._conv_date_from_bytes(KeyTypes.KEY_DEC, dates[4:8])
                 self._conv_date_from_bytes(KeyTypes.KEY_AUT, dates[8:12])
 
-        data = self._get_data(DataObject.CMD_RSA_EXP)
+        data = self._read_data(DataObject.CMD_RSA_EXP)
         self.data.rsa_pub_exp = self._get_int(data, 4)
-        self.data.aut.cert = self._get_data(DataObject.DO_CERT).decode("utf-8")
-        self.data.dec.cert = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
-        self.data.sig.cert = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
+        self.data.aut.cert = self._read_data(DataObject.DO_CERT).decode("utf-8")
+        self.data.dec.cert = self._read_data(DataObject.DO_CERT, True).decode("utf-8")
+        self.data.sig.cert = self._read_data(DataObject.DO_CERT, True).decode("utf-8")
 
-        self.data.sig.uif = int(self._get_data(DataObject.DO_UIF_SIG)[0])
-        self.data.dec.uif = int(self._get_data(DataObject.DO_UIF_DEC)[0])
-        self.data.aut.uif = int(self._get_data(DataObject.DO_UIF_AUT)[0])
+        self.data.sig.uif = int(self._read_data(DataObject.DO_UIF_SIG)[0])
+        self.data.dec.uif = int(self._read_data(DataObject.DO_UIF_DEC)[0])
+        self.data.aut.uif = int(self._read_data(DataObject.DO_UIF_AUT)[0])
 
-        data = self._get_data(DataObject.DO_SEC_TEMPL)
+        data = self._read_data(DataObject.DO_SEC_TEMPL)
         tags = self._decode_tlv(data)
         if DataObject.DO_SIG_COUNT in tags:
             b_data = tags[DataObject.DO_SIG_COUNT]
             self.data.digital_counter = self._get_int(b_data, 3)
 
         if self.data.ext_capabilities[0] & 0x08:
-            self.data.private_01 = self._get_data(DataObject.DO_PRIVATE_01)
-            self.data.private_02 = self._get_data(DataObject.DO_PRIVATE_02)
-            self.data.private_03 = self._get_data(DataObject.DO_PRIVATE_03)
-            self.data.private_04 = self._get_data(DataObject.DO_PRIVATE_04)
+            self.data.private_01 = self._read_data(DataObject.DO_PRIVATE_01)
+            self.data.private_02 = self._read_data(DataObject.DO_PRIVATE_02)
+            self.data.private_03 = self._read_data(DataObject.DO_PRIVATE_03)
+            self.data.private_04 = self._read_data(DataObject.DO_PRIVATE_04)
 
-        self.data.sig.key = self._get_data(DataObject.DO_SIG_KEY)
-        self.data.dec.key = self._get_data(DataObject.DO_DEC_KEY)
-        self.data.aut.key = self._get_data(DataObject.DO_AUT_KEY)
+        self.data.sig.key = self._read_data(DataObject.DO_SIG_KEY, missing=(ErrorCodes.ERR_COND_OF_USE_NOT_SATISFIED,))
+        self.data.dec.key = self._read_data(DataObject.DO_DEC_KEY, missing=(ErrorCodes.ERR_COND_OF_USE_NOT_SATISFIED,))
+        self.data.aut.key = self._read_data(DataObject.DO_AUT_KEY, missing=(ErrorCodes.ERR_COND_OF_USE_NOT_SATISFIED,))
 
     def backup(self, file_name: str, passphrase: str | None = None) -> None:
         """Backup data to backup file.
@@ -1287,6 +1287,27 @@ class GPGCard:
         ins = 0xCC if bnext else 0xCA
         apdu = bytes.fromhex(f"00{ins:02x}{tag:04x}00")
         resp, _ = self._exchange(apdu)
+        return resp
+
+    def _read_data(self, tag: int, bnext: bool = False, missing: tuple[int, ...] = ()) -> bytes:
+        """GET a Data Object, failing on any status other than success
+
+        Args:
+            tag (int):       Data Object tag
+            bnext (bool):    Read the next occurrence
+            missing (tuple): Status words meaning that the Data Object is absent
+
+        Return:
+            Data Object bytes, empty when absent
+        """
+
+        ins = 0xCC if bnext else 0xCA
+        apdu = bytes.fromhex(f"00{ins:02x}{tag:04x}00")
+        resp, sw = self._exchange(apdu)
+        if sw in missing:
+            return b""
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, f"Failed to read Data Object {tag:04x}")
         return resp
 
     def _put_data(self, tag: int, data: bytes) -> int:

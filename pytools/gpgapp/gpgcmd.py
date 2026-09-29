@@ -121,6 +121,7 @@ class ErrorCodes:
         0x9000: "Success",
     }
     ERR_SUCCESS = 0x9000
+    ERR_COND_OF_USE_NOT_SATISFIED = 0x6985
     ERR_SW1_VALID = 0x61
     ERR_INTERNAL = 0
 
