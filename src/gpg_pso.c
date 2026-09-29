@@ -67,6 +67,39 @@ static unsigned int gpg_pso_remaining() {
 }
 
 /**
+ * Uncompress a Curve25519 public key
+ *
+ * @param[in,out]  raw_public_key x coordinate as input, 04 || x || y as output
+ *
+ * @return CX error code
+ *
+ */
+static cx_err_t gpg_pso_cv25519_uncompress(uint8_t *raw_public_key) {
+    cx_ecpoint_t public_point;
+    cx_err_t error;
+    cx_err_t unlock_error;
+
+    error = cx_bn_lock(32, 0);
+    if (error != CX_OK) {
+        return error;
+    }
+    error = cx_ecpoint_alloc(&public_point, CX_CURVE_Curve25519);
+    if (error == CX_OK) {
+        error = cx_ecpoint_decompress(&public_point, raw_public_key, 32, 0);
+    }
+    if (error == CX_OK) {
+        error =
+            cx_ecpoint_export(&public_point, raw_public_key + 1, 32, raw_public_key + 1 + 32, 32);
+    }
+    unlock_error = cx_bn_unlock();
+    if (error == CX_OK) {
+        error = unlock_error;
+    }
+    raw_public_key[0] = 0x04;
+    return error;
+}
+
+/**
  * Reset PW1 verified status
  *
  */
@@ -414,7 +447,6 @@ int gpg_apdu_pso() {
                     if (curve == CX_CURVE_Curve25519) {
                         uint8_t raw_public_key[65];
                         uint8_t secret[32];
-                        cx_ecpoint_t public_point;
                         uint8_t i;
 
                         if (l != 32) {
@@ -435,16 +467,7 @@ int gpg_apdu_pso() {
                                 (G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset)[31 - i];
                         }
 
-                        CX_CHECK(cx_bn_lock(32, 0));
-                        CX_CHECK(cx_ecpoint_alloc(&public_point, CX_CURVE_Curve25519));
-                        CX_CHECK(cx_ecpoint_decompress(&public_point, raw_public_key, 32, 0));
-                        CX_CHECK(cx_ecpoint_export(&public_point,
-                                                   raw_public_key + 1,
-                                                   32,
-                                                   raw_public_key + 1 + 32,
-                                                   32));
-                        CX_CHECK(cx_bn_unlock());
-                        raw_public_key[0] = 0x04;
+                        CX_CHECK(gpg_pso_cv25519_uncompress(raw_public_key));
                         CX_CHECK(cx_ecdh_no_throw(ecfp_key,
                                                   CX_ECDH_X,
                                                   raw_public_key,

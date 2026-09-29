@@ -242,3 +242,36 @@ def test_decrypt_malformed(backend: BackendInterface) -> None:
     pubkey_do = struct.pack(">HB", tag_pubkey_do, len(ext_pubkey_tlv)) + ext_pubkey_tlv
     rapdu = client.decrypt_asym(struct.pack(">B", len(pubkey_do)) + pubkey_do, PubkeyAlgo.ECDH)
     assert rapdu.data == expected_secret
+
+
+def _ecdh_pubkey_do(ext_pubkey: bytes) -> bytes:
+    tag_pubkey_do, tag_ext_pubkey = 0x7F49, 0x86
+    ext_pubkey_tlv = struct.pack(">BB", tag_ext_pubkey, len(ext_pubkey)) + ext_pubkey
+    pubkey_do = struct.pack(">HB", tag_pubkey_do, len(ext_pubkey_tlv)) + ext_pubkey_tlv
+    return struct.pack(">B", len(pubkey_do)) + pubkey_do
+
+
+# In this test we check that a Curve25519 point rejected by the device does not block later ECDH
+def test_cv25519_invalid_point(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_DEC_ATTR, KEY_TEMPLATES["cv25519"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_DEC_KEY)
+    check_pincode(client, PassWord.PW2)
+    pubkey = get_ECDH_pub_key(client, DataObject.DO_DEC_KEY)
+
+    # About half of the x coordinates have no point on the curve
+    for _ in range(32):
+        rapdu = client.decrypt_asym(_ecdh_pubkey_do(get_random_bytes(32)), PubkeyAlgo.ECDH)
+        if rapdu.status != Errors.SW_OK:
+            break
+    else:
+        pytest.fail("No rejected Curve25519 point found")
+
+    privkey = ECC.generate(curve="Curve25519")
+    expected_secret = key_agreement(static_priv=privkey, static_pub=pubkey, kdf=lambda x: x)
+    ext_pubkey = privkey.public_key().export_key(format="raw", compress=True)
+    rapdu = client.decrypt_asym(_ecdh_pubkey_do(ext_pubkey), PubkeyAlgo.ECDH)
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == expected_secret
