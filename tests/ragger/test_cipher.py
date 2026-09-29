@@ -203,3 +203,42 @@ def test_uif_decrypt_invalid_padding(device: Device, backend: BackendInterface, 
 
     assert err.value.status != Errors.SW_OK
     assert len(err.value.data) == 0
+
+
+# In this test we send malformed PSO:DEC requests to an ECDH key
+def test_decrypt_malformed(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_DEC_ATTR, KEY_TEMPLATES["cv25519"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_DEC_KEY)
+    check_pincode(client, PassWord.PW2)
+
+    pso_dec_p1, pso_dec_p2 = 0x80, 0x86
+    ecdh_padding_indicator = 0xA6
+    tag_pubkey_do, tag_ext_pubkey = 0x7F49, 0x86
+    header_only = struct.pack(">BBBB", ClaType.CLA_APP, InsType.INS_PSO, pso_dec_p1, pso_dec_p2)
+    frames = (
+        b"",
+        struct.pack(">B", ecdh_padding_indicator),
+        struct.pack(">BBH", ecdh_padding_indicator, 5, tag_pubkey_do),
+        struct.pack(">BBHBBB", ecdh_padding_indicator, 37, tag_pubkey_do, 34, tag_ext_pubkey, 32) + bytes(8),
+    )
+    for frame in frames:
+        with pytest.raises(ExceptionRAPDU) as err:
+            if frame:
+                backend.exchange_raw(header_only + struct.pack(">B", len(frame)) + frame)
+            else:
+                backend.exchange_raw(header_only)
+        assert err.value.status == Errors.SW_WRONG_LENGTH
+
+    # The app still decrypts valid requests
+    pubkey = get_ECDH_pub_key(client, DataObject.DO_DEC_KEY)
+    privkey = ECC.generate(curve="Curve25519")
+    expected_secret = key_agreement(static_priv=privkey, static_pub=pubkey, kdf=lambda x: x)
+    ext_pubkey = privkey.public_key().export_key(format="raw", compress=True)
+    ext_pubkey_tlv = struct.pack(">BB", tag_ext_pubkey, len(ext_pubkey)) + ext_pubkey
+    pubkey_do = struct.pack(">HB", tag_pubkey_do, len(ext_pubkey_tlv)) + ext_pubkey_tlv
+    rapdu = client.decrypt_asym(struct.pack(">B", len(pubkey_do)) + pubkey_do, PubkeyAlgo.ECDH)
+    assert rapdu.data == expected_secret

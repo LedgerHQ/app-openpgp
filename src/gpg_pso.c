@@ -59,6 +59,14 @@ const unsigned char gpg_oid_sha512[] = {0x30,
                                         0x40};
 
 /**
+ * Number of input bytes not yet fetched
+ *
+ */
+static unsigned int gpg_pso_remaining() {
+    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+}
+
+/**
  * Reset PW1 verified status
  *
  */
@@ -273,6 +281,10 @@ int gpg_apdu_pso() {
             break;
 
         case PSO_DEC:
+            if (gpg_pso_remaining() < 1) {
+                error = SWO_WRONG_LENGTH;
+                break;
+            }
             pad_byte = gpg_io_fetch_u8();
 
             switch (pad_byte) {
@@ -361,8 +373,16 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    // Check APDU content tags
+                    // Check APDU content tags, each TL taking at most 5 bytes
+                    if (gpg_pso_remaining() < 3) {
+                        error = SWO_WRONG_LENGTH;
+                        break;
+                    }
                     gpg_io_fetch_l(&l);
+                    if (gpg_pso_remaining() < 5) {
+                        error = SWO_WRONG_LENGTH;
+                        break;
+                    }
                     gpg_io_fetch_tl(&t, &l);
                     // TAG 0x7f49 announces a Public Key DO
                     if (t != 0x7f49) {
@@ -370,11 +390,19 @@ int gpg_apdu_pso() {
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
+                    if (gpg_pso_remaining() < 5) {
+                        error = SWO_WRONG_LENGTH;
+                        break;
+                    }
                     gpg_io_fetch_tl(&t, &l);
                     // TAG 0x86 announces an External Public Key (with its length)
                     if (t != 0x86) {
                         PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x86);
                         error = SWO_INCORRECT_DATA;
+                        break;
+                    }
+                    if (l > gpg_pso_remaining()) {
+                        error = SWO_WRONG_LENGTH;
                         break;
                     }
 
@@ -423,6 +451,11 @@ int gpg_apdu_pso() {
                             G_gpg_vstate.work.io_buffer[128 + i] = secret[31 - i];
                         }
                     } else {
+                        if (l != 65) {
+                            PRINTF("[PSO] - PSO:DEC:ECDH - Wrong Ext Pub Key size %d\n", l);
+                            error = SWO_INCORRECT_DATA;
+                            break;
+                        }
                         CX_CHECK(
                             cx_ecdh_no_throw(ecfp_key,
                                              CX_ECDH_X,
