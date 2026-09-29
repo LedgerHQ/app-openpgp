@@ -1,4 +1,4 @@
-import { exchange, getData, putData, APDU_MAX_SIZE } from "./apdu";
+import { exchange, getData, putData, APDU_MAX_SIZE, RESPONSE_MAX_CHUNKS } from "./apdu";
 
 // Minimal fake transport: records every frame sent and replays canned
 // responses (each a Buffer of data + 2-byte SW) in order.
@@ -40,6 +40,20 @@ describe("exchange", () => {
     expect(t.sent[1].equals(Buffer.from([0x00, 0xc0, 0x00, 0x00, 0x03]))).toBe(
       true
     );
+  });
+
+  test("rejects an endless GET RESPONSE chain", async () => {
+    const endless = Array.from({ length: RESPONSE_MAX_CHUNKS + 2 }, () =>
+      Buffer.from([0x61, 0x00])
+    );
+    const t = new MockTransport(endless);
+    await expect(exchange(t, "00CA004F00")).rejects.toThrow("too long");
+    expect(t.sent.length).toBe(RESPONSE_MAX_CHUNKS + 1);
+  });
+
+  test("rejects a response shorter than a status word", async () => {
+    const t = new MockTransport([Buffer.from([0x90])]);
+    await expect(exchange(t, "00CA004F00")).rejects.toThrow("Truncated");
   });
 
   test("command-chains outgoing data larger than APDU_MAX_SIZE", async () => {

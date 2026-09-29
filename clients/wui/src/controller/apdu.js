@@ -18,6 +18,9 @@ export const SW1_MORE_DATA = 0x61;
 export const APDU_MAX_SIZE = 0xfe;
 // CLA bit flagging an intermediate command-chaining frame.
 export const APDU_CHAINING_MODE = 0x10;
+// Bounds of a response received through GET RESPONSE.
+export const RESPONSE_MAX_SIZE = 0x4000;
+export const RESPONSE_MAX_CHUNKS = 64;
 
 // Map of the OpenPGP status words we want to surface with a readable message.
 const ERROR_MESSAGES = Object.freeze({
@@ -38,6 +41,17 @@ const ERROR_MESSAGES = Object.freeze({
 export function statusMessage(sw) {
   const hex = sw.toString(16).padStart(4, "0");
   return ERROR_MESSAGES[sw] || `SW=0x${hex}`;
+}
+
+// Split a raw response into its data and its 2-byte status word.
+function parseResponse(response) {
+  if (response.length < 2) {
+    throw new Error("Truncated response from the device");
+  }
+  return {
+    data: response.slice(0, response.length - 2),
+    sw: response.readUInt16BE(response.length - 2),
+  };
 }
 
 function toBuffer(value) {
@@ -75,15 +89,20 @@ export async function exchange(transport, apdu, data = Buffer.alloc(0)) {
     frame = Buffer.concat([header, Buffer.from([rest.length]), rest]);
   }
 
-  let response = await transport.exchange(frame);
-  let respData = response.slice(0, response.length - 2);
-  let sw = response.readUInt16BE(response.length - 2);
+  let { data: respData, sw } = parseResponse(await transport.exchange(frame));
 
+  let chunks = 0;
   while (sw >> 8 === SW1_MORE_DATA) {
+    chunks += 1;
+    if (chunks > RESPONSE_MAX_CHUNKS || respData.length > RESPONSE_MAX_SIZE) {
+      throw new Error("Response from the device is too long");
+    }
     const le = sw & 0xff;
-    response = await transport.exchange(Buffer.from([0x00, 0xc0, 0x00, 0x00, le]));
-    respData = Buffer.concat([respData, response.slice(0, response.length - 2)]);
-    sw = response.readUInt16BE(response.length - 2);
+    const next = parseResponse(
+      await transport.exchange(Buffer.from([0x00, 0xc0, 0x00, 0x00, le]))
+    );
+    respData = Buffer.concat([respData, next.data]);
+    sw = next.sw;
   }
   return { data: respData, sw };
 }
