@@ -187,6 +187,11 @@ static int gpg_sign(gpg_key_t *sigkey) {
         case KEY_ID_EDDSA:
             ecfp_key = &sigkey->priv_key.ecfp;
             ksz = 256;
+            // the message must not overlap the signature output area
+            if (G_gpg_vstate.io_length > GPG_IO_BUFFER_LENGTH - ksz) {
+                error = SWO_WRONG_LENGTH;
+                break;
+            }
             CX_CHECK(cx_eddsa_sign_no_throw(ecfp_key,
                                             CX_SHA512,
                                             G_gpg_vstate.work.io_buffer,

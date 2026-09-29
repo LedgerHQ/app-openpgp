@@ -4,10 +4,11 @@
 This module provides Ragger tests for Key Templates feature
 """
 
+import struct
 import sys
 
 import pytest
-from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
+from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
 from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
@@ -192,6 +193,35 @@ def test_uif_permanent(backend: BackendInterface) -> None:
         assert client.get_data(tag).data[0] == uif_disabled
         rapdu = client.put_data(tag, bytes([uif_enabled, button_feature]))
         assert rapdu.status == Errors.SW_OK
+
+
+def _sign_chained(backend: BackendInterface, message: bytes) -> bytes:
+    chunk_len, pso_cds = 0xFE, 0x9E9A
+    chunks = [message[i : i + chunk_len] for i in range(0, len(message), chunk_len)]
+    for idx, chunk in enumerate(chunks):
+        cla = ClaType.CLA_APP if idx == len(chunks) - 1 else ClaType.CLA_APP_CHAIN
+        header = struct.pack(">BBHB", cla, InsType.INS_PSO, pso_cds, len(chunk))
+        rapdu = backend.exchange_raw(header + chunk)
+    return rapdu.data
+
+
+# In this test we sign long messages with an EdDSA key
+def test_eddsa_long_message(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["ed25519"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+    pubkey = get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY)
+    max_message_len = 1512 - 256
+
+    check_pincode(client, PassWord.PW1)
+    message = get_random_bytes(max_message_len)
+    eddsa.new(pubkey, "rfc8032").verify(message, _sign_chained(backend, message))
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        _sign_chained(backend, get_random_bytes(max_message_len + 1))
+    assert err.value.status == Errors.SW_WRONG_LENGTH
 
 
 # In this test we check that changing a key template keeps a permanently enabled UIF
