@@ -1233,10 +1233,13 @@ class GPGCard:
             # Compute the fingerprint https://www.rfc-editor.org/rfc/rfc4880#section-12.2
             modulus: bytes = bytes.fromhex(d["Modulus"])
             ksize: int = self._get_int(attributes, offset=1)
-            size: int = int(ksize / 8) + 0x0D  # len(header + tag + pub exp)
+            exponent: int = int.from_bytes(tags[0x82], "big")
+            exp_bytes: bytes = exponent.to_bytes((exponent.bit_length() + 7) // 8, "big")
+            # version, date, algorithm, then the modulus and exponent MPIs
+            size: int = 1 + 4 + 1 + 2 + int(ksize / 8) + 2 + len(exp_bytes)
 
             header: bytes = bytes.fromhex(f"99{size:04x}04{kdate:08x}01{ksize:04x}")
-            footer: bytes = bytes.fromhex("0011010001")
+            footer: bytes = exponent.bit_length().to_bytes(2, "big") + exp_bytes
             data: bytes = header + modulus + footer
 
             _hash = sha1()
