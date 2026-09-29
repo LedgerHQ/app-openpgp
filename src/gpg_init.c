@@ -376,7 +376,6 @@ void gpg_init() {
     // first init ?
     if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH) != 0) {
         gpg_install(STATE_ACTIVATE);
-        nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
         explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
     }
 
@@ -496,6 +495,9 @@ void gpg_install(unsigned char app_state) {
             gpg_install_slot((gpg_key_slot_t *) &N_gpg_pstate->keys[s]);
         }
     }
+
+    // installation completed, the next start keeps this state
+    nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
 }
 
 /**
