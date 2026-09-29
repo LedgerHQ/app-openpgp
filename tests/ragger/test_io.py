@@ -172,3 +172,19 @@ def test_gen_key_malformed_crt(backend: BackendInterface) -> None:
     # The app is still running
     rapdu = client.get_data(DataObject.DO_AID)
     assert rapdu.status == Errors.SW_OK
+
+
+# In this test we write the PW status bytes without any data
+def test_empty_pw_status(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    p1, p2 = DataObject.DO_PW_STATUS >> 8, DataObject.DO_PW_STATUS & 0xFF
+    with pytest.raises(ExceptionRAPDU) as err:
+        backend.exchange_raw(struct.pack(">BBBB", ClaType.CLA_APP, InsType.INS_PUT_DATA, p1, p2))
+    assert err.value.status == Errors.SW_WRONG_LENGTH
+
+    pw1_multiple_use = 0x01
+    rapdu = client.put_data(DataObject.DO_PW_STATUS, struct.pack(">B", pw1_multiple_use))
+    assert rapdu.status == Errors.SW_OK
+    assert client.get_data(DataObject.DO_PW_STATUS).data[0] == pw1_multiple_use

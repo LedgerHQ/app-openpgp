@@ -24,7 +24,7 @@ describe("buildBackup", () => {
 
   const data = {
     AID: "D2760001240103xxxx",
-    PWStatus: Buffer.from([0x00, 0x20, 0x20]),
+    PWStatus: Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]),
     rsaPubExp: 65537,
     digitalCounter: 42,
     private_01: Buffer.from("p1"),
@@ -67,7 +67,7 @@ describe("buildBackup", () => {
 
   test("base64-encodes binary fields and formats dates", () => {
     const out = buildBackup(data);
-    expect(out.PW_status).toBe(Buffer.from([0x00, 0x20, 0x20]).toString("base64"));
+    expect(out.PW_status).toBe(data.PWStatus.toString("base64"));
     expect(out.private_01).toBe(Buffer.from("p1").toString("base64"));
     expect(out.sig.key).toBe(Buffer.from([0xaa, 0xbb]).toString("base64"));
     expect(out.sig.date).toBe("1970-01-01 00:00:00");
@@ -117,5 +117,14 @@ describe("parseBackup", () => {
   });
   test("rejects a file missing a key slot", () => {
     expect(() => parseBackup({ version: 1, sig: {}, dec: {} })).toThrow(/aut/);
+  });
+  test.each([
+    ["missing", ""],
+    ["too long", Buffer.alloc(8).toString("base64")],
+  ])("rejects a %s PW_status", (_, pwStatus) => {
+    const slot = { date: "1970-01-01 00:00:00" };
+    expect(() => parseBackup({ version: 1, PW_status: pwStatus, sig: slot, dec: slot, aut: slot })).toThrow(
+      "PW_status"
+    );
   });
 });

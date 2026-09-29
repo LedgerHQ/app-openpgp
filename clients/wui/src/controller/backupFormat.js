@@ -125,6 +125,9 @@ export async function decryptBackup(bytes, passphrase) {
 
 // ── Plain-JSON parsing ────────────────────────────────────────────────────────
 
+// Size of the PW status bytes (DO C4) returned by the device.
+const PW_STATUS_SIZE = 7;
+
 // Decode a version-1 backup file into the structure consumed by
 // GpgManager.restore(). Inverse of buildBackup(). Throws on a malformed or
 // unsupported file.
@@ -148,9 +151,14 @@ export function parseBackup(json) {
     cert: raw.cert || "",
   });
 
+  const pwStatus = fromb64(p.PW_status);
+  if (pwStatus.length !== PW_STATUS_SIZE) {
+    throw new Error(`Backup field "PW_status" must be ${PW_STATUS_SIZE} bytes`);
+  }
+
   return {
     AID: p.AID || "",
-    PWStatus: fromb64(p.PW_status),
+    PWStatus: pwStatus,
     rsaPubExp: parseInt(p.rsa_pub_exp, 10) || 0,
     digitalCounter: parseInt(p.digital_counter, 10) || 0,
     private_01: fromb64(p.private_01),

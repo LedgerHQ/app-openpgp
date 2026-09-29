@@ -125,6 +125,8 @@ class DataObject(IntEnum):
     DO_DEC_ATTR = 0xC2
     # [Read/Write] Algorithm attributes AUThentication
     DO_AUT_ATTR = 0xC3
+    # [Read/Write] PW Status Bytes
+    DO_PW_STATUS = 0xC4
     # [Write] AES symmetric key
     DO_KEY_AES = 0xD5
     # [Write] Secure messaging ENC and MAC AES-128 keys, in one shot

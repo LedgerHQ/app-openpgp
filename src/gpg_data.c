@@ -871,6 +871,10 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             /* ----------------- PWS status ----------------- */
         case 0xC4:
+            if (G_gpg_vstate.io_length < 1) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             gpg_io_fetch_nv((unsigned char *) N_gpg_pstate->PW_status, 1);
             sw = SWO_SUCCESS;
             break;
