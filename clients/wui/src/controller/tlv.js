@@ -11,6 +11,15 @@ export function getInt(buffer, size = 2, offset = 0) {
   return value;
 }
 
+// Check that a fixed-format value read from the device has the expected size.
+export function checkLength(name, value, size) {
+  if (!value || value.length !== size) {
+    const got = value ? value.length : 0;
+    throw new Error(`Unexpected ${name} from the device (${got} bytes, expected ${size})`);
+  }
+  return value;
+}
+
 // Decode a (possibly multi-object) TLV buffer into a plain object keyed by
 // the numeric tag. Tags may be 1 or 2 bytes; lengths use the short form or the
 // 0x81 / 0x82 long forms. Duplicate tags keep the last occurrence, matching

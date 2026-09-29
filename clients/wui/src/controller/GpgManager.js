@@ -1,6 +1,6 @@
 import TransportWebHID from "@ledgerhq/hw-transport-webhid";
 import { exchange, getData, putData, statusMessage, SW_SUCCESS } from "./apdu.js";
-import { decodeTLV, getInt } from "./tlv.js";
+import { checkLength, decodeTLV, getInt } from "./tlv.js";
 import { DO, USER_SALUTATION, doName } from "./dataObjects.js";
 import { buildBackup, parseBackup } from "./backupFormat.js";
 
@@ -10,6 +10,8 @@ const OPENPGP_AID = "D27600012401";
 const SELECT_APDU = "00A4040006" + OPENPGP_AID;
 // GET DATA on tag 0x4F (full Application Identifier).
 const GET_DATA_AID = "00CA004F00";
+// Full AID length, including the manufacturer and the serial number
+const AID_LENGTH = 16;
 
 // Password references (ISO 7816 / OpenPGP).
 export const PW = Object.freeze({
@@ -107,10 +109,13 @@ class GpgManager {
       if (aid.sw !== SW_SUCCESS) {
         throw new Error(`Unable to read the AID (${statusMessage(aid.sw)})`);
       }
-      this.aid = aid.data.toString("hex").toUpperCase();
+      this.aid = checkLength("AID", aid.data, AID_LENGTH).toString("hex").toUpperCase();
+      if (!this.aid.startsWith(OPENPGP_AID)) {
+        throw new Error(`Unexpected AID from the device (${this.aid})`);
+      }
       // OpenPGP AID layout: RID[0:10] App[10:12] Version[12:16]
       // Manufacturer[16:20] Serial[20:28] RFU[28:32].
-      this.serial = this.aid.length >= 28 ? this.aid.slice(20, 28) : null;
+      this.serial = this.aid.slice(20, 28);
       this.connected = true;
     } catch (error) {
       await this.disconnect();
@@ -189,43 +194,45 @@ class GpgManager {
       if (d[DO.SIG_ATTR]) data.sig.attribute = d[DO.SIG_ATTR];
       if (d[DO.DEC_ATTR]) data.dec.attribute = d[DO.DEC_ATTR];
       if (d[DO.AUT_ATTR]) data.aut.attribute = d[DO.AUT_ATTR];
-      if (d[DO.PW_STATUS]) data.PWStatus = d[DO.PW_STATUS];
+      if (d[DO.PW_STATUS]) data.PWStatus = checkLength("PW status", d[DO.PW_STATUS], 7);
 
       const fp = d[DO.FINGERPRINTS];
       if (fp) {
+        checkLength("fingerprints", fp, 60);
         data.sig.fingerprint = fp.slice(0, 20);
         data.dec.fingerprint = fp.slice(20, 40);
         data.aut.fingerprint = fp.slice(40, 60);
       }
       const ca = d[DO.CA_FINGERPRINTS];
       if (ca) {
+        checkLength("CA fingerprints", ca, 60);
         data.sig.ca_fingerprint = ca.slice(0, 20);
         data.dec.ca_fingerprint = ca.slice(20, 40);
         data.aut.ca_fingerprint = ca.slice(40, 60);
       }
       const dates = d[DO.KEY_DATES];
       if (dates) {
+        checkLength("key dates", dates, 12);
         data.sig.date = getInt(dates, 4, 0);
         data.dec.date = getInt(dates, 4, 4);
         data.aut.date = getInt(dates, 4, 8);
       }
     }
 
-    data.rsaPubExp = getInt(await getData(t, DO.RSA_EXP), 4);
+    data.rsaPubExp = getInt(checkLength("RSA exponent", await getData(t, DO.RSA_EXP), 4), 4);
     data.aut.cert = (await getData(t, DO.CERT)).toString("utf-8");
     data.dec.cert = (await getData(t, DO.CERT, true)).toString("utf-8");
     data.sig.cert = (await getData(t, DO.CERT, true)).toString("utf-8");
 
-    const uifSig = await getData(t, DO.UIF_SIG);
-    const uifDec = await getData(t, DO.UIF_DEC);
-    const uifAut = await getData(t, DO.UIF_AUT);
-    data.sig.uif = uifSig.length ? uifSig[0] : 0;
-    data.dec.uif = uifDec.length ? uifDec[0] : 0;
-    data.aut.uif = uifAut.length ? uifAut[0] : 0;
+    data.sig.uif = checkLength("signature UIF", await getData(t, DO.UIF_SIG), 2)[0];
+    data.dec.uif = checkLength("decryption UIF", await getData(t, DO.UIF_DEC), 2)[0];
+    data.aut.uif = checkLength("authentication UIF", await getData(t, DO.UIF_AUT), 2)[0];
 
     // Security support template (0x7A) -> digital signature counter (0x93)
     tags = decodeTLV(await getData(t, DO.SEC_TEMPL));
-    if (tags[DO.SIG_COUNT]) data.digitalCounter = getInt(tags[DO.SIG_COUNT], 3);
+    if (tags[DO.SIG_COUNT]) {
+      data.digitalCounter = getInt(checkLength("signature counter", tags[DO.SIG_COUNT], 3), 3);
+    }
 
     // Private DOs are only present when supported by the extended capabilities.
     if (data.extCapabilities.length && data.extCapabilities[0] & 0x08) {

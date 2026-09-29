@@ -1,4 +1,4 @@
-import { getInt, decodeTLV } from "./tlv";
+import { getInt, decodeTLV, checkLength } from "./tlv";
 
 describe("getInt", () => {
   const buf = Buffer.from([0x12, 0x34, 0x56, 0x78]);
@@ -65,5 +65,19 @@ describe("decodeTLV", () => {
     ["unsupported length form", [0x01, 0x83, 0x00, 0x00, 0x01]],
   ])("rejects %s", (_, bytes) => {
     expect(() => decodeTLV(Buffer.from(bytes))).toThrow();
+  });
+});
+
+describe("checkLength", () => {
+  test("returns a value of the expected size", () => {
+    const value = Buffer.alloc(7);
+    expect(checkLength("PW status", value, 7)).toBe(value);
+  });
+  test.each([
+    ["shorter", Buffer.alloc(6)],
+    ["longer", Buffer.alloc(8)],
+    ["missing", undefined],
+  ])("rejects a %s value", (_, value) => {
+    expect(() => checkLength("PW status", value, 7)).toThrow("PW status");
   });
 });
