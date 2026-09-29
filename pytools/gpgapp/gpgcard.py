@@ -43,6 +43,9 @@ from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
 
 APDU_MAX_SIZE: int = 0xFE
 APDU_CHAINING_MODE: int = 0x10
+# Bounds of a response received through GET RESPONSE
+RESPONSE_MAX_SIZE: int = 0x4000
+RESPONSE_MAX_CHUNKS: int = 64
 
 
 class GPGCardExcpetion(Exception):
@@ -1411,12 +1414,17 @@ class GPGCard:
         resp, sw1, sw2 = self._transmit(apdu, True)
 
         # receive
+        response = bytearray(resp)
+        chunks = 0
         while sw1 == ErrorCodes.ERR_SW1_VALID:
+            chunks += 1
+            if chunks > RESPONSE_MAX_CHUNKS or len(response) > RESPONSE_MAX_SIZE:
+                raise GPGCardExcpetion((sw1 << 8) | sw2, "Response too long")
             apdux = bytes.fromhex(f"00c00000{sw2:02x}")
             resp2, sw1, sw2 = self._transmit(apdux, True)
-            resp += resp2
+            response += resp2
         sw = (sw1 << 8) | sw2
-        return bytes(resp), sw
+        return bytes(response), sw
 
     def _get_int(self, buffer: bytes, size: int = 2, offset: int = 0) -> int:
         """Exchange APDU, and get the response
