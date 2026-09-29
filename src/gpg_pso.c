@@ -316,10 +316,17 @@ int gpg_apdu_pso() {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
             msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+            if (msg_len > GPG_IO_BUFFER_LENGTH - 1) {
+                return SWO_WRONG_LENGTH;
+            }
+            // encrypt in place, after the padding indicator byte
+            memmove(G_gpg_vstate.work.io_buffer + 1,
+                    G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                    msg_len);
             ksz = GPG_IO_BUFFER_LENGTH - 1;
             CX_CHECK(cx_aes_no_throw(aes_key,
                                      CX_ENCRYPT | CX_CHAIN_CBC | CX_LAST,
-                                     G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                     G_gpg_vstate.work.io_buffer + 1,
                                      msg_len,
                                      G_gpg_vstate.work.io_buffer + 1,
                                      &ksz));

@@ -277,6 +277,28 @@ def test_cv25519_invalid_point(backend: BackendInterface) -> None:
     assert rapdu.data == expected_secret
 
 
+# In this test we encrypt and decrypt multi-block messages with the AES keys allowed by DO D5
+@pytest.mark.parametrize("key_len", [16, 32])
+def test_AES_key_sizes(backend: BackendInterface, key_len: int) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    key = get_random_bytes(key_len)
+    rapdu = client.put_data(DataObject.DO_KEY_AES, key)
+    assert rapdu.status == Errors.SW_OK
+
+    check_pincode(client, PassWord.PW2)
+    pad_aes = 0x02
+    plain = get_random_bytes(3 * AES.block_size)
+    expected = AES.new(key, AES.MODE_CBC, iv=bytes(AES.block_size)).encrypt(plain)
+    rapdu = client.encrypt(plain)
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == struct.pack(">B", pad_aes) + expected
+
+    rapdu = client.decrypt(rapdu.data)
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == plain
+
+
 # In this test we check that an AES key of a size not allowed by DO D5 is not used
 def test_AES_192_key(backend: BackendInterface) -> None:
     client = CommandSender(backend)
