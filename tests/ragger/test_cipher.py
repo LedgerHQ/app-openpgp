@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
-from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.Protocol.DH import key_agreement
 from Crypto.PublicKey import ECC
 from Crypto.Random import get_random_bytes
@@ -275,3 +275,15 @@ def test_cv25519_invalid_point(backend: BackendInterface) -> None:
     rapdu = client.decrypt_asym(_ecdh_pubkey_do(ext_pubkey), PubkeyAlgo.ECDH)
     assert rapdu.status == Errors.SW_OK
     assert rapdu.data == expected_secret
+
+
+# In this test we check that an AES key of a size not allowed by DO D5 is not used
+def test_AES_192_key(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.put_data(DataObject.DO_KEY_AES, get_random_bytes(24))
+    assert rapdu.status == Errors.SW_OK
+
+    check_pincode(client, PassWord.PW2)
+    rapdu = client.encrypt(get_random_bytes(AES.block_size))
+    assert rapdu.status == Errors.SW_CONDITIONS_NOT_SATISFIED

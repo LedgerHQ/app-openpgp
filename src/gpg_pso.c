@@ -100,6 +100,18 @@ static cx_err_t gpg_pso_cv25519_uncompress(uint8_t *raw_public_key) {
 }
 
 /**
+ * Check the AES key size against the ones allowed for DO D5
+ *
+ * @param[in]  aes_key AES key
+ *
+ * @return true for a 128 or 256 bits key
+ *
+ */
+static bool gpg_pso_aes_key_is_valid(const cx_aes_key_t *aes_key) {
+    return (aes_key->size == CX_AES_128_KEY_LEN) || (aes_key->size == CX_AES_256_KEY_LEN);
+}
+
+/**
  * Reset PW1 verified status
  *
  */
@@ -300,7 +312,7 @@ int gpg_apdu_pso() {
 
         case PSO_ENC:
             aes_key = &G_gpg_vstate.kslot->AES_dec;
-            if (!(aes_key->size != CX_AES_128_KEY_LEN)) {
+            if (!gpg_pso_aes_key_is_valid(aes_key)) {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
             msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
@@ -372,10 +384,8 @@ int gpg_apdu_pso() {
 
                 case PAD_AES:
                     aes_key = &G_gpg_vstate.kslot->AES_dec;
-                    if (!(aes_key->size != CX_AES_128_KEY_LEN)) {
-                        PRINTF("[PSO] - Wrong AES key size %d != %d\n",
-                               aes_key->size,
-                               CX_AES_128_KEY_LEN);
+                    if (!gpg_pso_aes_key_is_valid(aes_key)) {
+                        PRINTF("[PSO] - Wrong AES key size %d\n", aes_key->size);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
