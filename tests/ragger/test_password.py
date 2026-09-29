@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord
 from application_client.command_sender import CommandSender
-from ledgered.devices import Device
+from ledgered.devices import Device, DeviceType
 from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
-from ragger.navigator import Navigator
+from ragger.navigator import Navigator, NavIns, NavInsID
 from utils import check_pincode, util_navigate
 
 
@@ -236,4 +236,47 @@ def test_reset_with_resetting_code(backend: BackendInterface) -> None:
     )
     assert rapdu.status == Errors.SW_OK
     rapdu = client.send_verify_pw(PassWord.PW1, new_pin.decode())
+    assert rapdu.status == Errors.SW_OK
+
+
+# Row of the "Trust" choice in the PIN mode settings of touch devices
+TRUST_CHOICE = {DeviceType.FLEX: (430, 326), DeviceType.STAX: (350, 327), DeviceType.APEX_P: (270, 230)}
+PIN_MODE_SETTING = {DeviceType.FLEX: (430, 325), DeviceType.STAX: (350, 320), DeviceType.APEX_P: (270, 235)}
+
+
+# In this test we check that a pinpad VERIFY is answered in TRUST mode
+def test_verify_trust_mode(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    # Settings / PIN mode / Trust / confirm
+    if device.is_nano:
+        navigator.navigate(
+            [NavInsID.RIGHT_CLICK, NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK],
+            screen_change_before_first_instruction=False,
+        )
+        navigator.navigate_until_text(
+            NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "Pin mode", screen_change_before_first_instruction=False
+        )
+        navigator.navigate_until_text(
+            NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "Trust", screen_change_before_first_instruction=False
+        )
+        navigator.navigate_until_text(
+            NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "Yes", screen_change_before_first_instruction=False
+        )
+    else:
+        navigator.navigate(
+            [
+                NavInsID.USE_CASE_HOME_SETTINGS,
+                NavIns(NavInsID.TOUCH, PIN_MODE_SETTING[device.type]),
+                NavIns(NavInsID.TOUCH, TRUST_CHOICE[device.type]),
+                NavInsID.USE_CASE_CHOICE_CONFIRM,
+            ],
+            screen_change_before_first_instruction=False,
+        )
+    backend.wait_for_text_on_screen("TRUST MODE")
+
+    rapdu = backend.exchange(cla=ClaType.CLA_APP_VERIFY, ins=InsType.INS_VERIFY, p2=PassWord.PW1)
+    assert rapdu.status == Errors.SW_OK
+    rapdu = client.send_verify_pw(PassWord.PW1)
     assert rapdu.status == Errors.SW_OK

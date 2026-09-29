@@ -240,7 +240,7 @@ int gpg_apdu_verify() {
             case PIN_MODE_TRUST:
                 gpg_pin_set_verified(G_gpg_vstate.io_p2, 1);
                 gpg_io_discard(1);
-                sw = 0;
+                sw = SWO_SUCCESS;
                 break;
             default:
                 sw = SWO_INCORRECT_DATA;
