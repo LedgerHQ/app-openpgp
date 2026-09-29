@@ -29,6 +29,7 @@ import {
 } from "@ledgerhq/lumen-ui-react/symbols";
 import { listen } from "@ledgerhq/logs";
 import {
+  checkBackupFileSize,
   decryptBackup,
   encryptBackup,
   isEncryptedBackup,
@@ -211,6 +212,12 @@ export default function App() {
     const file = event.target.files[0];
     event.target.value = "";
     if (!file) return;
+    try {
+      checkBackupFileSize(file.size);
+    } catch (e) {
+      setNotice({ appearance: "error", title: e.message });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const bytes = new Uint8Array(reader.result);

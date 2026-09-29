@@ -1,4 +1,11 @@
-import { formatDate, buildBackup, parseDate, parseBackup } from "./backupFormat";
+import {
+  formatDate,
+  buildBackup,
+  parseDate,
+  parseBackup,
+  checkBackupFileSize,
+  BACKUP_MAX_FILE_SIZE,
+} from "./backupFormat";
 
 describe("formatDate", () => {
   test("epoch is 1970-01-01 00:00:00 (UTC)", () => {
@@ -118,13 +125,37 @@ describe("parseBackup", () => {
   test("rejects a file missing a key slot", () => {
     expect(() => parseBackup({ version: 1, sig: {}, dec: {} })).toThrow(/aut/);
   });
-  test.each([
-    ["missing", ""],
-    ["too long", Buffer.alloc(8).toString("base64")],
-  ])("rejects a %s PW_status", (_, pwStatus) => {
-    const slot = { date: "1970-01-01 00:00:00" };
-    expect(() => parseBackup({ version: 1, PW_status: pwStatus, sig: slot, dec: slot, aut: slot })).toThrow(
-      "PW_status"
+
+  const minimal = (fields = {}, slotFields = {}) => {
+    const slot = { date: "1970-01-01 00:00:00", ...slotFields };
+    const pwStatus = Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]).toString("base64");
+    return { version: 1, PW_status: pwStatus, sig: slot, dec: { date: slot.date }, aut: { date: slot.date }, ...fields };
+  };
+
+  test("accepts fields at their maximum size", () => {
+    const parsed = parseBackup(
+      minimal({ name: "n".repeat(39), private_01: Buffer.alloc(512).toString("base64") }, { cert: "c".repeat(1510) })
     );
+    expect(parsed.name.length).toBe(39);
+  });
+
+  test.each([
+    ["name", minimal({ name: "n".repeat(40) })],
+    ["private_01", minimal({ private_01: Buffer.alloc(513).toString("base64") })],
+    ["sig.cert", minimal({}, { cert: "c".repeat(1511) })],
+    ["sig.key", minimal({}, { key: Buffer.alloc(1513).toString("base64") })],
+    ["PW_status", minimal({ PW_status: "" })],
+    ["PW_status", minimal({ PW_status: Buffer.alloc(8).toString("base64") })],
+  ])("rejects a too long %s", (field, backup) => {
+    expect(() => parseBackup(backup)).toThrow(field);
+  });
+});
+
+describe("checkBackupFileSize", () => {
+  test("accepts a file up to the maximum size", () => {
+    expect(() => checkBackupFileSize(BACKUP_MAX_FILE_SIZE)).not.toThrow();
+  });
+  test("rejects a larger file", () => {
+    expect(() => checkBackupFileSize(BACKUP_MAX_FILE_SIZE + 1)).toThrow(/too large/);
   });
 });

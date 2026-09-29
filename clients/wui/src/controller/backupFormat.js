@@ -128,6 +128,35 @@ export async function decryptBackup(bytes, passphrase) {
 // Size of the PW status bytes (DO C4) returned by the device.
 const PW_STATUS_SIZE = 7;
 
+// Largest backup file accepted for a restore; real backups are a few KB.
+export const BACKUP_MAX_FILE_SIZE = 64 * 1024;
+
+// Largest value of each backup field, as stored by the device.
+const FIELD_MAX_SIZE = {
+  private: 512,
+  name: 39,
+  login: 512,
+  url: 512,
+  lang: 8,
+  attribute: 12,
+  fingerprint: 20,
+  cert: 1510,
+  key: 1512,
+};
+
+export function checkBackupFileSize(size) {
+  if (size > BACKUP_MAX_FILE_SIZE) {
+    throw new Error(`Backup file too large (${size} bytes)`);
+  }
+}
+
+function checkFieldSize(name, value, max) {
+  const size = typeof value === "string" ? Buffer.byteLength(value, "utf-8") : value.length;
+  if (size > max) {
+    throw new Error(`Backup field "${name}" too long (${size} bytes)`);
+  }
+}
+
 // Decode a version-1 backup file into the structure consumed by
 // GpgManager.restore(). Inverse of buildBackup(). Throws on a malformed or
 // unsupported file.
@@ -151,14 +180,9 @@ export function parseBackup(json) {
     cert: raw.cert || "",
   });
 
-  const pwStatus = fromb64(p.PW_status);
-  if (pwStatus.length !== PW_STATUS_SIZE) {
-    throw new Error(`Backup field "PW_status" must be ${PW_STATUS_SIZE} bytes`);
-  }
-
-  return {
+  const data = {
     AID: p.AID || "",
-    PWStatus: pwStatus,
+    PWStatus: fromb64(p.PW_status),
     rsaPubExp: parseInt(p.rsa_pub_exp, 10) || 0,
     digitalCounter: parseInt(p.digital_counter, 10) || 0,
     private_01: fromb64(p.private_01),
@@ -174,4 +198,21 @@ export function parseBackup(json) {
     dec: keySlot(p.dec),
     aut: keySlot(p.aut),
   };
+
+  if (data.PWStatus.length !== PW_STATUS_SIZE) {
+    throw new Error(`Backup field "PW_status" must be ${PW_STATUS_SIZE} bytes`);
+  }
+  for (const n of ["01", "02", "03", "04"]) {
+    checkFieldSize(`private_${n}`, data[`private_${n}`], FIELD_MAX_SIZE.private);
+  }
+  for (const field of ["name", "login", "url", "lang"]) {
+    checkFieldSize(field, data[field], FIELD_MAX_SIZE[field]);
+  }
+  for (const slot of ["sig", "dec", "aut"]) {
+    for (const field of ["attribute", "fingerprint", "cert", "key"]) {
+      checkFieldSize(`${slot}.${field}`, data[slot][field], FIELD_MAX_SIZE[field]);
+    }
+    checkFieldSize(`${slot}.ca_fingerprint`, data[slot].ca_fingerprint, FIELD_MAX_SIZE.fingerprint);
+  }
+  return data;
 }
