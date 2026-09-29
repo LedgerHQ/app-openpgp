@@ -306,8 +306,10 @@ int gpg_apdu_pso() {
     switch (G_gpg_vstate.io_p1p2) {
         case PSO_CDS:
             error = gpg_sign(&G_gpg_vstate.kslot->sig);
-            cnt = G_gpg_vstate.kslot->sig_count + 1;
-            nvm_write(&G_gpg_vstate.kslot->sig_count, &cnt, sizeof(unsigned int));
+            if (error == SWO_SUCCESS) {
+                cnt = G_gpg_vstate.kslot->sig_count + 1;
+                nvm_write(&G_gpg_vstate.kslot->sig_count, &cnt, sizeof(unsigned int));
+            }
             break;
 
         case PSO_ENC:

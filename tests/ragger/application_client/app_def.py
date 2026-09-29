@@ -141,6 +141,8 @@ class DataObject(IntEnum):
     DO_UIF_AUT = 0xD8
 
     # [Read/Write] Asymmetric Key Pair
+    # [Read] Security support template (digital signature counter)
+    DO_SECURITY_TEMPLATE = 0x7A
     DO_PUB_KEY = 0x7F49
     # [Read/Write] Cardholder certificate
     DO_CARDHOLDER_CERT = 0x7F21

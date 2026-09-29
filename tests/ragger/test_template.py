@@ -224,6 +224,31 @@ def test_eddsa_long_message(backend: BackendInterface) -> None:
     assert err.value.status == Errors.SW_WRONG_LENGTH
 
 
+def _signature_count(client: CommandSender) -> int:
+    # 93 03 <3 bytes counter>
+    return int.from_bytes(client.get_data(DataObject.DO_SECURITY_TEMPLATE).data[2:5], "big")
+
+
+# In this test we check that only successful signatures increment the signature counter
+def test_signature_counter(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["nistp256"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+    check_pincode(client, PassWord.PW1)
+    curve_len = 32
+
+    count = _signature_count(client)
+    rapdu = client.sign(get_random_bytes(curve_len - 1))
+    assert rapdu.status == Errors.SW_WRONG_LENGTH
+    assert _signature_count(client) == count
+
+    rapdu = client.sign(get_random_bytes(curve_len))
+    assert rapdu.status == Errors.SW_OK
+    assert _signature_count(client) == count + 1
+
+
 # In this test we check that changing a key template keeps a permanently enabled UIF
 def test_uif_permanent_kept_on_template_change(backend: BackendInterface) -> None:
     client = CommandSender(backend)
