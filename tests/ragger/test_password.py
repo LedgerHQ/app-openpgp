@@ -182,3 +182,16 @@ def test_reset_revokes_pw1_sessions(backend: BackendInterface) -> None:
         assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
     rapdu = client.send_verify_pw(PassWord.PW3)
     assert rapdu.status == Errors.SW_OK
+
+
+# In this test we check that changing PW1 revokes the PW2 session opened with the previous value
+def test_change_revokes_pw2_session(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW2)
+
+    rapdu = client.send_change_pw(PassWord.PW1, "123456", "654321")
+    assert rapdu.status == Errors.SW_OK
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.send_verify_pw(PassWord.PW2)
+    assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED

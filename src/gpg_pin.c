@@ -145,6 +145,10 @@ int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     newpin.counter = 3;
 
     nvm_write(pin, &newpin, sizeof(gpg_pin_t));
+    if (pin->ref == PIN_ID_PW1) {
+        // PW2 shares the PW1 value: its session was opened with the previous value
+        gpg_pin_set_verified(PIN_ID_PW2, 0);
+    }
 end:
     explicit_bzero(&newpin, sizeof(newpin));
     if (error != CX_OK) {
