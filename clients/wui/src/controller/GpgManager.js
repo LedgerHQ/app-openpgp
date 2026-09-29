@@ -86,12 +86,14 @@ class GpgManager {
     }
     if (!this.transport) {
       // request() prompts the device picker (filtered on the Ledger vendor id).
-      this.transport = await TransportWebHID.request();
+      const transport = await TransportWebHID.request();
+      this.transport = transport;
       // The OpenPGP app can crash and drop its USB interface during heavy
       // operations (e.g. key regeneration); surface that instead of hanging.
-      this.transport.on("disconnect", () => {
+      // A running operation keeps the lock until it fails on its own transport.
+      transport.on("disconnect", () => {
+        if (this.transport !== transport) return;
         this.connected = false;
-        this.busy = false;
         this.transport = null;
         if (!this._intentionalClose && this.onDisconnect) this.onDisconnect();
       });
@@ -138,9 +140,12 @@ class GpgManager {
     this.transport = null;
   }
 
+  // Take the operation lock and return the transport the operation must use.
   _lock() {
     if (this.busy) throw new Error("Device is busy");
+    if (!this.transport) throw new Error("Device not connected");
     this.busy = true;
+    return this.transport;
   }
 
   _unlock() {
@@ -148,20 +153,16 @@ class GpgManager {
   }
 
   // PIN verification (00 20 00 <pw> Lc <pin>). Returns success boolean.
-  async verifyPin(pw, value) {
+  async verifyPin(pw, value, t = this.transport) {
     const pin = Buffer.from(value || "", "utf-8");
     const header = Buffer.from([0x00, 0x20, 0x00, pw, pin.length]);
-    const { sw } = await exchange(
-      this.transport,
-      Buffer.concat([header, pin])
-    );
+    const { sw } = await exchange(t, Buffer.concat([header, pin]));
     return sw === SW_SUCCESS;
   }
 
   // Read every data object needed for a backup, ported from gpgcard.py
   // `get_all`. Returns the CardInfo structure consumed by buildBackup().
-  async getAll() {
-    const t = this.transport;
+  async getAll(t = this.transport) {
     const data = newCardInfo();
 
     data.AID = (await getData(t, DO.AID)).toString("hex").toUpperCase();
@@ -256,22 +257,22 @@ class GpgManager {
   // required to read/write private DOs 0x0101/0x0103 (see the firmware's
   // gpg_check_access_*_DO). Verifying only PW1+PW3 — as the python tool does —
   // silently loses those DOs.
-  async verifyPins(userPin, adminPin) {
-    if (!(await this.verifyPin(PW.PW1, userPin))) {
+  async verifyPins(userPin, adminPin, t = this.transport) {
+    if (!(await this.verifyPin(PW.PW1, userPin, t))) {
       throw new Error("User PIN verification failed");
     }
-    if (!(await this.verifyPin(PW.PW2, userPin))) {
+    if (!(await this.verifyPin(PW.PW2, userPin, t))) {
       throw new Error("User PIN verification failed");
     }
-    if (!(await this.verifyPin(PW.PW3, adminPin))) {
+    if (!(await this.verifyPin(PW.PW3, adminPin, t))) {
       throw new Error("Admin PIN verification failed");
     }
   }
 
   // Select the active key slot (PUT DATA 0x01F2, 0-based index). Requires PW2
   // verified and "Selection by APDU" enabled on the card.
-  async selectSlot(index) {
-    const sw = await putData(this.transport, DO.SLOT_CUR, Buffer.from([index]));
+  async selectSlot(index, t = this.transport) {
+    const sw = await putData(t, DO.SLOT_CUR, Buffer.from([index]));
     if (sw !== SW_SUCCESS) {
       throw new Error(
         `Slot selection failed (${statusMessage(sw)}) — is "Selection by APDU" enabled on the card?`
@@ -281,11 +282,11 @@ class GpgManager {
 
   // Verify PINs, select the slot, and read the full card state into a backup.
   async backup(userPin, adminPin, slot = 0) {
-    this._lock();
+    const t = this._lock();
     try {
-      await this.verifyPins(userPin, adminPin);
-      await this.selectSlot(slot);
-      return buildBackup(await this.getAll());
+      await this.verifyPins(userPin, adminPin, t);
+      await this.selectSlot(slot, t);
+      return buildBackup(await this.getAll(t));
     } finally {
       this._unlock();
     }
@@ -295,7 +296,7 @@ class GpgManager {
   // (GEN ASYM KEYPAIR, P1=Generate, P2=SEED). This rebuilds the exact same
   // keys from the master seed; it requires SEED mode enabled on the device
   // and the same recovery phrase. Returns the list of failures.
-  async seedKeys() {
+  async seedKeys(t = this.transport) {
     const GENERATE = 0x80;
     const SEEDED_MODE = 0x01;
     const header = Buffer.from([0x00, 0x47, GENERATE, SEEDED_MODE]);
@@ -306,7 +307,7 @@ class GpgManager {
       ["Authentication key", DO.AUT_KEY],
     ]) {
       // CRT key template: <tag> 00
-      const { sw } = await exchange(this.transport, header, Buffer.from([tag, 0x00]));
+      const { sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
       if (sw !== SW_SUCCESS) {
         failures.push({
           tag,
@@ -323,22 +324,22 @@ class GpgManager {
   // key and data object and resets the PINs to their defaults (123456 /
   // 12345678). Requires the admin PIN (PW3). DESTRUCTIVE.
   async factoryReset(adminPin) {
-    this._lock();
+    const t = this._lock();
     try {
-      if (!(await this.verifyPin(PW.PW3, adminPin))) {
+      if (!(await this.verifyPin(PW.PW3, adminPin, t))) {
         throw new Error("Admin PIN verification failed");
       }
-      let r = await exchange(this.transport, "00E60000"); // TERMINATE DF
+      let r = await exchange(t, "00E60000"); // TERMINATE DF
       if (r.sw !== SW_SUCCESS) {
         throw new Error(`Terminate failed (${statusMessage(r.sw)})`);
       }
-      r = await exchange(this.transport, "00440000"); // ACTIVATE FILE
+      r = await exchange(t, "00440000"); // ACTIVATE FILE
       if (r.sw !== SW_SUCCESS) {
         throw new Error(`Activate failed (${statusMessage(r.sw)})`);
       }
       // The card is now blank; refresh the AID/serial we display.
-      await exchange(this.transport, SELECT_APDU);
-      const aid = await exchange(this.transport, GET_DATA_AID);
+      await exchange(t, SELECT_APDU);
+      const aid = await exchange(t, GET_DATA_AID);
       if (aid.sw === SW_SUCCESS) {
         this.aid = aid.data.toString("hex").toUpperCase();
         this.serial = this.aid.length >= 28 ? this.aid.slice(20, 28) : null;
@@ -354,14 +355,13 @@ class GpgManager {
   // blob (the firmware rejects that on a wiped card); pass regenerateKeys to
   // rebuild them from the device seed instead. Returns the list of failures.
   async restore(userPin, adminPin, json, regenerateKeys = false, slot = 0) {
-    this._lock();
+    const t = this._lock();
     try {
       const data = parseBackup(json);
 
-      await this.verifyPins(userPin, adminPin);
-      await this.selectSlot(slot);
+      await this.verifyPins(userPin, adminPin, t);
+      await this.selectSlot(slot, t);
 
-      const t = this.transport;
       const failures = [];
       const put = async (tag, value) => {
         const sw = await putData(t, tag, value);
@@ -437,7 +437,7 @@ class GpgManager {
       // writing back the encrypted blob (which the firmware rejects on a
       // wiped card).
       if (regenerateKeys) {
-        failures.push(...(await this.seedKeys()));
+        failures.push(...(await this.seedKeys(t)));
       }
 
       return failures;
