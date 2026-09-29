@@ -109,4 +109,15 @@ describe("getData", () => {
     );
     expect(data.equals(Buffer.from([0xde, 0xad]))).toBe(true);
   });
+
+  test("throws on an error status word", async () => {
+    const t = new MockTransport([Buffer.from([0x6a, 0x88])]);
+    await expect(getData(t, 0x005e)).rejects.toThrow("005e");
+  });
+
+  test("returns an empty value for a status word meaning absent", async () => {
+    const t = new MockTransport([Buffer.from([0x69, 0x85])]);
+    const data = await getData(t, 0x00b6, false, [0x6985]);
+    expect(data.length).toBe(0);
+  });
 });

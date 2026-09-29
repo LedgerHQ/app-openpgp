@@ -12,6 +12,7 @@
 //     (e.g. to read RSA-4096 public keys).
 
 export const SW_SUCCESS = 0x9000;
+export const SW_CONDITIONS_NOT_SATISFIED = 0x6985;
 export const SW1_MORE_DATA = 0x61;
 
 // Largest data chunk per command-chaining frame (matches the python tool).
@@ -118,11 +119,19 @@ export async function exchange(transport, apdu, data = Buffer.alloc(0)) {
 }
 
 // GET DATA (INS 0xCA, or 0xCC for the next occurrence). Returns the value
-// bytes; the status word is ignored, like the python `_get_data`.
-export async function getData(transport, tag, bnext = false) {
+// bytes, and throws on any status word other than success, except those listed
+// in `missing`, which mean an absent value and return an empty buffer.
+export async function getData(transport, tag, bnext = false, missing = []) {
   const ins = bnext ? 0xcc : 0xca;
   const header = Buffer.from([0x00, ins, (tag >> 8) & 0xff, tag & 0xff, 0x00]);
-  const { data } = await exchange(transport, header);
+  const { data, sw } = await exchange(transport, header);
+  if (missing.includes(sw)) {
+    return Buffer.alloc(0);
+  }
+  if (sw !== SW_SUCCESS) {
+    const hex = tag.toString(16).padStart(4, "0");
+    throw new Error(`Unable to read data object ${hex} (${statusMessage(sw)})`);
+  }
   return data;
 }
 

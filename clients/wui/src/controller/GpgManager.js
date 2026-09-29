@@ -1,5 +1,12 @@
 import TransportWebHID from "@ledgerhq/hw-transport-webhid";
-import { exchange, getData, putData, statusMessage, SW_SUCCESS } from "./apdu.js";
+import {
+  exchange,
+  getData,
+  putData,
+  statusMessage,
+  SW_CONDITIONS_NOT_SATISFIED,
+  SW_SUCCESS,
+} from "./apdu.js";
 import { checkLength, decodeTLV, getInt } from "./tlv.js";
 import { DO, USER_SALUTATION, doName } from "./dataObjects.js";
 import { buildBackup, parseBackup } from "./backupFormat.js";
@@ -256,9 +263,11 @@ class GpgManager {
     }
 
     // Encrypted private key material (only readable in SEED mode with PW3).
-    data.sig.key = await getData(t, DO.SIG_KEY);
-    data.dec.key = await getData(t, DO.DEC_KEY);
-    data.aut.key = await getData(t, DO.AUT_KEY);
+    // A slot without key has no key blob to read
+    const noKey = [SW_CONDITIONS_NOT_SATISFIED];
+    data.sig.key = await getData(t, DO.SIG_KEY, false, noKey);
+    data.dec.key = await getData(t, DO.DEC_KEY, false, noKey);
+    data.aut.key = await getData(t, DO.AUT_KEY, false, noKey);
 
     this.data = data;
     return data;
