@@ -212,6 +212,10 @@ class GPGCard:
         else:
             self.transport = Transport("hid")
         print("")
+        # no PIN is sent before the OpenPGP application answers its selection
+        _, sw = self.select()
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, "OpenPGP application not selected")
 
     def logout(self) -> None:
         """Clear PW1/PW2/PW3 verification state on the card.
