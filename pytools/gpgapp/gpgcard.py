@@ -895,7 +895,8 @@ class GPGCard:
         if pinpad:
             apdu = bytes.fromhex(f"EF2000{pw:02x}00")
         else:
-            apdu = bytes.fromhex(f"002000{pw:02x}{len(value):02x}") + value.encode("utf-8")
+            b_value = value.encode("utf-8")
+            apdu = bytes.fromhex(f"002000{pw:02x}{len(b_value):02x}") + b_value
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -911,8 +912,8 @@ class GPGCard:
             Success / KO boolean
         """
 
-        lc = len(cur_value) + len(new_value)
-        apdu = bytes.fromhex(f"002400{pw:02x}{lc:02x}") + cur_value.encode("utf-8") + new_value.encode("utf-8")
+        data = cur_value.encode("utf-8") + new_value.encode("utf-8")
+        apdu = bytes.fromhex(f"002400{pw:02x}{len(data):02x}") + data
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -941,8 +942,8 @@ class GPGCard:
         """
 
         p1 = 2 if len(RC) == 0 else 0
-        lc = len(RC) + len(value)
-        apdu = bytes.fromhex(f"002C{p1:02x}81{lc:02x}") + RC.encode("utf-8") + value.encode("utf-8")
+        data = RC.encode("utf-8") + value.encode("utf-8")
+        apdu = bytes.fromhex(f"002C{p1:02x}81{len(data):02x}") + data
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
