@@ -509,7 +509,13 @@ static void template_key_cb(int token, uint8_t index, int page) {
     static uint8_t *oid = NULL;
     uint32_t oid_len = 0;
     uint32_t size = 0;
+#ifdef SCREEN_SIZE_NANO
+    // on Nano, index is already the position of the choice in the whole list
+    UNUSED(page);
+    uint8_t key_type = index + FIRST_USER_TOKEN;
+#else
     uint8_t key_type = index + (page * nb_elt_per_page) + FIRST_USER_TOKEN;
+#endif
 
     if (token != TOKEN_TYPE_BACK) {
         explicit_bzero(&attributes, sizeof(attributes));
