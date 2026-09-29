@@ -1,4 +1,4 @@
-import { exchange, getData, putData, APDU_MAX_SIZE, RESPONSE_MAX_CHUNKS } from "./apdu";
+import { exchange, getData, putData, APDU_MAX_SIZE, CHAIN_MAX_SIZE, RESPONSE_MAX_CHUNKS } from "./apdu";
 
 // Minimal fake transport: records every frame sent and replays canned
 // responses (each a Buffer of data + 2-byte SW) in order.
@@ -62,6 +62,14 @@ describe("exchange", () => {
     const sw = await putData(t, 0xb6, payload);
     expect(sw).toBe(0x6700);
     expect(t.sent.length).toBe(1);
+  });
+
+  test("refuses data larger than the device chaining buffer", async () => {
+    const t = new MockTransport([]);
+    await expect(putData(t, 0x7f21, Buffer.alloc(CHAIN_MAX_SIZE + 1))).rejects.toThrow(
+      "too long"
+    );
+    expect(t.sent.length).toBe(0);
   });
 
   test("command-chains outgoing data larger than APDU_MAX_SIZE", async () => {

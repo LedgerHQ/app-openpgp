@@ -18,6 +18,8 @@ export const SW1_MORE_DATA = 0x61;
 export const APDU_MAX_SIZE = 0xfe;
 // CLA bit flagging an intermediate command-chaining frame.
 export const APDU_CHAINING_MODE = 0x10;
+// Size of the device buffer receiving a whole command chain.
+export const CHAIN_MAX_SIZE = 1512;
 // Bounds of a response received through GET RESPONSE.
 export const RESPONSE_MAX_SIZE = 0x4000;
 export const RESPONSE_MAX_CHUNKS = 64;
@@ -67,6 +69,10 @@ function toBuffer(value) {
 export async function exchange(transport, apdu, data = Buffer.alloc(0)) {
   const header = toBuffer(apdu);
   const payload = toBuffer(data);
+
+  if (payload.length > CHAIN_MAX_SIZE) {
+    throw new Error(`Data too long for the device (${payload.length} bytes)`);
+  }
 
   let frame = header;
   if (payload.length > 0) {
