@@ -1,3 +1,5 @@
+import pytest
+
 # from ragger.conftest import configuration
 
 ###########################
@@ -25,3 +27,17 @@ BACKENDS = ["speculos"]
 
 def pytest_addoption(parser):
     parser.addoption("--full", action="store_true", help="Run full tests")
+    parser.addoption(
+        "--allow-physical-device",
+        action="store_true",
+        help="Allow running the tests on a physical device: they reset its OpenPGP data and PINs",
+    )
+
+
+def pytest_configure(config):
+    backend = config.getoption("backend", default="speculos")
+    if backend != "speculos" and not config.getoption("allow_physical_device"):
+        pytest.exit(
+            f"The tests reset the OpenPGP data and PINs of the device: add --allow-physical-device to run them on '{backend}'",
+            returncode=pytest.ExitCode.USAGE_ERROR,
+        )
