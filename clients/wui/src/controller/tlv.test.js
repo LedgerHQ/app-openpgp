@@ -56,4 +56,14 @@ describe("decodeTLV", () => {
     expect(tags[0x5b].toString()).toBe("A");
     expect(tags[0x5e].toString()).toBe("BC");
   });
+
+  test.each([
+    ["truncated two-byte tag", [0x5f]],
+    ["missing length", [0x01]],
+    ["truncated long length", [0x01, 0x82, 0x00]],
+    ["value shorter than its length", [0x01, 0x03, 0xaa]],
+    ["unsupported length form", [0x01, 0x83, 0x00, 0x00, 0x01]],
+  ])("rejects %s", (_, bytes) => {
+    expect(() => decodeTLV(Buffer.from(bytes))).toThrow();
+  });
 });
