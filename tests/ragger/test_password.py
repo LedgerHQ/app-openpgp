@@ -4,6 +4,7 @@
 This module provides Ragger tests for Password feature
 """
 
+import struct
 from pathlib import Path
 
 import pytest
@@ -280,3 +281,53 @@ def test_verify_trust_mode(device: Device, backend: BackendInterface, navigator:
     assert rapdu.status == Errors.SW_OK
     rapdu = client.send_verify_pw(PassWord.PW1)
     assert rapdu.status == Errors.SW_OK
+
+
+# Centers of the keypad columns and rows (digits 1 to 9, then back, 0 and validate) on touch devices
+KEYPAD = {
+    DeviceType.FLEX: ((80, 240, 398), (288, 376, 464, 552)),
+    DeviceType.STAX: ((68, 198, 330), (300, 404, 508, 612)),
+    DeviceType.APEX_P: ((52, 150, 250), (188, 248, 308, 368)),
+}
+
+
+def _enter_pin(device: Device, navigator: Navigator, pin: str) -> None:
+    if device.is_nano:
+        # The selection starts on 5 after each digit, and moves to Validate once the PIN is long enough
+        for digit in map(int, pin):
+            move = NavInsID.RIGHT_CLICK if digit > 5 else NavInsID.LEFT_CLICK
+            digit_instructions = [move] * abs(digit - 5) + [NavInsID.BOTH_CLICK]
+            navigator.navigate(digit_instructions, screen_change_before_first_instruction=False)
+        navigator.navigate([NavInsID.BOTH_CLICK], screen_change_before_first_instruction=False)
+    else:
+        cols, rows = KEYPAD[device.type]
+        instructions: list[NavIns | NavInsID] = []
+        for digit in map(int, pin):
+            position = (cols[1], rows[3]) if digit == 0 else (cols[(digit - 1) % 3], rows[(digit - 1) // 3])
+            instructions.append(NavIns(NavInsID.TOUCH, position))
+        instructions.append(NavIns(NavInsID.TOUCH, (cols[2], rows[3])))
+        navigator.navigate(instructions, screen_change_before_first_instruction=False)
+
+
+# In this test we check that cancelling an on-device PIN change leaves the PIN not verified
+def test_change_pin_cancelled(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
+    client = CommandSender(backend)
+    header = struct.pack(">BBBB", ClaType.CLA_APP, InsType.INS_CHANGE_REF_DATA, 0, PassWord.PW1)
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        with backend.exchange_async_raw(header):
+            backend.wait_for_text_on_screen("Current User PIN")
+            _enter_pin(device, navigator, "123456")
+            backend.wait_for_text_on_screen("New User PIN")
+            if device.is_nano:
+                # Backspace, on the left of 0, goes back when no digit is entered
+                navigator.navigate(
+                    [NavInsID.LEFT_CLICK] * 6 + [NavInsID.BOTH_CLICK], screen_change_before_first_instruction=False
+                )
+            else:
+                navigator.navigate([NavInsID.NAVIGATION_HEADER_TAP], screen_change_before_first_instruction=False)
+    assert err.value.status == Errors.SW_CONDITIONS_NOT_SATISFIED
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.send_verify_pw(PassWord.PW1)
+    assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
