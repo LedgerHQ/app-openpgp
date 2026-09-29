@@ -71,3 +71,19 @@ describe("disconnect", () => {
     expect(gpg.connected).toBe(true);
   });
 });
+
+describe("logout", () => {
+  test("leaves the PINs not verified after a backup, even when it fails", async () => {
+    const sent = [];
+    const transport = new FakeTransport(async (apdu) => {
+      sent.push(apdu.toString("hex"));
+      return Buffer.from([0x63, 0xc2]);
+    });
+    transports.push(transport);
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    await expect(gpg.backup("123456", "12345678")).rejects.toThrow("PIN verification failed");
+    expect(sent.slice(-3)).toEqual(["0020ff8100", "0020ff8200", "0020ff8300"]);
+  });
+});

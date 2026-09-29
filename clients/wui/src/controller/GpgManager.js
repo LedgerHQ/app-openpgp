@@ -152,6 +152,18 @@ class GpgManager {
     this.busy = false;
   }
 
+  // Leave PW1, PW2 and PW3 not verified (VERIFY with P1=FF). Best effort: a
+  // failure must not hide the result of the operation.
+  async _logout(t) {
+    for (const pw of [PW.PW1, PW.PW2, PW.PW3]) {
+      try {
+        await exchange(t, Buffer.from([0x00, 0x20, 0xff, pw, 0x00]));
+      } catch (e) {
+        // ignore: the device may be gone
+      }
+    }
+  }
+
   // PIN verification (00 20 00 <pw> Lc <pin>). Returns success boolean.
   async verifyPin(pw, value, t = this.transport) {
     const pin = Buffer.from(value || "", "utf-8");
@@ -288,6 +300,7 @@ class GpgManager {
       await this.selectSlot(slot, t);
       return buildBackup(await this.getAll(t));
     } finally {
+      await this._logout(t);
       this._unlock();
     }
   }
@@ -345,6 +358,7 @@ class GpgManager {
         this.serial = this.aid.length >= 28 ? this.aid.slice(20, 28) : null;
       }
     } finally {
+      await this._logout(t);
       this._unlock();
     }
   }
@@ -442,6 +456,7 @@ class GpgManager {
 
       return failures;
     } finally {
+      await this._logout(t);
       this._unlock();
     }
   }
