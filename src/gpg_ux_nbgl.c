@@ -1354,7 +1354,7 @@ static void ui_menu_pinentry_cb(void) {
  * While the prompt is pending (IO_ASYNCH_REPLY), the host can overwrite the
  * global APDU state with a different command.  Restoring from this snapshot
  * in the callback ensures the operation executed is exactly what the user
- * reviewed, not an attacker-substituted payload (V-102). */
+ * reviewed, not an attacker-substituted payload. */
 typedef struct {
     unsigned char ins;
     unsigned char p1;

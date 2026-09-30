@@ -216,7 +216,7 @@ class GPGCard:
         Sends VERIFY with P1=0xFF for each password role, which instructs
         the firmware to reset that role's verified flag without checking any
         PIN value.  Must be called before closing the transport so that a
-        subsequent process cannot reuse residual authorization (V-181).
+        subsequent process cannot reuse residual authorization.
         """
         errors = []
         for pw in (PassWord.PW1, PassWord.PW2, PassWord.PW3):
