@@ -198,3 +198,40 @@ describe("restore fingerprints", () => {
     expect(failures[0].message).toMatch("no key on the card");
   });
 });
+
+describe("WebHID permission", () => {
+  const withDevice = () => {
+    const transport = new FakeTransport();
+    transport.device = { forget: vi.fn(async () => {}) };
+    transports.push(transport);
+    return transport;
+  };
+
+  test("is revoked on disconnect", async () => {
+    const transport = withDevice();
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    await gpg.disconnect();
+    expect(transport.device.forget).toHaveBeenCalled();
+  });
+
+  test("is revoked when the device vanishes", async () => {
+    const transport = withDevice();
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    transport.emit("disconnect");
+    expect(transport.device.forget).toHaveBeenCalled();
+  });
+
+  test("is left alone by browsers without forget()", async () => {
+    const transport = new FakeTransport();
+    transport.device = {};
+    transports.push(transport);
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    await expect(gpg.disconnect()).resolves.toBeUndefined();
+  });
+});

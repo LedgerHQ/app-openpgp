@@ -66,6 +66,16 @@ function newCardInfo() {
   };
 }
 
+// Revoke the WebHID permission of the device, which is granted to the whole
+// origin and would otherwise stay usable by any page of that origin.
+async function forgetDevice(transport) {
+  try {
+    await transport.device?.forget?.();
+  } catch (e) {
+    // ignore: best effort, the permission may already be revoked
+  }
+}
+
 class GpgManager {
   constructor() {
     this.transport = null;
@@ -101,6 +111,7 @@ class GpgManager {
       // operations (e.g. key regeneration); surface that instead of hanging.
       // A running operation keeps the lock until it fails on its own transport.
       transport.on("disconnect", () => {
+        forgetDevice(transport);
         if (this.transport !== transport) return;
         this.connected = false;
         this.transport = null;
@@ -145,6 +156,7 @@ class GpgManager {
       } catch (e) {
         // ignore: device may already be gone
       }
+      await forgetDevice(this.transport);
     }
     this.transport = null;
   }

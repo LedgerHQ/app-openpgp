@@ -142,6 +142,13 @@ export default function App() {
   const fileInput = useRef(null);
   const regeneratingRef = useRef(false);
 
+  // Release the device, and its WebHID permission, when the page is left
+  useEffect(() => {
+    const release = () => gpg.disconnect();
+    window.addEventListener("pagehide", release);
+    return () => window.removeEventListener("pagehide", release);
+  }, []);
+
   useEffect(() => {
     gpg.onDisconnect = () => {
       const wasRegenerating = regeneratingRef.current;
