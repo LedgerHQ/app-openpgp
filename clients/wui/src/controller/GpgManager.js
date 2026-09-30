@@ -33,7 +33,7 @@ function emptyKey() {
     attribute: Buffer.alloc(0),
     fingerprint: Buffer.alloc(0),
     ca_fingerprint: Buffer.alloc(0),
-    cert: "",
+    cert: Buffer.alloc(0),
     date: 0,
     uif: 0,
     key: Buffer.alloc(0),
@@ -244,7 +244,7 @@ class GpgManager {
     // Certificate occurrences: 0 AUT, 1 DEC, 2 SIG
     for (const [occurrence, slot] of [data.aut, data.dec, data.sig].entries()) {
       const selected = await selectData(t, DO.CERT, occurrence);
-      slot.cert = (await getData(t, DO.CERT, !selected && occurrence > 0)).toString("utf-8");
+      slot.cert = await getData(t, DO.CERT, !selected && occurrence > 0);
     }
 
     data.sig.uif = checkLength("signature UIF", await getData(t, DO.UIF_SIG), 2)[0];
@@ -445,7 +445,7 @@ class GpgManager {
 
       for (const [occurrence, slot] of [data.aut, data.dec, data.sig].entries()) {
         await selectData(t, DO.CERT, occurrence);
-        await put(DO.CERT, enc(slot.cert));
+        await put(DO.CERT, slot.cert);
       }
 
       for (const [slot, caTag, fpTag, dateTag] of [

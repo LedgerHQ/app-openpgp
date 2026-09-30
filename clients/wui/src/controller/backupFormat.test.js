@@ -26,7 +26,7 @@ describe("buildBackup", () => {
     date: 0,
     fingerprint: Buffer.from([0x11]),
     ca_fingerprint: Buffer.from([0x22]),
-    cert: "cert-data",
+    cert: Buffer.from("cert-data"),
   });
 
   const data = {
@@ -79,6 +79,7 @@ describe("buildBackup", () => {
     expect(out.sig.key).toBe(Buffer.from([0xaa, 0xbb]).toString("base64"));
     expect(out.sig.date).toBe("1970-01-01 00:00:00");
     expect(out.sig.cert).toBe("cert-data");
+    expect(out.sig.cert_b64).toBe(Buffer.from("cert-data").toString("base64"));
     expect(out.sig.uif).toBe(1);
   });
 
@@ -102,7 +103,13 @@ describe("buildBackup", () => {
     expect(parsed.sig.fingerprint.equals(data.sig.fingerprint)).toBe(true);
     expect(parsed.sig.date).toBe(data.sig.date);
     expect(parsed.sig.uif).toBe(data.sig.uif);
-    expect(parsed.sig.cert).toBe(data.sig.cert);
+    expect(parsed.sig.cert.equals(data.sig.cert)).toBe(true);
+  });
+
+  test("round-trips a binary certificate", () => {
+    const der = Buffer.from([0x30, 0x82, 0x01, 0xff, 0x80, 0xc0, 0x00]);
+    const parsed = parseBackup(buildBackup({ ...data, aut: { ...slot(), cert: der } }));
+    expect(parsed.aut.cert.equals(der)).toBe(true);
   });
 });
 
@@ -132,6 +139,11 @@ describe("parseBackup", () => {
     return { version: 1, PW_status: pwStatus, sig: slot, dec: { date: slot.date }, aut: { date: slot.date }, ...fields };
   };
 
+  test("reads the certificate of a backup without cert_b64 as UTF-8", () => {
+    const parsed = parseBackup(minimal({}, { cert: "cert-é" }));
+    expect(parsed.sig.cert.equals(Buffer.from("cert-é", "utf-8"))).toBe(true);
+  });
+
   test("accepts fields at their maximum size", () => {
     const parsed = parseBackup(
       minimal({ name: "n".repeat(39), private_01: Buffer.alloc(512).toString("base64") }, { cert: "c".repeat(1510) })
@@ -143,6 +155,7 @@ describe("parseBackup", () => {
     ["name", minimal({ name: "n".repeat(40) })],
     ["private_01", minimal({ private_01: Buffer.alloc(513).toString("base64") })],
     ["sig.cert", minimal({}, { cert: "c".repeat(1511) })],
+    ["sig.cert", minimal({}, { cert_b64: Buffer.alloc(1511).toString("base64") })],
     ["sig.key", minimal({}, { key: Buffer.alloc(1513).toString("base64") })],
     ["PW_status", minimal({ PW_status: "" })],
     ["PW_status", minimal({ PW_status: Buffer.alloc(8).toString("base64") })],

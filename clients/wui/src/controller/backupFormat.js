@@ -27,7 +27,9 @@ export function buildBackup(data) {
     date: formatDate(slot.date),
     fingerprint: b64(slot.fingerprint),
     ca_fingerprint: b64(slot.ca_fingerprint),
-    cert: slot.cert,
+    // "cert" is kept for older tools, which cannot hold binary certificates
+    cert: Buffer.from(slot.cert || []).toString("utf-8"),
+    cert_b64: b64(slot.cert),
   });
 
   return {
@@ -177,7 +179,7 @@ export function parseBackup(json) {
     date: parseDate(raw.date),
     fingerprint: fromb64(raw.fingerprint),
     ca_fingerprint: fromb64(raw.ca_fingerprint),
-    cert: raw.cert || "",
+    cert: raw.cert_b64 !== undefined ? fromb64(raw.cert_b64) : Buffer.from(raw.cert || "", "utf-8"),
   });
 
   const data = {
