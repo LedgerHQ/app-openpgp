@@ -382,9 +382,11 @@ class GPGCard:
 
         data = self._read_data(DataObject.CMD_RSA_EXP)
         self.data.rsa_pub_exp = self._get_int(data, 4)
-        self.data.aut.cert = self._read_data(DataObject.DO_CERT).decode("utf-8")
-        self.data.dec.cert = self._read_data(DataObject.DO_CERT, True).decode("utf-8")
-        self.data.sig.cert = self._read_data(DataObject.DO_CERT, True).decode("utf-8")
+        for occurrence, slot in enumerate((self.data.aut, self.data.dec, self.data.sig)):
+            if self._select_cert(occurrence):
+                slot.cert = self._read_data(DataObject.DO_CERT).decode("utf-8")
+            else:
+                slot.cert = self._read_data(DataObject.DO_CERT, occurrence > 0).decode("utf-8")
 
         self.data.sig.uif = int(self._read_data(DataObject.DO_UIF_SIG)[0])
         self.data.dec.uif = int(self._read_data(DataObject.DO_UIF_DEC)[0])
@@ -546,9 +548,9 @@ class GPGCard:
         # but not written back here.
         _put(DataObject.CMD_RSA_EXP, self.data.rsa_pub_exp.to_bytes(4, "little"))
 
-        _put(DataObject.DO_CERT, self.data.aut.cert.encode("utf-8"))
-        _put(DataObject.DO_CERT, self.data.dec.cert.encode("utf-8"))
-        _put(DataObject.DO_CERT, self.data.sig.cert.encode("utf-8"))
+        for occurrence, slot in enumerate((self.data.aut, self.data.dec, self.data.sig)):
+            self._select_cert(occurrence)
+            _put(DataObject.DO_CERT, slot.cert.encode("utf-8"))
 
         _put(DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint)
         _put(DataObject.DO_FINGERPRINT_WR_SIG, self.data.sig.fingerprint)
@@ -1309,6 +1311,24 @@ class GPGCard:
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(sw, f"Failed to read Data Object {tag:04x}")
         return resp
+
+    def _select_cert(self, occurrence: int) -> bool:
+        """SELECT DATA of a cardholder certificate occurrence
+
+        Args:
+            occurrence (int): 0 for AUT, 1 for DEC, 2 for SIG
+
+        Return:
+            False when the card does not support SELECT DATA
+        """
+
+        apdu = bytes.fromhex(f"00A5{occurrence:02x}04")
+        _, sw = self._exchange(apdu, bytes.fromhex(f"60045C02{DataObject.DO_CERT:04x}"))
+        if sw == ErrorCodes.ERR_INS_NOT_SUPPORTED:
+            return False
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, f"Failed to select certificate occurrence {occurrence}")
+        return True
 
     def _put_data(self, tag: int, data: bytes) -> int:
         """Send APDU command to PUT a Data Object value
