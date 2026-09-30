@@ -13,6 +13,7 @@
 
 export const SW_SUCCESS = 0x9000;
 export const SW_CONDITIONS_NOT_SATISFIED = 0x6985;
+export const SW_INS_NOT_SUPPORTED = 0x6d00;
 export const SW1_MORE_DATA = 0x61;
 
 // Largest data chunk per command-chaining frame (matches the python tool).
@@ -133,6 +134,21 @@ export async function getData(transport, tag, bnext = false, missing = []) {
     throw new Error(`Unable to read data object ${hex} (${statusMessage(sw)})`);
   }
   return data;
+}
+
+// SELECT DATA (INS 0xA5) of occurrence `occurrence` of `tag`. Returns false
+// when the device does not support it, and throws on any other error.
+export async function selectData(transport, tag, occurrence) {
+  const header = Buffer.from([0x00, 0xa5, occurrence, 0x04]);
+  const data = Buffer.from([0x60, 0x04, 0x5c, 0x02, (tag >> 8) & 0xff, tag & 0xff]);
+  const { sw } = await exchange(transport, header, data);
+  if (sw === SW_INS_NOT_SUPPORTED) {
+    return false;
+  }
+  if (sw !== SW_SUCCESS) {
+    throw new Error(`Unable to select occurrence ${occurrence} (${statusMessage(sw)})`);
+  }
+  return true;
 }
 
 // PUT DATA (INS 0xDA). Returns the status word, like the python `_put_data`.

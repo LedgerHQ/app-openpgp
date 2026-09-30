@@ -1,4 +1,4 @@
-import { exchange, getData, putData, APDU_MAX_SIZE, CHAIN_MAX_SIZE, RESPONSE_MAX_CHUNKS } from "./apdu";
+import { exchange, getData, putData, selectData, APDU_MAX_SIZE, CHAIN_MAX_SIZE, RESPONSE_MAX_CHUNKS } from "./apdu";
 
 // Minimal fake transport: records every frame sent and replays canned
 // responses (each a Buffer of data + 2-byte SW) in order.
@@ -119,5 +119,23 @@ describe("getData", () => {
     const t = new MockTransport([Buffer.from([0x69, 0x85])]);
     const data = await getData(t, 0x00b6, false, [0x6985]);
     expect(data.length).toBe(0);
+  });
+});
+
+describe("selectData", () => {
+  test("sends the occurrence in P1 and the tag in a 5C template", async () => {
+    const t = new MockTransport([Buffer.from([0x90, 0x00])]);
+    expect(await selectData(t, 0x7f21, 2)).toBe(true);
+    expect(t.sent[0].toString("hex")).toBe("00a502040660045c027f21");
+  });
+
+  test("returns false when the device does not support it", async () => {
+    const t = new MockTransport([Buffer.from([0x6d, 0x00])]);
+    expect(await selectData(t, 0x7f21, 1)).toBe(false);
+  });
+
+  test("throws on any other error", async () => {
+    const t = new MockTransport([Buffer.from([0x6a, 0x80])]);
+    await expect(selectData(t, 0x7f21, 1)).rejects.toThrow("Unable to select occurrence 1");
   });
 });

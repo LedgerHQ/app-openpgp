@@ -222,3 +222,64 @@ def test_cardholder_certificate_size(backend: BackendInterface) -> None:
     rapdu = client.get_long_response(rapdu)
     assert rapdu.status == Errors.SW_OK
     assert rapdu.data == cert
+
+
+def _select_certificate(backend: BackendInterface, occurrence: int) -> None:
+    # SELECT DATA of the cardholder certificate, occurrence in P1
+    ins_select_data, skip_template = 0xA5, 0x04
+    tag = DataObject.DO_CARDHOLDER_CERT
+    data = struct.pack(">BBBBH", 0x60, 0x04, 0x5C, 0x02, tag)
+    header = _header(ClaType.CLA_APP, ins_select_data, occurrence, skip_template, len(data))
+    assert backend.exchange_raw(header + data).status == Errors.SW_OK
+
+
+def _get_certificate(backend: BackendInterface, get_next: bool = False) -> bytes:
+    ins = 0xCC if get_next else InsType.INS_GET_DATA
+    tag = DataObject.DO_CARDHOLDER_CERT
+    return backend.exchange_raw(_header(ClaType.CLA_APP, ins, tag >> 8, tag & 0xFF, 0)).data
+
+
+# In this test we write and read the cardholder certificate of each key
+def test_cardholder_certificate_occurrences(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    # Occurrences in the order of the OpenPGP card specification
+    certs = {"AUT": b"\x30\x82\xff\xfeAUT", "DEC": b"\x30\x82\xff\xfdDEC", "SIG": b"\x30\x82\xff\xfcSIG"}
+
+    for occurrence, cert in enumerate(certs.values()):
+        _select_certificate(backend, occurrence)
+        rapdu = client.put_data(DataObject.DO_CARDHOLDER_CERT, cert)
+        assert rapdu.status == Errors.SW_OK
+
+    for occurrence, cert in enumerate(certs.values()):
+        _select_certificate(backend, occurrence)
+        assert _get_certificate(backend) == cert
+
+    _select_certificate(backend, 0)
+    assert _get_certificate(backend) == certs["AUT"]
+    assert _get_certificate(backend, get_next=True) == certs["DEC"]
+    assert _get_certificate(backend, get_next=True) == certs["SIG"]
+    with pytest.raises(ExceptionRAPDU):
+        _get_certificate(backend, get_next=True)
+
+
+# In this test we send malformed SELECT DATA commands
+def test_select_data_malformed(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    ins_select_data, skip_template = 0xA5, 0x04
+    tag = DataObject.DO_CARDHOLDER_CERT
+    for data in (
+        b"",
+        b"\x60",
+        struct.pack(">BBB", 0x60, 0x04, 0x5C),
+        struct.pack(">BBBBH", 0x60, 0x05, 0x5C, 0x02, tag),
+        struct.pack(">BBBBH", 0x61, 0x04, 0x5C, 0x02, tag),
+        struct.pack(">BBBBHB", 0x60, 0x05, 0x5C, 0x03, tag, 0),
+    ):
+        header = struct.pack(">BBBB", ClaType.CLA_APP, ins_select_data, 0, skip_template)
+        apdu = header + struct.pack(">B", len(data)) + data if data else header
+        with pytest.raises(ExceptionRAPDU) as err:
+            backend.exchange_raw(apdu)
+        assert err.value.status == Errors.SW_WRONG_DATA
+        # The application is still running
+        assert client.get_data(DataObject.DO_AID).status == Errors.SW_OK

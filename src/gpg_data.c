@@ -413,9 +413,11 @@ int gpg_apdu_get_next_data(unsigned int ref) {
     if ((ref != 0x7F21) || (G_gpg_vstate.DO_current != 0x7F21)) {
         return SWO_CONDITIONS_NOT_SATISFIED;
     }
+    // read the occurrence following the current one, and stay on it only if it exists
+    G_gpg_vstate.DO_reccord++;
     sw = gpg_apdu_get_data(ref);
-    if (sw == SWO_SUCCESS) {
-        G_gpg_vstate.DO_reccord++;
+    if (sw != SWO_SUCCESS) {
+        G_gpg_vstate.DO_reccord--;
     }
     return sw;
 }
@@ -817,12 +819,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                     ptr_v = G_gpg_vstate.kslot->aut.CA.value;
                     break;
                 case 1:
-                    ptr_l = &G_gpg_vstate.kslot->sig.CA.length;
-                    ptr_v = G_gpg_vstate.kslot->sig.CA.value;
-                    break;
-                case 2:
                     ptr_l = &G_gpg_vstate.kslot->dec.CA.length;
                     ptr_v = G_gpg_vstate.kslot->dec.CA.value;
+                    break;
+                case 2:
+                    ptr_l = &G_gpg_vstate.kslot->sig.CA.length;
+                    ptr_v = G_gpg_vstate.kslot->sig.CA.value;
                     break;
                 default:
                     break;

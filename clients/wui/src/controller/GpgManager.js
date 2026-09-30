@@ -3,6 +3,7 @@ import {
   exchange,
   getData,
   putData,
+  selectData,
   statusMessage,
   SW_CONDITIONS_NOT_SATISFIED,
   SW_SUCCESS,
@@ -240,9 +241,11 @@ class GpgManager {
     }
 
     data.rsaPubExp = getInt(checkLength("RSA exponent", await getData(t, DO.RSA_EXP), 4), 4);
-    data.aut.cert = (await getData(t, DO.CERT)).toString("utf-8");
-    data.dec.cert = (await getData(t, DO.CERT, true)).toString("utf-8");
-    data.sig.cert = (await getData(t, DO.CERT, true)).toString("utf-8");
+    // Certificate occurrences: 0 AUT, 1 DEC, 2 SIG
+    for (const [occurrence, slot] of [data.aut, data.dec, data.sig].entries()) {
+      const selected = await selectData(t, DO.CERT, occurrence);
+      slot.cert = (await getData(t, DO.CERT, !selected && occurrence > 0)).toString("utf-8");
+    }
 
     data.sig.uif = checkLength("signature UIF", await getData(t, DO.UIF_SIG), 2)[0];
     data.dec.uif = checkLength("decryption UIF", await getData(t, DO.UIF_DEC), 2)[0];
@@ -440,11 +443,10 @@ class GpgManager {
       // reference but not written back here.
       await put(DO.RSA_EXP, u32le(data.rsaPubExp));
 
-      // Certificates share one DO with an internal pointer; written AUT, DEC,
-      // SIG to match the read order in getAll().
-      await put(DO.CERT, enc(data.aut.cert));
-      await put(DO.CERT, enc(data.dec.cert));
-      await put(DO.CERT, enc(data.sig.cert));
+      for (const [occurrence, slot] of [data.aut, data.dec, data.sig].entries()) {
+        await selectData(t, DO.CERT, occurrence);
+        await put(DO.CERT, enc(slot.cert));
+      }
 
       for (const [slot, caTag, fpTag, dateTag] of [
         [data.sig, DO.CA_FINGERPRINT_WR_SIG, DO.FINGERPRINT_WR_SIG, DO.DATES_WR_SIG],
