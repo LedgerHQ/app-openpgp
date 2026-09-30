@@ -134,6 +134,9 @@ export default function App() {
   const [isEncryptedFile, setIsEncryptedFile] = useState(false);
   const [regen, setRegen] = useState(true);
   const [slot, setSlot] = useState("1");
+  // Security settings a restore changes, awaiting the user's decision
+  const [review, setReview] = useState(null);
+  const reviewResolve = useRef(null);
 
   const restoreContent = useRef(null);
   const fileInput = useRef(null);
@@ -148,6 +151,7 @@ export default function App() {
       setAid(null);
       setSerial(null);
       // Close any open PIN dialog so the notice below is visible.
+      decideReview(false);
       setPinAction(null);
       setUserPin("");
       setAdminPin("");
@@ -167,6 +171,20 @@ export default function App() {
       gpg.onDisconnect = null;
     };
   }, []);
+
+  function confirmChanges(changes) {
+    return new Promise((resolve) => {
+      reviewResolve.current = resolve;
+      setReview(changes);
+    });
+  }
+
+  function decideReview(accepted) {
+    const resolve = reviewResolve.current;
+    reviewResolve.current = null;
+    setReview(null);
+    if (resolve) resolve(accepted);
+  }
 
   function closePin() {
     setPinAction(null);
@@ -254,9 +272,13 @@ export default function App() {
         const content = isEncryptedFile
           ? await decryptBackup(restoreContent.current, filePassphrase)
           : new TextDecoder().decode(restoreContent.current);
-        const f = await gpg.restore(userPin, adminPin, content, regen, parseInt(slot, 10) - 1);
+        const f = await gpg.restore(userPin, adminPin, content, regen, parseInt(slot, 10) - 1, confirmChanges);
         closePin();
         restoreContent.current = null;
+        if (f === null) {
+          setNotice({ appearance: "info", title: "Restore cancelled", description: "The card was not modified." });
+          return;
+        }
         setFailures(f);
         setRestartHint(true);
         setNotice(
@@ -466,7 +488,27 @@ export default function App() {
               onClose={busy ? undefined : closePin}
             />
             <DialogBody>
-              {busy && (
+              {review && (
+                <div className="flex flex-col gap-12">
+                  <p className="body-2 text-base">
+                    This backup changes the following security settings of the card.
+                  </p>
+                  {review.map((c) => (
+                    <div key={c.setting} className="flex items-start gap-8">
+                      {c.weaker ? (
+                        <Warning size={20} className="text-warning shrink-0" />
+                      ) : (
+                        <span className="body-3 text-muted shrink-0">•</span>
+                      )}
+                      <span className={`body-3 ${c.weaker ? "text-warning" : "text-muted"}`}>
+                        <span className="body-3-semi-bold">{c.setting}</span>: {c.from} → {c.to}
+                        {c.weaker ? " (less protective)" : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {busy && !review && (
                 <div className="flex flex-col items-center gap-12 py-24 text-center">
                   <Spinner />
                   <p className="body-2 text-muted">
@@ -553,18 +595,31 @@ export default function App() {
               </form>
             </DialogBody>
             <DialogFooter>
-              <Button appearance="gray" disabled={busy} onClick={closePin}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                form="pin-form"
-                appearance={cfg?.appearance}
-                loading={busy}
-                disabled={!canSubmit}
-              >
-                {cfg?.submit}
-              </Button>
+              {review ? (
+                <>
+                  <Button appearance="gray" onClick={() => decideReview(false)}>
+                    Cancel
+                  </Button>
+                  <Button appearance="accent" onClick={() => decideReview(true)}>
+                    Apply these settings
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button appearance="gray" disabled={busy} onClick={closePin}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="pin-form"
+                    appearance={cfg?.appearance}
+                    loading={busy}
+                    disabled={!canSubmit}
+                  >
+                    {cfg?.submit}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

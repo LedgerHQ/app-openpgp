@@ -159,6 +159,16 @@ function checkFieldSize(name, value, max) {
   }
 }
 
+// User Interaction Flag values, from the least to the most protective.
+const UIF_LABEL = ["Disabled", "Enabled", "Permanently enabled"];
+
+function parseUif(value, slot) {
+  if (!Number.isInteger(value) || value < 0 || value >= UIF_LABEL.length) {
+    throw new Error(`Backup field "${slot}.uif" is invalid`);
+  }
+  return value;
+}
+
 // Decode a version-1 backup file into the structure consumed by
 // GpgManager.restore(). Inverse of buildBackup(). Throws on a malformed or
 // unsupported file.
@@ -172,9 +182,9 @@ export function parseBackup(json) {
   }
 
   const fromb64 = (s) => Buffer.from(s || "", "base64");
-  const keySlot = (raw) => ({
+  const keySlot = (raw, name) => ({
     key: fromb64(raw.key),
-    uif: parseInt(raw.uif, 10) || 0,
+    uif: parseUif(raw.uif, name),
     attribute: fromb64(raw.attribute),
     date: parseDate(raw.date),
     fingerprint: fromb64(raw.fingerprint),
@@ -196,9 +206,9 @@ export function parseBackup(json) {
     salutation: p.salutation || "",
     url: p.url || "",
     lang: p.lang || "",
-    sig: keySlot(p.sig),
-    dec: keySlot(p.dec),
-    aut: keySlot(p.aut),
+    sig: keySlot(p.sig, "sig"),
+    dec: keySlot(p.dec, "dec"),
+    aut: keySlot(p.aut, "aut"),
   };
 
   if (data.PWStatus.length !== PW_STATUS_SIZE) {
@@ -217,4 +227,61 @@ export function parseBackup(json) {
     checkFieldSize(`${slot}.ca_fingerprint`, data[slot].ca_fingerprint, FIELD_MAX_SIZE.fingerprint);
   }
   return data;
+}
+
+// ── Security settings review ─────────────────────────────────────────────────
+
+const ALGO_NAME = { 0x12: "ECDH", 0x13: "ECDSA", 0x16: "EdDSA" };
+
+const CURVE_NAME = {
+  "2a8648ce3d030107": "NIST P-256",
+  "2b81040022": "NIST P-384",
+  "2b81040023": "NIST P-521",
+  "2b8104000a": "secp256k1",
+  "2b2403030208010107": "brainpoolP256r1",
+  "2b240303020801010b": "brainpoolP384r1",
+  "2b240303020801010d": "brainpoolP512r1",
+  "2b06010401da470f01": "Ed25519",
+  "2b060104019755010501": "Cv25519",
+};
+
+// Human readable key algorithm attributes (DO C1/C2/C3).
+export function describeAttribute(attribute) {
+  const attr = Buffer.from(attribute || []);
+  if (attr.length === 0) return "None";
+  if (attr[0] === 0x01 && attr.length >= 3) return `RSA ${attr.readUInt16BE(1)}`;
+  // ECC: algorithm id, curve OID, then an optional 0xFF import format
+  const oid = attr.slice(1, attr[attr.length - 1] === 0xff ? -1 : undefined).toString("hex");
+  const algo = ALGO_NAME[attr[0]];
+  if (algo && CURVE_NAME[oid]) return `${algo} ${CURVE_NAME[oid]}`;
+  return `Unknown (${attr.toString("hex")})`;
+}
+
+function describePw1Mode(pwStatus) {
+  return pwStatus[0] === 0x00 ? "Required for each signature" : "Valid for several signatures";
+}
+
+const SLOT_LABEL = { sig: "Signature", dec: "Decryption", aut: "Authentication" };
+
+// Security settings of `current` (read from the card) that restoring `backup`
+// changes, each flagged when the new value is less protective.
+export function securityChanges(current, backup) {
+  const changes = [];
+  const add = (setting, from, to, weaker) => {
+    if (from !== to) changes.push({ setting, from, to, weaker });
+  };
+  add(
+    "Signature PIN",
+    describePw1Mode(current.PWStatus),
+    describePw1Mode(backup.PWStatus),
+    current.PWStatus[0] === 0x00 && backup.PWStatus[0] !== 0x00
+  );
+  for (const slot of ["sig", "dec", "aut"]) {
+    const from = current[slot].uif;
+    const to = backup[slot].uif;
+    add(`${SLOT_LABEL[slot]} key confirmation`, UIF_LABEL[from] ?? `Unknown (${from})`, UIF_LABEL[to], to < from);
+    const fromAttr = describeAttribute(current[slot].attribute);
+    add(`${SLOT_LABEL[slot]} key algorithm`, fromAttr, describeAttribute(backup[slot].attribute), false);
+  }
+  return changes;
 }

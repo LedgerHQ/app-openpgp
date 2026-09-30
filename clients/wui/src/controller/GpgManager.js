@@ -10,7 +10,7 @@ import {
 } from "./apdu.js";
 import { checkLength, decodeTLV, getInt } from "./tlv.js";
 import { DO, USER_SALUTATION, doName } from "./dataObjects.js";
-import { buildBackup, parseBackup } from "./backupFormat.js";
+import { buildBackup, parseBackup, securityChanges } from "./backupFormat.js";
 
 // OpenPGP application identifier: RID D2:76:00:01:24 + application 01.
 // (matches `00A4040006D27600012401` used by the python backup tool)
@@ -304,6 +304,25 @@ class GpgManager {
     }
   }
 
+  // Read the security settings a restore can change: PW status, and the UIF
+  // and algorithm attributes of each key.
+  async readSecuritySettings(t = this.transport) {
+    const tags = decodeTLV(await getData(t, DO.APP_DATA));
+    const d = decodeTLV(tags[DO.DISCRET_DATA] || Buffer.alloc(0));
+    const settings = { PWStatus: checkLength("PW status", d[DO.PW_STATUS], 7) };
+    for (const [slot, attrTag, uifTag] of [
+      ["sig", DO.SIG_ATTR, DO.UIF_SIG],
+      ["dec", DO.DEC_ATTR, DO.UIF_DEC],
+      ["aut", DO.AUT_ATTR, DO.UIF_AUT],
+    ]) {
+      settings[slot] = {
+        attribute: d[attrTag] || Buffer.alloc(0),
+        uif: checkLength(`${slot} UIF`, await getData(t, uifTag), 2)[0],
+      };
+    }
+    return settings;
+  }
+
   // Verify PINs, select the slot, and read the full card state into a backup.
   async backup(userPin, adminPin, slot = 0) {
     const t = this._lock();
@@ -379,14 +398,21 @@ class GpgManager {
   // Individual PUT DATA failures are collected (not thrown) so a partial
   // restore still completes. The private keys are NOT written from the backup
   // blob (the firmware rejects that on a wiped card); pass regenerateKeys to
-  // rebuild them from the device seed instead. Returns the list of failures.
-  async restore(userPin, adminPin, json, regenerateKeys = false, slot = 0) {
+  // rebuild them from the device seed instead. Before any write, the security
+  // settings the backup changes are passed to `confirm`, which resolves to true
+  // to proceed. Returns the list of failures, or null when not confirmed.
+  async restore(userPin, adminPin, json, regenerateKeys = false, slot = 0, confirm = async () => true) {
     const t = this._lock();
     try {
       const data = parseBackup(json);
 
       await this.verifyPins(userPin, adminPin, t);
       await this.selectSlot(slot, t);
+
+      const changes = securityChanges(await this.readSecuritySettings(t), data);
+      if (changes.length > 0 && !(await confirm(changes))) {
+        return null;
+      }
 
       const failures = [];
       const put = async (tag, value) => {

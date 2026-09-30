@@ -87,3 +87,49 @@ describe("logout", () => {
     expect(sent.slice(-3)).toEqual(["0020ff8100", "0020ff8200", "0020ff8300"]);
   });
 });
+
+describe("restore", () => {
+  const pwStatus = (pw1) => Buffer.from([pw1, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]);
+  const backup = (pw1, uif) => {
+    const slot = { date: "1970-01-01 00:00:00", uif };
+    return JSON.stringify({ version: 1, PW_status: pwStatus(pw1).toString("base64"), sig: slot, dec: slot, aut: slot });
+  };
+
+  // Card with PW1 valid for one signature and UIF enabled on every key
+  const card = (sent) =>
+    new FakeTransport(async (apdu) => {
+      sent.push(apdu);
+      if (apdu[1] === 0xca && apdu[3] === 0x6e) {
+        const discretionary = Buffer.concat([Buffer.from([0xc4, 0x07]), pwStatus(0)]);
+        return Buffer.concat([Buffer.from([0x73, discretionary.length]), discretionary, OK]);
+      }
+      if (apdu[1] === 0xca && apdu[3] >= 0xd6 && apdu[3] <= 0xd8) return Buffer.from([0x01, 0x20, 0x90, 0x00]);
+      return OK;
+    });
+
+  test("writes nothing when the security changes are not confirmed", async () => {
+    const sent = [];
+    transports.push(card(sent));
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    const confirm = vi.fn(async () => false);
+    expect(await gpg.restore("123456", "12345678", backup(1, 0), false, 0, confirm)).toBe(null);
+    const [changes] = confirm.mock.calls[0];
+    expect(changes.filter((c) => c.weaker).length).toBe(4);
+    const writes = sent.filter((apdu) => apdu[1] === 0xda && apdu[3] !== 0xf2);
+    expect(writes).toEqual([]);
+    expect(gpg.busy).toBe(false);
+  });
+
+  test("does not ask for a confirmation when no security setting changes", async () => {
+    const sent = [];
+    transports.push(card(sent));
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    const confirm = vi.fn(async () => false);
+    expect(await gpg.restore("123456", "12345678", backup(0, 1), false, 0, confirm)).not.toBe(null);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+});
