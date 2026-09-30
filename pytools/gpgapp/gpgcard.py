@@ -109,7 +109,7 @@ class KeyInfo:
     attribute: bytes = b""
     fingerprint: bytes = b""
     ca_fingerprint: bytes = b""
-    cert: str = ""
+    cert: bytes = b""
     date: datetime = datetime.min
     uif: int = 0
     key: bytes = b""
@@ -120,7 +120,7 @@ class KeyInfo:
         self.attribute = b""
         self.fingerprint = b""
         self.ca_fingerprint = b""
-        self.cert = ""
+        self.cert = b""
         self.date = datetime.min
         self.uif = 0
         self.key = b""
@@ -384,9 +384,9 @@ class GPGCard:
         self.data.rsa_pub_exp = self._get_int(data, 4)
         for occurrence, slot in enumerate((self.data.aut, self.data.dec, self.data.sig)):
             if self._select_cert(occurrence):
-                slot.cert = self._read_data(DataObject.DO_CERT).decode("utf-8")
+                slot.cert = self._read_data(DataObject.DO_CERT)
             else:
-                slot.cert = self._read_data(DataObject.DO_CERT, occurrence > 0).decode("utf-8")
+                slot.cert = self._read_data(DataObject.DO_CERT, occurrence > 0)
 
         self.data.sig.uif = int(self._read_data(DataObject.DO_UIF_SIG)[0])
         self.data.dec.uif = int(self._read_data(DataObject.DO_UIF_DEC)[0])
@@ -427,7 +427,9 @@ class GPGCard:
                 "date": str(slot.date),
                 "fingerprint": _b64(slot.fingerprint),
                 "ca_fingerprint": _b64(slot.ca_fingerprint),
-                "cert": slot.cert,
+                # "cert" is kept for older tools, which cannot hold binary certificates
+                "cert": slot.cert.decode("utf-8", errors="replace"),
+                "cert_b64": _b64(slot.cert),
             }
 
         self.get_all()
@@ -504,7 +506,7 @@ class GPGCard:
             slot.date = datetime.strptime(raw["date"], "%Y-%m-%d %H:%M:%S")
             slot.fingerprint = _fromb64(raw["fingerprint"])
             slot.ca_fingerprint = _fromb64(raw["ca_fingerprint"])
-            slot.cert = raw["cert"]
+            slot.cert = _fromb64(raw["cert_b64"]) if "cert_b64" in raw else raw["cert"].encode("utf-8")
 
         failures: list[tuple[str, int]] = []
 
@@ -550,7 +552,7 @@ class GPGCard:
 
         for occurrence, slot in enumerate((self.data.aut, self.data.dec, self.data.sig)):
             self._select_cert(occurrence)
-            _put(DataObject.DO_CERT, slot.cert.encode("utf-8"))
+            _put(DataObject.DO_CERT, slot.cert)
 
         _put(DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint)
         _put(DataObject.DO_FINGERPRINT_WR_SIG, self.data.sig.fingerprint)
@@ -1023,10 +1025,11 @@ class GPGCard:
             key (str): Key type (SIG, DC, AUT)
 
         Return:
-            Key Certificate
+            Key Certificate, hex encoded
         """
 
-        return self._get_key_object(key).cert
+        cert = self._get_key_object(key).cert
+        return binascii.hexlify(cert).decode("ascii") if cert else "N/A"
 
     def set_template(self, key: str, template: str) -> None:
         """Set key Template
