@@ -10,6 +10,7 @@ vi.mock("@ledgerhq/hw-transport-webhid", () => ({
 }));
 
 const { default: GpgManager } = await import("./GpgManager");
+const { formatDate } = await import("./backupFormat");
 
 const OK = Buffer.from([0x90, 0x00]);
 const AID = Buffer.concat([Buffer.from("D2760001240103040000000100000000", "hex"), OK]);
@@ -131,5 +132,69 @@ describe("restore", () => {
     const confirm = vi.fn(async () => false);
     expect(await gpg.restore("123456", "12345678", backup(0, 1), false, 0, confirm)).not.toBe(null);
     expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+describe("restore fingerprints", () => {
+  const P256_ATTR = Buffer.from("132a8648ce3d030107", "hex");
+  const P256_POINT = Buffer.from(
+    "04213d060d85290672936c17346f84cd6fa784e9c40fa974acf2016942e9804baa33ac0f771af9cffd6281d7affcd9fa" +
+      "da327d11258d4ac5e719ffb641e7bedc42",
+    "hex"
+  );
+  const P256_DATE = 1790753455;
+  const P256_FINGERPRINT = "7a8b60a8bdf28b89f44d7ff7299b67877042b3c7";
+
+  const backup = () => {
+    const empty = { date: "1970-01-01 00:00:00", uif: 0 };
+    const sig = {
+      date: formatDate(P256_DATE),
+      uif: 0,
+      attribute: P256_ATTR.toString("base64"),
+      fingerprint: Buffer.from(P256_FINGERPRINT, "hex").toString("base64"),
+    };
+    const pwStatus = Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]).toString("base64");
+    return JSON.stringify({ version: 1, PW_status: pwStatus, sig, dec: empty, aut: empty });
+  };
+
+  // Card whose signature key public point is `point`, or absent when null
+  const card = (point) =>
+    new FakeTransport(async (apdu) => {
+      if (apdu[1] === 0xca && apdu[3] === 0x6e) {
+        const pw = Buffer.from([0xc4, 0x07, 0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]);
+        return Buffer.concat([Buffer.from([0x73, pw.length]), pw, OK]);
+      }
+      if (apdu[1] === 0xca && apdu[3] >= 0xd6 && apdu[3] <= 0xd8) return Buffer.from([0x00, 0x20, 0x90, 0x00]);
+      if (apdu[1] === 0x47 && apdu[2] === 0x81) {
+        if (point === null) return Buffer.from([0x69, 0x85]);
+        const inner = Buffer.concat([Buffer.from([0x86, point.length]), point]);
+        return Buffer.concat([Buffer.from([0x7f, 0x49, inner.length]), inner, OK]);
+      }
+      return OK;
+    });
+
+  const restore = async (point) => {
+    transports.push(card(point));
+    const gpg = new GpgManager();
+    await gpg.connect();
+    return gpg.restore("123456", "12345678", backup(), false, 0, async () => true);
+  };
+
+  test("accepts a key matching the backup fingerprint", async () => {
+    expect(await restore(P256_POINT)).toEqual([]);
+  });
+
+  test("reports a key not matching the backup fingerprint", async () => {
+    const other = Buffer.from(P256_POINT);
+    other[10] ^= 0x01;
+    const failures = await restore(other);
+    expect(failures.map((f) => f.name)).toEqual(["Signature key (fingerprint)"]);
+    expect(failures[0].message).toMatch("does not match the backup");
+  });
+
+  test("reports a missing key", async () => {
+    const failures = await restore(null);
+    expect(failures.map((f) => f.name)).toEqual(["Signature key (fingerprint)"]);
+    expect(failures[0].message).toMatch("no key on the card");
   });
 });

@@ -11,6 +11,7 @@ import {
 import { checkLength, decodeTLV, getInt } from "./tlv.js";
 import { DO, USER_SALUTATION, doName } from "./dataObjects.js";
 import { buildBackup, parseBackup, securityChanges } from "./backupFormat.js";
+import { keyFingerprint } from "./pubkeyPacket.js";
 
 // OpenPGP application identifier: RID D2:76:00:01:24 + application 01.
 // (matches `00A4040006D27600012401` used by the python backup tool)
@@ -364,6 +365,38 @@ class GpgManager {
     return failures;
   }
 
+  // Check that each key held by the card has the fingerprint the backup gives
+  // it, computed from its public key, attributes and creation date.
+  async checkFingerprints(data, t = this.transport) {
+    const READ_PUBLIC_KEY = 0x81;
+    const header = Buffer.from([0x00, 0x47, READ_PUBLIC_KEY, 0x00]);
+    const failures = [];
+    for (const [name, slot, tag] of [
+      ["Signature key", data.sig, DO.SIG_KEY],
+      ["Decryption key", data.dec, DO.DEC_KEY],
+      ["Authentication key", data.aut, DO.AUT_KEY],
+    ]) {
+      if (slot.fingerprint.every((b) => b === 0)) continue;
+      const { data: resp, sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
+      let message = null;
+      if (sw !== SW_SUCCESS) {
+        message = `no key on the card (${statusMessage(sw)})`;
+      } else {
+        const pubkey = decodeTLV(decodeTLV(resp)[DO.PUB_KEY] || Buffer.alloc(0));
+        const fp = await keyFingerprint(slot.attribute, pubkey, slot.date);
+        if (fp === null) {
+          message = "fingerprint cannot be computed for this key algorithm";
+        } else if (!fp.equals(slot.fingerprint)) {
+          message = "the key on the card does not match the backup (other recovery phrase or modified backup)";
+        }
+      }
+      if (message) {
+        failures.push({ tag, name: `${name} (fingerprint)`, sw, message });
+      }
+    }
+    return failures;
+  }
+
   // Factory-reset the app: TERMINATE DF then ACTIVATE FILE, which wipes every
   // key and data object and resets the PINs to their defaults (123456 /
   // 12345678). Requires the admin PIN (PW3). DESTRUCTIVE.
@@ -490,6 +523,7 @@ class GpgManager {
       if (regenerateKeys) {
         failures.push(...(await this.seedKeys(t)));
       }
+      failures.push(...(await this.checkFingerprints(data, t)));
 
       return failures;
     } finally {
