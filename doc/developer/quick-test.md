@@ -375,3 +375,15 @@ gpg: Signature made jeu. 18 janv. 2024 09:59:33 CET
 gpg:                using RSA key FD2D7E0C99825F8515EDB544156DEEF5959D4DC6
 gpg: Good signature from "testkey" [ultimate]
 ```
+
+### Verify Password
+
+You can sent APDU directly to the card to verify the password.
+
+- With pinpad
+  - PW1: `EF20008100`
+  - PW3: `EF20008300`
+- With the value entered directly
+  - PW1: `0020008106313233343536`
+  - PW2: `0020008206313233343536`
+  - PW3: `00200083083132333435363738`

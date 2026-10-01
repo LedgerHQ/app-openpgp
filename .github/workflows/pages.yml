@@ -1,13 +1,19 @@
 name: Generate GitHub Pages
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - develop
     paths:
       - 'doc/**'
       - 'clients/wui/**'
-  workflow_dispatch:
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'doc/**'
+      - 'clients/wui/**'
+      - '.github/workflows/pages.yml'
 
 concurrency:
   group: pages
@@ -19,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pages: read
 
     steps:
       - name: Checkout
@@ -68,6 +75,7 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

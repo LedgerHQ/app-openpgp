@@ -24,11 +24,13 @@
 
 void gpg_activate_pinpad(uint8_t enabled);
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len);
+bool gpg_key_curve_matches_attributes(const gpg_key_t *key, unsigned int curve);
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len);
 unsigned int gpg_curve2domainlen(unsigned int cv);
 
 void gpg_init(void);
 void gpg_install(unsigned char app_state);
+void gpg_init_session(void);
 
 /* ----------------------------------------------------------------------- */
 /* ---                            DISPATCH                            ---- */
@@ -57,6 +59,13 @@ int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned int idx,
                             unsigned char *Ski,
                             unsigned int Ski_len);
+int gpg_pso_derive_key_seed_full(unsigned char *Sn,
+                                 unsigned char *key_name,
+                                 unsigned int idx,
+                                 unsigned char *Ski,
+                                 unsigned int Ski_len);
+bool gpg_rsa_exponent_is_valid(const unsigned char *e);
+void gpg_key_erase(gpg_key_t *key);
 int gpg_apdu_pso(void);
 int gpg_apdu_internal_authenticate(void);
 
@@ -128,6 +137,6 @@ void gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
 void gpg_io_fetch_nv(unsigned char *buffer, int len);
 int gpg_io_fetch(unsigned char *buffer, int len);
 
-void gpg_io_do(unsigned int io_flags);
+unsigned int gpg_io_do(unsigned int io_flags);
 
 #endif

@@ -145,6 +145,10 @@ int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     newpin.counter = 3;
 
     nvm_write(pin, &newpin, sizeof(gpg_pin_t));
+    if (pin->ref == PIN_ID_PW1) {
+        // PW2 shares the PW1 value: its session was opened with the previous value
+        gpg_pin_set_verified(PIN_ID_PW2, 0);
+    }
 end:
     explicit_bzero(&newpin, sizeof(newpin));
     if (error != CX_OK) {
@@ -236,7 +240,7 @@ int gpg_apdu_verify() {
             case PIN_MODE_TRUST:
                 gpg_pin_set_verified(G_gpg_vstate.io_p2, 1);
                 gpg_io_discard(1);
-                sw = 0;
+                sw = SWO_SUCCESS;
                 break;
             default:
                 sw = SWO_INCORRECT_DATA;
@@ -367,6 +371,11 @@ int gpg_apdu_reset_retry_counter() {
     sw = gpg_pin_set(pin_pw1,
                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + rc_len,
                      pw1_len);
+    if (sw == SWO_SUCCESS) {
+        // sessions opened with the previous PW1 are revoked
+        gpg_pin_set_verified(PIN_ID_PW1, 0);
+        gpg_pin_set_verified(PIN_ID_PW2, 0);
+    }
     gpg_io_discard(1);
     return sw;
 }

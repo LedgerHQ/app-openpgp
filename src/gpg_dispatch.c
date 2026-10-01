@@ -37,7 +37,9 @@ static int gpg_check_access_ins() {
             break;
 
         case INS_RESET_RETRY_COUNTER:
-            if (gpg_pin_is_verified(PIN_ID_PW3) || gpg_pin_is_verified(PIN_ID_RC)) {
+            // with the Resetting Code, the command checks it from its own data
+            if ((G_gpg_vstate.io_p1 == RESET_RETRY_WITH_CODE) || gpg_pin_is_verified(PIN_ID_PW3) ||
+                gpg_pin_is_verified(PIN_ID_RC)) {
                 sw = SWO_SUCCESS;
             }
             break;
@@ -82,6 +84,7 @@ static int gpg_check_access_ins() {
         case INS_GET_LOG:
 #endif
         case INS_SELECT:
+        case INS_SELECT_DATA:
         case INS_GET_DATA:
         case INS_GET_NEXT_DATA:
         case INS_VERIFY:
@@ -258,15 +261,14 @@ static int gpg_check_access_write_DO() {
  *
  */
 int gpg_dispatch() {
-    unsigned int tag, t, l;
+    unsigned int tag, l;
     int sw = SWO_UNKNOWN;
 
     if (G_gpg_vstate.ui_pending) {
         return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
-    if ((G_gpg_vstate.io_cla != CLA_APP_DEF) && (G_gpg_vstate.io_cla != CLA_APP_CHAIN) &&
-        (G_gpg_vstate.io_cla != CLA_APP_APDU_PIN)) {
+    if ((G_gpg_vstate.io_cla != CLA_APP_DEF) && (G_gpg_vstate.io_cla != CLA_APP_APDU_PIN)) {
         return SWO_INVALID_CLA;
     }
 
@@ -287,6 +289,7 @@ int gpg_dispatch() {
             gpg_io_discard(0);
             if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] == STATE_TERMINATE) {
                 gpg_install(STATE_ACTIVATE);
+                gpg_init_session();
             }
             return SWO_SUCCESS;
 
@@ -296,6 +299,7 @@ int gpg_dispatch() {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
             gpg_install(STATE_TERMINATE);
+            gpg_init_session();
             return SWO_SUCCESS;
     }
 
@@ -328,24 +332,17 @@ int gpg_dispatch() {
                 sw = SWO_WRONG_P1_P2;
                 break;
             }
-            gpg_io_fetch_tl(&t, &l);
-            if (t != 0x60) {
+            // 60 <len> 5C <len> <tag on 1 or 2 bytes>
+            l = G_gpg_vstate.io_length;
+            if ((l < 5) || (l > 6) || (G_gpg_vstate.work.io_buffer[0] != 0x60) ||
+                (G_gpg_vstate.work.io_buffer[1] != l - 2) ||
+                (G_gpg_vstate.work.io_buffer[2] != 0x5C) ||
+                (G_gpg_vstate.work.io_buffer[3] != l - 4)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
-            gpg_io_fetch_tl(&t, &l);
-            if (t != 0x5C) {
-                sw = SWO_INCORRECT_DATA;
-                break;
-            }
-            if (l == 1) {
-                tag = gpg_io_fetch_u8();
-            } else if (l == 2) {
-                tag = gpg_io_fetch_u16();
-            } else {
-                sw = SWO_INCORRECT_DATA;
-                break;
-            }
+            tag = (l == 5) ? G_gpg_vstate.work.io_buffer[4] : U2BE(G_gpg_vstate.work.io_buffer, 4);
+            gpg_io_discard(1);
             gpg_apdu_select_data(tag, G_gpg_vstate.io_p1);
             sw = SWO_SUCCESS;
             break;

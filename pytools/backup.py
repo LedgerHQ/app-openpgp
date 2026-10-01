@@ -63,6 +63,12 @@ def get_argparser() -> Namespace:
         help="After Restore, regenerate all keys, based on seed mode",
     )
 
+    parser.add_argument(
+        "--file-passphrase",
+        metavar="PASS",
+        help="Passphrase to encrypt (backup) or decrypt (restore) the backup file",
+    )
+
     return parser.parse_args()
 
 
@@ -93,9 +99,9 @@ def entrypoint() -> None:
 
     # Processing
     # ----------
+    gpgcard: GPGCard = GPGCard()
     try:
         print(f"Connect to card '{args.reader}'...")
-        gpgcard: GPGCard = GPGCard()
         gpgcard.log_apdu(args.apdu)
         gpgcard.connect(args.reader)
 
@@ -114,20 +120,25 @@ def entrypoint() -> None:
         gpgcard.get_all()
 
         if args.restore:
-            gpgcard.restore(args.file)
+            gpgcard.restore(args.file, args.file_passphrase, seed_key=args.seed_key)
             print(f"Configuration restored from file '{args.file}'.")
 
             if args.seed_key:
                 gpgcard.seed_key()
 
         else:
-            gpgcard.backup(args.file)
+            gpgcard.backup(args.file, args.file_passphrase)
             print(f"Configuration saved in file '{args.file}'.")
-
-        gpgcard.disconnect()
 
     except GPGCardExcpetion as err:
         print(f"\n### Error {err.code}: {err.message}!\n")
+    finally:
+        if gpgcard.transport is not None:
+            try:
+                gpgcard.logout()
+            except GPGCardExcpetion:
+                pass
+            gpgcard.disconnect()
 
 
 if __name__ == "__main__":

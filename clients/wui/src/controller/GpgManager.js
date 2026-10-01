@@ -1,8 +1,17 @@
 import TransportWebHID from "@ledgerhq/hw-transport-webhid";
-import { exchange, getData, putData, statusMessage, SW_SUCCESS } from "./apdu.js";
-import { decodeTLV, getInt } from "./tlv.js";
+import {
+  exchange,
+  getData,
+  putData,
+  selectData,
+  statusMessage,
+  SW_CONDITIONS_NOT_SATISFIED,
+  SW_SUCCESS,
+} from "./apdu.js";
+import { checkLength, decodeTLV, getInt } from "./tlv.js";
 import { DO, USER_SALUTATION, doName } from "./dataObjects.js";
-import { buildBackup, parseBackup } from "./backupFormat.js";
+import { buildBackup, parseBackup, securityChanges } from "./backupFormat.js";
+import { keyFingerprint } from "./pubkeyPacket.js";
 
 // OpenPGP application identifier: RID D2:76:00:01:24 + application 01.
 // (matches `00A4040006D27600012401` used by the python backup tool)
@@ -10,6 +19,8 @@ const OPENPGP_AID = "D27600012401";
 const SELECT_APDU = "00A4040006" + OPENPGP_AID;
 // GET DATA on tag 0x4F (full Application Identifier).
 const GET_DATA_AID = "00CA004F00";
+// Full AID length, including the manufacturer and the serial number
+const AID_LENGTH = 16;
 
 // Password references (ISO 7816 / OpenPGP).
 export const PW = Object.freeze({
@@ -23,7 +34,7 @@ function emptyKey() {
     attribute: Buffer.alloc(0),
     fingerprint: Buffer.alloc(0),
     ca_fingerprint: Buffer.alloc(0),
-    cert: "",
+    cert: Buffer.alloc(0),
     date: 0,
     uif: 0,
     key: Buffer.alloc(0),
@@ -55,6 +66,16 @@ function newCardInfo() {
   };
 }
 
+// Revoke the WebHID permission of the device, which is granted to the whole
+// origin and would otherwise stay usable by any page of that origin.
+async function forgetDevice(transport) {
+  try {
+    await transport.device?.forget?.();
+  } catch (e) {
+    // ignore: best effort, the permission may already be revoked
+  }
+}
+
 class GpgManager {
   constructor() {
     this.transport = null;
@@ -84,12 +105,15 @@ class GpgManager {
     }
     if (!this.transport) {
       // request() prompts the device picker (filtered on the Ledger vendor id).
-      this.transport = await TransportWebHID.request();
+      const transport = await TransportWebHID.request();
+      this.transport = transport;
       // The OpenPGP app can crash and drop its USB interface during heavy
       // operations (e.g. key regeneration); surface that instead of hanging.
-      this.transport.on("disconnect", () => {
+      // A running operation keeps the lock until it fails on its own transport.
+      transport.on("disconnect", () => {
+        forgetDevice(transport);
+        if (this.transport !== transport) return;
         this.connected = false;
-        this.busy = false;
         this.transport = null;
         if (!this._intentionalClose && this.onDisconnect) this.onDisconnect();
       });
@@ -107,10 +131,13 @@ class GpgManager {
       if (aid.sw !== SW_SUCCESS) {
         throw new Error(`Unable to read the AID (${statusMessage(aid.sw)})`);
       }
-      this.aid = aid.data.toString("hex").toUpperCase();
+      this.aid = checkLength("AID", aid.data, AID_LENGTH).toString("hex").toUpperCase();
+      if (!this.aid.startsWith(OPENPGP_AID)) {
+        throw new Error(`Unexpected AID from the device (${this.aid})`);
+      }
       // OpenPGP AID layout: RID[0:10] App[10:12] Version[12:16]
       // Manufacturer[16:20] Serial[20:28] RFU[28:32].
-      this.serial = this.aid.length >= 28 ? this.aid.slice(20, 28) : null;
+      this.serial = this.aid.slice(20, 28);
       this.connected = true;
     } catch (error) {
       await this.disconnect();
@@ -129,34 +156,46 @@ class GpgManager {
       } catch (e) {
         // ignore: device may already be gone
       }
+      await forgetDevice(this.transport);
     }
     this.transport = null;
   }
 
+  // Take the operation lock and return the transport the operation must use.
   _lock() {
     if (this.busy) throw new Error("Device is busy");
+    if (!this.transport) throw new Error("Device not connected");
     this.busy = true;
+    return this.transport;
   }
 
   _unlock() {
     this.busy = false;
   }
 
+  // Leave PW1, PW2 and PW3 not verified (VERIFY with P1=FF). Best effort: a
+  // failure must not hide the result of the operation.
+  async _logout(t) {
+    for (const pw of [PW.PW1, PW.PW2, PW.PW3]) {
+      try {
+        await exchange(t, Buffer.from([0x00, 0x20, 0xff, pw, 0x00]));
+      } catch (e) {
+        // ignore: the device may be gone
+      }
+    }
+  }
+
   // PIN verification (00 20 00 <pw> Lc <pin>). Returns success boolean.
-  async verifyPin(pw, value) {
+  async verifyPin(pw, value, t = this.transport) {
     const pin = Buffer.from(value || "", "utf-8");
     const header = Buffer.from([0x00, 0x20, 0x00, pw, pin.length]);
-    const { sw } = await exchange(
-      this.transport,
-      Buffer.concat([header, pin])
-    );
+    const { sw } = await exchange(t, Buffer.concat([header, pin]));
     return sw === SW_SUCCESS;
   }
 
   // Read every data object needed for a backup, ported from gpgcard.py
   // `get_all`. Returns the CardInfo structure consumed by buildBackup().
-  async getAll() {
-    const t = this.transport;
+  async getAll(t = this.transport) {
     const data = newCardInfo();
 
     data.AID = (await getData(t, DO.AID)).toString("hex").toUpperCase();
@@ -189,43 +228,47 @@ class GpgManager {
       if (d[DO.SIG_ATTR]) data.sig.attribute = d[DO.SIG_ATTR];
       if (d[DO.DEC_ATTR]) data.dec.attribute = d[DO.DEC_ATTR];
       if (d[DO.AUT_ATTR]) data.aut.attribute = d[DO.AUT_ATTR];
-      if (d[DO.PW_STATUS]) data.PWStatus = d[DO.PW_STATUS];
+      if (d[DO.PW_STATUS]) data.PWStatus = checkLength("PW status", d[DO.PW_STATUS], 7);
 
       const fp = d[DO.FINGERPRINTS];
       if (fp) {
+        checkLength("fingerprints", fp, 60);
         data.sig.fingerprint = fp.slice(0, 20);
         data.dec.fingerprint = fp.slice(20, 40);
         data.aut.fingerprint = fp.slice(40, 60);
       }
       const ca = d[DO.CA_FINGERPRINTS];
       if (ca) {
+        checkLength("CA fingerprints", ca, 60);
         data.sig.ca_fingerprint = ca.slice(0, 20);
         data.dec.ca_fingerprint = ca.slice(20, 40);
         data.aut.ca_fingerprint = ca.slice(40, 60);
       }
       const dates = d[DO.KEY_DATES];
       if (dates) {
+        checkLength("key dates", dates, 12);
         data.sig.date = getInt(dates, 4, 0);
         data.dec.date = getInt(dates, 4, 4);
         data.aut.date = getInt(dates, 4, 8);
       }
     }
 
-    data.rsaPubExp = getInt(await getData(t, DO.RSA_EXP), 4);
-    data.aut.cert = (await getData(t, DO.CERT)).toString("utf-8");
-    data.dec.cert = (await getData(t, DO.CERT, true)).toString("utf-8");
-    data.sig.cert = (await getData(t, DO.CERT, true)).toString("utf-8");
+    data.rsaPubExp = getInt(checkLength("RSA exponent", await getData(t, DO.RSA_EXP), 4), 4);
+    // Certificate occurrences: 0 AUT, 1 DEC, 2 SIG
+    for (const [occurrence, slot] of [data.aut, data.dec, data.sig].entries()) {
+      const selected = await selectData(t, DO.CERT, occurrence);
+      slot.cert = await getData(t, DO.CERT, !selected && occurrence > 0);
+    }
 
-    const uifSig = await getData(t, DO.UIF_SIG);
-    const uifDec = await getData(t, DO.UIF_DEC);
-    const uifAut = await getData(t, DO.UIF_AUT);
-    data.sig.uif = uifSig.length ? uifSig[0] : 0;
-    data.dec.uif = uifDec.length ? uifDec[0] : 0;
-    data.aut.uif = uifAut.length ? uifAut[0] : 0;
+    data.sig.uif = checkLength("signature UIF", await getData(t, DO.UIF_SIG), 2)[0];
+    data.dec.uif = checkLength("decryption UIF", await getData(t, DO.UIF_DEC), 2)[0];
+    data.aut.uif = checkLength("authentication UIF", await getData(t, DO.UIF_AUT), 2)[0];
 
     // Security support template (0x7A) -> digital signature counter (0x93)
     tags = decodeTLV(await getData(t, DO.SEC_TEMPL));
-    if (tags[DO.SIG_COUNT]) data.digitalCounter = getInt(tags[DO.SIG_COUNT], 3);
+    if (tags[DO.SIG_COUNT]) {
+      data.digitalCounter = getInt(checkLength("signature counter", tags[DO.SIG_COUNT], 3), 3);
+    }
 
     // Private DOs are only present when supported by the extended capabilities.
     if (data.extCapabilities.length && data.extCapabilities[0] & 0x08) {
@@ -236,9 +279,11 @@ class GpgManager {
     }
 
     // Encrypted private key material (only readable in SEED mode with PW3).
-    data.sig.key = await getData(t, DO.SIG_KEY);
-    data.dec.key = await getData(t, DO.DEC_KEY);
-    data.aut.key = await getData(t, DO.AUT_KEY);
+    // A slot without key has no key blob to read
+    const noKey = [SW_CONDITIONS_NOT_SATISFIED];
+    data.sig.key = await getData(t, DO.SIG_KEY, false, noKey);
+    data.dec.key = await getData(t, DO.DEC_KEY, false, noKey);
+    data.aut.key = await getData(t, DO.AUT_KEY, false, noKey);
 
     this.data = data;
     return data;
@@ -249,22 +294,22 @@ class GpgManager {
   // required to read/write private DOs 0x0101/0x0103 (see the firmware's
   // gpg_check_access_*_DO). Verifying only PW1+PW3 — as the python tool does —
   // silently loses those DOs.
-  async verifyPins(userPin, adminPin) {
-    if (!(await this.verifyPin(PW.PW1, userPin))) {
+  async verifyPins(userPin, adminPin, t = this.transport) {
+    if (!(await this.verifyPin(PW.PW1, userPin, t))) {
       throw new Error("User PIN verification failed");
     }
-    if (!(await this.verifyPin(PW.PW2, userPin))) {
+    if (!(await this.verifyPin(PW.PW2, userPin, t))) {
       throw new Error("User PIN verification failed");
     }
-    if (!(await this.verifyPin(PW.PW3, adminPin))) {
+    if (!(await this.verifyPin(PW.PW3, adminPin, t))) {
       throw new Error("Admin PIN verification failed");
     }
   }
 
   // Select the active key slot (PUT DATA 0x01F2, 0-based index). Requires PW2
   // verified and "Selection by APDU" enabled on the card.
-  async selectSlot(index) {
-    const sw = await putData(this.transport, DO.SLOT_CUR, Buffer.from([index]));
+  async selectSlot(index, t = this.transport) {
+    const sw = await putData(t, DO.SLOT_CUR, Buffer.from([index]));
     if (sw !== SW_SUCCESS) {
       throw new Error(
         `Slot selection failed (${statusMessage(sw)}) — is "Selection by APDU" enabled on the card?`
@@ -272,14 +317,34 @@ class GpgManager {
     }
   }
 
+  // Read the security settings a restore can change: PW status, and the UIF
+  // and algorithm attributes of each key.
+  async readSecuritySettings(t = this.transport) {
+    const tags = decodeTLV(await getData(t, DO.APP_DATA));
+    const d = decodeTLV(tags[DO.DISCRET_DATA] || Buffer.alloc(0));
+    const settings = { PWStatus: checkLength("PW status", d[DO.PW_STATUS], 7) };
+    for (const [slot, attrTag, uifTag] of [
+      ["sig", DO.SIG_ATTR, DO.UIF_SIG],
+      ["dec", DO.DEC_ATTR, DO.UIF_DEC],
+      ["aut", DO.AUT_ATTR, DO.UIF_AUT],
+    ]) {
+      settings[slot] = {
+        attribute: d[attrTag] || Buffer.alloc(0),
+        uif: checkLength(`${slot} UIF`, await getData(t, uifTag), 2)[0],
+      };
+    }
+    return settings;
+  }
+
   // Verify PINs, select the slot, and read the full card state into a backup.
   async backup(userPin, adminPin, slot = 0) {
-    this._lock();
+    const t = this._lock();
     try {
-      await this.verifyPins(userPin, adminPin);
-      await this.selectSlot(slot);
-      return buildBackup(await this.getAll());
+      await this.verifyPins(userPin, adminPin, t);
+      await this.selectSlot(slot, t);
+      return buildBackup(await this.getAll(t));
     } finally {
+      await this._logout(t);
       this._unlock();
     }
   }
@@ -288,7 +353,7 @@ class GpgManager {
   // (GEN ASYM KEYPAIR, P1=Generate, P2=SEED). This rebuilds the exact same
   // keys from the master seed; it requires SEED mode enabled on the device
   // and the same recovery phrase. Returns the list of failures.
-  async seedKeys() {
+  async seedKeys(t = this.transport) {
     const GENERATE = 0x80;
     const SEEDED_MODE = 0x01;
     const header = Buffer.from([0x00, 0x47, GENERATE, SEEDED_MODE]);
@@ -299,7 +364,7 @@ class GpgManager {
       ["Authentication key", DO.AUT_KEY],
     ]) {
       // CRT key template: <tag> 00
-      const { sw } = await exchange(this.transport, header, Buffer.from([tag, 0x00]));
+      const { sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
       if (sw !== SW_SUCCESS) {
         failures.push({
           tag,
@@ -312,31 +377,64 @@ class GpgManager {
     return failures;
   }
 
+  // Check that each key held by the card has the fingerprint the backup gives
+  // it, computed from its public key, attributes and creation date.
+  async checkFingerprints(data, t = this.transport) {
+    const READ_PUBLIC_KEY = 0x81;
+    const header = Buffer.from([0x00, 0x47, READ_PUBLIC_KEY, 0x00]);
+    const failures = [];
+    for (const [name, slot, tag] of [
+      ["Signature key", data.sig, DO.SIG_KEY],
+      ["Decryption key", data.dec, DO.DEC_KEY],
+      ["Authentication key", data.aut, DO.AUT_KEY],
+    ]) {
+      if (slot.fingerprint.every((b) => b === 0)) continue;
+      const { data: resp, sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
+      let message = null;
+      if (sw !== SW_SUCCESS) {
+        message = `no key on the card (${statusMessage(sw)})`;
+      } else {
+        const pubkey = decodeTLV(decodeTLV(resp)[DO.PUB_KEY] || Buffer.alloc(0));
+        const fp = await keyFingerprint(slot.attribute, pubkey, slot.date);
+        if (fp === null) {
+          message = "fingerprint cannot be computed for this key algorithm";
+        } else if (!fp.equals(slot.fingerprint)) {
+          message = "the key on the card does not match the backup (other recovery phrase or modified backup)";
+        }
+      }
+      if (message) {
+        failures.push({ tag, name: `${name} (fingerprint)`, sw, message });
+      }
+    }
+    return failures;
+  }
+
   // Factory-reset the app: TERMINATE DF then ACTIVATE FILE, which wipes every
   // key and data object and resets the PINs to their defaults (123456 /
   // 12345678). Requires the admin PIN (PW3). DESTRUCTIVE.
   async factoryReset(adminPin) {
-    this._lock();
+    const t = this._lock();
     try {
-      if (!(await this.verifyPin(PW.PW3, adminPin))) {
+      if (!(await this.verifyPin(PW.PW3, adminPin, t))) {
         throw new Error("Admin PIN verification failed");
       }
-      let r = await exchange(this.transport, "00E60000"); // TERMINATE DF
+      let r = await exchange(t, "00E60000"); // TERMINATE DF
       if (r.sw !== SW_SUCCESS) {
         throw new Error(`Terminate failed (${statusMessage(r.sw)})`);
       }
-      r = await exchange(this.transport, "00440000"); // ACTIVATE FILE
+      r = await exchange(t, "00440000"); // ACTIVATE FILE
       if (r.sw !== SW_SUCCESS) {
         throw new Error(`Activate failed (${statusMessage(r.sw)})`);
       }
       // The card is now blank; refresh the AID/serial we display.
-      await exchange(this.transport, SELECT_APDU);
-      const aid = await exchange(this.transport, GET_DATA_AID);
+      await exchange(t, SELECT_APDU);
+      const aid = await exchange(t, GET_DATA_AID);
       if (aid.sw === SW_SUCCESS) {
         this.aid = aid.data.toString("hex").toUpperCase();
         this.serial = this.aid.length >= 28 ? this.aid.slice(20, 28) : null;
       }
     } finally {
+      await this._logout(t);
       this._unlock();
     }
   }
@@ -345,16 +443,22 @@ class GpgManager {
   // Individual PUT DATA failures are collected (not thrown) so a partial
   // restore still completes. The private keys are NOT written from the backup
   // blob (the firmware rejects that on a wiped card); pass regenerateKeys to
-  // rebuild them from the device seed instead. Returns the list of failures.
-  async restore(userPin, adminPin, json, regenerateKeys = false, slot = 0) {
-    this._lock();
+  // rebuild them from the device seed instead. Before any write, the security
+  // settings the backup changes are passed to `confirm`, which resolves to true
+  // to proceed. Returns the list of failures, or null when not confirmed.
+  async restore(userPin, adminPin, json, regenerateKeys = false, slot = 0, confirm = async () => true) {
+    const t = this._lock();
     try {
       const data = parseBackup(json);
 
-      await this.verifyPins(userPin, adminPin);
-      await this.selectSlot(slot);
+      await this.verifyPins(userPin, adminPin, t);
+      await this.selectSlot(slot, t);
 
-      const t = this.transport;
+      const changes = securityChanges(await this.readSecuritySettings(t), data);
+      if (changes.length > 0 && !(await confirm(changes))) {
+        return null;
+      }
+
       const failures = [];
       const put = async (tag, value) => {
         const sw = await putData(t, tag, value);
@@ -410,11 +514,10 @@ class GpgManager {
       // reference but not written back here.
       await put(DO.RSA_EXP, u32le(data.rsaPubExp));
 
-      // Certificates share one DO with an internal pointer; written AUT, DEC,
-      // SIG to match the read order in getAll().
-      await put(DO.CERT, enc(data.aut.cert));
-      await put(DO.CERT, enc(data.dec.cert));
-      await put(DO.CERT, enc(data.sig.cert));
+      for (const [occurrence, slot] of [data.aut, data.dec, data.sig].entries()) {
+        await selectData(t, DO.CERT, occurrence);
+        await put(DO.CERT, slot.cert);
+      }
 
       for (const [slot, caTag, fpTag, dateTag] of [
         [data.sig, DO.CA_FINGERPRINT_WR_SIG, DO.FINGERPRINT_WR_SIG, DO.DATES_WR_SIG],
@@ -430,11 +533,13 @@ class GpgManager {
       // writing back the encrypted blob (which the firmware rejects on a
       // wiped card).
       if (regenerateKeys) {
-        failures.push(...(await this.seedKeys()));
+        failures.push(...(await this.seedKeys(t)));
       }
+      failures.push(...(await this.checkFingerprints(data, t)));
 
       return failures;
     } finally {
+      await this._logout(t);
       this._unlock();
     }
   }

@@ -48,3 +48,17 @@ def test_slot(backend: BackendInterface) -> None:
     # Read an empty pub key
     rapdu = client.read_key(DataObject.DO_SIG_KEY)
     assert rapdu.status == Errors.SW_REFERENCED_DATA_NOT_FOUND
+
+
+# In this test we check that the home screen follows a slot change requested by APDU
+def test_slot_home_screen(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    nb_slots, _ = client.get_slot_config()
+    if nb_slots == 1:
+        pytest.skip("single slot configuration")
+
+    backend.wait_for_text_on_screen("ID: .* / 1")
+    check_pincode(client, PassWord.PW2)
+    rapdu = client.set_slot(1)
+    assert rapdu.status == Errors.SW_OK
+    backend.wait_for_text_on_screen("ID: .* / 2")

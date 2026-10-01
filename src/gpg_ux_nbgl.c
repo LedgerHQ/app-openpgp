@@ -157,11 +157,12 @@ static void ui_home_init(void) {
     static const char *const infoContents[] = {COMBINED_VERSION, "Ledger", "Ledger (c) 2025"};
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
+    unsigned int name_len = MIN(N_gpg_pstate->name.length, sizeof(name) - 1);
 
     explicit_bzero(name, sizeof(name));
-    if (N_gpg_pstate->name.value[0] != 0) {
-        memmove(name, (void *) (N_gpg_pstate->name.value), sizeof(name) - 1);
-        for (uint8_t i = 0; i < sizeof(name) - 1; i++) {
+    if (name_len != 0) {
+        memmove(name, (void *) (N_gpg_pstate->name.value), name_len);
+        for (uint8_t i = 0; i < name_len; i++) {
             if ((name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
@@ -508,7 +509,13 @@ static void template_key_cb(int token, uint8_t index, int page) {
     static uint8_t *oid = NULL;
     uint32_t oid_len = 0;
     uint32_t size = 0;
+#ifdef SCREEN_SIZE_NANO
+    // on Nano, index is already the position of the choice in the whole list
+    UNUSED(page);
+    uint8_t key_type = index + FIRST_USER_TOKEN;
+#else
     uint8_t key_type = index + (page * nb_elt_per_page) + FIRST_USER_TOKEN;
+#endif
 
     if (token != TOKEN_TYPE_BACK) {
         explicit_bzero(&attributes, sizeof(attributes));
@@ -585,7 +592,7 @@ static void template_key_cb(int token, uint8_t index, int page) {
 
         if (dest && attributes.value[0] &&
             memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
-            nvm_write(dest, NULL, sizeof(gpg_key_t));
+            gpg_key_erase(dest);
             nvm_write(&dest->attributes, &attributes, sizeof(attributes));
         }
     }
@@ -1278,7 +1285,11 @@ static void pinentry_validate_cb(const uint8_t *pinentry, uint8_t length) {
  */
 static void pinback_cb(void) {
     G_gpg_vstate.ui_pending = 0;
-    gpg_io_discard(0);
+    if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
+        // the current PIN checked at the first step does not stay verified
+        gpg_pin_set_verified(G_gpg_vstate.ux_pinconfirm_p2, 0);
+    }
+    gpg_io_discard(1);
     gpg_io_insert_u16(SWO_CONDITIONS_NOT_SATISFIED);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
@@ -1350,6 +1361,22 @@ static void ui_menu_pinentry_cb(void) {
 
 /* ------------------------------ UIF CONFIRM UX ----------------------------- */
 
+/* Snapshot of the APDU presented to the user before the UIF prompt is shown.
+ * While the prompt is pending (IO_ASYNCH_REPLY), the host can overwrite the
+ * global APDU state with a different command.  Restoring from this snapshot
+ * in the callback ensures the operation executed is exactly what the user
+ * reviewed, not an attacker-substituted payload. */
+typedef struct {
+    unsigned char ins;
+    unsigned char p1;
+    unsigned char p2;
+    unsigned short p1p2;
+    unsigned short length;
+    unsigned char data[GPG_IO_BUFFER_LENGTH];
+} uif_snapshot_t;
+
+static uif_snapshot_t G_uif_snapshot;
+
 /**
  * @brief UIF Confirmation callback
  *
@@ -1360,6 +1387,15 @@ void uif_confirm_cb(bool confirm) {
     unsigned int sw = SWO_SECURITY_ISSUE;
 
     if (confirm) {
+        /* Restore the exact APDU state that was shown to the user, discarding
+         * any APDU the host may have sent while the prompt was pending. */
+        G_gpg_vstate.io_ins = G_uif_snapshot.ins;
+        G_gpg_vstate.io_p1 = G_uif_snapshot.p1;
+        G_gpg_vstate.io_p2 = G_uif_snapshot.p2;
+        G_gpg_vstate.io_p1p2 = G_uif_snapshot.p1p2;
+        G_gpg_vstate.io_length = G_uif_snapshot.length;
+        G_gpg_vstate.io_offset = 0;
+        memmove(G_gpg_vstate.work.io_buffer, G_uif_snapshot.data, G_uif_snapshot.length);
         G_gpg_vstate.UIF_flags = 1;
         if (G_gpg_vstate.io_ins == INS_PSO) {
             sw = gpg_apdu_pso();
@@ -1369,9 +1405,13 @@ void uif_confirm_cb(bool confirm) {
             gpg_io_discard(1);
         }
         G_gpg_vstate.UIF_flags = 0;
+        if ((sw != SWO_SUCCESS) && ((sw & 0xFF00) != SWO_RESPONSE_BYTES_AVAILABLE)) {
+            gpg_io_discard(1);
+        }
     } else {
         gpg_io_discard(1);
     }
+    explicit_bzero(&G_uif_snapshot, sizeof(G_uif_snapshot));
     gpg_io_insert_u16(sw);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
@@ -1411,5 +1451,15 @@ void ui_menu_uifconfirm_display(unsigned int value) {
     if (G_gpg_vstate.menu[0] == 0) {
         snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Please Cancel");
     }
+
+    /* Capture APDU state before entering async mode so the callback can
+     * restore it even if the host sends a new APDU while the prompt is up. */
+    G_uif_snapshot.ins = G_gpg_vstate.io_ins;
+    G_uif_snapshot.p1 = G_gpg_vstate.io_p1;
+    G_uif_snapshot.p2 = G_gpg_vstate.io_p2;
+    G_uif_snapshot.p1p2 = G_gpg_vstate.io_p1p2;
+    G_uif_snapshot.length = G_gpg_vstate.io_length;
+    memmove(G_uif_snapshot.data, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+
     nbgl_useCaseChoice(NULL, "Confirm operation", G_gpg_vstate.menu, "Yes", "No", uif_confirm_cb);
 }

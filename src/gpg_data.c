@@ -19,6 +19,19 @@
 #include "gpg_ux.h"
 #include "cx_errors.h"
 
+/* Backup blob format version written by GET KEY DATA and expected by PUT KEY
+ * DATA for the authenticated-encryption path.  Old blobs start with the
+ * first byte of TARGET_ID (0x31 or 0x33 on Ledger devices), which is never
+ * 0x01, so the first byte alone is an unambiguous version discriminant. */
+#define BACKUP_FORMAT_V1     ((unsigned char) 0x01)
+#define BACKUP_FORMAT_V2     ((unsigned char) 0x02)
+#define GPG_BACKUP_TAG_LEN   16
+#define GPG_BACKUP_NONCE_LEN 12
+
+/* Largest cardholder certificate that can be read back with its status word */
+#define GPG_CARD_HOLDER_CERT_MAX_LENGTH \
+    MIN(GPG_EXT_CARD_HOLDER_CERT_LENTH, GPG_IO_BUFFER_LENGTH - 2)
+
 /**
  * Select a DO (Data Object) in the current template
  *
@@ -30,6 +43,164 @@ void gpg_apdu_select_data(unsigned int ref, int record) {
     G_gpg_vstate.DO_current = ref;
     G_gpg_vstate.DO_reccord = record;
     G_gpg_vstate.DO_offset = 0;
+}
+
+/**
+ * Number of received bytes not yet fetched
+ *
+ */
+static unsigned int gpg_key_data_left() {
+    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+}
+
+static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
+                                   cx_aes_gcm_context_t *gcm_ctx,
+                                   unsigned char *nonce) {
+    cx_err_t error = CX_INTERNAL_ERROR;
+    unsigned int aad_len = 0;
+    unsigned int enc_len = 0;
+    unsigned int ct_len = 0;
+    unsigned int ct_offset = 0;
+    unsigned int len = 0;
+    unsigned int ksz = 0;
+    cx_rsa_private_key_t *key = NULL;
+    unsigned char pub_e[sizeof(keygpg->pub_key.rsa)];
+
+    if (gpg_key_data_left() < 4) {
+        return SWO_WRONG_LENGTH;
+    }
+    len = gpg_io_fetch_u32();
+    if (len != sizeof(pub_e)) {
+        return SWO_INCORRECT_DATA;
+    }
+    // public key, then encrypted key length
+    if (gpg_key_data_left() < len + 4) {
+        return SWO_WRONG_LENGTH;
+    }
+    gpg_io_fetch(pub_e, len);
+    aad_len = G_gpg_vstate.io_offset;
+
+    enc_len = gpg_io_fetch_u32();
+    if (enc_len <= GPG_BACKUP_TAG_LEN ||
+        enc_len > G_gpg_vstate.io_length - G_gpg_vstate.io_offset) {
+        return SWO_INCORRECT_DATA;
+    }
+    ct_len = enc_len - GPG_BACKUP_TAG_LEN;
+    ct_offset = G_gpg_vstate.io_offset;
+
+    ksz = U2BE(keygpg->attributes.value, 1) >> 3;
+    switch (ksz) {
+        case 2048 / 8:
+            key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa2048;
+            len = sizeof(cx_rsa_2048_private_key_t);
+            break;
+        case 3072 / 8:
+            key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
+            len = sizeof(cx_rsa_3072_private_key_t);
+            break;
+        case 4096 / 8:
+            key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
+            len = sizeof(cx_rsa_4096_private_key_t);
+            break;
+        default:
+            return SWO_INCORRECT_DATA;
+    }
+
+    if ((key == NULL) || (ct_len != len)) {
+        return SWO_INCORRECT_DATA;
+    }
+
+    // Decrypt in-place: output to buffer[0], ciphertext at buffer[ct_offset].
+    // GCM processes AAD (buffer[0..aad_len)) as a separate phase before
+    // producing output, so overwriting the AAD region is safe.
+    CX_CHECK(cx_aes_gcm_decrypt_and_auth(gcm_ctx,
+                                         G_gpg_vstate.work.io_buffer + ct_offset,
+                                         ct_len,
+                                         nonce,
+                                         GPG_BACKUP_NONCE_LEN,
+                                         G_gpg_vstate.work.io_buffer,
+                                         aad_len,
+                                         G_gpg_vstate.work.io_buffer,
+                                         G_gpg_vstate.work.io_buffer + ct_offset + ct_len,
+                                         GPG_BACKUP_TAG_LEN));
+    // the restored key must have the size of the key attributes
+    if (((cx_rsa_private_key_t *) G_gpg_vstate.work.io_buffer)->size != ksz) {
+        error = SWO_INCORRECT_DATA;
+        goto end;
+    }
+
+    nvm_write((unsigned char *) key, G_gpg_vstate.work.io_buffer, len);
+    nvm_write(keygpg->pub_key.rsa, pub_e, sizeof(pub_e));
+    error = SWO_SUCCESS;
+end:
+    explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
+    return error;
+}
+
+static int gpg_put_key_data_v1_ec(gpg_key_t *keygpg,
+                                  cx_aes_gcm_context_t *gcm_ctx,
+                                  unsigned char *nonce) {
+    cx_err_t error = CX_INTERNAL_ERROR;
+    unsigned int aad_len = 0;
+    unsigned int enc_len = 0;
+    unsigned int ct_len = 0;
+    unsigned int ct_offset = 0;
+    unsigned int pub_offset = 0;
+    unsigned int len = 0;
+    unsigned char *priv = NULL;
+
+    if (gpg_key_data_left() < 4) {
+        return SWO_WRONG_LENGTH;
+    }
+    len = gpg_io_fetch_u32();
+    if (len != sizeof(cx_ecfp_640_public_key_t)) {
+        return SWO_INCORRECT_DATA;
+    }
+    // public key, then encrypted key length
+    if (gpg_key_data_left() < len + 4) {
+        return SWO_WRONG_LENGTH;
+    }
+    pub_offset = G_gpg_vstate.io_offset;
+    gpg_io_fetch(NULL, len);
+    G_gpg_vstate.io_offset += len;
+    aad_len = G_gpg_vstate.io_offset;
+
+    enc_len = gpg_io_fetch_u32();
+    if (enc_len <= GPG_BACKUP_TAG_LEN ||
+        enc_len > G_gpg_vstate.io_length - G_gpg_vstate.io_offset) {
+        return SWO_INCORRECT_DATA;
+    }
+    ct_len = enc_len - GPG_BACKUP_TAG_LEN;
+    ct_offset = G_gpg_vstate.io_offset;
+
+    if (ct_len != sizeof(cx_ecfp_640_private_key_t)) {
+        return SWO_INCORRECT_DATA;
+    }
+    // Decrypt past the blob so that the authenticated public key stays in place
+    if ((ct_offset + enc_len + ct_len) > GPG_IO_BUFFER_LENGTH) {
+        return SWO_WRONG_LENGTH;
+    }
+    priv = G_gpg_vstate.work.io_buffer + ct_offset + enc_len;
+
+    CX_CHECK(cx_aes_gcm_decrypt_and_auth(gcm_ctx,
+                                         G_gpg_vstate.work.io_buffer + ct_offset,
+                                         ct_len,
+                                         nonce,
+                                         GPG_BACKUP_NONCE_LEN,
+                                         G_gpg_vstate.work.io_buffer,
+                                         aad_len,
+                                         priv,
+                                         G_gpg_vstate.work.io_buffer + ct_offset + ct_len,
+                                         GPG_BACKUP_TAG_LEN));
+
+    nvm_write((unsigned char *) &keygpg->priv_key.ecfp640, priv, ct_len);
+    nvm_write((unsigned char *) &keygpg->pub_key.ecfp640,
+              G_gpg_vstate.work.io_buffer + pub_offset,
+              sizeof(cx_ecfp_640_public_key_t));
+    error = SWO_SUCCESS;
+end:
+    explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
+    return error;
 }
 
 /**
@@ -242,9 +413,11 @@ int gpg_apdu_get_next_data(unsigned int ref) {
     if ((ref != 0x7F21) || (G_gpg_vstate.DO_current != 0x7F21)) {
         return SWO_CONDITIONS_NOT_SATISFIED;
     }
+    // read the occurrence following the current one, and stay on it only if it exists
+    G_gpg_vstate.DO_reccord++;
     sw = gpg_apdu_get_data(ref);
-    if (sw == SWO_SUCCESS) {
-        G_gpg_vstate.DO_reccord++;
+    if (sw != SWO_SUCCESS) {
+        G_gpg_vstate.DO_reccord--;
     }
     return sw;
 }
@@ -334,6 +507,8 @@ int gpg_apdu_put_data(unsigned int ref) {
             G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
             gpg_mse_reset();
             ui_CCID_reset();
+            // leave any settings page bound to the previous slot, and show the new one
+            ui_init();
             sw = SWO_SUCCESS;
             break;
 
@@ -344,7 +519,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
+            // stored in native byte order, then read back big-endian by key generation
             e = gpg_io_fetch_u32();
+            if (!gpg_rsa_exponent_is_valid((const unsigned char *) &e)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             nvm_write((void *) &N_gpg_pstate->default_RSA_exponent, &e, sizeof(unsigned int));
             sw = SWO_SUCCESS;
             break;
@@ -435,6 +615,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
+            if (l > (unsigned int) (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 unsigned int e = 0;
@@ -490,7 +674,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 }
 
                 // move p,q over pub key, this only work because adr<rsa_pub> < adr<p>
-                if ((len_p > ksz) || (len_q > ksz)) {
+                if ((len_p > ksz) || (len_q > ksz) || ((len_e + len_p + len_q) > l)) {
                     sw = SWO_INCORRECT_DATA;
                     break;
                 }
@@ -523,6 +707,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                     break;
                 }
                 ksz = gpg_curve2domainlen(curve);
+                if (len_p > l) {
+                    sw = SWO_INCORRECT_DATA;
+                    break;
+                }
                 if (ksz == len_p) {
                     G_gpg_vstate.work.ecfp.private.curve = curve;
                     G_gpg_vstate.work.ecfp.private.d_len = ksz;
@@ -631,12 +819,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                     ptr_v = G_gpg_vstate.kslot->aut.CA.value;
                     break;
                 case 1:
-                    ptr_l = &G_gpg_vstate.kslot->sig.CA.length;
-                    ptr_v = G_gpg_vstate.kslot->sig.CA.value;
-                    break;
-                case 2:
                     ptr_l = &G_gpg_vstate.kslot->dec.CA.length;
                     ptr_v = G_gpg_vstate.kslot->dec.CA.value;
+                    break;
+                case 2:
+                    ptr_l = &G_gpg_vstate.kslot->sig.CA.length;
+                    ptr_v = G_gpg_vstate.kslot->sig.CA.value;
                     break;
                 default:
                     break;
@@ -645,7 +833,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
-            if (G_gpg_vstate.io_length > GPG_EXT_CARD_HOLDER_CERT_LENTH) {
+            if (G_gpg_vstate.io_length > GPG_CARD_HOLDER_CERT_MAX_LENGTH) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
@@ -710,7 +898,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             }
 
             if (sw == SWO_SUCCESS) {
-                nvm_write(ptr_key, NULL, sizeof(gpg_key_t));
+                gpg_key_erase(ptr_key);
                 nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
                 nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
             }
@@ -718,6 +906,10 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             /* ----------------- PWS status ----------------- */
         case 0xC4:
+            if (G_gpg_vstate.io_length < 1) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             gpg_io_fetch_nv((unsigned char *) N_gpg_pstate->PW_status, 1);
             sw = SWO_SUCCESS;
             break;
@@ -789,12 +981,16 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             /* AES key: one shot */
         case 0xF4:
+            if (G_gpg_vstate.io_length != 2 * CX_AES_128_KEY_LEN) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer,
-                                              G_gpg_vstate.io_length,
+                                              CX_AES_128_KEY_LEN,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_enc, &aes_key, sizeof(cx_aes_key_t));
             CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer + CX_AES_128_KEY_LEN,
-                                              G_gpg_vstate.io_length,
+                                              CX_AES_128_KEY_LEN,
                                               &aes_key));
             nvm_write((void *) &N_gpg_pstate->SM_mac, &aes_key, sizeof(cx_aes_key_t));
             sw = SWO_SUCCESS;
@@ -834,6 +1030,11 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
+            // a permanently enabled UIF can only be cleared by a card reset
+            if ((ptr_v[0] == 2) && (G_gpg_vstate.work.io_buffer[0] != 2)) {
+                sw = SWO_CONDITIONS_NOT_SATISFIED;
+                break;
+            }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, 2);
             sw = SWO_SUCCESS;
             break;
@@ -866,44 +1067,85 @@ static int gpg_init_keyenc(cx_aes_key_t *keyenc) {
 
     sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
     if (sw != SWO_SUCCESS) {
-        return sw;
+        error = sw;
+        goto end;
     }
     sw = gpg_pso_derive_key_seed(seed, (unsigned char *) PIC("key "), 1, seed, CX_AES_BLOCK_SIZE);
     if (sw != SWO_SUCCESS) {
-        return sw;
+        error = sw;
+        goto end;
     }
     CX_CHECK(cx_aes_init_key_no_throw(seed, CX_AES_BLOCK_SIZE, keyenc));
-
+    error = SWO_SUCCESS;
 end:
-    if (error != CX_OK) {
-        return error;
+    explicit_bzero(seed, sizeof(seed));
+    return error;
+}
+
+/* Initialise an AES-GCM context with the slot-derived backup key of the given format.
+ * The raw key bytes are wiped from the stack before returning. */
+static int gpg_init_gcm(cx_aes_gcm_context_t *ctx, unsigned char version) {
+    unsigned char seed[32];
+    cx_err_t error = CX_INTERNAL_ERROR;
+    int sw;
+
+    sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
+    if (sw != SWO_SUCCESS) {
+        error = sw;
+        goto end;
     }
-    return SWO_SUCCESS;
+    if (version == BACKUP_FORMAT_V1) {
+        sw = gpg_pso_derive_key_seed(seed,
+                                     (unsigned char *) PIC("key "),
+                                     1,
+                                     seed,
+                                     CX_AES_BLOCK_SIZE);
+    } else {
+        sw = gpg_pso_derive_key_seed_full(seed,
+                                          (unsigned char *) PIC("key "),
+                                          1,
+                                          seed,
+                                          CX_AES_BLOCK_SIZE);
+    }
+    if (sw != SWO_SUCCESS) {
+        error = sw;
+        goto end;
+    }
+    cx_aes_gcm_init(ctx);
+    CX_CHECK(cx_aes_gcm_set_key(ctx, seed, CX_AES_BLOCK_SIZE));
+    error = SWO_SUCCESS;
+end:
+    explicit_bzero(seed, sizeof(seed));
+    return error;
+}
+
+/* Rebuild the 12-byte GCM nonce of v1 backups from slot and key reference. */
+static void gpg_backup_nonce(unsigned int ref, unsigned char nonce[GPG_BACKUP_NONCE_LEN]) {
+    explicit_bzero(nonce, GPG_BACKUP_NONCE_LEN);
+    nonce[0] = (unsigned char) G_gpg_vstate.slot;
+    nonce[1] = (unsigned char) (ref >> 8);
+    nonce[2] = (unsigned char) (ref & 0xFF);
 }
 
 /**
- * Read a Key DO (Data Object) from the card
- * for Backup
+ * Encrypt a Key DO (Data Object) for Backup
  *
  * @param[in] ref DO tag
+ * @param[in] gcm_ctx AES-GCM context initialised with the backup key
  *
  * @return Status Word
  *
  */
-int gpg_apdu_get_key_data(unsigned int ref) {
-    cx_aes_key_t keyenc = {0};
+static int gpg_get_key_data(unsigned int ref, cx_aes_gcm_context_t *gcm_ctx) {
     gpg_key_t *keygpg = NULL;
     cx_rsa_private_key_t *key = NULL;
-    unsigned int len = 0;
     unsigned int k_len = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
     int sw = SWO_UNKNOWN;
     unsigned int ksz = 0;
+    unsigned int aad_len = 0;
+    unsigned char nonce[GPG_BACKUP_NONCE_LEN];
 
-    sw = gpg_init_keyenc(&keyenc);
-    if (sw != SWO_SUCCESS) {
-        return sw;
-    }
     switch (ref) {
         case 0x00B6:
             keygpg = &G_gpg_vstate.kslot->sig;
@@ -919,11 +1161,13 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     }
 
     gpg_io_discard(1);
-    // clear part
+    CX_CHECK(cx_get_random_bytes(nonce, sizeof(nonce)));
+    // header authenticated by GCM tag (not encrypted)
+    gpg_io_insert_u8(BACKUP_FORMAT_V2);
     gpg_io_insert_u32(TARGET_ID);
     gpg_io_insert_u32(get_api_level());
+    gpg_io_insert(nonce, sizeof(nonce));
 
-    // encrypted part
     switch (keygpg->attributes.value[0]) {
         case KEY_ID_RSA:
             ksz = U2BE(keygpg->attributes.value, 1) >> 3;
@@ -946,47 +1190,50 @@ int gpg_apdu_get_key_data(unsigned int ref) {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
 
-            // insert pubkey
             gpg_io_insert_u32(4);
             gpg_io_insert(keygpg->pub_key.rsa, 4);
+            aad_len = G_gpg_vstate.io_offset;
 
-            // insert privkey
-            gpg_io_mark();
-            len = GPG_IO_BUFFER_LENGTH - G_gpg_vstate.io_offset;
-            CX_CHECK(cx_aes_no_throw(&keyenc,
-                                     CX_ENCRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
-                                     (unsigned char *) key,
-                                     k_len,
-                                     G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                                     &len));
-            gpg_io_inserted(len);
-            gpg_io_set_offset(IO_OFFSET_MARK);
-            gpg_io_insert_u32(len);
-            gpg_io_set_offset(IO_OFFSET_END);
+            // GCM produces no padding: ciphertext length == plaintext length
+            gpg_io_insert_u32(k_len + GPG_BACKUP_TAG_LEN);
+            CX_CHECK(cx_aes_gcm_encrypt_and_tag(
+                gcm_ctx,
+                (unsigned char *) key,
+                k_len,
+                nonce,
+                GPG_BACKUP_NONCE_LEN,
+                G_gpg_vstate.work.io_buffer,
+                aad_len,
+                G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + k_len,
+                GPG_BACKUP_TAG_LEN));
+            gpg_io_inserted(k_len + GPG_BACKUP_TAG_LEN);
             sw = SWO_SUCCESS;
             break;
 
         case KEY_ID_ECDH:
         case KEY_ID_ECDSA:
         case KEY_ID_EDDSA:
-            // insert pubkey
+            k_len = sizeof(cx_ecfp_640_private_key_t);
+
             gpg_io_insert_u32(sizeof(cx_ecfp_640_public_key_t));
             gpg_io_insert((unsigned char *) &keygpg->pub_key.ecfp640,
                           sizeof(cx_ecfp_640_public_key_t));
+            aad_len = G_gpg_vstate.io_offset;
 
-            // insert privkey
-            gpg_io_mark();
-            len = GPG_IO_BUFFER_LENGTH - G_gpg_vstate.io_offset;
-            CX_CHECK(cx_aes_no_throw(&keyenc,
-                                     CX_ENCRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
-                                     (unsigned char *) &keygpg->priv_key.ecfp640,
-                                     sizeof(cx_ecfp_640_private_key_t),
-                                     G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                                     &len));
-            gpg_io_inserted(len);
-            gpg_io_set_offset(IO_OFFSET_MARK);
-            gpg_io_insert_u32(len);
-            gpg_io_set_offset(IO_OFFSET_END);
+            gpg_io_insert_u32(k_len + GPG_BACKUP_TAG_LEN);
+            CX_CHECK(cx_aes_gcm_encrypt_and_tag(
+                gcm_ctx,
+                (unsigned char *) &keygpg->priv_key.ecfp640,
+                k_len,
+                nonce,
+                GPG_BACKUP_NONCE_LEN,
+                G_gpg_vstate.work.io_buffer,
+                aad_len,
+                G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + k_len,
+                GPG_BACKUP_TAG_LEN));
+            gpg_io_inserted(k_len + GPG_BACKUP_TAG_LEN);
             sw = SWO_SUCCESS;
             break;
 
@@ -1000,6 +1247,27 @@ end:
 }
 
 /**
+ * Read a Key DO (Data Object) from the card
+ * for Backup
+ *
+ * @param[in] ref DO tag
+ *
+ * @return Status Word
+ *
+ */
+int gpg_apdu_get_key_data(unsigned int ref) {
+    cx_aes_gcm_context_t gcm_ctx;
+    int sw;
+
+    sw = gpg_init_gcm(&gcm_ctx, BACKUP_FORMAT_V2);
+    if (sw == SWO_SUCCESS) {
+        sw = gpg_get_key_data(ref, &gcm_ctx);
+    }
+    explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
+    return sw;
+}
+
+/**
  * Write a key DO (Data Object) to the card
  * For Restore
  *
@@ -1008,21 +1276,129 @@ end:
  * @return Status Word
  *
  */
-int gpg_apdu_put_key_data(unsigned int ref) {
-    cx_aes_key_t keyenc = {0};
-    gpg_key_t *keygpg = NULL;
+static int gpg_put_key_data_legacy_rsa(gpg_key_t *keygpg, cx_aes_key_t *keyenc) {
+    cx_err_t error = CX_INTERNAL_ERROR;
     unsigned int len = 0;
     unsigned int enc_len = 0;
-    cx_rsa_private_key_t *key = NULL;
     unsigned int offset = 0;
+    unsigned int ksz = 0;
+    cx_rsa_private_key_t *key = NULL;
+
+    // insert pubkey
+    if (gpg_key_data_left() < 4) {
+        return SWO_WRONG_LENGTH;
+    }
+    len = gpg_io_fetch_u32();
+    if (len != 4) {
+        return SWO_INCORRECT_DATA;
+    }
+    // public key, then encrypted key length
+    if (gpg_key_data_left() < len + 4) {
+        return SWO_WRONG_LENGTH;
+    }
+    gpg_io_fetch_nv(keygpg->pub_key.rsa, len);
+
+    // insert privkey
+    enc_len = gpg_io_fetch_u32();
+    if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+        return SWO_INCORRECT_DATA;
+    }
+    offset = G_gpg_vstate.io_offset;
+    ksz = U2BE(keygpg->attributes.value, 1) >> 3;
+    switch (ksz) {
+        case 2048 / 8:
+            key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa2048;
+            len = sizeof(cx_rsa_2048_private_key_t);
+            break;
+        case 3072 / 8:
+            key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
+            len = sizeof(cx_rsa_3072_private_key_t);
+            break;
+        case 4096 / 8:
+            key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
+            len = sizeof(cx_rsa_4096_private_key_t);
+            break;
+        default:
+            return SWO_INCORRECT_DATA;
+    }
+
+    if (key == NULL) {
+        return SWO_CONDITIONS_NOT_SATISFIED;
+    }
+
+    gpg_io_discard(0);
+    ksz = len;
+    CX_CHECK(cx_aes_no_throw(keyenc,
+                             CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
+                             G_gpg_vstate.work.io_buffer + offset,
+                             enc_len,
+                             G_gpg_vstate.work.io_buffer,
+                             &ksz));
+    // the restored key must have the size of the key attributes
+    if ((len != ksz) || (((cx_rsa_private_key_t *) G_gpg_vstate.work.io_buffer)->size !=
+                         (unsigned int) (U2BE(keygpg->attributes.value, 1) >> 3))) {
+        error = SWO_INCORRECT_DATA;
+        goto end;
+    }
+    nvm_write((unsigned char *) key, G_gpg_vstate.work.io_buffer, len);
+    error = SWO_SUCCESS;
+end:
+    explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
+    return error;
+}
+
+static int gpg_put_key_data_legacy_ec(gpg_key_t *keygpg, cx_aes_key_t *keyenc) {
     cx_err_t error = CX_INTERNAL_ERROR;
-    int sw = SWO_UNKNOWN;
+    unsigned int len = 0;
+    unsigned int enc_len = 0;
+    unsigned int offset = 0;
     unsigned int ksz = 0;
 
-    sw = gpg_init_keyenc(&keyenc);
-    if (sw != SWO_SUCCESS) {
-        return sw;
+    // insert pubkey
+    if (gpg_key_data_left() < 4) {
+        return SWO_WRONG_LENGTH;
     }
+    len = gpg_io_fetch_u32();
+    if (len != sizeof(cx_ecfp_640_public_key_t)) {
+        return SWO_INCORRECT_DATA;
+    }
+    // public key, then encrypted key length
+    if (gpg_key_data_left() < len + 4) {
+        return SWO_WRONG_LENGTH;
+    }
+    gpg_io_fetch_nv((unsigned char *) &keygpg->pub_key.ecfp640, len);
+
+    // insert privkey
+    enc_len = gpg_io_fetch_u32();
+    if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+        return SWO_INCORRECT_DATA;
+    }
+    offset = G_gpg_vstate.io_offset;
+    gpg_io_discard(0);
+
+    ksz = sizeof(cx_ecfp_640_private_key_t);
+    CX_CHECK(cx_aes_no_throw(keyenc,
+                             CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
+                             G_gpg_vstate.work.io_buffer + offset,
+                             enc_len,
+                             G_gpg_vstate.work.io_buffer,
+                             &ksz));
+    if (ksz != sizeof(cx_ecfp_640_private_key_t)) {
+        error = SWO_INCORRECT_DATA;
+        goto end;
+    }
+    nvm_write((unsigned char *) &keygpg->priv_key.ecfp640, G_gpg_vstate.work.io_buffer, ksz);
+    error = SWO_SUCCESS;
+end:
+    explicit_bzero(G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
+    return error;
+}
+
+int gpg_apdu_put_key_data(unsigned int ref) {
+    gpg_key_t *keygpg = NULL;
+    int sw = SWO_UNKNOWN;
+    unsigned char version;
+
     switch (ref) {
         case KEY_SIG:
             keygpg = &G_gpg_vstate.kslot->sig;
@@ -1037,108 +1413,84 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             return SWO_INCORRECT_DATA;
     }
 
-    /* unsigned int target_id = */
-    gpg_io_fetch_u32();
-    /* unsigned int cx_apilevel = */
-    gpg_io_fetch_u32();
+    if (gpg_key_data_left() < 1) {
+        return SWO_WRONG_LENGTH;
+    }
+    version = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
+    if ((version == BACKUP_FORMAT_V1) || (version == BACKUP_FORMAT_V2)) {
+        // AES-GCM authenticated blob, with the nonce stored in the header from v2
+        cx_aes_gcm_context_t gcm_ctx;
+        unsigned char nonce[GPG_BACKUP_NONCE_LEN];
 
-    switch (keygpg->attributes.value[0]) {
-        case KEY_ID_RSA:
-            // insert pubkey
-            len = gpg_io_fetch_u32();
-            if (len != 4) {
-                sw = SWO_INCORRECT_DATA;
+        // version, TARGET_ID and api_level, then the nonce
+        if (gpg_key_data_left() <
+            1 + 4 + 4 + ((version == BACKUP_FORMAT_V2) ? GPG_BACKUP_NONCE_LEN : 0)) {
+            return SWO_WRONG_LENGTH;
+        }
+        sw = gpg_init_gcm(&gcm_ctx, version);
+        if (sw != SWO_SUCCESS) {
+            explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
+            return sw;
+        }
+        gpg_io_fetch_u8();   // version
+        gpg_io_fetch_u32();  // TARGET_ID
+        gpg_io_fetch_u32();  // api_level
+        if (version == BACKUP_FORMAT_V2) {
+            gpg_io_fetch(nonce, sizeof(nonce));
+        } else {
+            gpg_backup_nonce(ref, nonce);
+        }
+
+        switch (keygpg->attributes.value[0]) {
+            case KEY_ID_RSA:
+                sw = gpg_put_key_data_v1_rsa(keygpg, &gcm_ctx, nonce);
                 break;
-            }
-            gpg_io_fetch_nv(keygpg->pub_key.rsa, len);
 
-            // insert privkey
-            enc_len = gpg_io_fetch_u32();
-            if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
-                sw = SWO_INCORRECT_DATA;
+            case KEY_ID_ECDH:
+            case KEY_ID_ECDSA:
+            case KEY_ID_EDDSA:
+                sw = gpg_put_key_data_v1_ec(keygpg, &gcm_ctx, nonce);
                 break;
-            }
-            offset = G_gpg_vstate.io_offset;
-            ksz = U2BE(keygpg->attributes.value, 1) >> 3;
-            switch (ksz) {
-                case 2048 / 8:
-                    key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa2048;
-                    len = sizeof(cx_rsa_2048_private_key_t);
-                    break;
-                case 3072 / 8:
-                    key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa3072;
-                    len = sizeof(cx_rsa_3072_private_key_t);
-                    break;
-                case 4096 / 8:
-                    key = (cx_rsa_private_key_t *) &keygpg->priv_key.rsa4096;
-                    len = sizeof(cx_rsa_4096_private_key_t);
-                    break;
-            }
 
-            if ((key == NULL) || (key->size != ksz)) {
-                sw = SWO_CONDITIONS_NOT_SATISFIED;
+            default:
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
-            }
+        }
+        explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
+    } else {
+        // legacy: AES-CBC blob (first byte is high byte of TARGET_ID, never 0x01 nor 0x02)
+        cx_aes_key_t keyenc = {0};
 
-            gpg_io_discard(0);
-            ksz = len;
-            CX_CHECK(cx_aes_no_throw(&keyenc,
-                                     CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
-                                     G_gpg_vstate.work.io_buffer + offset,
-                                     enc_len,
-                                     G_gpg_vstate.work.io_buffer,
-                                     &ksz));
-            if (len != ksz) {
-                sw = SWO_INCORRECT_DATA;
+        // TARGET_ID and api_level
+        if (gpg_key_data_left() < 4 + 4) {
+            return SWO_WRONG_LENGTH;
+        }
+        sw = gpg_init_keyenc(&keyenc);
+        if (sw != SWO_SUCCESS) {
+            explicit_bzero(&keyenc, sizeof(keyenc));
+            return sw;
+        }
+
+        gpg_io_fetch_u32();  // TARGET_ID
+        gpg_io_fetch_u32();  // api_level
+
+        switch (keygpg->attributes.value[0]) {
+            case KEY_ID_RSA:
+                sw = gpg_put_key_data_legacy_rsa(keygpg, &keyenc);
                 break;
-            }
-            nvm_write((unsigned char *) key, G_gpg_vstate.work.io_buffer, len);
-            sw = SWO_SUCCESS;
-            break;
 
-        case KEY_ID_ECDH:
-        case KEY_ID_ECDSA:
-        case KEY_ID_EDDSA:
-            // insert pubkey
-            len = gpg_io_fetch_u32();
-            if (len != sizeof(cx_ecfp_640_public_key_t)) {
-                sw = SWO_INCORRECT_DATA;
+            case KEY_ID_ECDH:
+            case KEY_ID_ECDSA:
+            case KEY_ID_EDDSA:
+                sw = gpg_put_key_data_legacy_ec(keygpg, &keyenc);
                 break;
-            }
-            gpg_io_fetch_nv((unsigned char *) &keygpg->pub_key.ecfp640, len);
 
-            // insert privkey
-            enc_len = gpg_io_fetch_u32();
-            if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
-                sw = SWO_INCORRECT_DATA;
+            default:
+                sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
-            }
-            offset = G_gpg_vstate.io_offset;
-            gpg_io_discard(0);
-
-            ksz = sizeof(cx_ecfp_640_private_key_t);
-            CX_CHECK(cx_aes_no_throw(&keyenc,
-                                     CX_DECRYPT | CX_CHAIN_CBC | CX_PAD_ISO9797M2 | CX_LAST,
-                                     G_gpg_vstate.work.io_buffer + offset,
-                                     enc_len,
-                                     G_gpg_vstate.work.io_buffer,
-                                     &ksz));
-            if (ksz != sizeof(cx_ecfp_640_private_key_t)) {
-                sw = SWO_INCORRECT_DATA;
-                break;
-            }
-            nvm_write((unsigned char *) &keygpg->priv_key.ecfp640,
-                      G_gpg_vstate.work.io_buffer,
-                      ksz);
-            sw = SWO_SUCCESS;
-            break;
-
-        default:
-            sw = SWO_REFERENCED_DATA_NOT_FOUND;
-            break;
+        }
+        explicit_bzero(&keyenc, sizeof(keyenc));
     }
     gpg_io_discard(1);
     return sw;
-end:
-    return error;
 }

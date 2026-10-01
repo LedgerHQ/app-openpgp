@@ -1,4 +1,4 @@
-import { exchange, getData, putData, APDU_MAX_SIZE } from "./apdu";
+import { exchange, getData, putData, selectData, APDU_MAX_SIZE, CHAIN_MAX_SIZE, RESPONSE_MAX_CHUNKS } from "./apdu";
 
 // Minimal fake transport: records every frame sent and replays canned
 // responses (each a Buffer of data + 2-byte SW) in order.
@@ -42,6 +42,36 @@ describe("exchange", () => {
     );
   });
 
+  test("rejects an endless GET RESPONSE chain", async () => {
+    const endless = Array.from({ length: RESPONSE_MAX_CHUNKS + 2 }, () =>
+      Buffer.from([0x61, 0x00])
+    );
+    const t = new MockTransport(endless);
+    await expect(exchange(t, "00CA004F00")).rejects.toThrow("too long");
+    expect(t.sent.length).toBe(RESPONSE_MAX_CHUNKS + 1);
+  });
+
+  test("rejects a response shorter than a status word", async () => {
+    const t = new MockTransport([Buffer.from([0x90])]);
+    await expect(exchange(t, "00CA004F00")).rejects.toThrow("Truncated");
+  });
+
+  test("stops a command chain on a refused intermediate frame", async () => {
+    const payload = Buffer.alloc(600, 0x77);
+    const t = new MockTransport([Buffer.from([0x67, 0x00])]);
+    const sw = await putData(t, 0xb6, payload);
+    expect(sw).toBe(0x6700);
+    expect(t.sent.length).toBe(1);
+  });
+
+  test("refuses data larger than the device chaining buffer", async () => {
+    const t = new MockTransport([]);
+    await expect(putData(t, 0x7f21, Buffer.alloc(CHAIN_MAX_SIZE + 1))).rejects.toThrow(
+      "too long"
+    );
+    expect(t.sent.length).toBe(0);
+  });
+
   test("command-chains outgoing data larger than APDU_MAX_SIZE", async () => {
     const payload = Buffer.alloc(300, 0x77); // > 254
     const t = new MockTransport([
@@ -78,5 +108,34 @@ describe("getData", () => {
       true
     );
     expect(data.equals(Buffer.from([0xde, 0xad]))).toBe(true);
+  });
+
+  test("throws on an error status word", async () => {
+    const t = new MockTransport([Buffer.from([0x6a, 0x88])]);
+    await expect(getData(t, 0x005e)).rejects.toThrow("005e");
+  });
+
+  test("returns an empty value for a status word meaning absent", async () => {
+    const t = new MockTransport([Buffer.from([0x69, 0x85])]);
+    const data = await getData(t, 0x00b6, false, [0x6985]);
+    expect(data.length).toBe(0);
+  });
+});
+
+describe("selectData", () => {
+  test("sends the occurrence in P1 and the tag in a 5C template", async () => {
+    const t = new MockTransport([Buffer.from([0x90, 0x00])]);
+    expect(await selectData(t, 0x7f21, 2)).toBe(true);
+    expect(t.sent[0].toString("hex")).toBe("00a502040660045c027f21");
+  });
+
+  test("returns false when the device does not support it", async () => {
+    const t = new MockTransport([Buffer.from([0x6d, 0x00])]);
+    expect(await selectData(t, 0x7f21, 1)).toBe(false);
+  });
+
+  test("throws on any other error", async () => {
+    const t = new MockTransport([Buffer.from([0x6a, 0x80])]);
+    await expect(selectData(t, 0x7f21, 1)).rejects.toThrow("Unable to select occurrence 1");
   });
 });

@@ -369,9 +369,9 @@ def entrypoint() -> None:
 
     # Processing
     # ----------
+    gpgcard: GPGCard = GPGCard()
     try:
         print(f"Connect to card '{args.reader}'...")
-        gpgcard: GPGCard = GPGCard()
         gpgcard.log_apdu(args.apdu)
         gpgcard.connect(args.reader)
 
@@ -391,16 +391,18 @@ def entrypoint() -> None:
         if args.lang:
             gpgcard.set_lang(args.lang)
 
-        if args.new_user_pin:
-            gpgcard.change_pin(PassWord.PW1, args.user_pin, args.new_user_pin)
-        if args.new_adm_pin:
-            gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin)
+        if args.new_user_pin and not gpgcard.change_pin(PassWord.PW1, args.user_pin, args.new_user_pin):
+            error(ErrorCodes.ERR_INTERNAL, "User PIN not changed")
+        if args.new_adm_pin and not gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin):
+            error(ErrorCodes.ERR_INTERNAL, "Admin PIN not changed")
         if args.reset_pw1:
             # Reset the User PIN with Resetting Code
-            gpgcard.reset_PW1(args.reset_code, args.reset_pw1)
+            if not gpgcard.reset_PW1(args.reset_code, args.reset_pw1):
+                error(ErrorCodes.ERR_INTERNAL, "User PIN not reset")
         elif args.reset_code:
             # Use the Resetting code to set the value
-            gpgcard.set_RC(args.reset_code)
+            if not gpgcard.set_RC(args.reset_code):
+                error(ErrorCodes.ERR_INTERNAL, "Resetting Code not set")
 
         get_info(gpgcard, args.info)
 
@@ -422,10 +424,15 @@ def entrypoint() -> None:
         if args.key_action:
             handle_key(gpgcard, args.key_action, args.key_type, args.file, args.seed_key)
 
-        gpgcard.disconnect()
-
     except GPGCardExcpetion as err:
         error(err.code, err.message)
+    finally:
+        if gpgcard.transport is not None:
+            try:
+                gpgcard.logout()
+            except GPGCardExcpetion:
+                pass
+            gpgcard.disconnect()
 
 
 if __name__ == "__main__":

@@ -12,12 +12,19 @@
 //     (e.g. to read RSA-4096 public keys).
 
 export const SW_SUCCESS = 0x9000;
+export const SW_CONDITIONS_NOT_SATISFIED = 0x6985;
+export const SW_INS_NOT_SUPPORTED = 0x6d00;
 export const SW1_MORE_DATA = 0x61;
 
 // Largest data chunk per command-chaining frame (matches the python tool).
 export const APDU_MAX_SIZE = 0xfe;
 // CLA bit flagging an intermediate command-chaining frame.
 export const APDU_CHAINING_MODE = 0x10;
+// Size of the device buffer receiving a whole command chain.
+export const CHAIN_MAX_SIZE = 1512;
+// Bounds of a response received through GET RESPONSE.
+export const RESPONSE_MAX_SIZE = 0x4000;
+export const RESPONSE_MAX_CHUNKS = 64;
 
 // Map of the OpenPGP status words we want to surface with a readable message.
 const ERROR_MESSAGES = Object.freeze({
@@ -40,6 +47,17 @@ export function statusMessage(sw) {
   return ERROR_MESSAGES[sw] || `SW=0x${hex}`;
 }
 
+// Split a raw response into its data and its 2-byte status word.
+function parseResponse(response) {
+  if (response.length < 2) {
+    throw new Error("Truncated response from the device");
+  }
+  return {
+    data: response.slice(0, response.length - 2),
+    sw: response.readUInt16BE(response.length - 2),
+  };
+}
+
 function toBuffer(value) {
   return typeof value === "string" ? Buffer.from(value, "hex") : Buffer.from(value);
 }
@@ -54,6 +72,10 @@ export async function exchange(transport, apdu, data = Buffer.alloc(0)) {
   const header = toBuffer(apdu);
   const payload = toBuffer(data);
 
+  if (payload.length > CHAIN_MAX_SIZE) {
+    throw new Error(`Data too long for the device (${payload.length} bytes)`);
+  }
+
   let frame = header;
   if (payload.length > 0) {
     let rest = payload;
@@ -66,35 +88,67 @@ export async function exchange(transport, apdu, data = Buffer.alloc(0)) {
         APDU_MAX_SIZE,
       ]);
       while (rest.length > APDU_MAX_SIZE) {
-        await transport.exchange(
-          Buffer.concat([chained, rest.slice(0, APDU_MAX_SIZE)])
+        const { sw } = parseResponse(
+          await transport.exchange(Buffer.concat([chained, rest.slice(0, APDU_MAX_SIZE)]))
         );
+        // A refused frame aborts the chain: the rest must not be sent alone
+        if (sw !== SW_SUCCESS) {
+          return { data: Buffer.alloc(0), sw };
+        }
         rest = rest.slice(APDU_MAX_SIZE);
       }
     }
     frame = Buffer.concat([header, Buffer.from([rest.length]), rest]);
   }
 
-  let response = await transport.exchange(frame);
-  let respData = response.slice(0, response.length - 2);
-  let sw = response.readUInt16BE(response.length - 2);
+  let { data: respData, sw } = parseResponse(await transport.exchange(frame));
 
+  let chunks = 0;
   while (sw >> 8 === SW1_MORE_DATA) {
+    chunks += 1;
+    if (chunks > RESPONSE_MAX_CHUNKS || respData.length > RESPONSE_MAX_SIZE) {
+      throw new Error("Response from the device is too long");
+    }
     const le = sw & 0xff;
-    response = await transport.exchange(Buffer.from([0x00, 0xc0, 0x00, 0x00, le]));
-    respData = Buffer.concat([respData, response.slice(0, response.length - 2)]);
-    sw = response.readUInt16BE(response.length - 2);
+    const next = parseResponse(
+      await transport.exchange(Buffer.from([0x00, 0xc0, 0x00, 0x00, le]))
+    );
+    respData = Buffer.concat([respData, next.data]);
+    sw = next.sw;
   }
   return { data: respData, sw };
 }
 
 // GET DATA (INS 0xCA, or 0xCC for the next occurrence). Returns the value
-// bytes; the status word is ignored, like the python `_get_data`.
-export async function getData(transport, tag, bnext = false) {
+// bytes, and throws on any status word other than success, except those listed
+// in `missing`, which mean an absent value and return an empty buffer.
+export async function getData(transport, tag, bnext = false, missing = []) {
   const ins = bnext ? 0xcc : 0xca;
   const header = Buffer.from([0x00, ins, (tag >> 8) & 0xff, tag & 0xff, 0x00]);
-  const { data } = await exchange(transport, header);
+  const { data, sw } = await exchange(transport, header);
+  if (missing.includes(sw)) {
+    return Buffer.alloc(0);
+  }
+  if (sw !== SW_SUCCESS) {
+    const hex = tag.toString(16).padStart(4, "0");
+    throw new Error(`Unable to read data object ${hex} (${statusMessage(sw)})`);
+  }
   return data;
+}
+
+// SELECT DATA (INS 0xA5) of occurrence `occurrence` of `tag`. Returns false
+// when the device does not support it, and throws on any other error.
+export async function selectData(transport, tag, occurrence) {
+  const header = Buffer.from([0x00, 0xa5, occurrence, 0x04]);
+  const data = Buffer.from([0x60, 0x04, 0x5c, 0x02, (tag >> 8) & 0xff, tag & 0xff]);
+  const { sw } = await exchange(transport, header, data);
+  if (sw === SW_INS_NOT_SUPPORTED) {
+    return false;
+  }
+  if (sw !== SW_SUCCESS) {
+    throw new Error(`Unable to select occurrence ${occurrence} (${statusMessage(sw)})`);
+  }
+  return true;
 }
 
 // PUT DATA (INS 0xDA). Returns the status word, like the python `_put_data`.

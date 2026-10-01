@@ -21,10 +21,12 @@ import json
 import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from hashlib import sha1
+from hashlib import pbkdf2_hmac, sha1
 
 # pylint: disable=import-error
+from Crypto.Cipher import AES
 from Crypto.PublicKey.RSA import construct
+from Crypto.Random import get_random_bytes
 from ledgercomm import Transport  # type: ignore
 
 # pylint: enable=import-error
@@ -41,6 +43,9 @@ from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
 
 APDU_MAX_SIZE: int = 0xFE
 APDU_CHAINING_MODE: int = 0x10
+# Bounds of a response received through GET RESPONSE
+RESPONSE_MAX_SIZE: int = 0x4000
+RESPONSE_MAX_CHUNKS: int = 64
 
 
 class GPGCardExcpetion(Exception):
@@ -57,6 +62,46 @@ class GPGCardExcpetion(Exception):
         super().__init__(self.message)
 
 
+# Encrypted backup file format: version(1) || salt(16) || nonce(12) || ciphertext || tag(16)
+# First byte of an unencrypted backup is '{' (0x7B); 0x01 is unambiguously the encrypted format.
+# KDF: PBKDF2-SHA256, 600 000 iterations — matches the WUI (Web Crypto API).
+_BACKUP_ENC_VERSION = b"\x01"
+_PBKDF2_ITER = 600_000
+_SALT_LEN = 16
+_NONCE_LEN = 12
+_KEY_LEN = 32  # AES-256-GCM
+
+
+def _derive_key(passphrase: str, salt: bytes) -> bytes:
+    return pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, _PBKDF2_ITER, dklen=_KEY_LEN)
+
+
+def _encrypt_backup(data: bytes, passphrase: str) -> bytes:
+    salt = get_random_bytes(_SALT_LEN)
+    nonce = get_random_bytes(_NONCE_LEN)
+    cipher = AES.new(_derive_key(passphrase, salt), AES.MODE_GCM, nonce=nonce)
+    ciphertext, tag = cipher.encrypt_and_digest(data)
+    return _BACKUP_ENC_VERSION + salt + nonce + ciphertext + tag
+
+
+def _decrypt_backup(data: bytes, passphrase: str) -> bytes:
+    min_len = 1 + _SALT_LEN + _NONCE_LEN + 16
+    if len(data) < min_len:
+        raise GPGCardExcpetion(0, "Encrypted backup file is truncated")
+    off = 1  # skip version byte
+    salt = data[off : off + _SALT_LEN]
+    off += _SALT_LEN
+    nonce = data[off : off + _NONCE_LEN]
+    off += _NONCE_LEN
+    ciphertext = data[off:-16]
+    tag = data[-16:]
+    cipher = AES.new(_derive_key(passphrase, salt), AES.MODE_GCM, nonce=nonce)
+    try:
+        return cipher.decrypt_and_verify(ciphertext, tag)
+    except ValueError as e:
+        raise GPGCardExcpetion(0, "Backup decryption failed (wrong passphrase or corrupted file)") from e
+
+
 @dataclass
 class KeyInfo:
     """Key description information"""
@@ -64,7 +109,7 @@ class KeyInfo:
     attribute: bytes = b""
     fingerprint: bytes = b""
     ca_fingerprint: bytes = b""
-    cert: str = ""
+    cert: bytes = b""
     date: datetime = datetime.min
     uif: int = 0
     key: bytes = b""
@@ -75,7 +120,7 @@ class KeyInfo:
         self.attribute = b""
         self.fingerprint = b""
         self.ca_fingerprint = b""
-        self.cert = ""
+        self.cert = b""
         self.date = datetime.min
         self.uif = 0
         self.key = b""
@@ -167,6 +212,27 @@ class GPGCard:
         else:
             self.transport = Transport("hid")
         print("")
+        # no PIN is sent before the OpenPGP application answers its selection
+        _, sw = self.select()
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, "OpenPGP application not selected")
+
+    def logout(self) -> None:
+        """Clear PW1/PW2/PW3 verification state on the card.
+
+        Sends VERIFY with P1=0xFF for each password role, which instructs
+        the firmware to reset that role's verified flag without checking any
+        PIN value.  Must be called before closing the transport so that a
+        subsequent process cannot reuse residual authorization.
+        """
+        errors = []
+        for pw in (PassWord.PW1, PassWord.PW2, PassWord.PW3):
+            apdu = bytes([0x00, 0x20, 0xFF, int(pw), 0x00])
+            _, sw = self._exchange(apdu)
+            if sw != ErrorCodes.ERR_SUCCESS:
+                errors.append((pw, sw))
+        if errors:
+            raise GPGCardExcpetion(errors[0][1], "Failed to clear PIN session")
 
     def disconnect(self):
         """Connect from the selected Reader"""
@@ -198,20 +264,25 @@ class GPGCard:
             # INS bytes covered: VERIFY (0x20), CHANGE REFERENCE DATA (0x24),
             # RESET RETRY COUNTER (0x2C), PUT DATA (0xDA).
             _SENSITIVE_INS = {0x20, 0x24, 0x2C, 0xDA}
-            # GET DATA (INS=0xCA) for private-key DOs B6/A4/B8 returns key
-            # material; redact the following recv response too (CWE-532).
-            _KEY_READ_DOS = {0xB6, 0xA4, 0xB8}
+            # GET DATA / GET NEXT DATA of the key blobs and of the private DOs
+            # return secrets, until the last GET RESPONSE chunk
+            _SENSITIVE_DOS = {0x00B6, 0x00A4, 0x00B8, 0x0101, 0x0102, 0x0103, 0x0104}
+            _GET_DATA_INS = {0xCA, 0xCC}
+            _GET_RESPONSE_INS = 0xC0
             if mode == "send":
                 if len(data) > 1 and data[1] in _SENSITIVE_INS:
                     print(f"{mode}: [REDACTED SENSITIVE APDU ins={data[1]:02x}]")
                     return
-                self._last_sent_was_key_read = len(data) >= 4 and data[1] == 0xCA and data[2] == 0x00 and data[3] in _KEY_READ_DOS
+                if len(data) > 1 and data[1] != _GET_RESPONSE_INS:
+                    self._last_sent_was_key_read = (
+                        len(data) >= 4 and data[1] in _GET_DATA_INS and ((data[2] << 8) | data[3]) in _SENSITIVE_DOS
+                    )
             elif mode == "recv":
                 if self._last_sent_was_key_read:
-                    self._last_sent_was_key_read = False
-                    print(f"{mode}: [REDACTED KEY MATERIAL sw={sw:04x}]")
+                    if (sw >> 8) != ErrorCodes.ERR_SW1_VALID:
+                        self._last_sent_was_key_read = False
+                    print(f"{mode}: [REDACTED SENSITIVE DATA sw={sw:04x}]")
                     return
-                self._last_sent_was_key_read = False
             sw_code = f" ({sw:04x})" if mode == "recv" else ""
             print(f"{mode}:{sw_code} {''.join([f'{b:02x}' for b in data])}")
 
@@ -249,18 +320,18 @@ class GPGCard:
         b_data: bytes = b""
         s_data: str = ""
 
-        self.slot_current = self._get_data(DataObject.CMD_SLOT_CUR)
-        self.slot_config = self._get_data(DataObject.CMD_SLOT_CFG)
+        self.slot_current = self._read_data(DataObject.CMD_SLOT_CUR)
+        self.slot_config = self._read_data(DataObject.CMD_SLOT_CFG)
 
-        self.data.AID = self._get_data(DataObject.DO_AID).hex().upper()
-        self.data.login = self._get_data(DataObject.DO_LOGIN).decode("utf-8")
-        self.data.url = self._get_data(DataObject.DO_URL).decode("utf-8")
-        self.data.histo_bytes = self._get_data(DataObject.DO_HIST)
-        data = self._get_data(DataObject.DO_GEN_FEATURES)
+        self.data.AID = self._read_data(DataObject.DO_AID).hex().upper()
+        self.data.login = self._read_data(DataObject.DO_LOGIN).decode("utf-8")
+        self.data.url = self._read_data(DataObject.DO_URL).decode("utf-8")
+        self.data.histo_bytes = self._read_data(DataObject.DO_HIST)
+        data = self._read_data(DataObject.DO_GEN_FEATURES)
         if data:
             self.data.hw_features = data[0]
 
-        data = self._get_data(DataObject.DO_CARDHOLDER_DATA)
+        data = self._read_data(DataObject.DO_CARDHOLDER_DATA)
         tags = self._decode_tlv(data)
         if DataObject.DO_CARD_NAME in tags:
             self.data.name = tags[DataObject.DO_CARD_NAME].decode("utf-8")
@@ -274,7 +345,7 @@ class GPGCard:
         if DataObject.DO_CARD_LANG in tags:
             self.data.lang = tags[DataObject.DO_CARD_LANG].decode("utf-8")
 
-        data = self._get_data(DataObject.DO_APP_DATA)
+        data = self._read_data(DataObject.DO_APP_DATA)
         tags = self._decode_tlv(data)
         if DataObject.DO_EXT_LEN in tags:
             self.data.ext_length = tags[DataObject.DO_EXT_LEN]
@@ -309,37 +380,40 @@ class GPGCard:
                 self._conv_date_from_bytes(KeyTypes.KEY_DEC, dates[4:8])
                 self._conv_date_from_bytes(KeyTypes.KEY_AUT, dates[8:12])
 
-        data = self._get_data(DataObject.CMD_RSA_EXP)
+        data = self._read_data(DataObject.CMD_RSA_EXP)
         self.data.rsa_pub_exp = self._get_int(data, 4)
-        self.data.aut.cert = self._get_data(DataObject.DO_CERT).decode("utf-8")
-        self.data.dec.cert = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
-        self.data.sig.cert = self._get_data(DataObject.DO_CERT, True).decode("utf-8")
+        for occurrence, slot in enumerate((self.data.aut, self.data.dec, self.data.sig)):
+            if self._select_cert(occurrence):
+                slot.cert = self._read_data(DataObject.DO_CERT)
+            else:
+                slot.cert = self._read_data(DataObject.DO_CERT, occurrence > 0)
 
-        self.data.sig.uif = int(self._get_data(DataObject.DO_UIF_SIG)[0])
-        self.data.dec.uif = int(self._get_data(DataObject.DO_UIF_DEC)[0])
-        self.data.aut.uif = int(self._get_data(DataObject.DO_UIF_AUT)[0])
+        self.data.sig.uif = int(self._read_data(DataObject.DO_UIF_SIG)[0])
+        self.data.dec.uif = int(self._read_data(DataObject.DO_UIF_DEC)[0])
+        self.data.aut.uif = int(self._read_data(DataObject.DO_UIF_AUT)[0])
 
-        data = self._get_data(DataObject.DO_SEC_TEMPL)
+        data = self._read_data(DataObject.DO_SEC_TEMPL)
         tags = self._decode_tlv(data)
         if DataObject.DO_SIG_COUNT in tags:
             b_data = tags[DataObject.DO_SIG_COUNT]
             self.data.digital_counter = self._get_int(b_data, 3)
 
         if self.data.ext_capabilities[0] & 0x08:
-            self.data.private_01 = self._get_data(DataObject.DO_PRIVATE_01)
-            self.data.private_02 = self._get_data(DataObject.DO_PRIVATE_02)
-            self.data.private_03 = self._get_data(DataObject.DO_PRIVATE_03)
-            self.data.private_04 = self._get_data(DataObject.DO_PRIVATE_04)
+            self.data.private_01 = self._read_data(DataObject.DO_PRIVATE_01)
+            self.data.private_02 = self._read_data(DataObject.DO_PRIVATE_02)
+            self.data.private_03 = self._read_data(DataObject.DO_PRIVATE_03)
+            self.data.private_04 = self._read_data(DataObject.DO_PRIVATE_04)
 
-        self.data.sig.key = self._get_data(DataObject.DO_SIG_KEY)
-        self.data.dec.key = self._get_data(DataObject.DO_DEC_KEY)
-        self.data.aut.key = self._get_data(DataObject.DO_AUT_KEY)
+        self.data.sig.key = self._read_data(DataObject.DO_SIG_KEY, missing=(ErrorCodes.ERR_COND_OF_USE_NOT_SATISFIED,))
+        self.data.dec.key = self._read_data(DataObject.DO_DEC_KEY, missing=(ErrorCodes.ERR_COND_OF_USE_NOT_SATISFIED,))
+        self.data.aut.key = self._read_data(DataObject.DO_AUT_KEY, missing=(ErrorCodes.ERR_COND_OF_USE_NOT_SATISFIED,))
 
-    def backup(self, file_name: str) -> None:
-        """Backup data to backup file
+    def backup(self, file_name: str, passphrase: str | None = None) -> None:
+        """Backup data to backup file.
 
         Args:
             file_name (str): Backup filename
+            passphrase (str | None): If provided, the file is encrypted with AES-256-GCM.
         """
 
         def _b64(b: bytes) -> str:
@@ -353,7 +427,9 @@ class GPGCard:
                 "date": str(slot.date),
                 "fingerprint": _b64(slot.fingerprint),
                 "ca_fingerprint": _b64(slot.ca_fingerprint),
-                "cert": slot.cert,
+                # "cert" is kept for older tools, which cannot hold binary certificates
+                "cert": slot.cert.decode("utf-8", errors="replace"),
+                "cert_b64": _b64(slot.cert),
             }
 
         self.get_all()
@@ -376,22 +452,37 @@ class GPGCard:
             "dec": _key_slot(self.data.dec),
             "aut": _key_slot(self.data.aut),
         }
-        fd = os.open(file_name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, mode="w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
+        raw = json.dumps(payload, indent=2).encode("utf-8")
+        if passphrase is not None:
+            raw = _encrypt_backup(raw, passphrase)
+        # never reuse an existing path, nor follow a link created in its place
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(file_name, flags, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
 
-    def restore(self, file_name: str) -> None:
-        """Restore data from backup file
+    def restore(self, file_name: str, passphrase: str | None = None, seed_key: bool = False) -> None:
+        """Restore data from backup file.
 
         Args:
             file_name (str): Backup filename
+            passphrase (str | None): Required when the file was encrypted with --file-passphrase.
+            seed_key (bool): When True, skip writing key blobs; caller must invoke seed_key()
+                             afterwards to regenerate keys from the device seed.
         """
 
         def _fromb64(s: str) -> bytes:
             return base64.b64decode(s)
 
-        with open(file_name, encoding="utf-8") as f:
-            payload = json.load(f)
+        with open(file_name, "rb") as f:
+            raw = f.read()
+
+        if raw[:1] == _BACKUP_ENC_VERSION:
+            if passphrase is None:
+                raise GPGCardExcpetion(0, "Backup file is encrypted; provide --file-passphrase")
+            raw = _decrypt_backup(raw, passphrase)
+
+        payload = json.loads(raw.decode("utf-8"))
 
         self.data.AID = payload["AID"]
         self.data.PW_status = _fromb64(payload["PW_status"])
@@ -415,70 +506,84 @@ class GPGCard:
             slot.date = datetime.strptime(raw["date"], "%Y-%m-%d %H:%M:%S")
             slot.fingerprint = _fromb64(raw["fingerprint"])
             slot.ca_fingerprint = _fromb64(raw["ca_fingerprint"])
-            slot.cert = raw["cert"]
+            slot.cert = _fromb64(raw["cert_b64"]) if "cert_b64" in raw else raw["cert"].encode("utf-8")
 
-        self._put_data(DataObject.DO_AID, bytes.fromhex(self.data.AID[20:28]))
-        self._put_data(DataObject.DO_PW_STATUS, self.data.PW_status)
+        failures: list[tuple[str, int]] = []
 
-        self._put_data(DataObject.DO_PRIVATE_01, self.data.private_01)
-        self._put_data(DataObject.DO_PRIVATE_02, self.data.private_02)
-        self._put_data(DataObject.DO_PRIVATE_03, self.data.private_03)
-        self._put_data(DataObject.DO_PRIVATE_04, self.data.private_04)
+        def _put(tag: DataObject, value: bytes) -> None:
+            sw = self._put_data(tag, value)
+            if sw != ErrorCodes.ERR_SUCCESS:
+                failures.append((tag.name, sw))
 
-        self._put_data(DataObject.DO_CARD_NAME, self.data.name.encode("utf-8"))
-        self._put_data(DataObject.DO_LOGIN, self.data.login.encode("utf-8"))
-        self._put_data(DataObject.DO_CARD_LANG, self.data.lang.encode("utf-8"))
-        self._put_data(DataObject.DO_URL, self.data.url.encode("utf-8"))
+        _put(DataObject.DO_AID, bytes.fromhex(self.data.AID[20:28]))
+        _put(DataObject.DO_PW_STATUS, self.data.PW_status)
+
+        _put(DataObject.DO_PRIVATE_01, self.data.private_01)
+        _put(DataObject.DO_PRIVATE_02, self.data.private_02)
+        _put(DataObject.DO_PRIVATE_03, self.data.private_03)
+        _put(DataObject.DO_PRIVATE_04, self.data.private_04)
+
+        _put(DataObject.DO_CARD_NAME, self.data.name.encode("utf-8"))
+        _put(DataObject.DO_LOGIN, self.data.login.encode("utf-8"))
+        _put(DataObject.DO_CARD_LANG, self.data.lang.encode("utf-8"))
+        _put(DataObject.DO_URL, self.data.url.encode("utf-8"))
         if len(self.data.salutation) == 0:
-            self._put_data(DataObject.DO_CARD_SALUTATION, b"\x30")
+            _put(DataObject.DO_CARD_SALUTATION, b"\x30")
         else:
             # The salutation DO (ISO 5218) holds an ASCII digit ("1"/"2"), as
             # written by set_salutation(); fromhex() here would raise.
-            self._put_data(
+            _put(
                 DataObject.DO_CARD_SALUTATION,
                 USER_SALUTATION[self.data.salutation].encode("utf-8"),
             )
 
-        self._put_data(DataObject.DO_SIG_ATTR, self.data.sig.attribute)
-        self._put_data(DataObject.DO_DEC_ATTR, self.data.dec.attribute)
-        self._put_data(DataObject.DO_AUT_ATTR, self.data.aut.attribute)
+        _put(DataObject.DO_SIG_ATTR, self.data.sig.attribute)
+        _put(DataObject.DO_DEC_ATTR, self.data.dec.attribute)
+        _put(DataObject.DO_AUT_ATTR, self.data.aut.attribute)
 
-        self._put_data(DataObject.DO_UIF_SIG, self.data.sig.uif.to_bytes(2, "little"))
-        self._put_data(DataObject.DO_UIF_DEC, self.data.dec.uif.to_bytes(2, "little"))
-        self._put_data(DataObject.DO_UIF_AUT, self.data.aut.uif.to_bytes(2, "little"))
+        _put(DataObject.DO_UIF_SIG, self.data.sig.uif.to_bytes(2, "little"))
+        _put(DataObject.DO_UIF_DEC, self.data.dec.uif.to_bytes(2, "little"))
+        _put(DataObject.DO_UIF_AUT, self.data.aut.uif.to_bytes(2, "little"))
 
         # The digital signature counter (DO 0x93) is read-only on the card (no
         # write access path in the firmware): kept in the backup for reference
         # but not written back here.
-        self._put_data(DataObject.CMD_RSA_EXP, self.data.rsa_pub_exp.to_bytes(4, "little"))
+        _put(DataObject.CMD_RSA_EXP, self.data.rsa_pub_exp.to_bytes(4, "little"))
 
-        self._put_data(DataObject.DO_CERT, self.data.aut.cert.encode("utf-8"))
-        self._put_data(DataObject.DO_CERT, self.data.dec.cert.encode("utf-8"))
-        self._put_data(DataObject.DO_CERT, self.data.sig.cert.encode("utf-8"))
+        for occurrence, slot in enumerate((self.data.aut, self.data.dec, self.data.sig)):
+            self._select_cert(occurrence)
+            _put(DataObject.DO_CERT, slot.cert)
 
-        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint)
-        self._put_data(DataObject.DO_FINGERPRINT_WR_SIG, self.data.sig.fingerprint)
+        _put(DataObject.DO_CA_FINGERPRINT_WR_SIG, self.data.sig.ca_fingerprint)
+        _put(DataObject.DO_FINGERPRINT_WR_SIG, self.data.sig.fingerprint)
         date = str(self.data.sig.date)
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
-        self._put_data(DataObject.DO_DATES_WR_SIG, bdate)
-        self._put_data(DataObject.DO_SIG_KEY, self.data.sig.key)
+        _put(DataObject.DO_DATES_WR_SIG, bdate)
+        if not seed_key and self.data.sig.key:
+            _put(DataObject.DO_SIG_KEY, self.data.sig.key)
 
-        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
-        self._put_data(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
+        _put(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
+        _put(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
         date = str(self.data.dec.date)
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
-        self._put_data(DataObject.DO_DATES_WR_DEC, bdate)
-        self._put_data(DataObject.DO_DEC_KEY, self.data.dec.key)
+        _put(DataObject.DO_DATES_WR_DEC, bdate)
+        if not seed_key and self.data.dec.key:
+            _put(DataObject.DO_DEC_KEY, self.data.dec.key)
 
-        self._put_data(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
-        self._put_data(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
+        _put(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
+        _put(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
         date = str(self.data.aut.date)
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         bdate = int(dt.timestamp()).to_bytes(4, "big")
-        self._put_data(DataObject.DO_DATES_WR_AUT, bdate)
-        self._put_data(DataObject.DO_AUT_KEY, self.data.aut.key)
+        _put(DataObject.DO_DATES_WR_AUT, bdate)
+        if not seed_key and self.data.aut.key:
+            _put(DataObject.DO_AUT_KEY, self.data.aut.key)
+
+        if failures:
+            names = ", ".join(f"{name} ({sw:04x})" for name, sw in failures)
+            raise GPGCardExcpetion(failures[0][1], f"{len(failures)} items rejected by the card: {names}")
 
     def export_pub_key(self, pubkey: dict, file_name: str) -> None:
         """Export a Public key to file
@@ -528,9 +633,8 @@ class GPGCard:
             (b"0047800102A400", "AUT"),
         ):
             _, sw = self._exchange(binascii.unhexlify(apdu_hex))
-            assert sw == ErrorCodes.ERR_SUCCESS, (
-                f"{name} key generation failed (sw={sw:#06x}) — check seed mode is ON and PIN is verified"
-            )
+            if sw != ErrorCodes.ERR_SUCCESS:
+                raise GPGCardExcpetion(sw, f"{name} key generation failed, check seed mode is ON and PIN is verified")
 
     ############### Information decoding ###############
     def decode_AID(self) -> dict:
@@ -680,8 +784,11 @@ class GPGCard:
             slot (int): slot id to select (0 to 3)
         """
 
-        self.slot_current = slot.to_bytes(1, "big")
-        self._put_data(DataObject.CMD_SLOT_CUR, self.slot_current)
+        slot_id = slot.to_bytes(1, "big")
+        sw = self._put_data(DataObject.CMD_SLOT_CUR, slot_id)
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, f"Failed to select slot {slot + 1}")
+        self.slot_current = slot_id
 
     def decode_slot(self) -> dict:
         """Decode Slots information
@@ -809,7 +916,8 @@ class GPGCard:
         if pinpad:
             apdu = bytes.fromhex(f"EF2000{pw:02x}00")
         else:
-            apdu = bytes.fromhex(f"002000{pw:02x}{len(value):02x}") + value.encode("utf-8")
+            b_value = value.encode("utf-8")
+            apdu = bytes.fromhex(f"002000{pw:02x}{len(b_value):02x}") + b_value
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -825,8 +933,8 @@ class GPGCard:
             Success / KO boolean
         """
 
-        lc = len(cur_value) + len(new_value)
-        apdu = bytes.fromhex(f"002400{pw:02x}{lc:02x}") + cur_value.encode("utf-8") + new_value.encode("utf-8")
+        data = cur_value.encode("utf-8") + new_value.encode("utf-8")
+        apdu = bytes.fromhex(f"002400{pw:02x}{len(data):02x}") + data
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -855,8 +963,8 @@ class GPGCard:
         """
 
         p1 = 2 if len(RC) == 0 else 0
-        lc = len(RC) + len(value)
-        apdu = bytes.fromhex(f"002C{p1:02x}81{lc:02x}") + RC.encode("utf-8") + value.encode("utf-8")
+        data = RC.encode("utf-8") + value.encode("utf-8")
+        apdu = bytes.fromhex(f"002C{p1:02x}81{len(data):02x}") + data
         _, sw = self._exchange(apdu)
         return sw == ErrorCodes.ERR_SUCCESS
 
@@ -917,10 +1025,11 @@ class GPGCard:
             key (str): Key type (SIG, DC, AUT)
 
         Return:
-            Key Certificate
+            Key Certificate, hex encoded
         """
 
-        return self._get_key_object(key).cert
+        cert = self._get_key_object(key).cert
+        return binascii.hexlify(cert).decode("ascii") if cert else "N/A"
 
     def set_template(self, key: str, template: str) -> None:
         """Set key Template
@@ -1129,10 +1238,13 @@ class GPGCard:
             # Compute the fingerprint https://www.rfc-editor.org/rfc/rfc4880#section-12.2
             modulus: bytes = bytes.fromhex(d["Modulus"])
             ksize: int = self._get_int(attributes, offset=1)
-            size: int = int(ksize / 8) + 0x0D  # len(header + tag + pub exp)
+            exponent: int = int.from_bytes(tags[0x82], "big")
+            exp_bytes: bytes = exponent.to_bytes((exponent.bit_length() + 7) // 8, "big")
+            # version, date, algorithm, then the modulus and exponent MPIs
+            size: int = 1 + 4 + 1 + 2 + int(ksize / 8) + 2 + len(exp_bytes)
 
             header: bytes = bytes.fromhex(f"99{size:04x}04{kdate:08x}01{ksize:04x}")
-            footer: bytes = bytes.fromhex("0011010001")
+            footer: bytes = exponent.bit_length().to_bytes(2, "big") + exp_bytes
             data: bytes = header + modulus + footer
 
             _hash = sha1()
@@ -1181,6 +1293,45 @@ class GPGCard:
         apdu = bytes.fromhex(f"00{ins:02x}{tag:04x}00")
         resp, _ = self._exchange(apdu)
         return resp
+
+    def _read_data(self, tag: int, bnext: bool = False, missing: tuple[int, ...] = ()) -> bytes:
+        """GET a Data Object, failing on any status other than success
+
+        Args:
+            tag (int):       Data Object tag
+            bnext (bool):    Read the next occurrence
+            missing (tuple): Status words meaning that the Data Object is absent
+
+        Return:
+            Data Object bytes, empty when absent
+        """
+
+        ins = 0xCC if bnext else 0xCA
+        apdu = bytes.fromhex(f"00{ins:02x}{tag:04x}00")
+        resp, sw = self._exchange(apdu)
+        if sw in missing:
+            return b""
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, f"Failed to read Data Object {tag:04x}")
+        return resp
+
+    def _select_cert(self, occurrence: int) -> bool:
+        """SELECT DATA of a cardholder certificate occurrence
+
+        Args:
+            occurrence (int): 0 for AUT, 1 for DEC, 2 for SIG
+
+        Return:
+            False when the card does not support SELECT DATA
+        """
+
+        apdu = bytes.fromhex(f"00A5{occurrence:02x}04")
+        _, sw = self._exchange(apdu, bytes.fromhex(f"60045C02{DataObject.DO_CERT:04x}"))
+        if sw == ErrorCodes.ERR_INS_NOT_SUPPORTED:
+            return False
+        if sw != ErrorCodes.ERR_SUCCESS:
+            raise GPGCardExcpetion(sw, f"Failed to select certificate occurrence {occurrence}")
+        return True
 
     def _put_data(self, tag: int, data: bytes) -> int:
         """Send APDU command to PUT a Data Object value
@@ -1235,7 +1386,7 @@ class GPGCard:
         """
 
         dt = datetime.utcnow().replace(microsecond=0)
-        bdate = int(dt.timestamp()).to_bytes(4, "big")
+        bdate = int(dt.replace(tzinfo=UTC).timestamp()).to_bytes(4, "big")
         tag: DataObject | None = None
         if key == KeyTypes.KEY_SIG:
             self.data.sig.date = dt
@@ -1330,12 +1481,17 @@ class GPGCard:
         resp, sw1, sw2 = self._transmit(apdu, True)
 
         # receive
+        response = bytearray(resp)
+        chunks = 0
         while sw1 == ErrorCodes.ERR_SW1_VALID:
+            chunks += 1
+            if chunks > RESPONSE_MAX_CHUNKS or len(response) > RESPONSE_MAX_SIZE:
+                raise GPGCardExcpetion((sw1 << 8) | sw2, "Response too long")
             apdux = bytes.fromhex(f"00c00000{sw2:02x}")
             resp2, sw1, sw2 = self._transmit(apdux, True)
-            resp += resp2
+            response += resp2
         sw = (sw1 << 8) | sw2
-        return bytes(resp), sw
+        return bytes(response), sw
 
     def _get_int(self, buffer: bytes, size: int = 2, offset: int = 0) -> int:
         """Exchange APDU, and get the response
