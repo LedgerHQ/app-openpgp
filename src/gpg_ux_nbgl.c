@@ -157,11 +157,12 @@ static void ui_home_init(void) {
     static const char *const infoContents[] = {COMBINED_VERSION, "Ledger", "Ledger (c) 2025"};
     char name[32];
     unsigned int serial = U4BE(G_gpg_vstate.kslot->serial, 0);
+    unsigned int name_len = MIN(N_gpg_pstate->name.length, sizeof(name) - 1);
 
     explicit_bzero(name, sizeof(name));
-    if (N_gpg_pstate->name.value[0] != 0) {
-        memmove(name, (void *) (N_gpg_pstate->name.value), sizeof(name) - 1);
-        for (uint8_t i = 0; i < sizeof(name) - 1; i++) {
+    if (name_len != 0) {
+        memmove(name, (void *) (N_gpg_pstate->name.value), name_len);
+        for (uint8_t i = 0; i < name_len; i++) {
             if ((name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
@@ -508,7 +509,13 @@ static void template_key_cb(int token, uint8_t index, int page) {
     static uint8_t *oid = NULL;
     uint32_t oid_len = 0;
     uint32_t size = 0;
+#ifdef SCREEN_SIZE_NANO
+    // on Nano, index is already the position of the choice in the whole list
+    UNUSED(page);
+    uint8_t key_type = index + FIRST_USER_TOKEN;
+#else
     uint8_t key_type = index + (page * nb_elt_per_page) + FIRST_USER_TOKEN;
+#endif
 
     if (token != TOKEN_TYPE_BACK) {
         explicit_bzero(&attributes, sizeof(attributes));
@@ -585,7 +592,7 @@ static void template_key_cb(int token, uint8_t index, int page) {
 
         if (dest && attributes.value[0] &&
             memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
-            nvm_write(dest, NULL, sizeof(gpg_key_t));
+            gpg_key_erase(dest);
             nvm_write(&dest->attributes, &attributes, sizeof(attributes));
         }
     }
@@ -1278,7 +1285,11 @@ static void pinentry_validate_cb(const uint8_t *pinentry, uint8_t length) {
  */
 static void pinback_cb(void) {
     G_gpg_vstate.ui_pending = 0;
-    gpg_io_discard(0);
+    if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
+        // the current PIN checked at the first step does not stay verified
+        gpg_pin_set_verified(G_gpg_vstate.ux_pinconfirm_p2, 0);
+    }
+    gpg_io_discard(1);
     gpg_io_insert_u16(SWO_CONDITIONS_NOT_SATISFIED);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
@@ -1354,7 +1365,7 @@ static void ui_menu_pinentry_cb(void) {
  * While the prompt is pending (IO_ASYNCH_REPLY), the host can overwrite the
  * global APDU state with a different command.  Restoring from this snapshot
  * in the callback ensures the operation executed is exactly what the user
- * reviewed, not an attacker-substituted payload (V-102). */
+ * reviewed, not an attacker-substituted payload. */
 typedef struct {
     unsigned char ins;
     unsigned char p1;
@@ -1394,6 +1405,9 @@ void uif_confirm_cb(bool confirm) {
             gpg_io_discard(1);
         }
         G_gpg_vstate.UIF_flags = 0;
+        if ((sw != SWO_SUCCESS) && ((sw & 0xFF00) != SWO_RESPONSE_BYTES_AVAILABLE)) {
+            gpg_io_discard(1);
+        }
     } else {
         gpg_io_discard(1);
     }

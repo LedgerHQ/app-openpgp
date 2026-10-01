@@ -141,6 +141,21 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
 }
 
 /**
+ * Check that a curve is the one of the key attributes
+ *
+ * @param[in]  key key whose attributes are checked
+ * @param[in]  curve curve of the stored key material
+ *
+ * @return true if the curves match
+ *
+ */
+bool gpg_key_curve_matches_attributes(const gpg_key_t *key, unsigned int curve) {
+    unsigned int attr_curve =
+        gpg_oid2curve((unsigned char *) key->attributes.value + 1, key->attributes.length - 1);
+    return (attr_curve != CX_CURVE_NONE) && (attr_curve == curve);
+}
+
+/**
  * Retrieve OID of the selected Curve
  *
  * @param[in]  cv Selected Curve as a reference
@@ -368,18 +383,12 @@ const unsigned char C_sha256_PW2[] = {
 /* ----------------------------------------------------------------------- */
 
 /**
- * App global config
+ * Reset the session state from the persistent configuration
+ * PINs are no longer verified
  *
  */
-void gpg_init() {
-    explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
-    // first init ?
-    if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH) != 0) {
-        gpg_install(STATE_ACTIVATE);
-        nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
-        explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
-    }
-
+void gpg_init_session() {
+    explicit_bzero(G_gpg_vstate.verified_pin, sizeof(G_gpg_vstate.verified_pin));
     // key conf
     G_gpg_vstate.slot = N_gpg_pstate->config_slot[1];
     G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
@@ -388,6 +397,21 @@ void gpg_init() {
     G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
     // seed conf
     G_gpg_vstate.seed_mode = 1;
+}
+
+/**
+ * App global config
+ *
+ */
+void gpg_init() {
+    explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
+    // first init ?
+    if (memcmp((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH) != 0) {
+        gpg_install(STATE_ACTIVATE);
+        explicit_bzero(&G_gpg_vstate, sizeof(gpg_v_state_t));
+    }
+
+    gpg_init_session();
     // ux conf
     G_gpg_vstate.ux_type = -1;
     G_gpg_vstate.ux_key = -1;
@@ -496,6 +520,9 @@ void gpg_install(unsigned char app_state) {
             gpg_install_slot((gpg_key_slot_t *) &N_gpg_pstate->keys[s]);
         }
     }
+
+    // installation completed, the next start keeps this state
+    nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
 }
 
 /**

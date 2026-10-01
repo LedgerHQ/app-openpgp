@@ -59,6 +59,59 @@ const unsigned char gpg_oid_sha512[] = {0x30,
                                         0x40};
 
 /**
+ * Number of input bytes not yet fetched
+ *
+ */
+static unsigned int gpg_pso_remaining() {
+    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+}
+
+/**
+ * Uncompress a Curve25519 public key
+ *
+ * @param[in,out]  raw_public_key x coordinate as input, 04 || x || y as output
+ *
+ * @return CX error code
+ *
+ */
+static cx_err_t gpg_pso_cv25519_uncompress(uint8_t *raw_public_key) {
+    cx_ecpoint_t public_point;
+    cx_err_t error;
+    cx_err_t unlock_error;
+
+    error = cx_bn_lock(32, 0);
+    if (error != CX_OK) {
+        return error;
+    }
+    error = cx_ecpoint_alloc(&public_point, CX_CURVE_Curve25519);
+    if (error == CX_OK) {
+        error = cx_ecpoint_decompress(&public_point, raw_public_key, 32, 0);
+    }
+    if (error == CX_OK) {
+        error =
+            cx_ecpoint_export(&public_point, raw_public_key + 1, 32, raw_public_key + 1 + 32, 32);
+    }
+    unlock_error = cx_bn_unlock();
+    if (error == CX_OK) {
+        error = unlock_error;
+    }
+    raw_public_key[0] = 0x04;
+    return error;
+}
+
+/**
+ * Check the AES key size against the ones allowed for DO D5
+ *
+ * @param[in]  aes_key AES key
+ *
+ * @return true for a 128 or 256 bits key
+ *
+ */
+static bool gpg_pso_aes_key_is_valid(const cx_aes_key_t *aes_key) {
+    return (aes_key->size == CX_AES_128_KEY_LEN) || (aes_key->size == CX_AES_256_KEY_LEN);
+}
+
+/**
  * Reset PW1 verified status
  *
  */
@@ -138,8 +191,14 @@ static int gpg_sign(gpg_key_t *sigkey) {
         case KEY_ID_ECDSA:
             ecfp_key = &sigkey->priv_key.ecfp;
             ksz = (unsigned int) gpg_curve2domainlen(ecfp_key->curve);
-            if ((ksz == 0) || (ecfp_key->d_len != ksz)) {
+            if ((ksz == 0) || (ecfp_key->d_len != ksz) ||
+                !gpg_key_curve_matches_attributes(sigkey, ecfp_key->curve)) {
                 error = SWO_CONDITIONS_NOT_SATISFIED;
+                break;
+            }
+            // longer digests are truncated to the curve length
+            if (G_gpg_vstate.io_length < ksz) {
+                error = SWO_WRONG_LENGTH;
                 break;
             }
             s_len = 256;
@@ -173,7 +232,16 @@ static int gpg_sign(gpg_key_t *sigkey) {
 
         case KEY_ID_EDDSA:
             ecfp_key = &sigkey->priv_key.ecfp;
+            if (!gpg_key_curve_matches_attributes(sigkey, ecfp_key->curve)) {
+                error = SWO_CONDITIONS_NOT_SATISFIED;
+                break;
+            }
             ksz = 256;
+            // the message must not overlap the signature output area
+            if (G_gpg_vstate.io_length > GPG_IO_BUFFER_LENGTH - ksz) {
+                error = SWO_WRONG_LENGTH;
+                break;
+            }
             CX_CHECK(cx_eddsa_sign_no_throw(ecfp_key,
                                             CX_SHA512,
                                             G_gpg_vstate.work.io_buffer,
@@ -243,20 +311,29 @@ int gpg_apdu_pso() {
     switch (G_gpg_vstate.io_p1p2) {
         case PSO_CDS:
             error = gpg_sign(&G_gpg_vstate.kslot->sig);
-            cnt = G_gpg_vstate.kslot->sig_count + 1;
-            nvm_write(&G_gpg_vstate.kslot->sig_count, &cnt, sizeof(unsigned int));
+            if (error == SWO_SUCCESS) {
+                cnt = G_gpg_vstate.kslot->sig_count + 1;
+                nvm_write(&G_gpg_vstate.kslot->sig_count, &cnt, sizeof(unsigned int));
+            }
             break;
 
         case PSO_ENC:
             aes_key = &G_gpg_vstate.kslot->AES_dec;
-            if (!(aes_key->size != CX_AES_128_KEY_LEN)) {
+            if (!gpg_pso_aes_key_is_valid(aes_key)) {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
             msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+            if (msg_len > GPG_IO_BUFFER_LENGTH - 1) {
+                return SWO_WRONG_LENGTH;
+            }
+            // encrypt in place, after the padding indicator byte
+            memmove(G_gpg_vstate.work.io_buffer + 1,
+                    G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                    msg_len);
             ksz = GPG_IO_BUFFER_LENGTH - 1;
             CX_CHECK(cx_aes_no_throw(aes_key,
                                      CX_ENCRYPT | CX_CHAIN_CBC | CX_LAST,
-                                     G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                     G_gpg_vstate.work.io_buffer + 1,
                                      msg_len,
                                      G_gpg_vstate.work.io_buffer + 1,
                                      &ksz));
@@ -268,6 +345,10 @@ int gpg_apdu_pso() {
             break;
 
         case PSO_DEC:
+            if (gpg_pso_remaining() < 1) {
+                error = SWO_WRONG_LENGTH;
+                break;
+            }
             pad_byte = gpg_io_fetch_u8();
 
             switch (pad_byte) {
@@ -317,10 +398,8 @@ int gpg_apdu_pso() {
 
                 case PAD_AES:
                     aes_key = &G_gpg_vstate.kslot->AES_dec;
-                    if (!(aes_key->size != CX_AES_128_KEY_LEN)) {
-                        PRINTF("[PSO] - Wrong AES key size %d != %d\n",
-                               aes_key->size,
-                               CX_AES_128_KEY_LEN);
+                    if (!gpg_pso_aes_key_is_valid(aes_key)) {
+                        PRINTF("[PSO] - Wrong AES key size %d\n", aes_key->size);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -356,13 +435,25 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    // Check APDU content tags
+                    // Check APDU content tags, each TL taking at most 5 bytes
+                    if (gpg_pso_remaining() < 3) {
+                        error = SWO_WRONG_LENGTH;
+                        break;
+                    }
                     gpg_io_fetch_l(&l);
+                    if (gpg_pso_remaining() < 5) {
+                        error = SWO_WRONG_LENGTH;
+                        break;
+                    }
                     gpg_io_fetch_tl(&t, &l);
                     // TAG 0x7f49 announces a Public Key DO
                     if (t != 0x7f49) {
                         PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x7f49);
                         error = SWO_INCORRECT_DATA;
+                        break;
+                    }
+                    if (gpg_pso_remaining() < 5) {
+                        error = SWO_WRONG_LENGTH;
                         break;
                     }
                     gpg_io_fetch_tl(&t, &l);
@@ -372,11 +463,14 @@ int gpg_apdu_pso() {
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
+                    if (l > gpg_pso_remaining()) {
+                        error = SWO_WRONG_LENGTH;
+                        break;
+                    }
 
                     if (curve == CX_CURVE_Curve25519) {
                         uint8_t raw_public_key[65];
                         uint8_t secret[32];
-                        cx_ecpoint_t public_point;
                         uint8_t i;
 
                         if (l != 32) {
@@ -397,16 +491,7 @@ int gpg_apdu_pso() {
                                 (G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset)[31 - i];
                         }
 
-                        CX_CHECK(cx_bn_lock(32, 0));
-                        CX_CHECK(cx_ecpoint_alloc(&public_point, CX_CURVE_Curve25519));
-                        CX_CHECK(cx_ecpoint_decompress(&public_point, raw_public_key, 32, 0));
-                        CX_CHECK(cx_ecpoint_export(&public_point,
-                                                   raw_public_key + 1,
-                                                   32,
-                                                   raw_public_key + 1 + 32,
-                                                   32));
-                        CX_CHECK(cx_bn_unlock());
-                        raw_public_key[0] = 0x04;
+                        CX_CHECK(gpg_pso_cv25519_uncompress(raw_public_key));
                         CX_CHECK(cx_ecdh_no_throw(ecfp_key,
                                                   CX_ECDH_X,
                                                   raw_public_key,
@@ -418,6 +503,11 @@ int gpg_apdu_pso() {
                             G_gpg_vstate.work.io_buffer[128 + i] = secret[31 - i];
                         }
                     } else {
+                        if (l != 65) {
+                            PRINTF("[PSO] - PSO:DEC:ECDH - Wrong Ext Pub Key size %d\n", l);
+                            error = SWO_INCORRECT_DATA;
+                            break;
+                        }
                         CX_CHECK(
                             cx_ecdh_no_throw(ecfp_key,
                                              CX_ECDH_X,

@@ -39,6 +39,50 @@ int gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
     CX_CHECK(os_derive_bip32_no_throw(CX_CURVE_SECP256K1, path, 2, seed, chain));
 
 end:
+    explicit_bzero(chain, sizeof(chain));
+    if (error != CX_OK) {
+        return error;
+    }
+    return SWO_SUCCESS;
+}
+
+/**
+ * Derivate a sub-seed from the Generated Seed with SHAKE256
+ *
+ * @param[in]  Sn Seed for the selected slot
+ * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  idx sub-seed index
+ * @param[out] Ski generated sub_seed
+ * @param[in]  out_bits SHAKE256 output length, in bits
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_derive_shake(unsigned char *Sn,
+                            unsigned char *key_name,
+                            unsigned int idx,
+                            unsigned char *Ski,
+                            unsigned int out_bits) {
+    unsigned char h[32];
+    cx_err_t error = CX_INTERNAL_ERROR;
+    U2BE_ENCODE(h, 0, idx);
+
+    cx_sha256_init(&G_gpg_vstate.work.md.sha256);
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
+                              0,
+                              (unsigned char *) key_name,
+                              4,
+                              NULL,
+                              0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32));
+    CX_CHECK(cx_shake256_init_no_throw(&G_gpg_vstate.work.md.sha3, out_bits));
+    CX_CHECK(cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, 32));
+    CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
+
+end:
+    explicit_bzero(h, sizeof(h));
+    explicit_bzero(&G_gpg_vstate.work.md.sha3, MAX(sizeof(cx_sha3_t), sizeof(cx_sha256_t)));
     if (error != CX_OK) {
         return error;
     }
@@ -47,6 +91,7 @@ end:
 
 /**
  * Derivate the Key from the Generated Seed
+ * Only the first Ski_len / 8 bytes of Ski are derived, the others are left unchanged.
  *
  * @param[in]  Sn Seed for the selected slot
  * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
@@ -62,28 +107,54 @@ int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned int idx,
                             unsigned char *Ski,
                             unsigned int Ski_len) {
-    unsigned char h[32];
-    cx_err_t error = CX_INTERNAL_ERROR;
-    U2BE_ENCODE(h, 0, idx);
+    return gpg_derive_shake(Sn, key_name, idx, Ski, Ski_len);
+}
 
-    cx_sha256_init(&G_gpg_vstate.work.md.sha256);
-    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0));
-    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
-                              0,
-                              (unsigned char *) key_name,
-                              4,
-                              NULL,
-                              0));
-    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, CX_LAST, h, 2, h, 32));
-    CX_CHECK(cx_shake256_init_no_throw(&G_gpg_vstate.work.md.sha3, Ski_len));
-    CX_CHECK(cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, 32));
-    CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
+/**
+ * Derivate the Key from the Generated Seed, on its full length
+ *
+ * @param[in]  Sn Seed for the selected slot
+ * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  idx sub-seed index
+ * @param[out] Ski generated sub_seed
+ * @param[in]  Ski_len sub-seed length
+ *
+ * @return Status Word
+ *
+ */
+int gpg_pso_derive_key_seed_full(unsigned char *Sn,
+                                 unsigned char *key_name,
+                                 unsigned int idx,
+                                 unsigned char *Ski,
+                                 unsigned int Ski_len) {
+    return gpg_derive_shake(Sn, key_name, idx, Ski, Ski_len * 8);
+}
 
-end:
-    if (error != CX_OK) {
-        return error;
-    }
-    return SWO_SUCCESS;
+/**
+ * Check a RSA public exponent
+ *
+ * @param[in]  e 4 bytes big-endian exponent
+ *
+ * @return true if the exponent is odd and at least 3
+ *
+ */
+bool gpg_rsa_exponent_is_valid(const unsigned char *e) {
+    uint32_t value = U4BE(e, 0);
+    return ((value & 1) != 0) && (value >= 3);
+}
+
+/**
+ * Erase a key, keeping its User Interaction Flag
+ *
+ * @param[in]  key key to erase
+ *
+ */
+void gpg_key_erase(gpg_key_t *key) {
+    unsigned char uif[sizeof(key->UIF)];
+
+    memmove(uif, key->UIF, sizeof(uif));
+    nvm_write(key, NULL, sizeof(gpg_key_t));
+    nvm_write(key->UIF, uif, sizeof(uif));
 }
 
 /**
@@ -122,6 +193,9 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
     }
     if (pkey_size == 0) {
         return SWO_INCORRECT_DATA;
+    }
+    if (!gpg_rsa_exponent_is_valid((const unsigned char *) N_gpg_pstate->default_RSA_exponent)) {
+        return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
     if ((G_gpg_vstate.io_p2 == SEEDED_MODE) || (G_gpg_vstate.seed_mode)) {
@@ -276,7 +350,6 @@ end:
  *
  */
 static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
-    uint32_t curve = 0;
     uint32_t i = 0;
     cx_err_t error = CX_INTERNAL_ERROR;
     const unsigned char *x = NULL;
@@ -293,8 +366,11 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
     }
     gpg_io_discard(1);
     gpg_io_mark();
-    curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
-    if (curve == CX_CURVE_Ed25519) {
+    // the stored key must be on the curve advertised by the key attributes
+    if (!gpg_key_curve_matches_attributes(keygpg, keygpg->pub_key.ecfp.curve)) {
+        return SWO_CONDITIONS_NOT_SATISFIED;
+    }
+    if (keygpg->pub_key.ecfp.curve == CX_CURVE_Ed25519) {
         // cx_edwards_compress_point_no_throw is called with a hardcoded length of 65
         // (uncompressed SEC1 point: 0x04 || X(32) || Y(32)). Enforce that the imported
         // key matches this exact format, otherwise the compression would consume
@@ -310,7 +386,7 @@ static int gpg_read_ecc_kyey(gpg_key_t *keygpg) {
                                                     65));
         gpg_io_insert_tlv(0x86, 32,
                           G_gpg_vstate.work.io_buffer + 129);  // 129: discard 02
-    } else if (curve == CX_CURVE_Curve25519) {
+    } else if (keygpg->pub_key.ecfp.curve == CX_CURVE_Curve25519) {
         if ((keygpg->pub_key.ecfp.W_len == 65) && (keygpg->pub_key.ecfp.W[0] == 0x04)) {
             x = keygpg->pub_key.ecfp.W + 1;
         } else if ((keygpg->pub_key.ecfp.W_len == 33) && (keygpg->pub_key.ecfp.W[0] == 0x04)) {
@@ -357,11 +433,12 @@ int gpg_apdu_gen() {
             return SWO_WRONG_P1_P2;
     }
 
-    if (G_gpg_vstate.io_lc != 2) {
+    // Control Reference Template: a single byte tag and an empty value
+    if (G_gpg_vstate.io_length != 2) {
         return SWO_WRONG_LENGTH;
     }
 
-    gpg_io_fetch_tl(&t, &l);
+    t = G_gpg_vstate.work.io_buffer[0];
     gpg_io_discard(1);
     switch (t) {
         case KEY_SIG:

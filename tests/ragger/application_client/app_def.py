@@ -69,6 +69,7 @@ class Errors(IntEnum):
     """Application Errors definitions"""
 
     SW_STATE_TERMINATED = 0x6285
+    SW_VERIFY_FAILED = 0x63C0
     SW_MEMORY = 0x6581
     SW_SECURITY = 0x6600
     SW_WRONG_LENGTH = 0x6700
@@ -125,8 +126,14 @@ class DataObject(IntEnum):
     DO_DEC_ATTR = 0xC2
     # [Read/Write] Algorithm attributes AUThentication
     DO_AUT_ATTR = 0xC3
+    # [Read/Write] PW Status Bytes
+    DO_PW_STATUS = 0xC4
     # [Write] AES symmetric key
+    # [Write] Resetting Code
+    DO_RESET_CODE = 0xD3
     DO_KEY_AES = 0xD5
+    # [Write] Secure messaging ENC and MAC AES-128 keys, in one shot
+    DO_KEY_SM = 0xF4
 
     # [Read/Write] User Interaction Flag (UIF) for PSO:CDS
     DO_UIF_SIG = 0xD6
@@ -136,12 +143,18 @@ class DataObject(IntEnum):
     DO_UIF_AUT = 0xD8
 
     # [Read/Write] Asymmetric Key Pair
+    # [Read] Security support template (digital signature counter)
+    DO_SECURITY_TEMPLATE = 0x7A
     DO_PUB_KEY = 0x7F49
+    # [Read/Write] Cardholder certificate
+    DO_CARDHOLDER_CERT = 0x7F21
 
     # [Read/Write] Slot config
     CMD_SLOT_CFG = 0x01F1
     # [Read/Write] Slot selection
     CMD_SLOT_CUR = 0x01F2
+    # [Read/Write] RSA public exponent used for key generation
+    CMD_RSA_EXP = 0x01F8
 
     # [Read/Write] Language preferences (according to ISO 639)
     DO_CARD_LANG = 0x5F2D
@@ -149,3 +162,6 @@ class DataObject(IntEnum):
     DO_CARD_SALUTATION = 0x5F35
     # [Read/Write] Uniform resource locator (URL, as defined in RFC 1738)
     DO_URL = 0x5F50
+
+    # [Write] Extended Header list, private key import
+    DO_EXTENDED_HEADER_LIST = 0x3FFF

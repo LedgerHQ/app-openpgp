@@ -1,10 +1,11 @@
 from collections.abc import Sequence
 
 import pytest
-from application_client.app_def import PassWord
+from application_client.app_def import DataObject, Errors, PassWord
 from application_client.command_sender import CommandSender
 from ledgered.devices import Device, DeviceType
 from ragger.backend import BackendInterface
+from ragger.error import ExceptionRAPDU
 from ragger.navigator import Navigator, NavIns, NavInsID
 from ragger.navigator.navigator import InstructionType
 from utils import ROOT_SCREENSHOT_PATH, check_pincode
@@ -210,3 +211,26 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
         screen_change_before_first_instruction=False,
         screen_change_after_last_instruction=False,
     )
+
+
+# In this test we check that the home screen only displays the current cardholder name
+def test_home_name(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    rapdu = client.put_data(DataObject.DO_CARD_NAME, b"Alexander")
+    assert rapdu.status == Errors.SW_OK
+    rapdu = client.put_data(DataObject.DO_CARD_NAME, b"Bob")
+    assert rapdu.status == Errors.SW_OK
+
+    # Refuse a PIN confirmation to get back to a refreshed home screen
+    if device.is_nano:
+        nav_inst, valid_instr, text = NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "No"
+    else:
+        nav_inst, valid_instr, text = NavInsID.USE_CASE_REVIEW_REJECT, [NavInsID.USE_CASE_CHOICE_REJECT], "Confirm"
+    with pytest.raises(ExceptionRAPDU):
+        with client.send_verify_pw_with_confirmation(PassWord.PW1):
+            navigator.navigate_until_text(nav_inst, valid_instr, text, screen_change_after_last_instruction=False)
+
+    backend.wait_for_text_on_screen("Bob")
+    assert not backend.compare_screen_with_text("Bobxander")

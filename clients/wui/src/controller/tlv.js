@@ -11,6 +11,15 @@ export function getInt(buffer, size = 2, offset = 0) {
   return value;
 }
 
+// Check that a fixed-format value read from the device has the expected size.
+export function checkLength(name, value, size) {
+  if (!value || value.length !== size) {
+    const got = value ? value.length : 0;
+    throw new Error(`Unexpected ${name} from the device (${got} bytes, expected ${size})`);
+  }
+  return value;
+}
+
 // Decode a (possibly multi-object) TLV buffer into a plain object keyed by
 // the numeric tag. Tags may be 1 or 2 bytes; lengths use the short form or the
 // 0x81 / 0x82 long forms. Duplicate tags keep the last occurrence, matching
@@ -19,10 +28,17 @@ export function decodeTLV(buffer) {
   const tags = {};
   let tlv = Buffer.from(buffer);
 
+  const need = (count) => {
+    if (tlv.length < count) {
+      throw new Error("Truncated TLV data");
+    }
+  };
+
   while (tlv.length) {
     let offset;
     let tag;
     if ((tlv[0] & 0x1f) === 0x1f) {
+      need(2);
       tag = getInt(tlv, 2, 0);
       offset = 2;
     } else {
@@ -30,20 +46,26 @@ export function decodeTLV(buffer) {
       offset = 1;
     }
 
+    need(offset + 1);
     let length = tlv[offset];
     if (length & 0x80) {
       const numBytes = length & 0x7f;
       if (numBytes === 1) {
+        need(offset + 2);
         length = tlv[offset + 1];
         offset += 2;
       } else if (numBytes === 2) {
+        need(offset + 3);
         length = getInt(tlv, 2, offset + 1);
         offset += 3;
+      } else {
+        throw new Error("Unsupported TLV length form");
       }
     } else {
       offset += 1;
     }
 
+    need(offset + length);
     tags[tag] = tlv.slice(offset, offset + length);
     tlv = tlv.slice(offset + length);
   }

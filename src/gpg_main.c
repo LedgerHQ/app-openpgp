@@ -46,12 +46,19 @@ void app_main(void) {
     // - send the ATR
     // - receive the first command
     for (;;) {
-        gpg_io_do(io_flags);
-        sw = gpg_dispatch();
+        sw = gpg_io_do(io_flags);
+        if (sw == SWO_SUCCESS) {
+            sw = gpg_dispatch();
+        }
         if (sw) {
             PRINTF("[MAIN] - FINALLY INSERT sw=0x%x\n", sw);
             if ((sw != SWO_SUCCESS) && ((sw & 0xFF00) != SWO_RESPONSE_BYTES_AVAILABLE)) {
                 gpg_io_discard(1);
+            }
+            if (G_gpg_vstate.io_length > GPG_IO_BUFFER_LENGTH - 2) {
+                // no room left for the status word
+                gpg_io_discard(1);
+                sw = SWO_EXECUTION_ERROR;
             }
             gpg_io_insert_u16(sw);
             io_flags = 0;

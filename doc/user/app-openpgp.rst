@@ -1691,10 +1691,23 @@ Trouble/FAQ
 **Q:** It may happens the reader is no more visible with ``gpg`` tool, whereas it can be seen by ``pytools``.
 
 **R:** In such case (which seems to be linked to the PC configuration), one solution is to re-install the tool packages and libraries:
+Unplug/replug your device before running the following commands:
 
+ | ``killall scdaemon gpg-agent 2>/dev/null``
  | ``sudo apt remove --purge libpcsclite-dev scdaemon pcscd opensc pcsc-tool``
  | ``sudo apt autoremove``
  | ``sudo apt install libpcsclite-dev scdaemon pcscd opensc pcsc-tool``
+ | ``gpgconf --reload scdaemon``
+ | ``pcsc_scan -c``
+ | ``gpg --card-status``
+
+A simplified version of the above commands is:
+
+ | ``killall scdaemon gpg-agent 2>/dev/null``
+ | ``sudo apt remove --purge pcscd -y; sudo apt autoremove; sudo apt install pcscd``
+ | ``gpgconf --reload scdaemon``
+ | ``pcsc_scan -c``
+ | ``gpg --card-status``
 
 **Q:** gpg-connection agent failed
 

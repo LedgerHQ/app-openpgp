@@ -53,7 +53,7 @@ You can use the following command to get your first experience with Ragger and L
 Make sure that the device is plugged, unlocked, and that the tested application is open.
 
 ```shell
-pytest -v --tb=short --device nanox --backend ledgerwallet
+pytest -v --tb=short --device nanox --backend ledgerwallet --allow-physical-device
 ```
 
 Or you can refer to the section `Available pytest options` to configure the options you want to use
