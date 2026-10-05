@@ -383,7 +383,7 @@ def entrypoint() -> None:
     # Arguments checking
     # ------------------
     try:
-        get_pins(args)
+        get_pins(args, user=args.reset_pw1 is None)
         if args.new_user_pin is not None:
             args.new_user_pin = get_secret(args.new_user_pin, "--new-user-pin", ENV_NEW_USER_PIN, "New User PIN", confirm=True)
             if not args.new_user_pin:
@@ -426,7 +426,16 @@ def entrypoint() -> None:
         gpgcard.log_apdu(args.apdu)
         gpgcard.connect(args.reader)
 
-        verify_pins(gpgcard, args.user_pin, args.adm_pin, args.pinpad)
+        if args.reset_pw1:
+            # The User PIN may be blocked: reset it with the Admin PIN, then verify the new value
+            print("Verify PINs...")
+            verify_admin_pin(gpgcard, args.adm_pin, args.pinpad)
+            if not gpgcard.reset_PW1("", args.reset_pw1):
+                error(ErrorCodes.ERR_INTERNAL, "User PIN not reset")
+            args.user_pin = args.reset_pw1
+            verify_user_pin(gpgcard, args.user_pin, args.pinpad)
+        else:
+            verify_pins(gpgcard, args.user_pin, args.adm_pin, args.pinpad)
 
         if args.slot:
             gpgcard.select_slot(args.slot - 1)
@@ -450,11 +459,7 @@ def entrypoint() -> None:
             verify_user_pin(gpgcard, args.user_pin, args.pinpad)
         if args.new_adm_pin and not gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin):
             error(ErrorCodes.ERR_INTERNAL, "Admin PIN not changed")
-        if args.reset_pw1:
-            # Reset the User PIN with Resetting Code
-            if not gpgcard.reset_PW1(args.reset_code, args.reset_pw1):
-                error(ErrorCodes.ERR_INTERNAL, "User PIN not reset")
-        elif args.reset_code:
+        if args.reset_code:
             # Use the Resetting code to set the value
             if not gpgcard.set_RC(args.reset_code):
                 error(ErrorCodes.ERR_INTERNAL, "Resetting Code not set")
