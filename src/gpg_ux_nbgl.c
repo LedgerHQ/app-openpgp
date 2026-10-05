@@ -1304,6 +1304,7 @@ static void pinback_cb(void) {
 void ui_menu_pinentry_display(unsigned int step) {
     uint8_t minLen;
     char line[10];
+    bool shuffled = true;
 
     G_gpg_vstate.ui_pending = 1;
     // Init the page title
@@ -1335,11 +1336,14 @@ void ui_menu_pinentry_display(unsigned int step) {
 
     minLen =
         (G_gpg_vstate.ux_pinconfirm_p2 == PIN_ID_PW3) ? GPG_MIN_PW3_LENGTH : GPG_MIN_PW1_LENGTH;
+#ifdef KEYBOARD_NOT_SHUFFLED
+    shuffled = false;
+#endif
     // Draw the keypad
     nbgl_useCaseKeypad(G_gpg_vstate.menu,
                        minLen,
                        GPG_MAX_PW_LENGTH,
-                       false,
+                       shuffled,
                        true,
                        pinentry_validate_cb,
                        pinback_cb);

@@ -82,6 +82,13 @@ VARIANT_VALUES = OpenPGP
 # Enabling DEBUG flag will enable PRINTF and disable optimizations
 #DEBUG = 1
 
+# Keep the PIN keypad digits in a fixed order, for functional tests only
+KEYBOARD_NOT_SHUFFLED ?= 0
+ifneq ($(KEYBOARD_NOT_SHUFFLED), 0)
+    $(info KEYBOARD_NOT_SHUFFLED ENABLED)
+    DEFINES += KEYBOARD_NOT_SHUFFLED
+endif
+
 ########################################
 #     Application custom permissions   #
 ########################################
