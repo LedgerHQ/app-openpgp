@@ -129,6 +129,11 @@ def entrypoint() -> None:
         else:
             gpgcard.backup(args.file, args.file_passphrase)
             print(f"Configuration saved in file '{args.file}'.")
+            if args.file_passphrase is None:
+                print(
+                    "Warning: the file is not encrypted, its private data objects and card details are readable."
+                    " Use --file-passphrase to encrypt it."
+                )
 
     except GPGCardExcpetion as err:
         print(f"\n### Error {err.code}: {err.message}!\n")

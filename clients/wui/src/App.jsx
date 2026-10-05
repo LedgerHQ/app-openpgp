@@ -270,11 +270,18 @@ export default function App() {
         } else {
           saved = await saveJSON(payload, name);
         }
-        setNotice(
-          saved
-            ? { appearance: "success", title: "Backup saved" }
-            : { appearance: "info", title: "Backup cancelled" }
-        );
+        if (!saved) {
+          setNotice({ appearance: "info", title: "Backup cancelled" });
+        } else if (filePassphrase) {
+          setNotice({ appearance: "success", title: "Backup saved" });
+        } else {
+          setNotice({
+            appearance: "warning",
+            title: "Backup saved without encryption",
+            description:
+              "Anyone with the file can read its private data objects and card details. Set a file passphrase to encrypt it.",
+          });
+        }
       } else if (pinAction === "restore") {
         const content = isEncryptedFile
           ? await decryptBackup(restoreContent.current, filePassphrase)
@@ -435,7 +442,7 @@ export default function App() {
               <Banner
                 appearance="info"
                 title="Keep your backup safe"
-                description="The backup file holds encrypted key material. Restoring the keys requires the app's SEED mode."
+                description="The backup file holds encrypted key material. Without a file passphrase, its private data objects and card details are stored in clear. Restoring the keys requires the app's SEED mode."
               />
             )}
 

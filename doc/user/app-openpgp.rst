@@ -1667,8 +1667,13 @@ The tool usage is the following:
  |  ``--restore        Perform a Restore instead of Backup``
  |  ``--file FILE      Backup/Restore file (default is 'gpg_backup')``
  |  ``--seed-key       After Restore, regenerate all keys, based on seed mode``
+ |  ``--file-passphrase PASS  Passphrase to encrypt (backup) or decrypt (restore) the backup file``
  |
  | ``Keys restore is only possible with SEED mode...``
+
+The private keys are always stored encrypted with a key derived from the device seed.
+The rest of the file (private data objects, name, login, URL, certificates, ...) is stored in
+clear, unless a file passphrase is given with ``--file-passphrase``.
 
 To perform a backup, simply use the tool like this:
 
