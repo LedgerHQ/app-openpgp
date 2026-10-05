@@ -156,11 +156,33 @@ def verify_pins(gpgcard: GPGCard, user_pin: str, adm_pin: str, pinpad: bool) -> 
     """
 
     print("Verify PINs...")
-    if (
-        not gpgcard.verify_pin(PassWord.PW1, user_pin, pinpad)
-        or not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad)
-        or not gpgcard.verify_pin(PassWord.PW3, adm_pin, pinpad)
-    ):
+    verify_user_pin(gpgcard, user_pin, pinpad)
+    verify_admin_pin(gpgcard, adm_pin, pinpad)
+
+
+def verify_user_pin(gpgcard: GPGCard, user_pin: str, pinpad: bool) -> None:
+    """Verify the User pin code, for both PW1 and PW2
+
+    Args:
+        gpgcard (GPGCard): smartcard object
+        user_pin (str): User pin code
+        pinpad (bool): Indicates to use pinpad
+    """
+
+    if not gpgcard.verify_pin(PassWord.PW1, user_pin, pinpad) or not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad):
+        error(ErrorCodes.ERR_INTERNAL, "PIN not verified")
+
+
+def verify_admin_pin(gpgcard: GPGCard, adm_pin: str, pinpad: bool) -> None:
+    """Verify the Admin pin code
+
+    Args:
+        gpgcard (GPGCard): smartcard object
+        adm_pin (str): Admin pin code
+        pinpad (bool): Indicates to use pinpad
+    """
+
+    if not gpgcard.verify_pin(PassWord.PW3, adm_pin, pinpad):
         error(ErrorCodes.ERR_INTERNAL, "PIN not verified")
 
 
@@ -420,8 +442,12 @@ def entrypoint() -> None:
         if args.lang:
             gpgcard.set_lang(args.lang)
 
-        if args.new_user_pin and not gpgcard.change_pin(PassWord.PW1, args.user_pin, args.new_user_pin):
-            error(ErrorCodes.ERR_INTERNAL, "User PIN not changed")
+        if args.new_user_pin:
+            if not gpgcard.change_pin(PassWord.PW1, args.user_pin, args.new_user_pin):
+                error(ErrorCodes.ERR_INTERNAL, "User PIN not changed")
+            # Changing the User PIN closes the PW2 session
+            args.user_pin = args.new_user_pin
+            verify_user_pin(gpgcard, args.user_pin, args.pinpad)
         if args.new_adm_pin and not gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin):
             error(ErrorCodes.ERR_INTERNAL, "Admin PIN not changed")
         if args.reset_pw1:
