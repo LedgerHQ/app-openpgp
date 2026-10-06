@@ -102,6 +102,11 @@ class DataObject(IntEnum):
     # [Read] Full Application identifier (AID), ISO 7816-4
     DO_AID = 0x4F
 
+    # [Read/Write] Private use data objects, readable after PW2 (0103) or PW3 (0104)
+    DO_PRIVATE_01 = 0x0101
+    DO_PRIVATE_03 = 0x0103
+    DO_PRIVATE_04 = 0x0104
+
     # [Read/Write] Name according to ISO/IEC 7501-1)
     DO_CARD_NAME = 0x5B
     # [Read/Write] Login data

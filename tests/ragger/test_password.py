@@ -331,3 +331,29 @@ def test_change_pin_cancelled(device: Device, backend: BackendInterface, navigat
     with pytest.raises(ExceptionRAPDU) as err:
         client.send_verify_pw(PassWord.PW1)
     assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
+
+
+# In this test we check that commands and data objects gated by a PIN not verified are refused with 6982
+def test_access_without_pin(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    for pwd in (PassWord.PW1, PassWord.PW2, PassWord.PW3):
+        rapdu = client.send_verify_pw(pwd, reset=True)
+        assert rapdu.status == Errors.SW_OK
+
+    for tag in (DataObject.DO_PRIVATE_03, DataObject.DO_PRIVATE_04, DataObject.DO_SIG_KEY):
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.get_data(tag)
+        assert err.value.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+
+    for tag in (DataObject.DO_PRIVATE_01, DataObject.DO_LOGIN):
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.put_data(tag, b"data")
+        assert err.value.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+
+    digest = bytes(32)
+    rapdu = client.sign(digest)
+    assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+    rapdu = client.authenticate(digest)
+    assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+    rapdu = client.generate_key(DataObject.DO_SIG_KEY)
+    assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
