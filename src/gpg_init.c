@@ -16,7 +16,6 @@
  *****************************************************************************/
 
 #include "gpg_vars.h"
-#include "ccid_cmd.h"
 #include "ox_ec.h"
 
 #define SHORT(x) ((x) >> 8) & 0xFF, (x) & 0xFF
@@ -519,7 +518,6 @@ void gpg_install(unsigned char app_state) {
         nvm_write((void *) (&N_gpg_pstate->keypad_shuffle),
                   &keypad_shuffle,
                   sizeof(keypad_shuffle));
-        gpg_activate_pinpad(3);
 
         // default key template
         for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
@@ -529,18 +527,4 @@ void gpg_install(unsigned char app_state) {
 
     // installation completed, the next start keeps this state
     nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
-}
-
-/**
- * Setup pinpad configuration
- *
- * @param[in]  enabled pinpad configuration
- *
- * @return N/A
- *
- */
-void gpg_activate_pinpad(uint8_t enabled) {
-    uint8_t e = enabled ? 3 : 0;
-
-    io_usb_ccid_configure_pinpad(e);
 }

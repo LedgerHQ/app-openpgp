@@ -992,9 +992,7 @@ static void pin_cb(int token, uint8_t index) {
                 break;
             }
             if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin) {
-                // set new mode
                 nvm_write((void *) (&N_gpg_pstate->config_pin), &G_gpg_vstate.pinmode, 1);
-                gpg_activate_pinpad(3);
             }
             if (G_gpg_vstate.keypad_shuffle != N_gpg_pstate->keypad_shuffle) {
                 nvm_write((void *) (&N_gpg_pstate->keypad_shuffle),

@@ -437,7 +437,6 @@ int gpg_select_slot(unsigned int slot) {
     G_gpg_vstate.slot = slot;
     G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
     gpg_mse_reset();
-    ui_CCID_reset();
     return SWO_SUCCESS;
 }
 

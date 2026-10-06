@@ -276,6 +276,9 @@ to set the default slot when the application start.
 
 To change the current slot, display the slot you want and select it
 
+The host is not notified of a slot change: restart ``scdaemon`` afterwards (``gpgconf --kill scdaemon``)
+so that ``gpg`` reads the keys of the new slot.
+
 To change the default slot, first select it, and then select the *Set Default* entry.
 
 

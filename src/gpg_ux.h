@@ -41,7 +41,6 @@
 #define ICON_APP C_gpg_48px
 #endif
 
-void ui_CCID_reset(void);
 void app_reset(void);
 void ui_init(void);
 void ui_menu_pinconfirm_display(unsigned int value);
