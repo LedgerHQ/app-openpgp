@@ -158,6 +158,19 @@ void gpg_key_erase(gpg_key_t *key) {
 }
 
 /**
+ * Check whether a key holds key material, whatever its attributes
+ *
+ * @param[in]  key key to check
+ *
+ * @return true if its private or public part is not erased
+ *
+ */
+bool gpg_key_is_present(const gpg_key_t *key) {
+    return !is_zeroes_buffer(&key->priv_key, sizeof(key->priv_key)) ||
+           !is_zeroes_buffer(&key->pub_key, sizeof(key->pub_key));
+}
+
+/**
  * Generate a RSA key pair and writes it in NVRam
  *
  * @param[in]  keygpg pointer on key structure

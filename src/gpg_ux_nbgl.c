@@ -491,6 +491,52 @@ static uint32_t _getKeyType(const uint8_t key) {
     return token;
 }
 
+// Template change waiting for the confirmation to delete the existing key
+static struct {
+    uint8_t slot;
+    uint8_t key;
+    LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
+} G_template_pending;
+
+/**
+ * @brief Key of the active slot designated by a template token
+ *
+ * @param[in] token template token
+ * @return key, or NULL for an unknown token
+ *
+ */
+static gpg_key_t *template_key(uint8_t token) {
+    switch (token) {
+        case TOKEN_TEMPLATE_SIG:
+            return &G_gpg_vstate.kslot->sig;
+        case TOKEN_TEMPLATE_DEC:
+            return &G_gpg_vstate.kslot->dec;
+        case TOKEN_TEMPLATE_AUT:
+            return &G_gpg_vstate.kslot->aut;
+        default:
+            return NULL;
+    }
+}
+
+/**
+ * @brief Template change confirmation callback
+ *
+ * @param[in] confirm indicate if the user accepts to delete the existing key
+ *
+ */
+static void template_confirm_cb(bool confirm) {
+    gpg_key_t *dest = template_key(G_template_pending.key);
+
+    if (confirm && (dest != NULL) && (G_template_pending.slot == G_gpg_vstate.slot)) {
+        gpg_key_erase(dest);
+        nvm_write(&dest->attributes,
+                  &G_template_pending.attributes,
+                  sizeof(G_template_pending.attributes));
+    }
+    explicit_bzero(&G_template_pending, sizeof(G_template_pending));
+    ui_settings_template();
+}
+
 /**
  * @brief Keys Templates Action callback
  *
@@ -574,22 +620,27 @@ static void template_key_cb(int token, uint8_t index, int page) {
                 break;
         }
 
-        switch (G_gpg_vstate.ux_key) {
-            case TOKEN_TEMPLATE_SIG:
-                dest = &G_gpg_vstate.kslot->sig;
-                break;
-            case TOKEN_TEMPLATE_DEC:
-                dest = &G_gpg_vstate.kslot->dec;
-                break;
-            case TOKEN_TEMPLATE_AUT:
-                dest = &G_gpg_vstate.kslot->aut;
-                break;
-        }
-
+        dest = template_key(G_gpg_vstate.ux_key);
         if (dest && attributes.value[0] &&
             memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
-            gpg_key_erase(dest);
-            nvm_write(&dest->attributes, &attributes, sizeof(attributes));
+            G_template_pending.slot = G_gpg_vstate.slot;
+            G_template_pending.key = G_gpg_vstate.ux_key;
+            memmove(&G_template_pending.attributes, &attributes, sizeof(attributes));
+            if (gpg_key_is_present(dest)) {
+                snprintf(G_gpg_vstate.menu,
+                         sizeof(G_gpg_vstate.menu),
+                         "The %s key will be deleted",
+                         (const char *) PIC(keyNameTexts[G_gpg_vstate.ux_key - FIRST_USER_TOKEN]));
+                nbgl_useCaseChoice(NULL,
+                                   "Change template",
+                                   G_gpg_vstate.menu,
+                                   "Yes, delete key",
+                                   "Cancel",
+                                   template_confirm_cb);
+            } else {
+                template_confirm_cb(true);
+            }
+            return;
         }
     }
     ui_settings_template();
