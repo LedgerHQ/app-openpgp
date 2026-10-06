@@ -136,7 +136,9 @@ struct gpg_nv_state_s {
     unsigned char magic[MAGIC_LENGTH];
 
     /* pin mode */
-    unsigned char config_pin[1];
+    unsigned char config_pin;
+    /* keypad digits shuffled for on-screen PIN entry */
+    bool keypad_shuffle;
 
     /* 01F1 (01F2 is volatile)*/
     unsigned char config_slot[3];
@@ -265,6 +267,7 @@ struct gpg_v_state_s {
     unsigned char verified_pin[5];
     unsigned char pinmode;
     unsigned char pinmode_req;
+    bool keypad_shuffle;
 
     /* ux menus */
     char menu[112];

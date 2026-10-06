@@ -107,11 +107,13 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
             NavInsID.BOTH_CLICK,  # (Back to settings)
             NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,  # PIN mode
-            NavInsID.BOTH_CLICK,  # On Screen
+            NavInsID.BOTH_CLICK,  # Random keypad
+            NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.BOTH_CLICK,  # Set as default
+            NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
@@ -144,7 +146,7 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
                 NavIns(NavInsID.TOUCH, (350, 220)),  # Seed mode
                 NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
                 NavIns(NavInsID.TOUCH, (350, 320)),  # PIN mode
-                NavIns(NavInsID.TOUCH, (350, 140)),  # On Screen
+                NavIns(NavInsID.TOUCH, (350, 140)),  # Random keypad
                 NavInsID.CENTERED_FOOTER_TAP,  # Set default
                 NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
                 NavIns(NavInsID.TOUCH, (350, 420)),  # UIF
@@ -162,7 +164,7 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
                 NavIns(NavInsID.TOUCH, (430, 230)),  # Seed mode
                 NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
                 NavIns(NavInsID.TOUCH, (430, 325)),  # PIN mode
-                NavIns(NavInsID.TOUCH, (430, 140)),  # On Screen
+                NavIns(NavInsID.TOUCH, (430, 140)),  # Random keypad
                 NavInsID.EXIT_FOOTER_TAP,  # Set default
                 NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
                 NavIns(NavInsID.TOUCH, (430, 420)),  # UIF
@@ -181,7 +183,7 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
                 NavIns(NavInsID.TOUCH, (270, 160)),  # Seed mode
                 NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
                 NavIns(NavInsID.TOUCH, (270, 235)),  # PIN mode
-                NavIns(NavInsID.TOUCH, (270, 90)),  # On Screen
+                NavIns(NavInsID.TOUCH, (270, 90)),  # Random keypad
                 NavInsID.EXIT_FOOTER_TAP,  # Set default
                 NavInsID.NAVIGATION_HEADER_TAP,  # (Back)
                 NavIns(NavInsID.TOUCH, (270, 300)),  # UIF

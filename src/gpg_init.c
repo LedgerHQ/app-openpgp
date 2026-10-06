@@ -394,7 +394,8 @@ void gpg_init_session() {
     G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
     gpg_mse_reset();
     // pin conf
-    G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
+    G_gpg_vstate.pinmode = N_gpg_pstate->config_pin;
+    G_gpg_vstate.keypad_shuffle = N_gpg_pstate->keypad_shuffle;
     // seed conf
     G_gpg_vstate.seed_mode = 1;
 }
@@ -461,6 +462,7 @@ void gpg_install_slot(gpg_key_slot_t *slot) {
  */
 void gpg_install(unsigned char app_state) {
     gpg_pin_t pin;
+    bool keypad_shuffle;
 
     // full reset data
     nvm_write((void *) (N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
@@ -513,6 +515,10 @@ void gpg_install(unsigned char app_state) {
         // config pin
         G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
         nvm_write((void *) (&N_gpg_pstate->config_pin), G_gpg_vstate.work.io_buffer, 1);
+        keypad_shuffle = true;
+        nvm_write((void *) (&N_gpg_pstate->keypad_shuffle),
+                  &keypad_shuffle,
+                  sizeof(keypad_shuffle));
         gpg_activate_pinpad(3);
 
         // default key template
