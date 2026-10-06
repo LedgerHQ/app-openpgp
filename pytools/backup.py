@@ -41,7 +41,7 @@ def get_argparser() -> Namespace:
         "--reader",
         type=str,
         default="Ledger",
-        help="PCSC reader name (default is '%(default)s') or 'speculos'",
+        help="HID path of the device, or 'speculos' (default is '%(default)s', the only Ledger device connected)",
     )
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")

@@ -1512,7 +1512,7 @@ Its usage is:
  | ``options:``
  |  ``-h, --help            show this help message and exit``
  |  ``--info                Get and display card information``
- |  ``--reader READER       PCSC reader name (default is 'Ledger')``
+ |  ``--reader READER       HID path of the device, or 'speculos' (default is 'Ledger', the only Ledger device connected)``
  |  ``--apdu                Log APDU exchange``
  |  ``--slot {1,2,3}        Select slot (1 to 3)``
  |  ``--reset               Reset the application (all data will be erased)``
@@ -1554,6 +1554,11 @@ process list and the shell history. Each such option is resolved in this order:
 - an interactive prompt, when the option is given without value or, for the User and Admin PINs,
   when it is absent,
 - the factory value (``123456`` and ``12345678``) for the User and Admin PINs.
+
+Before sending any PIN, the tools select the OpenPGP application and check its identifier. When
+several Ledger devices are connected, they stop and list the HID paths to give with ``--reader``.
+This check does not authenticate the device: with ``--pinpad``, the PINs are entered on the device
+itself and never cross the USB link.
 
 Sample output to get Card information:
 
@@ -1667,7 +1672,7 @@ The tool usage is the following:
  |
  | ``options:``
  |  ``-h, --help       show this help message and exit``
- |  ``--reader READER  PCSC reader name (default is 'Ledger')``
+ |  ``--reader READER  HID path of the device, or 'speculos' (default is 'Ledger', the only Ledger device connected)``
  |  ``--slot {1,2,3}   Select slot (1 to 3)``
  |  ``--pinpad         PIN validation will be delegated to pinpad``
  |  ``--adm-pin [PIN]  Admin PIN (if pinpad not used), or $OPENPGP_ADMIN_PIN``

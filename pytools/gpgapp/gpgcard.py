@@ -28,6 +28,8 @@ from Crypto.Cipher import AES
 from Crypto.PublicKey.RSA import construct
 from Crypto.Random import get_random_bytes
 from ledgercomm import Transport  # type: ignore
+from ledgercomm.interfaces.hid_device import HID  # type: ignore
+from ledgercomm.transport import TransportType  # type: ignore
 
 # pylint: enable=import-error
 from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
@@ -46,6 +48,48 @@ APDU_CHAINING_MODE: int = 0x10
 # Bounds of a response received through GET RESPONSE
 RESPONSE_MAX_SIZE: int = 0x4000
 RESPONSE_MAX_CHUNKS: int = 64
+# Reader name standing for the only connected Ledger device
+DEFAULT_READER: str = "Ledger"
+# OpenPGP AID: RID and application, then version, manufacturer, serial and RFU
+AID_LENGTH: int = 16
+AID_PREFIX: bytes = bytes.fromhex("D27600012401")
+AID_VERSION_MAJOR: int = 3
+AID_MANUFACTURER: bytes = bytes.fromhex("2C97")
+
+
+class _HIDTransport(Transport):
+    """Transport bound to a given HID device path"""
+
+    def __init__(self, path: bytes) -> None:  # pylint: disable=super-init-not-called
+        self.interface = TransportType.HID
+        self.com = HID()
+        self.com.path = path
+        self.com.open()
+
+
+def _hid_path(reader: str) -> bytes:
+    """Select the HID path of the reader
+
+    Args:
+        reader (str): HID path of the device, or DEFAULT_READER for the only connected Ledger device
+
+    Returns:
+        HID path of the device
+    """
+
+    try:
+        paths = sorted(set(HID.enumerate_devices()))
+    except AssertionError as err:
+        raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "No Ledger device found") from err
+    names = ", ".join(f"'{p.decode()}'" for p in paths)
+    if reader == DEFAULT_READER:
+        if len(paths) != 1:
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Several Ledger devices found, select one with --reader: {names}")
+        return paths[0]
+    for path in paths:
+        if path.decode() == reader:
+            return path
+    raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Reader '{reader}' not found, available: {names}")
 
 
 class GPGCardExcpetion(Exception):
@@ -210,12 +254,15 @@ class GPGCard:
         if device == "speculos":
             self.transport = Transport("tcp", server="127.0.0.1", port=9999, debug=False)
         else:
-            self.transport = Transport("hid")
+            self.transport = _HIDTransport(_hid_path(device))
         print("")
         # no PIN is sent before the OpenPGP application answers its selection
         _, sw = self.select()
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(sw, "OpenPGP application not selected")
+        aid = self._read_data(DataObject.DO_AID)
+        if len(aid) != AID_LENGTH or aid[0:6] != AID_PREFIX or aid[6] != AID_VERSION_MAJOR or aid[8:10] != AID_MANUFACTURER:
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Unexpected OpenPGP application identifier {aid.hex()}")
 
     def logout(self) -> None:
         """Clear PW1/PW2/PW3 verification state on the card.
