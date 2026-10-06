@@ -423,6 +423,25 @@ int gpg_apdu_get_next_data(unsigned int ref) {
 }
 
 /**
+ * Make a slot the active one, with its default security environment
+ *
+ * @param[in] slot slot index
+ *
+ * @return Status Word
+ *
+ */
+int gpg_select_slot(unsigned int slot) {
+    if (slot >= GPG_KEYS_SLOTS) {
+        return SWO_INCORRECT_DATA;
+    }
+    G_gpg_vstate.slot = slot;
+    G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
+    gpg_mse_reset();
+    ui_CCID_reset();
+    return SWO_SUCCESS;
+}
+
+/**
  * Write a DO (Data Object) to the card
  *
  * @param[in] ref DO tag
@@ -498,18 +517,15 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
-            if ((G_gpg_vstate.io_length != 1) ||
-                (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset] >= GPG_KEYS_SLOTS)) {
+            if (G_gpg_vstate.io_length != 1) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
-            G_gpg_vstate.slot = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
-            G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
-            gpg_mse_reset();
-            ui_CCID_reset();
-            // leave any settings page bound to the previous slot, and show the new one
-            ui_init();
-            sw = SWO_SUCCESS;
+            sw = gpg_select_slot(G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset]);
+            if (sw == SWO_SUCCESS) {
+                // leave any settings page bound to the previous slot, and show the new one
+                ui_init();
+            }
             break;
 
         /* ----------------- Config RSA exponent ----------------- */

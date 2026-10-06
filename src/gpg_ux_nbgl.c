@@ -261,11 +261,7 @@ static void slot_cb(int token, uint8_t index) {
             ui_init();
             break;
         case TOKEN_SLOT_SELECT:
-            if (index != G_gpg_vstate.slot) {
-                G_gpg_vstate.slot = index;
-                G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
-                gpg_mse_reset();
-                ui_CCID_reset();
+            if ((index != G_gpg_vstate.slot) && (gpg_select_slot(index) == SWO_SUCCESS)) {
 #ifdef SCREEN_SIZE_NANO
                 slot_initPage = index;
                 ui_menu_slot_action();

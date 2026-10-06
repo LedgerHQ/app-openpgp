@@ -46,6 +46,7 @@ void gpg_apdu_select_data(unsigned int ref, int record);
 int gpg_apdu_get_data(unsigned int ref);
 int gpg_apdu_get_next_data(unsigned int ref);
 int gpg_apdu_put_data(unsigned int ref);
+int gpg_select_slot(unsigned int slot);
 int gpg_apdu_get_key_data(unsigned int ref);
 int gpg_apdu_put_key_data(unsigned int ref);
 
