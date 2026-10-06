@@ -295,11 +295,16 @@ export default function App() {
         }
         setFailures(f);
         setRestartHint(true);
-        setNotice(
-          f.length === 0
-            ? { appearance: "success", title: "Restore complete" }
-            : { appearance: "warning", title: `Restore done — ${f.length} item(s) rejected (see below).` }
-        );
+        if (f.length === 0) {
+          setNotice({ appearance: "success", title: "Restore complete" });
+        } else if (f.some((x) => x.keyMismatch)) {
+          setNotice({
+            appearance: "error",
+            title: "Restore failed — the keys on the card do not match the backup (see below).",
+          });
+        } else {
+          setNotice({ appearance: "warning", title: `Restore done — ${f.length} item(s) rejected (see below).` });
+        }
       } else if (pinAction === "factoryReset") {
         await gpg.factoryReset(adminPin);
         await gpg.disconnect();

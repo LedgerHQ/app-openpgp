@@ -26,8 +26,8 @@ describe("buildBackup", () => {
     uif: 1,
     attribute: Buffer.from([0x01, 0x08]),
     date: 0,
-    fingerprint: Buffer.from([0x11]),
-    ca_fingerprint: Buffer.from([0x22]),
+    fingerprint: Buffer.alloc(20, 0x11),
+    ca_fingerprint: Buffer.alloc(20, 0x22),
     cert: Buffer.from("cert-data"),
   });
 
@@ -167,6 +167,13 @@ describe("parseBackup", () => {
     ["PW_status", minimal({ PW_status: "" })],
     ["PW_status", minimal({ PW_status: Buffer.alloc(8).toString("base64") })],
   ])("rejects a too long %s", (field, backup) => {
+    expect(() => parseBackup(backup)).toThrow(field);
+  });
+
+  test.each([
+    ["sig.fingerprint", minimal({}, { fingerprint: Buffer.alloc(19).toString("base64") })],
+    ["sig.ca_fingerprint", minimal({}, { ca_fingerprint: Buffer.alloc(1).toString("base64") })],
+  ])("rejects a %s that is neither empty nor 20 bytes", (field, backup) => {
     expect(() => parseBackup(backup)).toThrow(field);
   });
 });

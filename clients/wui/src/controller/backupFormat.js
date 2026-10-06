@@ -134,6 +134,8 @@ const PW_STATUS_SIZE = 7;
 export const BACKUP_MAX_FILE_SIZE = 64 * 1024;
 
 // Largest value of each backup field, as stored by the device.
+export const FINGERPRINT_SIZE = 20;
+
 const FIELD_MAX_SIZE = {
   private: 512,
   name: 39,
@@ -141,7 +143,7 @@ const FIELD_MAX_SIZE = {
   url: 512,
   lang: 8,
   attribute: 12,
-  fingerprint: 20,
+  fingerprint: FINGERPRINT_SIZE,
   cert: 1510,
   key: 1512,
 };
@@ -225,6 +227,12 @@ export function parseBackup(json) {
       checkFieldSize(`${slot}.${field}`, data[slot][field], FIELD_MAX_SIZE[field]);
     }
     checkFieldSize(`${slot}.ca_fingerprint`, data[slot].ca_fingerprint, FIELD_MAX_SIZE.fingerprint);
+    for (const field of ["fingerprint", "ca_fingerprint"]) {
+      const { length } = data[slot][field];
+      if (length !== 0 && length !== FINGERPRINT_SIZE) {
+        throw new Error(`Backup field "${slot}.${field}" must be empty or ${FINGERPRINT_SIZE} bytes`);
+      }
+    }
   }
   return data;
 }

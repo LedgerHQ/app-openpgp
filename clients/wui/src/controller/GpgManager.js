@@ -10,7 +10,7 @@ import {
 } from "./apdu.js";
 import { checkLength, decodeTLV, getInt } from "./tlv.js";
 import { DO, USER_SALUTATION, doName } from "./dataObjects.js";
-import { buildBackup, parseBackup, securityChanges } from "./backupFormat.js";
+import { buildBackup, FINGERPRINT_SIZE, parseBackup, securityChanges } from "./backupFormat.js";
 import { keyFingerprint } from "./pubkeyPacket.js";
 
 // OpenPGP application identifier: RID D2:76:00:01:24 + application 01.
@@ -74,6 +74,11 @@ async function forgetDevice(transport) {
   } catch (e) {
     // ignore: best effort, the permission may already be revoked
   }
+}
+
+// A backup key slot holds a key when its fingerprint is set
+function hasKey(slot) {
+  return slot.fingerprint.length === FINGERPRINT_SIZE && slot.fingerprint.some((b) => b !== 0);
 }
 
 class GpgManager {
@@ -352,17 +357,14 @@ class GpgManager {
   // Regenerate the three keys deterministically from the device seed
   // (GEN ASYM KEYPAIR, P1=Generate, P2=SEED). This rebuilds the exact same
   // keys from the master seed; it requires SEED mode enabled on the device
-  // and the same recovery phrase. Returns the list of failures.
-  async seedKeys(t = this.transport) {
+  // and the same recovery phrase. `keys` lists the [name, tag] of the keys to
+  // regenerate. Returns the list of failures.
+  async seedKeys(keys, t = this.transport) {
     const GENERATE = 0x80;
     const SEEDED_MODE = 0x01;
     const header = Buffer.from([0x00, 0x47, GENERATE, SEEDED_MODE]);
     const failures = [];
-    for (const [name, tag] of [
-      ["Signature key", DO.SIG_KEY],
-      ["Decryption key", DO.DEC_KEY],
-      ["Authentication key", DO.AUT_KEY],
-    ]) {
+    for (const [name, tag] of keys) {
       // CRT key template: <tag> 00
       const { sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
       if (sw !== SW_SUCCESS) {
@@ -377,36 +379,25 @@ class GpgManager {
     return failures;
   }
 
-  // Check that each key held by the card has the fingerprint the backup gives
-  // it, computed from its public key, attributes and creation date.
-  async checkFingerprints(data, t = this.transport) {
+  // Check the card key against the fingerprint the backup gives it, computed
+  // from its public key, attributes and creation date. Returns the failure
+  // message, or null when the key matches.
+  async checkKey(slot, tag, t = this.transport) {
     const READ_PUBLIC_KEY = 0x81;
     const header = Buffer.from([0x00, 0x47, READ_PUBLIC_KEY, 0x00]);
-    const failures = [];
-    for (const [name, slot, tag] of [
-      ["Signature key", data.sig, DO.SIG_KEY],
-      ["Decryption key", data.dec, DO.DEC_KEY],
-      ["Authentication key", data.aut, DO.AUT_KEY],
-    ]) {
-      if (slot.fingerprint.every((b) => b === 0)) continue;
-      const { data: resp, sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
-      let message = null;
-      if (sw !== SW_SUCCESS) {
-        message = `no key on the card (${statusMessage(sw)})`;
-      } else {
-        const pubkey = decodeTLV(decodeTLV(resp)[DO.PUB_KEY] || Buffer.alloc(0));
-        const fp = await keyFingerprint(slot.attribute, pubkey, slot.date);
-        if (fp === null) {
-          message = "fingerprint cannot be computed for this key algorithm";
-        } else if (!fp.equals(slot.fingerprint)) {
-          message = "the key on the card does not match the backup (other recovery phrase or modified backup)";
-        }
-      }
-      if (message) {
-        failures.push({ tag, name: `${name} (fingerprint)`, sw, message });
-      }
+    const { data: resp, sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
+    if (sw !== SW_SUCCESS) {
+      return `no key on the card (${statusMessage(sw)})`;
     }
-    return failures;
+    const pubkey = decodeTLV(decodeTLV(resp)[DO.PUB_KEY] || Buffer.alloc(0));
+    const fp = await keyFingerprint(slot.attribute, pubkey, slot.date);
+    if (fp === null) {
+      return "fingerprint cannot be computed for this key algorithm";
+    }
+    if (!fp.equals(slot.fingerprint)) {
+      return "the key on the card does not match the backup (other recovery phrase or modified backup)";
+    }
+    return null;
   }
 
   // Factory-reset the app: TERMINATE DF then ACTIVATE FILE, which wipes every
@@ -519,23 +510,38 @@ class GpgManager {
         await put(DO.CERT, slot.cert);
       }
 
-      for (const [slot, caTag, fpTag, dateTag] of [
-        [data.sig, DO.CA_FINGERPRINT_WR_SIG, DO.FINGERPRINT_WR_SIG, DO.DATES_WR_SIG],
-        [data.dec, DO.CA_FINGERPRINT_WR_DEC, DO.FINGERPRINT_WR_DEC, DO.DATES_WR_DEC],
-        [data.aut, DO.CA_FINGERPRINT_WR_AUT, DO.FINGERPRINT_WR_AUT, DO.DATES_WR_AUT],
-      ]) {
-        await put(caTag, slot.ca_fingerprint);
-        await put(fpTag, slot.fingerprint);
-        await put(dateTag, u32be(slot.date));
-      }
+      const keys = [
+        ["Signature key", data.sig, DO.SIG_KEY, DO.CA_FINGERPRINT_WR_SIG, DO.FINGERPRINT_WR_SIG, DO.DATES_WR_SIG],
+        ["Decryption key", data.dec, DO.DEC_KEY, DO.CA_FINGERPRINT_WR_DEC, DO.FINGERPRINT_WR_DEC, DO.DATES_WR_DEC],
+        ["Authentication key", data.aut, DO.AUT_KEY, DO.CA_FINGERPRINT_WR_AUT, DO.FINGERPRINT_WR_AUT, DO.DATES_WR_AUT],
+      ];
 
       // Keys are recovered by regenerating them from the device seed, not by
       // writing back the encrypted blob (which the firmware rejects on a
-      // wiped card).
+      // wiped card). Only the keys the backup holds are regenerated.
       if (regenerateKeys) {
-        failures.push(...(await this.seedKeys(t)));
+        const present = keys.filter(([, slot]) => hasKey(slot)).map(([name, , tag]) => [name, tag]);
+        failures.push(...(await this.seedKeys(present, t)));
       }
-      failures.push(...(await this.checkFingerprints(data, t)));
+
+      // A key fingerprint and date are only written once the card key matches them
+      for (const [name, slot, tag, caTag, fpTag, dateTag] of keys) {
+        await put(caTag, slot.ca_fingerprint);
+        if (!hasKey(slot)) {
+          await put(fpTag, slot.fingerprint);
+          await put(dateTag, u32be(slot.date));
+          continue;
+        }
+        const message = await this.checkKey(slot, tag, t);
+        if (message) {
+          failures.push({ tag, name: `${name} (fingerprint)`, sw: SW_SUCCESS, message, keyMismatch: true });
+          await put(fpTag, Buffer.alloc(FINGERPRINT_SIZE));
+          await put(dateTag, u32be(0));
+        } else {
+          await put(fpTag, slot.fingerprint);
+          await put(dateTag, u32be(slot.date));
+        }
+      }
 
       return failures;
     } finally {

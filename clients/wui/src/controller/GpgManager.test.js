@@ -158,8 +158,9 @@ describe("restore fingerprints", () => {
   };
 
   // Card whose signature key public point is `point`, or absent when null
-  const card = (point) =>
+  const card = (point, sent = []) =>
     new FakeTransport(async (apdu) => {
+      sent.push(apdu);
       if (apdu[1] === 0xca && apdu[3] === 0x6e) {
         const pw = Buffer.from([0xc4, 0x07, 0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]);
         return Buffer.concat([Buffer.from([0x73, pw.length]), pw, OK]);
@@ -173,15 +174,45 @@ describe("restore fingerprints", () => {
       return OK;
     });
 
-  const restore = async (point) => {
-    transports.push(card(point));
+  const restore = async (point, sent = [], regenerate = false) => {
+    transports.push(card(point, sent));
     const gpg = new GpgManager();
     await gpg.connect();
-    return gpg.restore("123456", "12345678", backup(), false, 0, async () => true);
+    return gpg.restore("123456", "12345678", backup(), regenerate, 0, async () => true);
   };
+
+  // Data of the PUT DATA APDUs writing the signature key fingerprint (C7)
+  const sigFingerprintWrites = (sent) =>
+    sent.filter((apdu) => apdu[1] === 0xda && apdu[2] === 0x00 && apdu[3] === 0xc7).map((apdu) => apdu.subarray(5));
 
   test("accepts a key matching the backup fingerprint", async () => {
     expect(await restore(P256_POINT)).toEqual([]);
+  });
+
+  test("writes the fingerprint of a matching key after reading it", async () => {
+    const sent = [];
+    await restore(P256_POINT, sent);
+    const read = sent.findIndex((apdu) => apdu[1] === 0x47 && apdu[2] === 0x81);
+    const write = sent.findIndex((apdu) => apdu[1] === 0xda && apdu[3] === 0xc7);
+    expect(read).toBeGreaterThanOrEqual(0);
+    expect(write).toBeGreaterThan(read);
+    expect(sigFingerprintWrites(sent).map((d) => d.toString("hex"))).toEqual([P256_FINGERPRINT]);
+  });
+
+  test("does not write the fingerprint of a mismatching key", async () => {
+    const other = Buffer.from(P256_POINT);
+    other[10] ^= 0x01;
+    const sent = [];
+    const failures = await restore(other, sent);
+    expect(failures[0].keyMismatch).toBe(true);
+    expect(sigFingerprintWrites(sent).map((d) => d.toString("hex"))).toEqual(["00".repeat(20)]);
+  });
+
+  test("regenerates only the keys the backup holds", async () => {
+    const sent = [];
+    await restore(P256_POINT, sent, true);
+    const generated = sent.filter((apdu) => apdu[1] === 0x47 && apdu[2] === 0x80).map((apdu) => apdu[5]);
+    expect(generated).toEqual([0xb6]);
   });
 
   test("reports a key not matching the backup fingerprint", async () => {
