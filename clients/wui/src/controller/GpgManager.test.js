@@ -145,7 +145,8 @@ describe("restore fingerprints", () => {
   const P256_DATE = 1790753455;
   const P256_FINGERPRINT = "7a8b60a8bdf28b89f44d7ff7299b67877042b3c7";
 
-  const backup = () => {
+  // Backup holding the signature key, and the same key as decryption key when `withDec`
+  const backup = (withDec = false) => {
     const empty = { date: "1970-01-01 00:00:00", uif: 0 };
     const sig = {
       date: formatDate(P256_DATE),
@@ -154,16 +155,18 @@ describe("restore fingerprints", () => {
       fingerprint: Buffer.from(P256_FINGERPRINT, "hex").toString("base64"),
     };
     const pwStatus = Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]).toString("base64");
-    return JSON.stringify({ version: 1, PW_status: pwStatus, sig, dec: empty, aut: empty });
+    return JSON.stringify({ version: 1, PW_status: pwStatus, sig, dec: withDec ? sig : empty, aut: empty });
   };
 
-  // Card whose signature key public point is `point`, or absent when null;
-  // `generated` maps a generation P2 to the point it gives, or to a status word
+  // Card whose key public point is `point`, or absent when null; `generated`
+  // maps a generation P2 to the point it gives, or to a status word, or is a
+  // function of the key tag and P2
   const card = (point, sent = [], generated = {}) =>
     new FakeTransport(async (apdu) => {
       sent.push(apdu);
-      if (apdu[1] === 0x47 && apdu[2] === 0x80 && apdu[3] in generated) {
-        const result = generated[apdu[3]];
+      if (apdu[1] === 0x47 && apdu[2] === 0x80) {
+        const result = typeof generated === "function" ? generated(apdu[5], apdu[3]) : generated[apdu[3]];
+        if (result === undefined) return OK;
         if (typeof result === "number") return Buffer.from([result >> 8, result & 0xff]);
         point = result;
         return OK;
@@ -181,11 +184,12 @@ describe("restore fingerprints", () => {
       return OK;
     });
 
-  const restore = async (point, sent = [], regenerate = false, generated = {}) => {
+  const restore = async (point, sent = [], regenerate = false, generated = {}, withDec = false) => {
     transports.push(card(point, sent, generated));
     const gpg = new GpgManager();
+    gpg.generationDelay = 0;
     await gpg.connect();
-    return gpg.restore("123456", "12345678", backup(), regenerate, 0, async () => true);
+    return gpg.restore("123456", "12345678", backup(withDec), regenerate, 0, async () => true);
   };
 
   // Data of the PUT DATA APDUs writing the signature key fingerprint (C7)
@@ -256,6 +260,35 @@ describe("restore fingerprints", () => {
     expect(failures.map((f) => f.name)).toEqual(["Signature key (fingerprint)"]);
     expect(failures[0].keyMismatch).toBe(true);
     expect(sigFingerprintWrites(sent).map((d) => d.toString("hex"))).toEqual(["00".repeat(20)]);
+  });
+
+  test("tries the derivation of the first key first for the next keys", async () => {
+    const other = Buffer.from(P256_POINT);
+    other[10] ^= 0x01;
+    const sent = [];
+    expect(await restore(null, sent, true, { 0x02: other, 0x01: P256_POINT }, true)).toEqual([]);
+    expect(generationModes(sent)).toEqual([0x02, 0x01, 0x01]);
+  });
+
+  test("regenerates a backup mixing both derivations", async () => {
+    const other = Buffer.from(P256_POINT);
+    other[10] ^= 0x01;
+    // Legacy signature key, current decryption key
+    const generated = (tag, p2) => ((tag === 0xb6) === (p2 === 0x01) ? P256_POINT : other);
+    const sent = [];
+    expect(await restore(null, sent, true, generated, true)).toEqual([]);
+    expect(generationModes(sent)).toEqual([0x02, 0x01, 0x01, 0x02]);
+  });
+
+  test("regenerates the next keys when the first key matches no derivation", async () => {
+    const other = Buffer.from(P256_POINT);
+    other[10] ^= 0x01;
+    // Imported signature key, seeded decryption key
+    const generated = (tag, p2) => (tag === 0xb8 && p2 === 0x01 ? P256_POINT : other);
+    const sent = [];
+    const failures = await restore(null, sent, true, generated, true);
+    expect(generationModes(sent)).toEqual([0x02, 0x01, 0x02, 0x01]);
+    expect(failures.map((f) => f.name)).toEqual(["Signature key (fingerprint)"]);
   });
 
   test("reports a key that cannot be regenerated", async () => {

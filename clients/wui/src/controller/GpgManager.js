@@ -76,6 +76,10 @@ async function forgetDevice(transport) {
   }
 }
 
+// GEN ASYM KEYPAIR P2 of a seeded key: current derivation, and legacy one of app 2.x
+const SEED_V2 = 0x02;
+const SEED_LEGACY = 0x01;
+
 // A backup key slot holds a key when its fingerprint is set
 function hasKey(slot) {
   return slot.fingerprint.length === FINGERPRINT_SIZE && slot.fingerprint.some((b) => b !== 0);
@@ -88,6 +92,8 @@ class GpgManager {
     this.busy = false;
     this.aid = null;
     this.serial = null;
+    // Pause after a key generation, before the next command, for the device to settle
+    this.generationDelay = 2000;
     // Optional callback fired when the device vanishes unexpectedly (e.g. the
     // app crashes and the USB interface drops mid-operation).
     this.onDisconnect = null;
@@ -355,29 +361,27 @@ class GpgManager {
   }
 
   // Regenerate a key deterministically from the device seed (GEN ASYM KEYPAIR,
-  // P1=Generate), first with the current derivation (P2=0x02), then with the
-  // legacy one of app 2.x (P2=0x01): the backup fingerprint tells which one
-  // built the key. Requires the same recovery phrase. Returns the failure, or
-  // null when the regenerated key matches the backup.
-  async seedKey(name, slot, tag, t = this.transport) {
+  // P1=Generate), trying the `derivations` (GEN ASYM KEYPAIR P2) in turn: the
+  // backup fingerprint tells which one built the key. Requires the same
+  // recovery phrase. Returns the failure, or null, with the matching derivation.
+  async seedKey(name, slot, tag, derivations, t = this.transport) {
     const GENERATE = 0x80;
-    const SEED_V2 = 0x02;
-    const SEED_LEGACY = 0x01;
     let failure = null;
-    for (const p2 of [SEED_V2, SEED_LEGACY]) {
+    for (const p2 of derivations) {
       // CRT key template: <tag> 00
       const { sw } = await exchange(t, Buffer.from([0x00, 0x47, GENERATE, p2]), Buffer.from([tag, 0x00]));
+      await new Promise((resolve) => setTimeout(resolve, this.generationDelay));
       if (sw !== SW_SUCCESS) {
         failure = { tag, name: `${name} (regenerate)`, sw, message: statusMessage(sw) };
         continue;
       }
       const message = await this.checkKey(slot, tag, t);
       if (!message) {
-        return null;
+        return { failure: null, derivation: p2 };
       }
       failure = { tag, name: `${name} (fingerprint)`, sw: SW_SUCCESS, message, keyMismatch: true };
     }
-    return failure;
+    return { failure, derivation: null };
   }
 
   // Check the card key against the fingerprint the backup gives it, computed
@@ -521,6 +525,9 @@ class GpgManager {
       // writing back the encrypted blob (which the firmware rejects on a
       // wiped card). Only the keys the backup holds are regenerated, and a key
       // fingerprint and date are only written once the card key matches them.
+      // The current derivation comes first, then the legacy one of app 2.x; the
+      // derivation of a matching key is tried first for the next ones.
+      let derivations = [SEED_V2, SEED_LEGACY];
       for (const [name, slot, tag, caTag, fpTag, dateTag] of keys) {
         await put(caTag, slot.ca_fingerprint);
         if (!hasKey(slot)) {
@@ -530,7 +537,11 @@ class GpgManager {
         }
         let failure = null;
         if (regenerateKeys) {
-          failure = await this.seedKey(name, slot, tag, t);
+          const result = await this.seedKey(name, slot, tag, derivations, t);
+          failure = result.failure;
+          if (result.derivation !== null) {
+            derivations = [result.derivation, result.derivation === SEED_V2 ? SEED_LEGACY : SEED_V2];
+          }
         } else {
           const message = await this.checkKey(slot, tag, t);
           if (message) {

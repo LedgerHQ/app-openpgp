@@ -19,6 +19,7 @@ import base64
 import binascii
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from hashlib import pbkdf2_hmac, sha1
@@ -45,6 +46,8 @@ from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
 )
 
 APDU_MAX_SIZE: int = 0xFE
+# Pause after a key generation, before the next command, for the device to settle
+KEY_GENERATION_SETTLE_S: float = 2.0
 # P2 of GEN ASYM KEY in SEED mode: legacy derivation of app 2.x, and current derivation
 SEED_MODE_LEGACY: int = 0x01
 SEED_MODE_V2: int = 0x02
@@ -683,7 +686,7 @@ class GPGCard:
             (b"0047800202B800", "DEC"),
             (b"0047800202A400", "AUT"),
         ):
-            _, sw = self._exchange(binascii.unhexlify(apdu_hex))
+            _, sw = self._generate_key(binascii.unhexlify(apdu_hex))
             if sw != ErrorCodes.ERR_SUCCESS:
                 raise GPGCardExcpetion(sw, f"{name} key generation failed, check seed mode is ON and PIN is verified")
 
@@ -691,11 +694,13 @@ class GPGCard:
         """Regenerate the restored keys from the device seed, checking the backup fingerprints
 
         Each key the backup holds is generated with the current derivation, then with the
-        legacy one of app 2.x, until it matches its fingerprint. A key matching neither has
-        its fingerprint and date cleared.
+        legacy one of app 2.x, until it matches its fingerprint; the derivation of a matching key
+        is tried first for the next ones. A key matching no derivation has its fingerprint and
+        date cleared.
         """
 
-        mismatches = []
+        derivations = (SEED_MODE_V2, SEED_MODE_LEGACY)
+        mismatches: list[str] = []
         for name, slot, key_tag, fp_tag, date_tag in (
             ("SIG", self.data.sig, DataObject.DO_SIG_KEY, DataObject.DO_FINGERPRINT_WR_SIG, DataObject.DO_DATES_WR_SIG),
             ("DEC", self.data.dec, DataObject.DO_DEC_KEY, DataObject.DO_FINGERPRINT_WR_DEC, DataObject.DO_DATES_WR_DEC),
@@ -703,36 +708,40 @@ class GPGCard:
         ):
             if len(slot.fingerprint) != 20 or not any(slot.fingerprint):
                 continue
-            if not self._seed_key_matching(slot, key_tag):
+            derivation = self._seed_key_matching(slot, key_tag, derivations)
+            if derivation is None:
                 mismatches.append(name)
                 self._put_data(fp_tag, bytes(20))
                 self._put_data(date_tag, bytes(4))
+            else:
+                derivations = (derivation, SEED_MODE_LEGACY if derivation == SEED_MODE_V2 else SEED_MODE_V2)
         if mismatches:
             raise GPGCardExcpetion(
                 ErrorCodes.ERR_INTERNAL,
                 f"{', '.join(mismatches)} key(s) do not match the backup (other recovery phrase or modified backup)",
             )
 
-    def _seed_key_matching(self, slot: KeyInfo, key_tag: int) -> bool:
-        """Regenerate a key in SEED mode, current then legacy derivation, until it matches its fingerprint
+    def _seed_key_matching(self, slot: KeyInfo, key_tag: int, derivations: tuple[int, ...]) -> int | None:
+        """Regenerate a key in SEED mode with each derivation in turn, until it matches its fingerprint
 
         Args:
-            slot (KeyInfo): Restored key information
-            key_tag (int):  Key to regenerate
+            slot (KeyInfo):           Restored key information
+            key_tag (int):            Key to regenerate
+            derivations (tuple[int]): GEN ASYM KEY P2 values to try
 
         Returns:
-            True when a regenerated key matches the backup fingerprint
+            The derivation of the key matching the backup fingerprint, or None
         """
 
         date = int(slot.date.replace(tzinfo=UTC).timestamp())
-        for p2 in (SEED_MODE_V2, SEED_MODE_LEGACY):
-            resp, sw = self._exchange(bytes.fromhex(f"004780{p2:02x}02{key_tag:02x}00"))
+        for p2 in derivations:
+            resp, sw = self._generate_key(bytes.fromhex(f"004780{p2:02x}02{key_tag:02x}00"))
             if sw != ErrorCodes.ERR_SUCCESS:
                 continue
             pubkey = self._decode_tlv(self._decode_tlv(resp).get(DataObject.DO_PUB_KEY, b""))
             if key_fingerprint(slot.attribute, pubkey, date) == slot.fingerprint:
-                return True
-        return False
+                return p2
+        return None
 
     ############### Information decoding ###############
     def decode_AID(self) -> dict:
@@ -1460,7 +1469,7 @@ class GPGCard:
 
         p2 = SEED_MODE_V2 if seed else 0x00
         apdu = bytes.fromhex(f"0047{op:02x}{p2:02x}02{key:02x}00")
-        resp, sw = self._exchange(apdu)
+        resp, sw = self._generate_key(apdu) if op == KEY_OPERATIONS["Generate"] else self._exchange(apdu)
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Key operation error!")
         tags = self._decode_tlv(resp)
@@ -1552,6 +1561,20 @@ class GPGCard:
         if sw != ErrorCodes.ERR_SUCCESS and not long_resp:
             raise GPGCardExcpetion(sw, "")
         return resp, sw1, sw2
+
+    def _generate_key(self, apdu: bytes) -> tuple[bytes, int]:
+        """Send a GEN ASYM KEY command, then let the device settle before the next command
+
+        Args:
+            apdu (bytes): GEN ASYM KEY command
+
+        Returns:
+            Response data and status word
+        """
+
+        resp, sw = self._exchange(apdu)
+        time.sleep(KEY_GENERATION_SETTLE_S)
+        return resp, sw
 
     def _exchange(self, apdu: bytes, data: bytes = b"") -> tuple[bytes, int]:
         """Exchange APDU, and get the response

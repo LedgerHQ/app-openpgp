@@ -360,7 +360,7 @@ P2 parameter of GENERATE ASYMMETRIC KEY PAIR is set to (hex value):
 - 02 for a seeded key, whatever the Seed mode
 
 A restore regenerates each key with 02 first, then with 01 when the key does not match the
-fingerprint of the backup.
+fingerprint of the backup; once a key matches, its value of P2 is tried first for the next keys.
 
 Deterministic random number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
