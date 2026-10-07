@@ -104,7 +104,7 @@ Usage: ./manual.sh <options>
 
 Options:
 
-  -c <init|reset|card|status|encrypt|decrypt|sign|verify|default>  : Requested command
+  -c <init|reset|reset_all|switch|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|all|default>  : Requested command
   -e     : Expert mode
   -v     : Verbose mode
   -h     : Displays this help
@@ -121,7 +121,13 @@ debug 11
 log-file /tmp/scdaemon.log
 ```
 
-The `reset` command just allows to kill running *scdaemon* or *gpg-agent* processes. Useful to start clean tests.
+The `reset` command just allows to kill the *scdaemon* and *gpg-agent* processes of the test `gnupg` directory.
+Useful to start clean tests.
+
+The `reset_all` command kills every *scdaemon* and *gpg-agent* process of the machine, including the ones of
+`~/.gnupg`.
+
+The `switch` command makes *gpg* use the card of the slot selected on the device (see [Step 8](#step-8-several-slots)).
 
 The `card` command is a shortcut to the `gpg --card-edit` command.
 
@@ -130,6 +136,9 @@ The `status` command is a shortcut to the `gpg --card-status` command.
 The `default` command, used **after** keys creation, allows to configure the *default* keys for signature and decryption.
 The information is written in the file `tests/manual/gnupg/gpg.conf`.
 This step is very useful when playing with backup/restore to ensure the default key will be found.
+It must be run from the `tests/manual` directory, and nothing is written when no card is found.
+
+The `all` command runs the signature, decryption and authentication roundtrips.
 
 The other commands are shortcuts allowing basic operations to test the key.
 
@@ -387,3 +396,54 @@ You can sent APDU directly to the card to verify the password.
   - PW1: `0020008106313233343536`
   - PW2: `0020008206313233343536`
   - PW3: `00200083083132333435363738`
+
+## Step 8: Several slots
+
+Each slot has its own keys, derived from its own seed, and its own serial number: *gpg* sees each slot as a separate
+card, and a single `gnupg` directory holds the keys of every slot.
+
+The slot change is not notified to the PC, so *scdaemon* keeps the previous card until it is restarted: the `switch`
+command restarts it, learns the keys of the new card, and sets them as *default* keys.
+
+Also note:
+
+- The App starts on the default slot: use *Set default* in the slot menu to start on another one.
+- The key templates belong to the selected slot.
+- A Factory Reset erases every slot.
+
+### Create the keys of an empty slot
+
+```shell
+# On the device: select the slot
+./manual.sh -c switch       # reports that the slot has no key
+./manual.sh -c card         # gpg/card> admin, key-attr, generate
+./manual.sh -c default
+```
+
+The key templates are set with `key-attr` in the `card` session. They can also be set in the device menu, but then
+**before** the `switch` command: otherwise *scdaemon* keeps the previous templates, and the fingerprints computed by
+*gpg* would not match the generated keys.
+
+### Use the keys of another slot
+
+```shell
+# On the device: select the slot
+./manual.sh -c switch
+./manual.sh -c status       # check the serial number and keys of the slot
+./manual.sh -c sign_verify
+./manual.sh -c encrypt_decrypt
+./manual.sh -c authenticate
+```
+
+### Backup and restore a slot
+
+The Web UI and `pytools` select the slot themselves (PUT DATA 0x01F2), and do not restore the previous one.
+A seeded key is regenerated from the seed of its slot: a backup must be restored on the slot it was taken from.
+
+```shell
+./manual.sh -c reset        # no scdaemon must send commands during the backup or restore
+pgrep -a scdaemon           # must print nothing; else: gpgconf --kill scdaemon
+# Backup or restore with the Web UI or pytools, one file per slot
+# On the device: select the slot to test
+./manual.sh -c switch
+```
