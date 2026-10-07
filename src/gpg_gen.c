@@ -699,6 +699,8 @@ int gpg_apdu_gen() {
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 sw = gpg_gen_rsa_kyey(keygpg, name);
                 if (sw != SWO_SUCCESS) {
+                    // no key material left in RAM
+                    explicit_bzero(&G_gpg_vstate.work, sizeof(G_gpg_vstate.work));
                     break;
                 }
             } else if ((keygpg->attributes.value[0] == KEY_ID_ECDH) ||
@@ -706,6 +708,8 @@ int gpg_apdu_gen() {
                        (keygpg->attributes.value[0] == KEY_ID_EDDSA)) {
                 sw = gpg_gen_ecc_kyey(keygpg, name);
                 if (sw != SWO_SUCCESS) {
+                    // no key material left in RAM
+                    explicit_bzero(&G_gpg_vstate.work, sizeof(G_gpg_vstate.work));
                     break;
                 }
             }
