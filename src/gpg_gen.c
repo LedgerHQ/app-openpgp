@@ -19,6 +19,12 @@
 #include "cx_ram.h"
 #include "cx_errors.h"
 
+typedef enum {
+    KEY_SOURCE_RANDOM,
+    KEY_SOURCE_SEED_LEGACY,
+    KEY_SOURCE_SEED_V2,
+} gpg_key_source_t;
+
 /**
  * Derivate the App Path from the Master Seed for a specific slot
  *
@@ -131,6 +137,105 @@ int gpg_pso_derive_key_seed_full(unsigned char *Sn,
 }
 
 /**
+ * Derivate key material from the Generated Seed, bound to the key algorithm and size
+ *
+ * Ski = SHAKE256(SHA256("kdf2" || Sn || key_name || idx || ctx_len || ctx)), on Ski_len bytes,
+ * where ctx is the algorithm with the RSA modulus size or the curve OID.
+ *
+ * @param[in]  Sn Seed for the selected slot
+ * @param[in]  keygpg key whose attributes are bound to the derivation
+ * @param[in]  key_name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  idx sub-seed index
+ * @param[out] Ski generated sub_seed
+ * @param[in]  Ski_len sub-seed length
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_derive_key_seed_v2(const unsigned char *Sn,
+                                  const gpg_key_t *keygpg,
+                                  const unsigned char *key_name,
+                                  unsigned int idx,
+                                  unsigned char *Ski,
+                                  unsigned int Ski_len) {
+    unsigned char h[32];
+    unsigned char hdr[3];
+    unsigned int ctx_len;
+    cx_err_t error = CX_INTERNAL_ERROR;
+
+    switch (keygpg->attributes.value[0]) {
+        case KEY_ID_RSA:
+            ctx_len = 3;
+            break;
+        case KEY_ID_ECDH:
+        case KEY_ID_ECDSA:
+        case KEY_ID_EDDSA:
+            ctx_len = keygpg->attributes.length;
+            break;
+        default:
+            return SWO_CONDITIONS_NOT_SATISFIED;
+    }
+    if ((ctx_len < 3) || (ctx_len > keygpg->attributes.length)) {
+        return SWO_CONDITIONS_NOT_SATISFIED;
+    }
+    U2BE_ENCODE(hdr, 0, idx);
+    hdr[2] = ctx_len;
+
+    cx_sha256_init(&G_gpg_vstate.work.md.sha256);
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
+                              0,
+                              (const unsigned char *) PIC("kdf2"),
+                              4,
+                              NULL,
+                              0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, Sn, 32, NULL, 0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, key_name, 4, NULL, 0));
+    CX_CHECK(
+        cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256, 0, hdr, sizeof(hdr), NULL, 0));
+    CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
+                              CX_LAST,
+                              keygpg->attributes.value,
+                              ctx_len,
+                              h,
+                              sizeof(h)));
+    CX_CHECK(cx_shake256_init_no_throw(&G_gpg_vstate.work.md.sha3, Ski_len * 8));
+    CX_CHECK(cx_sha3_update(&G_gpg_vstate.work.md.sha3, h, sizeof(h)));
+    CX_CHECK(cx_sha3_final(&G_gpg_vstate.work.md.sha3, Ski));
+
+end:
+    explicit_bzero(h, sizeof(h));
+    explicit_bzero(&G_gpg_vstate.work.md.sha3, MAX(sizeof(cx_sha3_t), sizeof(cx_sha256_t)));
+    if (error != CX_OK) {
+        return error;
+    }
+    return SWO_SUCCESS;
+}
+
+/**
+ * Select how GEN ASYM KEY builds the key, from P2 and the Seed mode setting
+ *
+ * @param[out] source selected key source
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_gen_key_source(gpg_key_source_t *source) {
+    switch (G_gpg_vstate.io_p2) {
+        case DEFAULT_GEN_MODE:
+            *source = G_gpg_vstate.seed_mode ? KEY_SOURCE_SEED_V2 : KEY_SOURCE_RANDOM;
+            return SWO_SUCCESS;
+        case SEEDED_MODE:
+            *source = KEY_SOURCE_SEED_LEGACY;
+            return SWO_SUCCESS;
+        case SEEDED_MODE_V2:
+            *source = KEY_SOURCE_SEED_V2;
+            return SWO_SUCCESS;
+        default:
+            return SWO_WRONG_P1_P2;
+    }
+}
+
+/**
  * Check a RSA public exponent
  *
  * @param[in]  e 4 bytes big-endian exponent
@@ -171,6 +276,68 @@ bool gpg_key_is_present(const gpg_key_t *key) {
 }
 
 /**
+ * Derive the RSA primes p and q from the Generated Seed
+ *
+ * @param[in]  keygpg pointer on key structure
+ * @param[in]  name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  source legacy or v2 key derivation
+ * @param[out] pq p then q, size bytes each
+ * @param[in]  size prime length
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_gen_rsa_seed_primes(const gpg_key_t *keygpg,
+                                   uint8_t *name,
+                                   gpg_key_source_t source,
+                                   uint8_t *pq,
+                                   unsigned int size) {
+    uint8_t seed[32] = {0};
+    uint8_t top_bits = 0;
+    int sw = SWO_UNKNOWN;
+    cx_err_t error = CX_INTERNAL_ERROR;
+
+    sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
+    if (sw != SWO_SUCCESS) {
+        goto end;
+    }
+    switch (source) {
+        case KEY_SOURCE_SEED_LEGACY:
+            sw = gpg_pso_derive_key_seed(seed, name, 1, pq, size);
+            if (sw == SWO_SUCCESS) {
+                sw = gpg_pso_derive_key_seed(seed, name, 2, pq + size, size);
+            }
+            top_bits = 0x80;
+            break;
+        case KEY_SOURCE_SEED_V2:
+            sw = gpg_derive_key_seed_v2(seed, keygpg, name, 1, pq, size);
+            if (sw == SWO_SUCCESS) {
+                sw = gpg_derive_key_seed_v2(seed, keygpg, name, 2, pq + size, size);
+            }
+            // full-size modulus, as for a random key
+            top_bits = 0xC0;
+            break;
+        default:
+            sw = SWO_CONDITIONS_NOT_SATISFIED;
+            break;
+    }
+    if (sw != SWO_SUCCESS) {
+        goto end;
+    }
+    *pq |= top_bits;
+    *(pq + size) |= top_bits;
+    error = cx_math_next_prime_no_throw(pq, size);
+    if (error == CX_OK) {
+        error = cx_math_next_prime_no_throw(pq + size, size);
+    }
+    sw = (error == CX_OK) ? SWO_SUCCESS : (int) error;
+
+end:
+    explicit_bzero(seed, sizeof(seed));
+    return sw;
+}
+
+/**
  * Generate a RSA key pair and writes it in NVRam
  *
  * @param[in]  keygpg pointer on key structure
@@ -186,7 +353,7 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
     uint32_t ksz = 0, reset_cnt = 0, pkey_size = 0;
     int sw = SWO_UNKNOWN;
     cx_err_t error = CX_INTERNAL_ERROR;
-    uint8_t seed[66] = {0};
+    gpg_key_source_t source = KEY_SOURCE_RANDOM;
 
     ksz = U2BE(keygpg->attributes.value, 1) >> 3;
     rsa_pub = (cx_rsa_public_key_t *) &G_gpg_vstate.work.rsa.public;
@@ -211,29 +378,16 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
         return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
-    if ((G_gpg_vstate.io_p2 == SEEDED_MODE) || (G_gpg_vstate.seed_mode)) {
+    sw = gpg_gen_key_source(&source);
+    if (sw != SWO_SUCCESS) {
+        return sw;
+    }
+    if (source != KEY_SOURCE_RANDOM) {
         pq = &rsa_pub->n[0];
-        unsigned int size;
-        size = ksz >> 1;
-        sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
+        sw = gpg_gen_rsa_seed_primes(keygpg, name, source, pq, ksz >> 1);
         if (sw != SWO_SUCCESS) {
-            explicit_bzero(seed, sizeof(seed));
             return sw;
         }
-        sw = gpg_pso_derive_key_seed(seed, name, 1, pq, size);
-        if (sw != SWO_SUCCESS) {
-            explicit_bzero(seed, sizeof(seed));
-            return sw;
-        }
-        sw = gpg_pso_derive_key_seed(seed, name, 2, pq + size, size);
-        if (sw != SWO_SUCCESS) {
-            explicit_bzero(seed, sizeof(seed));
-            return sw;
-        }
-        *pq |= 0x80;
-        *(pq + size) |= 0x80;
-        CX_CHECK(cx_math_next_prime_no_throw(pq, size));
-        CX_CHECK(cx_math_next_prime_no_throw(pq + size, size));
     }
 
     CX_CHECK(
@@ -249,11 +403,9 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
 
     nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
     gpg_io_clear();
-    explicit_bzero(seed, sizeof(seed));
     return SWO_SUCCESS;
 
 end:
-    explicit_bzero(seed, sizeof(seed));
     return error;
 }
 
@@ -300,6 +452,70 @@ static int gpg_read_rsa_kyey(gpg_key_t *keygpg) {
 }
 
 /**
+ * Derive an Elliptic Curve private scalar from the Generated Seed
+ *
+ * @param[in]  keygpg pointer on key structure
+ * @param[in]  name key name: 'sig ', 'auth ', 'dec '
+ * @param[in]  curve key curve
+ * @param[in]  source legacy or v2 key derivation
+ * @param[out] d private scalar, in a 66 bytes buffer
+ * @param[in]  ksz curve domain length
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_gen_ecc_seed_scalar(const gpg_key_t *keygpg,
+                                   uint8_t *name,
+                                   uint32_t curve,
+                                   gpg_key_source_t source,
+                                   uint8_t *d,
+                                   unsigned int ksz) {
+    uint8_t wide[2 * 32] = {0};
+    uint8_t order[32] = {0};
+    int sw = SWO_UNKNOWN;
+    cx_err_t error = CX_INTERNAL_ERROR;
+
+    sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, d);
+    if (sw != SWO_SUCCESS) {
+        return sw;
+    }
+    switch (source) {
+        case KEY_SOURCE_SEED_LEGACY:
+            // derived in place
+            sw = gpg_pso_derive_key_seed(d, name, 1, d, ksz);
+            break;
+        case KEY_SOURCE_SEED_V2:
+            if ((ksz == 0) || (ksz > sizeof(order))) {
+                sw = SWO_CONDITIONS_NOT_SATISFIED;
+                break;
+            }
+            // reduced and clamped as for a random key
+            sw = gpg_derive_key_seed_v2(d, keygpg, name, 1, wide, 2 * ksz);
+            if (sw != SWO_SUCCESS) {
+                break;
+            }
+            CX_CHECK(cx_ecdomain_parameter(curve, CX_CURVE_PARAM_Order, order, ksz));
+            CX_CHECK(cx_math_modm_no_throw(wide, 2 * ksz, order, ksz));
+            memmove(d, wide + ksz, ksz);
+            if (curve == CX_CURVE_Curve25519) {
+                d[ksz - 1] &= 0xF8;
+                d[0] = (d[0] & 0x7F) | 0x40;
+            }
+            break;
+        default:
+            sw = SWO_CONDITIONS_NOT_SATISFIED;
+            break;
+    }
+    goto clear;
+
+end:
+    sw = error;
+clear:
+    explicit_bzero(wide, sizeof(wide));
+    return sw;
+}
+
+/**
  * Generate an Elliptic Curve key pair and writes it in NVRam
  *
  * @param[in]  keygpg pointer on key structure
@@ -314,19 +530,19 @@ static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
     int sw = SWO_UNKNOWN;
     cx_err_t error = CX_INTERNAL_ERROR;
     uint8_t seed[66] = {0};
+    gpg_key_source_t source = KEY_SOURCE_RANDOM;
 
     curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
     if (curve == CX_CURVE_NONE) {
         return SWO_REFERENCED_DATA_NOT_FOUND;
     }
-    if ((G_gpg_vstate.io_p2 == SEEDED_MODE) || (G_gpg_vstate.seed_mode)) {
+    sw = gpg_gen_key_source(&source);
+    if (sw != SWO_SUCCESS) {
+        return sw;
+    }
+    if (source != KEY_SOURCE_RANDOM) {
         ksz = gpg_curve2domainlen(curve);
-        sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
-        if (sw != SWO_SUCCESS) {
-            explicit_bzero(seed, sizeof(seed));
-            return sw;
-        }
-        sw = gpg_pso_derive_key_seed(seed, name, 1, seed, ksz);
+        sw = gpg_gen_ecc_seed_scalar(keygpg, name, curve, source, seed, ksz);
         if (sw != SWO_SUCCESS) {
             explicit_bzero(seed, sizeof(seed));
             return sw;
@@ -440,6 +656,7 @@ int gpg_apdu_gen() {
     switch (G_gpg_vstate.io_p1p2) {
         case GEN_ASYM_KEY:
         case GEN_ASYM_KEY_SEED:
+        case GEN_ASYM_KEY_SEED_V2:
         case READ_ASYM_KEY:
             break;
         default:
@@ -477,6 +694,7 @@ int gpg_apdu_gen() {
         // -- generate keypair ---
         case GEN_ASYM_KEY:
         case GEN_ASYM_KEY_SEED:
+        case GEN_ASYM_KEY_SEED_V2:
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 sw = gpg_gen_rsa_kyey(keygpg, name);

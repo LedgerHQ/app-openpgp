@@ -67,7 +67,7 @@ def get_argparser() -> Namespace:
     parser.add_argument(
         "--seed-key",
         action="store_true",
-        help="After Restore, regenerate all keys, based on seed mode",
+        help="After Restore, regenerate the backed up keys from the device seed and check their fingerprints",
     )
 
     parser.add_argument(
@@ -142,7 +142,7 @@ def entrypoint() -> None:
             print(f"Configuration restored from file '{args.file}'.")
 
             if args.seed_key:
-                gpgcard.seed_key()
+                gpgcard.restore_seed_keys()
 
         else:
             gpgcard.backup(args.file, args.file_passphrase)

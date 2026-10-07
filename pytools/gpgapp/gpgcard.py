@@ -32,6 +32,7 @@ from ledgercomm.interfaces.hid_device import HID  # type: ignore
 from ledgercomm.transport import TransportType  # type: ignore
 
 # pylint: enable=import-error
+from gpgapp.fingerprint import key_fingerprint
 from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
     KEY_OPERATIONS,
     KEY_TEMPLATES,
@@ -44,6 +45,9 @@ from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
 )
 
 APDU_MAX_SIZE: int = 0xFE
+# P2 of GEN ASYM KEY in SEED mode: legacy derivation of app 2.x, and current derivation
+SEED_MODE_LEGACY: int = 0x01
+SEED_MODE_V2: int = 0x02
 APDU_CHAINING_MODE: int = 0x10
 # Bounds of a response received through GET RESPONSE
 RESPONSE_MAX_SIZE: int = 0x4000
@@ -675,13 +679,60 @@ class GPGCard:
         """Regenerate keys, based on seed mode"""
 
         for apdu_hex, name in (
-            (b"0047800102B600", "SIG"),
-            (b"0047800102B800", "DEC"),
-            (b"0047800102A400", "AUT"),
+            (b"0047800202B600", "SIG"),
+            (b"0047800202B800", "DEC"),
+            (b"0047800202A400", "AUT"),
         ):
             _, sw = self._exchange(binascii.unhexlify(apdu_hex))
             if sw != ErrorCodes.ERR_SUCCESS:
                 raise GPGCardExcpetion(sw, f"{name} key generation failed, check seed mode is ON and PIN is verified")
+
+    def restore_seed_keys(self) -> None:
+        """Regenerate the restored keys from the device seed, checking the backup fingerprints
+
+        Each key the backup holds is generated with the current derivation, then with the
+        legacy one of app 2.x, until it matches its fingerprint. A key matching neither has
+        its fingerprint and date cleared.
+        """
+
+        mismatches = []
+        for name, slot, key_tag, fp_tag, date_tag in (
+            ("SIG", self.data.sig, DataObject.DO_SIG_KEY, DataObject.DO_FINGERPRINT_WR_SIG, DataObject.DO_DATES_WR_SIG),
+            ("DEC", self.data.dec, DataObject.DO_DEC_KEY, DataObject.DO_FINGERPRINT_WR_DEC, DataObject.DO_DATES_WR_DEC),
+            ("AUT", self.data.aut, DataObject.DO_AUT_KEY, DataObject.DO_FINGERPRINT_WR_AUT, DataObject.DO_DATES_WR_AUT),
+        ):
+            if len(slot.fingerprint) != 20 or not any(slot.fingerprint):
+                continue
+            if not self._seed_key_matching(slot, key_tag):
+                mismatches.append(name)
+                self._put_data(fp_tag, bytes(20))
+                self._put_data(date_tag, bytes(4))
+        if mismatches:
+            raise GPGCardExcpetion(
+                ErrorCodes.ERR_INTERNAL,
+                f"{', '.join(mismatches)} key(s) do not match the backup (other recovery phrase or modified backup)",
+            )
+
+    def _seed_key_matching(self, slot: KeyInfo, key_tag: int) -> bool:
+        """Regenerate a key in SEED mode, current then legacy derivation, until it matches its fingerprint
+
+        Args:
+            slot (KeyInfo): Restored key information
+            key_tag (int):  Key to regenerate
+
+        Returns:
+            True when a regenerated key matches the backup fingerprint
+        """
+
+        date = int(slot.date.replace(tzinfo=UTC).timestamp())
+        for p2 in (SEED_MODE_V2, SEED_MODE_LEGACY):
+            resp, sw = self._exchange(bytes.fromhex(f"004780{p2:02x}02{key_tag:02x}00"))
+            if sw != ErrorCodes.ERR_SUCCESS:
+                continue
+            pubkey = self._decode_tlv(self._decode_tlv(resp).get(DataObject.DO_PUB_KEY, b""))
+            if key_fingerprint(slot.attribute, pubkey, date) == slot.fingerprint:
+                return True
+        return False
 
     ############### Information decoding ###############
     def decode_AID(self) -> dict:
@@ -1407,7 +1458,8 @@ class GPGCard:
             Public key decoded data bytes
         """
 
-        apdu = bytes.fromhex(f"0047{op:02x}{seed:02x}02{key:02x}00")
+        p2 = SEED_MODE_V2 if seed else 0x00
+        apdu = bytes.fromhex(f"0047{op:02x}{p2:02x}02{key:02x}00")
         resp, sw = self._exchange(apdu)
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Key operation error!")

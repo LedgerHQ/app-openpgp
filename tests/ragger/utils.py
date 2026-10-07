@@ -7,7 +7,7 @@ This module provides Ragger tests utility functions
 import re
 from pathlib import Path
 
-from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
+from application_client.app_def import DataObject, Errors, KeyGenMode, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
 from Crypto.Protocol import DH as ecdh
 from Crypto.PublicKey import ECC, RSA
@@ -70,20 +70,20 @@ def util_navigate(
     )
 
 
-def generate_key(client: CommandSender, key_tag: DataObject, seed: bool = False) -> None:
+def generate_key(client: CommandSender, key_tag: DataObject, mode: KeyGenMode = KeyGenMode.DEFAULT) -> None:
     """Generate a Asymmetric key
 
     Args:
         client (CommandSender): Application object
         key_tag (DataObject):   Tag identifying the key
-        seed (bool):            Generate a key in SEED mode
+        mode (KeyGenMode):      Random or seeded generation
     """
 
     # Verify PW3 (Admin)
     check_pincode(client, PassWord.PW3)
 
     # Generate the SIG Key Pair
-    rapdu = client.generate_key(key_tag, seed)
+    rapdu = client.generate_key(key_tag, mode)
     assert rapdu.status == Errors.SW_OK
 
 

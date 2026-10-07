@@ -354,29 +354,30 @@ class GpgManager {
     }
   }
 
-  // Regenerate the three keys deterministically from the device seed
-  // (GEN ASYM KEYPAIR, P1=Generate, P2=SEED). This rebuilds the exact same
-  // keys from the master seed; it requires SEED mode enabled on the device
-  // and the same recovery phrase. `keys` lists the [name, tag] of the keys to
-  // regenerate. Returns the list of failures.
-  async seedKeys(keys, t = this.transport) {
+  // Regenerate a key deterministically from the device seed (GEN ASYM KEYPAIR,
+  // P1=Generate), first with the current derivation (P2=0x02), then with the
+  // legacy one of app 2.x (P2=0x01): the backup fingerprint tells which one
+  // built the key. Requires the same recovery phrase. Returns the failure, or
+  // null when the regenerated key matches the backup.
+  async seedKey(name, slot, tag, t = this.transport) {
     const GENERATE = 0x80;
-    const SEEDED_MODE = 0x01;
-    const header = Buffer.from([0x00, 0x47, GENERATE, SEEDED_MODE]);
-    const failures = [];
-    for (const [name, tag] of keys) {
+    const SEED_V2 = 0x02;
+    const SEED_LEGACY = 0x01;
+    let failure = null;
+    for (const p2 of [SEED_V2, SEED_LEGACY]) {
       // CRT key template: <tag> 00
-      const { sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
+      const { sw } = await exchange(t, Buffer.from([0x00, 0x47, GENERATE, p2]), Buffer.from([tag, 0x00]));
       if (sw !== SW_SUCCESS) {
-        failures.push({
-          tag,
-          name: `${name} (regenerate)`,
-          sw,
-          message: statusMessage(sw),
-        });
+        failure = { tag, name: `${name} (regenerate)`, sw, message: statusMessage(sw) };
+        continue;
       }
+      const message = await this.checkKey(slot, tag, t);
+      if (!message) {
+        return null;
+      }
+      failure = { tag, name: `${name} (fingerprint)`, sw: SW_SUCCESS, message, keyMismatch: true };
     }
-    return failures;
+    return failure;
   }
 
   // Check the card key against the fingerprint the backup gives it, computed
@@ -518,13 +519,8 @@ class GpgManager {
 
       // Keys are recovered by regenerating them from the device seed, not by
       // writing back the encrypted blob (which the firmware rejects on a
-      // wiped card). Only the keys the backup holds are regenerated.
-      if (regenerateKeys) {
-        const present = keys.filter(([, slot]) => hasKey(slot)).map(([name, , tag]) => [name, tag]);
-        failures.push(...(await this.seedKeys(present, t)));
-      }
-
-      // A key fingerprint and date are only written once the card key matches them
+      // wiped card). Only the keys the backup holds are regenerated, and a key
+      // fingerprint and date are only written once the card key matches them.
       for (const [name, slot, tag, caTag, fpTag, dateTag] of keys) {
         await put(caTag, slot.ca_fingerprint);
         if (!hasKey(slot)) {
@@ -532,9 +528,17 @@ class GpgManager {
           await put(dateTag, u32be(slot.date));
           continue;
         }
-        const message = await this.checkKey(slot, tag, t);
-        if (message) {
-          failures.push({ tag, name: `${name} (fingerprint)`, sw: SW_SUCCESS, message, keyMismatch: true });
+        let failure = null;
+        if (regenerateKeys) {
+          failure = await this.seedKey(name, slot, tag, t);
+        } else {
+          const message = await this.checkKey(slot, tag, t);
+          if (message) {
+            failure = { tag, name: `${name} (fingerprint)`, sw: SW_SUCCESS, message, keyMismatch: true };
+          }
+        }
+        if (failure) {
+          failures.push(failure);
           await put(fpTag, Buffer.alloc(FINGERPRINT_SIZE));
           await put(dateTag, u32be(0));
         } else {

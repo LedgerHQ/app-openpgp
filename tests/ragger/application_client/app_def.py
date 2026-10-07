@@ -37,6 +37,16 @@ class InsType(IntEnum):
     INS_MSE = 0x22
 
 
+class KeyGenMode(IntEnum):
+    """P2 of Generate Asymmetric Key pair"""
+
+    # Seeded with the current derivation when SEED mode is ON, random otherwise
+    DEFAULT = 0x00
+    # Seeded with the legacy derivation, to restore existing keys
+    SEED_LEGACY = 0x01
+    SEED_V2 = 0x02
+
+
 class PubkeyAlgo(IntEnum):
     """Public-Key Algorithm IDs definition"""
 
