@@ -53,7 +53,7 @@ int gpg_apdu_put_key_data(unsigned int ref);
 /* ---                              PSO                               ---- */
 /* ----------------------------------------------------------------------- */
 
-int gpg_pso_derive_slot_seed(int slot, unsigned char *seed);
+int gpg_pso_derive_slot_seed(unsigned int slot, unsigned char *seed);
 int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned char *key_name,
                             unsigned int idx,

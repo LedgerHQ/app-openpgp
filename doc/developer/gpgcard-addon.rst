@@ -141,7 +141,9 @@ Seeded keys are generated as follow:
 
 For a given keys slot n, starting from 1, a seed is first derived with the following path
 
- | ``Sn = BIP32_derive (/0x80475047/n)``
+ | ``Sn = BIP32_derive (/0x80475047'/n')``
+
+The last index is hardened, so that the seed of one slot gives no information on the other slots.
 
 **Step 2**:
 
@@ -197,6 +199,7 @@ Generate ECC key pair:
 App versions up to 2.x derived the seeded keys differently, and this derivation is only kept
 to restore their keys (see P2 of GENERATE ASYMMETRIC KEY PAIR):
 
+- step 1 uses a non-hardened last index: ``Sn = BIP32_derive (/0x80475047'/n)``
 - step 2 hashes neither "kdf2" nor ctx: ``SHA256(Sn | <key_name> | int16(i))``
 - only the first length/8 bytes of the key buffer are derived:
 

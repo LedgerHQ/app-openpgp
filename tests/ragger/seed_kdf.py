@@ -8,7 +8,7 @@ computed from the default Speculos recovery phrase.
 import hashlib
 from math import isqrt
 
-from bip_utils import Bip32Slip10Secp256k1, Bip39SeedGenerator, Secp256k1PrivateKey
+from bip_utils import Bip32KeyIndex, Bip32Slip10Secp256k1, Bip39SeedGenerator, Secp256k1PrivateKey
 from Crypto.PublicKey import ECC
 from Crypto.Signature import eddsa
 from Crypto.Util.number import isPrime
@@ -27,11 +27,12 @@ CURVE_ORDER = {
 P25519 = 2**255 - 19
 
 
-def slot_seed(slot: int) -> bytes:
-    """Seed of a slot: BIP32 secp256k1 derivation on APP_PATH / (slot + 1)"""
+def slot_seed(slot: int, v2: bool = False) -> bytes:
+    """Seed of a slot: BIP32 secp256k1 derivation on APP_PATH / (slot + 1), hardened for v2"""
 
     root = Bip32Slip10Secp256k1.FromSeed(Bip39SeedGenerator(SPECULOS_MNEMONIC).Generate())
-    return root.ChildKey(APP_PATH).ChildKey(slot + 1).PrivateKey().Raw().ToBytes()
+    index = Bip32KeyIndex.HardenIndex(slot + 1) if v2 else slot + 1
+    return root.ChildKey(APP_PATH).ChildKey(index).PrivateKey().Raw().ToBytes()
 
 
 def role_name(role: str) -> bytes:
@@ -67,7 +68,7 @@ def next_prime(x: int) -> int:
 def rsa_modulus(slot: int, role: str, attributes: bytes, v2: bool) -> int:
     """Modulus of a seeded RSA key"""
 
-    seed = slot_seed(slot)
+    seed = slot_seed(slot, v2)
     size = int.from_bytes(attributes[1:3], "big") // 16
     primes = []
     for idx in (1, 2):
@@ -84,7 +85,7 @@ def rsa_modulus(slot: int, role: str, attributes: bytes, v2: bool) -> int:
 def ecc_private(slot: int, role: str, template: str, attributes: bytes, v2: bool) -> bytes:
     """Private scalar of a seeded key on a 256-bit curve"""
 
-    seed = slot_seed(slot)
+    seed = slot_seed(slot, v2)
     if not v2:
         # derived in place over the slot seed
         return derive_legacy(seed, role, 1, 32) + seed[4:32]

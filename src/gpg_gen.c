@@ -18,6 +18,7 @@
 #include "gpg_vars.h"
 #include "cx_ram.h"
 #include "cx_errors.h"
+#include "bip32.h"
 
 typedef enum {
     KEY_SOURCE_RANDOM,
@@ -28,13 +29,13 @@ typedef enum {
 /**
  * Derivate the App Path from the Master Seed for a specific slot
  *
- * @param[in] slot Selected slot
+ * @param[in] slot Selected slot, with BIP32_HARDENED_MASK for a hardened derivation
  * @param[out] seed 32 bytes seed for given slot
  *
  * @return Status Word
  *
  */
-int gpg_pso_derive_slot_seed(int slot, unsigned char *seed) {
+int gpg_pso_derive_slot_seed(unsigned int slot, unsigned char *seed) {
     unsigned int path[2];
     unsigned char chain[32];
     cx_err_t error = CX_INTERNAL_ERROR;
@@ -50,6 +51,31 @@ end:
         return error;
     }
     return SWO_SUCCESS;
+}
+
+/**
+ * Derivate the seed of the selected slot for a seeded key
+ *
+ * @param[in] source legacy or v2 key derivation
+ * @param[out] seed 32 bytes seed for the selected slot
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_gen_slot_seed(gpg_key_source_t source, unsigned char *seed) {
+    unsigned int slot;
+
+    switch (source) {
+        case KEY_SOURCE_SEED_LEGACY:
+            slot = G_gpg_vstate.slot;
+            break;
+        case KEY_SOURCE_SEED_V2:
+            slot = G_gpg_vstate.slot | BIP32_HARDENED_MASK;
+            break;
+        default:
+            return SWO_CONDITIONS_NOT_SATISFIED;
+    }
+    return gpg_pso_derive_slot_seed(slot, seed);
 }
 
 /**
@@ -297,7 +323,7 @@ static int gpg_gen_rsa_seed_primes(const gpg_key_t *keygpg,
     int sw = SWO_UNKNOWN;
     cx_err_t error = CX_INTERNAL_ERROR;
 
-    sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
+    sw = gpg_gen_slot_seed(source, seed);
     if (sw != SWO_SUCCESS) {
         goto end;
     }
@@ -475,7 +501,7 @@ static int gpg_gen_ecc_seed_scalar(const gpg_key_t *keygpg,
     int sw = SWO_UNKNOWN;
     cx_err_t error = CX_INTERNAL_ERROR;
 
-    sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, d);
+    sw = gpg_gen_slot_seed(source, d);
     if (sw != SWO_SUCCESS) {
         return sw;
     }
