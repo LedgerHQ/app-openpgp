@@ -695,22 +695,45 @@ class GPGCard:
 
         Each key the backup holds is generated with the current derivation, then with the
         legacy one of app 2.x, until it matches its fingerprint; the derivation of a matching key
-        is tried first for the next ones. A key matching no derivation has its fingerprint and
-        date cleared.
+        is tried first for the next ones. A key matching no derivation is erased, and has its
+        fingerprint and date cleared.
         """
 
         derivations = (SEED_MODE_V2, SEED_MODE_LEGACY)
         mismatches: list[str] = []
-        for name, slot, key_tag, fp_tag, date_tag in (
-            ("SIG", self.data.sig, DataObject.DO_SIG_KEY, DataObject.DO_FINGERPRINT_WR_SIG, DataObject.DO_DATES_WR_SIG),
-            ("DEC", self.data.dec, DataObject.DO_DEC_KEY, DataObject.DO_FINGERPRINT_WR_DEC, DataObject.DO_DATES_WR_DEC),
-            ("AUT", self.data.aut, DataObject.DO_AUT_KEY, DataObject.DO_FINGERPRINT_WR_AUT, DataObject.DO_DATES_WR_AUT),
+        for name, slot, key_tag, attr_tag, fp_tag, date_tag in (
+            (
+                "SIG",
+                self.data.sig,
+                DataObject.DO_SIG_KEY,
+                DataObject.DO_SIG_ATTR,
+                DataObject.DO_FINGERPRINT_WR_SIG,
+                DataObject.DO_DATES_WR_SIG,
+            ),
+            (
+                "DEC",
+                self.data.dec,
+                DataObject.DO_DEC_KEY,
+                DataObject.DO_DEC_ATTR,
+                DataObject.DO_FINGERPRINT_WR_DEC,
+                DataObject.DO_DATES_WR_DEC,
+            ),
+            (
+                "AUT",
+                self.data.aut,
+                DataObject.DO_AUT_KEY,
+                DataObject.DO_AUT_ATTR,
+                DataObject.DO_FINGERPRINT_WR_AUT,
+                DataObject.DO_DATES_WR_AUT,
+            ),
         ):
             if len(slot.fingerprint) != 20 or not any(slot.fingerprint):
                 continue
             derivation = self._seed_key_matching(slot, key_tag, derivations)
             if derivation is None:
                 mismatches.append(name)
+                # Writing the key attributes erases the regenerated key
+                self._put_data(attr_tag, slot.attribute)
                 self._put_data(fp_tag, bytes(20))
                 self._put_data(date_tag, bytes(4))
             else:

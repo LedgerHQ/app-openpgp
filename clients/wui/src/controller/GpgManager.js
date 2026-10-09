@@ -80,6 +80,9 @@ async function forgetDevice(transport) {
 const SEED_V2 = 0x02;
 const SEED_LEGACY = 0x01;
 
+// Algorithm attributes DO of each key
+const ATTRIBUTE_TAGS = { [DO.SIG_KEY]: DO.SIG_ATTR, [DO.DEC_KEY]: DO.DEC_ATTR, [DO.AUT_KEY]: DO.AUT_ATTR };
+
 // A backup key slot holds a key when its fingerprint is set
 function hasKey(slot) {
   return slot.fingerprint.length === FINGERPRINT_SIZE && slot.fingerprint.some((b) => b !== 0);
@@ -550,6 +553,10 @@ class GpgManager {
         }
         if (failure) {
           failures.push(failure);
+          if (regenerateKeys) {
+            // Writing the key attributes erases the regenerated key
+            await put(ATTRIBUTE_TAGS[tag], slot.attribute);
+          }
           await put(fpTag, Buffer.alloc(FINGERPRINT_SIZE));
           await put(dateTag, u32be(0));
         } else {

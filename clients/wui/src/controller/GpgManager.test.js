@@ -262,6 +262,29 @@ describe("restore fingerprints", () => {
     expect(sigFingerprintWrites(sent).map((d) => d.toString("hex"))).toEqual(["00".repeat(20)]);
   });
 
+  test("erases a regenerated key matching no derivation", async () => {
+    const other = Buffer.from(P256_POINT);
+    other[10] ^= 0x01;
+    const sent = [];
+    await restore(null, sent, true, { 0x02: other, 0x01: other });
+    const lastGeneration = sent.findLastIndex((apdu) => apdu[1] === 0x47 && apdu[2] === 0x80);
+    const attributeWrites = sent
+      .map((apdu, index) => ({ apdu, index }))
+      .filter(({ apdu }) => apdu[1] === 0xda && apdu[2] === 0x00 && apdu[3] === 0xc1);
+    expect(attributeWrites.at(-1).index).toBeGreaterThan(lastGeneration);
+    expect(attributeWrites.at(-1).apdu.subarray(5).equals(P256_ATTR)).toBe(true);
+  });
+
+  test("keeps a regenerated key matching the backup", async () => {
+    const sent = [];
+    await restore(null, sent, true, { 0x02: P256_POINT });
+    const lastGeneration = sent.findLastIndex((apdu) => apdu[1] === 0x47 && apdu[2] === 0x80);
+    const lateAttributeWrites = sent.filter(
+      (apdu, index) => index > lastGeneration && apdu[1] === 0xda && apdu[3] === 0xc1
+    );
+    expect(lateAttributeWrites).toEqual([]);
+  });
+
   test("tries the derivation of the first key first for the next keys", async () => {
     const other = Buffer.from(P256_POINT);
     other[10] ^= 0x01;
