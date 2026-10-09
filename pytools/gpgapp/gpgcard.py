@@ -700,7 +700,7 @@ class GPGCard:
         """
 
         derivations = (SEED_MODE_V2, SEED_MODE_LEGACY)
-        mismatches: list[str] = []
+        failures: list[str] = []
         for name, slot, key_tag, attr_tag, fp_tag, date_tag in (
             (
                 "SIG",
@@ -729,22 +729,25 @@ class GPGCard:
         ):
             if len(slot.fingerprint) != 20 or not any(slot.fingerprint):
                 continue
-            derivation = self._seed_key_matching(slot, key_tag, derivations)
-            if derivation is None:
-                mismatches.append(name)
-                # Writing the key attributes erases the regenerated key
-                self._put_data(attr_tag, slot.attribute)
-                self._put_data(fp_tag, bytes(20))
-                self._put_data(date_tag, bytes(4))
-            else:
+            derivation, sw = self._seed_key_matching(slot, key_tag, derivations)
+            if derivation is not None:
                 derivations = (derivation, SEED_MODE_LEGACY if derivation == SEED_MODE_V2 else SEED_MODE_V2)
-        if mismatches:
-            raise GPGCardExcpetion(
-                ErrorCodes.ERR_INTERNAL,
-                f"{', '.join(mismatches)} key(s) do not match the backup (other recovery phrase or modified backup)",
-            )
+                continue
+            if sw == ErrorCodes.ERR_SUCCESS:
+                failure = f"{name} does not match the backup (other recovery phrase or modified backup)"
+            else:
+                failure = f"{name} generation refused ({sw:04x})"
+            # Writing the key attributes erases the regenerated key
+            sw = self._put_data(attr_tag, slot.attribute)
+            if sw != ErrorCodes.ERR_SUCCESS:
+                failure += f", and not erased ({sw:04x})"
+            failures.append(failure)
+            self._put_data(fp_tag, bytes(20))
+            self._put_data(date_tag, bytes(4))
+        if failures:
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Keys not restored: {'; '.join(failures)}")
 
-    def _seed_key_matching(self, slot: KeyInfo, key_tag: int, derivations: tuple[int, ...]) -> int | None:
+    def _seed_key_matching(self, slot: KeyInfo, key_tag: int, derivations: tuple[int, ...]) -> tuple[int | None, int]:
         """Regenerate a key in SEED mode with each derivation in turn, until it matches its fingerprint
 
         Args:
@@ -753,18 +756,23 @@ class GPGCard:
             derivations (tuple[int]): GEN ASYM KEY P2 values to try
 
         Returns:
-            The derivation of the key matching the backup fingerprint, or None
+            The derivation of the key matching the backup fingerprint, or None, and the status word
+            of the last generation when every generation was refused, or ERR_SUCCESS
         """
 
         date = int(slot.date.replace(tzinfo=UTC).timestamp())
+        refused = ErrorCodes.ERR_SUCCESS
+        generated = False
         for p2 in derivations:
             resp, sw = self._generate_key(bytes.fromhex(f"004780{p2:02x}02{key_tag:02x}00"))
             if sw != ErrorCodes.ERR_SUCCESS:
+                refused = sw
                 continue
+            generated = True
             pubkey = self._decode_tlv(self._decode_tlv(resp).get(DataObject.DO_PUB_KEY, b""))
             if key_fingerprint(slot.attribute, pubkey, date) == slot.fingerprint:
-                return p2
-        return None
+                return p2, ErrorCodes.ERR_SUCCESS
+        return None, ErrorCodes.ERR_SUCCESS if generated else refused
 
     ############### Information decoding ###############
     def decode_AID(self) -> dict:
