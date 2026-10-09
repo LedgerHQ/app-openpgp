@@ -262,7 +262,7 @@ export default function App() {
       if (pinAction === "backup") {
         const payload = await gpg.backup(userPin, adminPin, parseInt(slot, 10) - 1);
         closePin();
-        const name = `gpg_backup_${serial || "openpgp"}.json`;
+        const name = `gpg_backup_${serial || "openpgp"}_slot${slot}.json`;
         let saved;
         if (filePassphrase) {
           const encrypted = await encryptBackup(payload, filePassphrase);
