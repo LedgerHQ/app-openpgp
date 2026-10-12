@@ -140,6 +140,11 @@ export default function App() {
 
   const restoreContent = useRef(null);
   const fileInput = useRef(null);
+  // Pending read of a restore file, and the generation that invalidates older reads
+  const restoreReader = useRef(null);
+  const restoreGeneration = useRef(0);
+  // Name and SHA-256 of the file being restored, shown in the restore dialog
+  const [restoreFile, setRestoreFile] = useState(null);
   const regeneratingRef = useRef(false);
 
   // Release the device, and its WebHID permission, when the page is left
@@ -194,10 +199,19 @@ export default function App() {
     if (resolve) resolve(accepted);
   }
 
+  // Abort the pending read of a restore file, and ignore the reads started before
+  function cancelRestoreRead() {
+    restoreGeneration.current += 1;
+    restoreReader.current?.abort();
+    restoreReader.current = null;
+  }
+
   // Drop the backup file read for a restore, overwriting its bytes
   function clearRestoreContent() {
+    cancelRestoreRead();
     restoreContent.current?.fill(0);
     restoreContent.current = null;
+    setRestoreFile(null);
   }
 
   function closePin() {
@@ -210,13 +224,20 @@ export default function App() {
     setSlot("1");
   }
 
-  // Open the PIN dialog of `action` on the slot active on the card
+  // Open the PIN dialog of `action` on the slot active on the card, busy until the slot is read
   async function openWithActiveSlot(action) {
+    setBusy(true);
     try {
-      setSlot(mock ? "1" : String((await gpg.activeSlot()) + 1));
+      const active = mock ? "1" : String((await gpg.activeSlot()) + 1);
+      // The restore file is dropped on a disconnection during the read
+      if (action === "restore" && restoreContent.current === null) return false;
+      setSlot(active);
     } catch (e) {
+      clearRestoreContent();
       setNotice({ appearance: "error", title: "Unable to read the active slot", description: e.message });
       return false;
+    } finally {
+      setBusy(false);
     }
     setPinAction(action);
     return true;
@@ -257,23 +278,43 @@ export default function App() {
   function onPickRestoreFile(event) {
     const file = event.target.files[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || busy) return;
     try {
       checkBackupFileSize(file.size);
     } catch (e) {
       setNotice({ appearance: "error", title: e.message });
       return;
     }
+    clearRestoreContent();
+    const generation = restoreGeneration.current;
     const reader = new FileReader();
-    reader.onload = () => {
+    restoreReader.current = reader;
+    setBusy(true);
+    const isCurrent = () => generation === restoreGeneration.current;
+    reader.onload = async () => {
+      if (!isCurrent()) return;
       const bytes = new Uint8Array(reader.result);
+      const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+      if (!isCurrent()) {
+        bytes.fill(0);
+        return;
+      }
+      restoreReader.current = null;
       restoreContent.current = bytes;
+      setRestoreFile({ name: file.name, digest: Array.from(hash, (b) => b.toString(16).padStart(2, "0")).join("") });
       setIsEncryptedFile(isEncryptedBackup(bytes));
       setRegen(true);
-      openWithActiveSlot("restore");
+      await openWithActiveSlot("restore");
+    };
+    reader.onerror = () => {
+      if (!isCurrent()) return;
+      restoreReader.current = null;
+      setBusy(false);
+      setNotice({ appearance: "error", title: "Unable to read the backup file" });
     };
     reader.readAsArrayBuffer(file);
   }
+
 
   async function submitPin(event) {
     event.preventDefault();
@@ -564,6 +605,13 @@ export default function App() {
                 onSubmit={submitPin}
                 className={busy ? "hidden" : "flex flex-col gap-16"}
               >
+                {pinAction === "restore" && restoreFile && (
+                  <div className="flex flex-col gap-4">
+                    <span className="body-3-semi-bold text-base">Backup file</span>
+                    <span className="body-3 text-muted break-all">{restoreFile.name}</span>
+                    <span className="body-4 text-muted break-all">SHA-256 {restoreFile.digest}</span>
+                  </div>
+                )}
                 {cfg?.showSlot && (
                   <div className="flex flex-col gap-8">
                     <span className="body-3-semi-bold text-base">Key slot</span>
