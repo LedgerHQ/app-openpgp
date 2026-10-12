@@ -11,15 +11,19 @@ import pytest
 from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
 from Crypto.Cipher import AES, PKCS1_v1_5
+from Crypto.Hash import SHA256
 from Crypto.Protocol.DH import key_agreement
 from Crypto.PublicKey import ECC
 from Crypto.Random import get_random_bytes
+from Crypto.Signature import pkcs1_15
 from ledgered.devices import Device
 from ragger.backend import BackendInterface
+from ragger.backend.interface import RAPDU
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import Navigator
 from utils import (
     KEY_TEMPLATES,
+    SHA256_DIGEST_INFO,
     check_pincode,
     generate_key,
     get_ECDH_pub_key,
@@ -128,6 +132,98 @@ def test_MSE(backend: BackendInterface) -> None:
     assert rapdu.status == Errors.SW_OK
 
     assert rapdu.data == plain
+
+
+# In this test we check that selecting the application restores the default MSE keys
+def test_MSE_reset_on_select(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+
+    check_pincode(client, PassWord.PW3)
+    for attr, key in ((DataObject.DO_DEC_ATTR, DataObject.DO_DEC_KEY), (DataObject.DO_AUT_ATTR, DataObject.DO_AUT_KEY)):
+        rapdu = client.set_template(attr, KEY_TEMPLATES["rsa2048"])
+        assert rapdu.status == Errors.SW_OK
+        generate_key(client, key)
+
+    check_pincode(client, PassWord.PW2)
+    plain = get_random_bytes(32)
+    ciphertext = PKCS1_v1_5.new(get_RSA_pub_key(client, DataObject.DO_DEC_KEY)).encrypt(plain)
+
+    # Decrypt with the AUT key
+    rapdu = client.manage_security_env(DataObject.DO_DEC_KEY, 3)
+    assert rapdu.status == Errors.SW_OK
+
+    rapdu = client.send_select()
+    assert rapdu.status == Errors.SW_OK
+
+    check_pincode(client, PassWord.PW2)
+    rapdu = client.decrypt_asym(ciphertext)
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == plain
+
+
+# In this test we check that the UIF confirmation names the AUT key used by PSO:DEC through MSE
+def test_uif_decrypt_with_aut_key(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
+    client = CommandSender(backend)
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_AUT_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_AUT_KEY)
+    assert client.set_uif(DataObject.DO_UIF_AUT, True).status == Errors.SW_OK
+    assert client.set_uif(DataObject.DO_UIF_DEC, False).status == Errors.SW_OK
+
+    check_pincode(client, PassWord.PW2)
+    plain = get_random_bytes(32)
+    ciphertext = PKCS1_v1_5.new(get_RSA_pub_key(client, DataObject.DO_AUT_KEY)).encrypt(plain)
+
+    # Decrypt with the AUT key
+    rapdu = client.manage_security_env(DataObject.DO_DEC_KEY, 3)
+    assert rapdu.status == Errors.SW_OK
+
+    pso_dec_p1, pso_dec_p2 = 0x80, 0x86
+    rsa_padding_indicator = b"\x00"
+    frame = rsa_padding_indicator + ciphertext
+    first, last = frame[: len(frame) // 2], frame[len(frame) // 2 :]
+    header = struct.pack(">BBBBB", ClaType.CLA_APP_CHAIN, InsType.INS_PSO, pso_dec_p1, pso_dec_p2, len(first))
+    rapdu = backend.exchange_raw(header + first)
+    assert rapdu.status == Errors.SW_OK
+
+    header = struct.pack(">BBBBB", ClaType.CLA_APP, InsType.INS_PSO, pso_dec_p1, pso_dec_p2, len(last))
+    with backend.exchange_async_raw(header + last):
+        util_navigate(device, navigator, test_name, "Confirm_Yes")
+    rapdu = backend.last_async_response
+    assert rapdu is not None
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == plain
+
+
+# In this test we check that the UIF confirmation names the DEC key used by INTERNAL AUTHENTICATE through MSE
+def test_uif_authenticate_with_dec_key(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
+    client = CommandSender(backend)
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_DEC_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_DEC_KEY)
+    assert client.set_uif(DataObject.DO_UIF_DEC, True).status == Errors.SW_OK
+    assert client.set_uif(DataObject.DO_UIF_AUT, False).status == Errors.SW_OK
+
+    check_pincode(client, PassWord.PW2)
+
+    # Authenticate with the DEC key
+    rapdu = client.manage_security_env(DataObject.DO_AUT_KEY, 2)
+    assert rapdu.status == Errors.SW_OK
+
+    hash_obj = SHA256.new(get_random_bytes(16))
+    frame = SHA256_DIGEST_INFO + hash_obj.digest()
+    header = struct.pack(">BBBBB", ClaType.CLA_APP, InsType.INS_INT_AUTHENTICATE, 0x00, 0x00, len(frame))
+    # The 256-byte signature ends with a 61xx status word
+    with pytest.raises(ExceptionRAPDU) as err:
+        with backend.exchange_async_raw(header + frame):
+            util_navigate(device, navigator, test_name, "Confirm_Yes")
+    rapdu = client.get_long_response(RAPDU(err.value.status, err.value.data))
+    assert rapdu.status == Errors.SW_OK
+    pkcs1_15.new(get_RSA_pub_key(client, DataObject.DO_DEC_KEY)).verify(hash_obj, rapdu.data)
 
 
 def test_cv25519(backend: BackendInterface) -> None:

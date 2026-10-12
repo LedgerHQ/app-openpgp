@@ -37,7 +37,7 @@ class CommandSender:
             Response APDU
         """
 
-        data = binascii.unhexlify(b"06D27600012401")
+        data = binascii.unhexlify(b"D27600012401")
         return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_SELECT, p1=0x04, data=data)
 
     def send_activate(self) -> RAPDU:

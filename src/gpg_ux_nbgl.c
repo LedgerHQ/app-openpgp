@@ -1539,7 +1539,13 @@ void ui_menu_uifconfirm_display(unsigned int value) {
 
     switch (G_gpg_vstate.io_ins) {
         case INS_INTERNAL_AUTHENTICATE:
-            snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+            if (G_gpg_vstate.mse_aut == &G_gpg_vstate.kslot->aut) {
+                snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+            } else {
+                snprintf(G_gpg_vstate.menu,
+                         sizeof(G_gpg_vstate.menu),
+                         "Authentication with Decryption key");
+            }
             break;
         case INS_PSO:
             switch (G_gpg_vstate.io_p1p2) {
@@ -1550,7 +1556,13 @@ void ui_menu_uifconfirm_display(unsigned int value) {
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Encryption");
                     break;
                 case PSO_DEC:
-                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                    if (G_gpg_vstate.mse_dec == &G_gpg_vstate.kslot->dec) {
+                        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                    } else {
+                        snprintf(G_gpg_vstate.menu,
+                                 sizeof(G_gpg_vstate.menu),
+                                 "Decryption with Authentication key");
+                    }
                     break;
                 default:
                     break;
