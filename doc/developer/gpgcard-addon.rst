@@ -246,14 +246,6 @@ For a given length *L* and seed *S*:
 - generate r = SHA3-XOF(SHA256(Sr \| 'rnd' \| S), L)
 - return r
 
-**Seeded prime number generation**:
-
-For a given length *L* and seed *S*:
-
-- generate r as for "Seeded random number"
-- generate rp = next_prime(r)
-- return rp
-
 Key Backup & Restore
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -379,18 +371,21 @@ fingerprint of the backup; once a key matches, its value of P2 is tried first fo
 Deterministic random number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-P1 parameter of GET CHALLENGE is a bit-field encoded as follow:
+P1 parameter of GET CHALLENGE selects one of these modes, any other value is rejected:
 
-  +----+----+----+----+----+----+----+----+-------------------------+
-  | b8 | b7 | b6 | b5 | b4 | b3 | b2 | b1 | Meaning                 |
-  +----+----+----+----+----+----+----+----+-------------------------+
-  | \- | \- | \- | \- | \- | \- | \- | x  | seeded random           |
-  +----+----+----+----+----+----+----+----+-------------------------+
-  | \- | \- | \- | \- | \- | \- | x  | \- | prime random            |
-  +----+----+----+----+----+----+----+----+-------------------------+
+  +------+-----------------------------------------------------------+
+  | P1   | Meaning                                                   |
+  +======+===========================================================+
+  | 00   | random number, of Le bytes                                |
+  +------+-----------------------------------------------------------+
+  | 01   | seeded random number: the data field contains the seed S, |
+  |      | and P2 the length L                                       |
+  +------+-----------------------------------------------------------+
+  | 02   | random prime number, of Le bytes                          |
+  +------+-----------------------------------------------------------+
 
-When *seeded mode* is set, data field contains the seed and P2 contains
-the length of random bytes to generate.
+GET CHALLENGE requires no PIN of the app: like every command, it is only processed while the device
+is unlocked.
 
 
 Other minor add-on
