@@ -196,6 +196,19 @@ def reset_app(gpgcard: GPGCard) -> None:
 # ===============================================================================
 #          Retrieve the OpenPGP Card information
 # ===============================================================================
+def printable(text: str) -> str:
+    """Escape the control, format and other non-printable characters of a card text
+
+    Args:
+        text (str): Text read from the card
+
+    Returns:
+        The text, with each non-printable character as a Python escape sequence
+    """
+
+    return "".join(c if c.isprintable() else c.encode("unicode_escape").decode("ascii") for c in text)
+
+
 def get_info(gpgcard: GPGCard, display: bool = True) -> None:
     """Retrieve and display Card information
 
@@ -233,11 +246,11 @@ def get_info(gpgcard: GPGCard, display: bool = True) -> None:
     for k, v in gpgcard.decode_hardware().items():
         print(f" - {k:20s}: {v}")
     print(f"{line} User Info {line}")
-    print(f" - {'Name':20s}: {gpgcard.get_name()}")
-    print(f" - {'Login':20s}: {gpgcard.get_login()}")
-    print(f" - {'URL':20s}: {gpgcard.get_url()}")
-    print(f" - {'Salutation':20s}: {gpgcard.get_salutation()}")
-    print(f" - {'Lang':20s}: {gpgcard.get_lang()}")
+    print(f" - {'Name':20s}: {printable(gpgcard.get_name())}")
+    print(f" - {'Login':20s}: {printable(gpgcard.get_login())}")
+    print(f" - {'URL':20s}: {printable(gpgcard.get_url())}")
+    print(f" - {'Salutation':20s}: {printable(gpgcard.get_salutation())}")
+    print(f" - {'Lang':20s}: {printable(gpgcard.get_lang())}")
     print(f"{line} Slots Info {line}")
     for k, v in gpgcard.decode_slot().items():
         print(f" - {k:20s}: {v}")
