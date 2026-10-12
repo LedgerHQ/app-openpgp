@@ -239,6 +239,7 @@ class CardInfo:
         self.private_01 = b""
         self.private_02 = b""
         self.private_03 = b""
+        self.private_04 = b""
 
 
 class GPGCard:
