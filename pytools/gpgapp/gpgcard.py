@@ -34,7 +34,7 @@ from ledgercomm.transport import TransportType  # type: ignore
 
 # pylint: enable=import-error
 from gpgapp.fingerprint import key_fingerprint
-from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
+from gpgapp.gpgcmd import (  # type: ignore
     KEY_OPERATIONS,
     KEY_TEMPLATES,
     USER_SALUTATION,
@@ -1556,27 +1556,28 @@ class GPGCard:
         """
 
         tags = {}
-        while len(tlv):
-            offset = 0
-            length = 0
-            if (tlv[0] & 0x1F) == 0x1F:
-                tag = self._get_int(tlv)
-                offset = 2
-            else:
-                tag = tlv[0]
-                offset = 1
+        offset = 0
+        while offset < len(tlv):
+            # one or two byte tag, then a one byte length or 81/82 followed by the length
+            tag_len = 2 if (tlv[offset] & 0x1F) == 0x1F else 1
+            if offset + tag_len + 1 > len(tlv):
+                raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Truncated TLV data")
+            tag = int.from_bytes(tlv[offset : offset + tag_len], "big")
+            offset += tag_len
             length = tlv[offset]
+            offset += 1
             if length & 0x80:
-                if (length & 0x7F) == 1:
-                    length = tlv[offset + 1]
-                    offset += 2
-                elif (length & 0x7F) == 2:
-                    length = self._get_int(tlv, offset=offset + 1)
-                    offset += 3
-            else:
-                offset += 1
+                size = length & 0x7F
+                if size not in (1, 2) or offset + size > len(tlv):
+                    raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Invalid TLV length for tag {tag:x}")
+                length = int.from_bytes(tlv[offset : offset + size], "big")
+                offset += size
+            if offset + length > len(tlv):
+                raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Truncated TLV value for tag {tag:x}")
+            if tag in tags:
+                raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Duplicate TLV tag {tag:x}")
             tags[tag] = tlv[offset : offset + length]
-            tlv = tlv[offset + length :]
+            offset += length
         return tags
 
     def _transmit(self, data: bytes, long_resp: bool = False) -> tuple[bytes, int, int]:
