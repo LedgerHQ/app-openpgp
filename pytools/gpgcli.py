@@ -463,8 +463,12 @@ def entrypoint() -> None:
             # Changing the User PIN closes the PW2 session
             args.user_pin = args.new_user_pin
             verify_user_pin(gpgcard, args.user_pin, args.pinpad)
-        if args.new_adm_pin and not gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin):
-            error(ErrorCodes.ERR_INTERNAL, "Admin PIN not changed")
+        if args.new_adm_pin:
+            if not gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin):
+                error(ErrorCodes.ERR_INTERNAL, "Admin PIN not changed")
+            # Check that the card accepts the new Admin PIN
+            args.adm_pin = args.new_adm_pin
+            verify_admin_pin(gpgcard, args.adm_pin, args.pinpad)
         if args.reset_code:
             # Use the Resetting code to set the value
             if not gpgcard.set_RC(args.reset_code):
