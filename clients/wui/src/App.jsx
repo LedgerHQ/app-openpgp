@@ -510,16 +510,16 @@ export default function App() {
               {review && (
                 <div className="flex flex-col gap-12">
                   <p className="body-2 text-base">
-                    This backup changes the following security settings of the card.
+                    This backup changes the following security settings and keys of the card.
                   </p>
                   {review.map((c) => (
                     <div key={c.setting} className="flex items-start gap-8">
-                      {c.weaker ? (
+                      {c.weaker || c.erased ? (
                         <Warning size={20} className="text-warning shrink-0" />
                       ) : (
                         <span className="body-3 text-muted shrink-0">•</span>
                       )}
-                      <span className={`body-3 ${c.weaker ? "text-warning" : "text-muted"}`}>
+                      <span className={`body-3 ${c.weaker || c.erased ? "text-warning" : "text-muted"}`}>
                         <span className="body-3-semi-bold">{c.setting}</span>: {c.from} → {c.to}
                         {c.weaker ? " (less protective)" : ""}
                       </span>
@@ -606,7 +606,8 @@ export default function App() {
                     <span className="body-3 text-base">
                       Regenerate keys from the device seed
                       <span className="block body-4 text-muted mt-2">
-                        Requires SEED mode; may take a while.
+                        Requires SEED mode; may take a while. Otherwise the keys on the card are kept,
+                        unless the backup changes their algorithm.
                       </span>
                     </span>
                   </label>

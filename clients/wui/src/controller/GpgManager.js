@@ -82,6 +82,11 @@ const SEED_LEGACY = 0x01;
 
 // Algorithm attributes DO of each key
 const ATTRIBUTE_TAGS = { [DO.SIG_KEY]: DO.SIG_ATTR, [DO.DEC_KEY]: DO.DEC_ATTR, [DO.AUT_KEY]: DO.AUT_ATTR };
+const KEY_ROLES = [
+  ["sig", DO.SIG_KEY],
+  ["dec", DO.DEC_KEY],
+  ["aut", DO.AUT_KEY],
+];
 
 // A backup key slot holds a key when its fingerprint is set
 function hasKey(slot) {
@@ -387,17 +392,24 @@ class GpgManager {
     return { failure, derivation: null };
   }
 
+  // Read the public key of a card key (GEN ASYM KEYPAIR, P1=Read): the
+  // decoded 7F49 template, and the status word.
+  async readPublicKey(tag, t = this.transport) {
+    const READ_PUBLIC_KEY = 0x81;
+    const header = Buffer.from([0x00, 0x47, READ_PUBLIC_KEY, 0x00]);
+    const { data: resp, sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
+    const pubkey = sw === SW_SUCCESS ? decodeTLV(decodeTLV(resp)[DO.PUB_KEY] || Buffer.alloc(0)) : null;
+    return { pubkey, sw };
+  }
+
   // Check the card key against the fingerprint the backup gives it, computed
   // from its public key, attributes and creation date. Returns the failure
   // message, or null when the key matches.
   async checkKey(slot, tag, t = this.transport) {
-    const READ_PUBLIC_KEY = 0x81;
-    const header = Buffer.from([0x00, 0x47, READ_PUBLIC_KEY, 0x00]);
-    const { data: resp, sw } = await exchange(t, header, Buffer.from([tag, 0x00]));
+    const { pubkey, sw } = await this.readPublicKey(tag, t);
     if (sw !== SW_SUCCESS) {
       return `no key on the card (${statusMessage(sw)})`;
     }
-    const pubkey = decodeTLV(decodeTLV(resp)[DO.PUB_KEY] || Buffer.alloc(0));
     const fp = await keyFingerprint(slot.attribute, pubkey, slot.date);
     if (fp === null) {
       return "fingerprint cannot be computed for this key algorithm";
@@ -443,8 +455,9 @@ class GpgManager {
   // restore still completes. The private keys are NOT written from the backup
   // blob (the firmware rejects that on a wiped card); pass regenerateKeys to
   // rebuild them from the device seed instead. Before any write, the security
-  // settings the backup changes are passed to `confirm`, which resolves to true
-  // to proceed. Returns the list of failures, or null when not confirmed.
+  // settings the backup changes, and the card keys it erases, are passed to
+  // `confirm`, which resolves to true to proceed. Returns the list of failures,
+  // or null when not confirmed.
   async restore(userPin, adminPin, json, regenerateKeys = false, slot = 0, confirm = async () => true) {
     const t = this._lock();
     try {
@@ -453,7 +466,22 @@ class GpgManager {
       await this.verifyPins(userPin, adminPin, t);
       await this.selectSlot(slot, t);
 
-      const changes = securityChanges(await this.readSecuritySettings(t), data);
+      // Writing the key attributes erases the key: only the changed ones are
+      // written, and a key they erase is not restored without regeneration.
+      const current = await this.readSecuritySettings(t);
+      const changed = {};
+      const kept = {};
+      const erased = [];
+      for (const [role, tag] of KEY_ROLES) {
+        changed[role] = !current[role].attribute.equals(data[role].attribute);
+        const regenerated = regenerateKeys && hasKey(data[role]);
+        const onCard = !regenerated && (await this.readPublicKey(tag, t)).sw === SW_SUCCESS;
+        kept[role] = onCard && !changed[role];
+        if (onCard && changed[role]) {
+          erased.push(role);
+        }
+      }
+      const changes = securityChanges(current, data, erased);
       if (changes.length > 0 && !(await confirm(changes))) {
         return null;
       }
@@ -500,9 +528,11 @@ class GpgManager {
         await put(DO.CARD_SALUTATION, enc(USER_SALUTATION[data.salutation]));
       }
 
-      await put(DO.SIG_ATTR, data.sig.attribute);
-      await put(DO.DEC_ATTR, data.dec.attribute);
-      await put(DO.AUT_ATTR, data.aut.attribute);
+      for (const [role, tag] of KEY_ROLES) {
+        if (changed[role]) {
+          await put(ATTRIBUTE_TAGS[tag], data[role].attribute);
+        }
+      }
 
       await put(DO.UIF_SIG, u16le(data.sig.uif));
       await put(DO.UIF_DEC, u16le(data.dec.uif));
@@ -519,9 +549,9 @@ class GpgManager {
       }
 
       const keys = [
-        ["Signature key", data.sig, DO.SIG_KEY, DO.CA_FINGERPRINT_WR_SIG, DO.FINGERPRINT_WR_SIG, DO.DATES_WR_SIG],
-        ["Decryption key", data.dec, DO.DEC_KEY, DO.CA_FINGERPRINT_WR_DEC, DO.FINGERPRINT_WR_DEC, DO.DATES_WR_DEC],
-        ["Authentication key", data.aut, DO.AUT_KEY, DO.CA_FINGERPRINT_WR_AUT, DO.FINGERPRINT_WR_AUT, DO.DATES_WR_AUT],
+        ["sig", "Signature key", DO.SIG_KEY, DO.CA_FINGERPRINT_WR_SIG, DO.FINGERPRINT_WR_SIG, DO.DATES_WR_SIG],
+        ["dec", "Decryption key", DO.DEC_KEY, DO.CA_FINGERPRINT_WR_DEC, DO.FINGERPRINT_WR_DEC, DO.DATES_WR_DEC],
+        ["aut", "Authentication key", DO.AUT_KEY, DO.CA_FINGERPRINT_WR_AUT, DO.FINGERPRINT_WR_AUT, DO.DATES_WR_AUT],
       ];
 
       // Keys are recovered by regenerating them from the device seed, not by
@@ -531,11 +561,15 @@ class GpgManager {
       // The current derivation comes first, then the legacy one of app 2.x; the
       // derivation of a matching key is tried first for the next ones.
       let derivations = [SEED_V2, SEED_LEGACY];
-      for (const [name, slot, tag, caTag, fpTag, dateTag] of keys) {
+      for (const [role, name, tag, caTag, fpTag, dateTag] of keys) {
+        const slot = data[role];
         await put(caTag, slot.ca_fingerprint);
         if (!hasKey(slot)) {
-          await put(fpTag, slot.fingerprint);
-          await put(dateTag, u32be(slot.date));
+          // A key kept on the card keeps its fingerprint and date
+          if (!kept[role]) {
+            await put(fpTag, slot.fingerprint);
+            await put(dateTag, u32be(slot.date));
+          }
           continue;
         }
         let failure = null;
@@ -557,8 +591,10 @@ class GpgManager {
             // Writing the key attributes erases the regenerated key
             await put(ATTRIBUTE_TAGS[tag], slot.attribute);
           }
-          await put(fpTag, Buffer.alloc(FINGERPRINT_SIZE));
-          await put(dateTag, u32be(0));
+          if (!kept[role]) {
+            await put(fpTag, Buffer.alloc(FINGERPRINT_SIZE));
+            await put(dateTag, u32be(0));
+          }
         } else {
           await put(fpTag, slot.fingerprint);
           await put(dateTag, u32be(slot.date));

@@ -158,12 +158,17 @@ describe("restore fingerprints", () => {
     return JSON.stringify({ version: 1, PW_status: pwStatus, sig, dec: withDec ? sig : empty, aut: empty });
   };
 
-  // Card whose key public point is `point`, or absent when null; `generated`
-  // maps a generation P2 to the point it gives, or to a status word, or is a
-  // function of the key tag and P2
-  const card = (point, sent = [], generated = {}) =>
+  // Card whose key public point is `point`, or absent when null, with the
+  // signature key `attribute`; `generated` maps a generation P2 to the point it
+  // gives, or to a status word, or is a function of the key tag and P2. Writing
+  // key attributes erases the key, as the firmware does.
+  const card = (point, sent = [], generated = {}, attribute = P256_ATTR) =>
     new FakeTransport(async (apdu) => {
       sent.push(apdu);
+      if (apdu[1] === 0xda && apdu[2] === 0x00 && apdu[3] >= 0xc1 && apdu[3] <= 0xc3) {
+        point = null;
+        return OK;
+      }
       if (apdu[1] === 0x47 && apdu[2] === 0x80) {
         const result = typeof generated === "function" ? generated(apdu[5], apdu[3]) : generated[apdu[3]];
         if (result === undefined) return OK;
@@ -173,7 +178,8 @@ describe("restore fingerprints", () => {
       }
       if (apdu[1] === 0xca && apdu[3] === 0x6e) {
         const pw = Buffer.from([0xc4, 0x07, 0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]);
-        return Buffer.concat([Buffer.from([0x73, pw.length]), pw, OK]);
+        const discretionary = Buffer.concat([pw, Buffer.from([0xc1, attribute.length]), attribute]);
+        return Buffer.concat([Buffer.from([0x73, discretionary.length]), discretionary, OK]);
       }
       if (apdu[1] === 0xca && apdu[3] >= 0xd6 && apdu[3] <= 0xd8) return Buffer.from([0x00, 0x20, 0x90, 0x00]);
       if (apdu[1] === 0x47 && apdu[2] === 0x81) {
@@ -184,13 +190,25 @@ describe("restore fingerprints", () => {
       return OK;
     });
 
-  const restore = async (point, sent = [], regenerate = false, generated = {}, withDec = false) => {
-    transports.push(card(point, sent, generated));
+  const restore = async (
+    point,
+    sent = [],
+    regenerate = false,
+    generated = {},
+    withDec = false,
+    attribute = P256_ATTR,
+    confirm = async () => true
+  ) => {
+    transports.push(card(point, sent, generated, attribute));
     const gpg = new GpgManager();
     gpg.generationDelay = 0;
     await gpg.connect();
-    return gpg.restore("123456", "12345678", backup(withDec), regenerate, 0, async () => true);
+    return gpg.restore("123456", "12345678", backup(withDec), regenerate, 0, confirm);
   };
+
+  // PUT DATA APDUs writing the signature key attributes (C1)
+  const sigAttributeWrites = (sent) => sent.filter((apdu) => apdu[1] === 0xda && apdu[2] === 0x00 && apdu[3] === 0xc1);
+  const RSA2048_ATTR = Buffer.from("010800002001", "hex");
 
   // Data of the PUT DATA APDUs writing the signature key fingerprint (C7)
   const sigFingerprintWrites = (sent) =>
@@ -210,13 +228,53 @@ describe("restore fingerprints", () => {
     expect(sigFingerprintWrites(sent).map((d) => d.toString("hex"))).toEqual([P256_FINGERPRINT]);
   });
 
-  test("does not write the fingerprint of a mismatching key", async () => {
+  test("keeps the fingerprint of a mismatching key kept on the card", async () => {
     const other = Buffer.from(P256_POINT);
     other[10] ^= 0x01;
     const sent = [];
     const failures = await restore(other, sent);
     expect(failures[0].keyMismatch).toBe(true);
+    expect(sigFingerprintWrites(sent)).toEqual([]);
+  });
+
+  test("keeps the card keys when the backup does not change their attributes", async () => {
+    const sent = [];
+    expect(await restore(P256_POINT, sent)).toEqual([]);
+    expect(sigAttributeWrites(sent)).toEqual([]);
+  });
+
+  test("asks before erasing a key whose algorithm the backup changes", async () => {
+    const sent = [];
+    const confirm = vi.fn(async () => false);
+    expect(await restore(P256_POINT, sent, false, {}, false, RSA2048_ATTR, confirm)).toBe(null);
+    const [changes] = confirm.mock.calls[0];
+    expect(changes.filter((c) => c.erased).map((c) => c.setting)).toEqual(["Signature key"]);
+    expect(sent.filter((apdu) => apdu[1] === 0xda && apdu[3] !== 0xf2)).toEqual([]);
+  });
+
+  test("reports the key erased by an algorithm change once confirmed", async () => {
+    const sent = [];
+    const failures = await restore(P256_POINT, sent, false, {}, false, RSA2048_ATTR);
+    expect(sigAttributeWrites(sent).map((apdu) => apdu.subarray(5).toString("hex"))).toEqual([
+      P256_ATTR.toString("hex"),
+    ]);
+    expect(failures.map((f) => f.name)).toEqual(["Signature key (fingerprint)"]);
+    expect(failures[0].message).toMatch("no key on the card");
     expect(sigFingerprintWrites(sent).map((d) => d.toString("hex"))).toEqual(["00".repeat(20)]);
+  });
+
+  test("does not ask before erasing a key the backup regenerates", async () => {
+    const confirm = vi.fn(async () => true);
+    expect(await restore(P256_POINT, [], true, { 0x02: P256_POINT }, false, RSA2048_ATTR, confirm)).toEqual([]);
+    const [changes] = confirm.mock.calls[0];
+    expect(changes.filter((c) => c.erased)).toEqual([]);
+  });
+
+  test("does not rewrite unchanged attributes before regenerating", async () => {
+    const sent = [];
+    await restore(P256_POINT, sent, true, { 0x02: P256_POINT });
+    const firstGeneration = sent.findIndex((apdu) => apdu[1] === 0x47 && apdu[2] === 0x80);
+    expect(sigAttributeWrites(sent.slice(0, firstGeneration))).toEqual([]);
   });
 
   test("regenerates only the keys the backup holds", async () => {

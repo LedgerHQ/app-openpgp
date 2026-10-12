@@ -231,4 +231,10 @@ describe("securityChanges", () => {
       to: "RSA 2048",
     });
   });
+
+  test("lists the erased keys after the settings", () => {
+    const changes = securityChanges(settings(0, 1), settings(0, 1, "010800002001"), ["sig", "aut"]);
+    expect(changes.filter((c) => c.erased).map((c) => c.setting)).toEqual(["Signature key", "Authentication key"]);
+    expect(changes.at(-1)).toMatchObject({ from: "On the card", to: "Erased, not restored" });
+  });
 });

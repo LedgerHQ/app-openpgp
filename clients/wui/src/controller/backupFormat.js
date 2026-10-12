@@ -272,8 +272,9 @@ function describePw1Mode(pwStatus) {
 const SLOT_LABEL = { sig: "Signature", dec: "Decryption", aut: "Authentication" };
 
 // Security settings of `current` (read from the card) that restoring `backup`
-// changes, each flagged when the new value is less protective.
-export function securityChanges(current, backup) {
+// changes, each flagged when the new value is less protective, then the keys
+// of `erasedKeys` ("sig", "dec", "aut") that the restore erases.
+export function securityChanges(current, backup, erasedKeys = []) {
   const changes = [];
   const add = (setting, from, to, weaker) => {
     if (from !== to) changes.push({ setting, from, to, weaker });
@@ -290,6 +291,9 @@ export function securityChanges(current, backup) {
     add(`${SLOT_LABEL[slot]} key confirmation`, UIF_LABEL[from] ?? `Unknown (${from})`, UIF_LABEL[to], to < from);
     const fromAttr = describeAttribute(current[slot].attribute);
     add(`${SLOT_LABEL[slot]} key algorithm`, fromAttr, describeAttribute(backup[slot].attribute), false);
+  }
+  for (const slot of erasedKeys) {
+    changes.push({ setting: `${SLOT_LABEL[slot]} key`, from: "On the card", to: "Erased, not restored", erased: true });
   }
   return changes;
 }
