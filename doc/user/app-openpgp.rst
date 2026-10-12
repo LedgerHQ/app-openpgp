@@ -276,6 +276,9 @@ to set the default slot when the application start.
 
 To change the current slot, display the slot you want and select it
 
+The host is not notified of a slot change: restart ``scdaemon`` afterwards (``gpgconf --kill scdaemon``)
+so that ``gpg`` reads the keys of the new slot.
+
 To change the default slot, first select it, and then select the *Set Default* entry.
 
 
@@ -1503,7 +1506,7 @@ or simply get the information on the configuration and keys.
 Its usage is:
 
  | ``$ ./gpgcli.py --help``
- | ``usage: gpgcli.py [-h] [--info] [--reader READER] [--apdu] [--slot {1,2,3}] [--reset] [--pinpad] [--adm-pin PIN] [--user-pin PIN] [--new-user-pin PIN] [--new-adm-pin PIN] [--reset-code RESET_CODE | --reset-pw1 RESET_PW1] [--serial SERIAL]``
+ | ``usage: gpgcli.py [-h] [--info] [--reader READER] [--apdu] [--slot {1,2,3}] [--reset] [--pinpad] [--adm-pin [PIN]] [--user-pin [PIN]] [--new-user-pin [PIN]] [--new-adm-pin [PIN]] [--reset-code [RESET_CODE] | --reset-pw1 [PIN]] [--serial SERIAL]``
  |                 ``[--salutation {Male,Female}] [--name NAME] [--url URL] [--login LOGIN] [--lang LANG] [--key-type {SIG,DEC,AUT}] [--key-action {Export,Generate,Read}] [--set-fingerprints SIG:DEC:AUT] [--set-templates SIG:DEC:AUT] [--seed-key]``
  |                 ``[--file FILE]``
  |
@@ -1512,19 +1515,18 @@ Its usage is:
  | ``options:``
  |  ``-h, --help            show this help message and exit``
  |  ``--info                Get and display card information``
- |  ``--reader READER       PCSC reader name (default is 'Ledger')``
+ |  ``--reader READER       HID path of the device, or 'speculos' (default is 'Ledger', the only Ledger device connected)``
  |  ``--apdu                Log APDU exchange``
  |  ``--slot {1,2,3}        Select slot (1 to 3)``
  |  ``--reset               Reset the application (all data will be erased)``
  |  ``--pinpad              PIN validation will be delegated to pinpad``
- |  ``--adm-pin PIN         Admin PIN (if pinpad not used)``
- |  ``--user-pin PIN        User PIN (if pinpad not used)``
- |  ``--new-user-pin PIN    Change User PIN``
- |  ``--new-adm-pin PIN     Change Admin PIN``
- |  ``--reset-code RESET_CODE``
- |                        ``Update 'PW1 Resetting Code'``
- |  ``--reset-pw1 RESET_PW1``
- |                        ``Reset the User PIN``
+ |  ``--adm-pin [PIN]       Admin PIN (if pinpad not used), or $OPENPGP_ADMIN_PIN``
+ |  ``--user-pin [PIN]      User PIN (if pinpad not used), or $OPENPGP_USER_PIN``
+ |  ``--new-user-pin [PIN]  Change User PIN, or $OPENPGP_NEW_USER_PIN``
+ |  ``--new-adm-pin [PIN]   Change Admin PIN, or $OPENPGP_NEW_ADMIN_PIN``
+ |  ``--reset-code [RESET_CODE]``
+ |                        ``Update 'PW1 Resetting Code', or $OPENPGP_RESET_CODE``
+ |  ``--reset-pw1 [PIN]     Reset the User PIN, or $OPENPGP_NEW_USER_PIN``
  |  ``--serial SERIAL       Update the 'serial' data (4 bytes)``
  |  ``--salutation {Male,Female}``
  |                        ``Update 'salutation' data``
@@ -1547,9 +1549,23 @@ Its usage is:
  |  ``--seed-key            Regenerate all keys, based on seed mode``
  |  ``--file FILE           Public Key export file (default is 'pubkey')``
 
+PINs, codes and passphrases are better not given on the command line, where they are visible in the
+process list and the shell history. Each such option is resolved in this order:
+
+- the value given on the command line (a warning is printed),
+- the environment variable named in the help,
+- an interactive prompt, when the option is given without value or, for the User and Admin PINs,
+  when it is absent,
+- the factory value (``123456`` and ``12345678``) for the User and Admin PINs.
+
+Before sending any PIN, the tools select the OpenPGP application and check its identifier. When
+several Ledger devices are connected, they stop and list the HID paths to give with ``--reader``.
+This check does not authenticate the device: with ``--pinpad``, the PINs are entered on the device
+itself and never cross the USB link.
+
 Sample output to get Card information:
 
- | ``$ ./gpgcli.py --adm-pin 12345678 --user-pin 123456 --info``
+ | ``$ ./gpgcli.py --adm-pin --user-pin --info``
  | ``Connect to card 'Ledger'...``
  | ``Verify PINs...``
  | ``Get card info...``
@@ -1653,32 +1669,40 @@ Backup tool
 The tool usage is the following:
 
  | ``$ ./backup.py --help``
- | ``usage: backup.py [-h] [--reader READER] [--slot {1,2,3}] [--pinpad] --adm-pin PIN --user-pin PIN [--restore] [--file FILE]``
+ | ``usage: backup.py [-h] [--reader READER] [--slot {1,2,3}] [--pinpad] [--adm-pin [PIN]] [--user-pin [PIN]] [--restore] [--file FILE] [--seed-key] [--file-passphrase [PASS]]``
  |
  | ``Backup/Restore OpenPGP App configuration``
  |
  | ``options:``
  |  ``-h, --help       show this help message and exit``
- |  ``--reader READER  PCSC reader name (default is 'Ledger')``
+ |  ``--reader READER  HID path of the device, or 'speculos' (default is 'Ledger', the only Ledger device connected)``
  |  ``--slot {1,2,3}   Select slot (1 to 3)``
  |  ``--pinpad         PIN validation will be delegated to pinpad``
- |  ``--adm-pin PIN    Admin PIN (if pinpad not used)``
- |  ``--user-pin PIN   User PIN (if pinpad not used)``
+ |  ``--adm-pin [PIN]  Admin PIN (if pinpad not used), or $OPENPGP_ADMIN_PIN``
+ |  ``--user-pin [PIN] User PIN (if pinpad not used), or $OPENPGP_USER_PIN``
  |  ``--restore        Perform a Restore instead of Backup``
  |  ``--file FILE      Backup/Restore file (default is 'gpg_backup')``
  |  ``--seed-key       After Restore, regenerate all keys, based on seed mode``
+ |  ``--file-passphrase [PASS]``
+ |                   ``Passphrase to encrypt (backup) or decrypt (restore) the backup file, or $OPENPGP_FILE_PASSPHRASE``
  |
  | ``Keys restore is only possible with SEED mode...``
 
+The private keys are always stored encrypted with a key derived from the device seed.
+The rest of the file (private data objects, name, login, URL, certificates, ...) is stored in
+clear, unless a file passphrase is given with ``--file-passphrase``.
+
+PINs and passphrase are resolved as described for ``gpgcli.py`` above.
+
 To perform a backup, simply use the tool like this:
 
- | ``$ ./backup.py --adm-pin 12345678 --user-pin 123456``
+ | ``$ ./backup.py --adm-pin --user-pin --file-passphrase``
  | ``Connect to card 'Ledger'...``
  | ``Configuration saved in file 'gpg_backup'.``
 
 To *restore* a backup, simply use the tool like this:
 
- | ``$ ./backup.py --restore --adm-pin 12345678 --user-pin 123456 --seed-key``
+ | ``$ ./backup.py --restore --adm-pin --user-pin --file-passphrase --seed-key``
  | ``Connect to card 'Ledger'...``
  | ``Configuration restored from file 'gpg_backup'.``
 

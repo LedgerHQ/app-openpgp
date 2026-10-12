@@ -262,7 +262,7 @@ export default function App() {
       if (pinAction === "backup") {
         const payload = await gpg.backup(userPin, adminPin, parseInt(slot, 10) - 1);
         closePin();
-        const name = `gpg_backup_${serial || "openpgp"}.json`;
+        const name = `gpg_backup_${serial || "openpgp"}_slot${slot}.json`;
         let saved;
         if (filePassphrase) {
           const encrypted = await encryptBackup(payload, filePassphrase);
@@ -270,11 +270,18 @@ export default function App() {
         } else {
           saved = await saveJSON(payload, name);
         }
-        setNotice(
-          saved
-            ? { appearance: "success", title: "Backup saved" }
-            : { appearance: "info", title: "Backup cancelled" }
-        );
+        if (!saved) {
+          setNotice({ appearance: "info", title: "Backup cancelled" });
+        } else if (filePassphrase) {
+          setNotice({ appearance: "success", title: "Backup saved" });
+        } else {
+          setNotice({
+            appearance: "warning",
+            title: "Backup saved without encryption",
+            description:
+              "Anyone with the file can read its private data objects and card details. Set a file passphrase to encrypt it.",
+          });
+        }
       } else if (pinAction === "restore") {
         const content = isEncryptedFile
           ? await decryptBackup(restoreContent.current, filePassphrase)
@@ -288,11 +295,16 @@ export default function App() {
         }
         setFailures(f);
         setRestartHint(true);
-        setNotice(
-          f.length === 0
-            ? { appearance: "success", title: "Restore complete" }
-            : { appearance: "warning", title: `Restore done — ${f.length} item(s) rejected (see below).` }
-        );
+        if (f.length === 0) {
+          setNotice({ appearance: "success", title: "Restore complete" });
+        } else if (f.some((x) => x.keyMismatch)) {
+          setNotice({
+            appearance: "error",
+            title: "Restore failed — the keys on the card do not match the backup (see below).",
+          });
+        } else {
+          setNotice({ appearance: "warning", title: `Restore done — ${f.length} item(s) rejected (see below).` });
+        }
       } else if (pinAction === "factoryReset") {
         await gpg.factoryReset(adminPin);
         await gpg.disconnect();
@@ -435,7 +447,7 @@ export default function App() {
               <Banner
                 appearance="info"
                 title="Keep your backup safe"
-                description="The backup file holds encrypted key material. Restoring the keys requires the app's SEED mode."
+                description="The backup file holds encrypted key material. Without a file passphrase, its private data objects and card details are stored in clear. Restoring the keys requires the app's SEED mode."
               />
             )}
 

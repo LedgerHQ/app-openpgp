@@ -22,7 +22,6 @@
 /* ---                              INIT                              ---- */
 /* ----------------------------------------------------------------------- */
 
-void gpg_activate_pinpad(uint8_t enabled);
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len);
 bool gpg_key_curve_matches_attributes(const gpg_key_t *key, unsigned int curve);
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len);
@@ -46,6 +45,7 @@ void gpg_apdu_select_data(unsigned int ref, int record);
 int gpg_apdu_get_data(unsigned int ref);
 int gpg_apdu_get_next_data(unsigned int ref);
 int gpg_apdu_put_data(unsigned int ref);
+int gpg_select_slot(unsigned int slot);
 int gpg_apdu_get_key_data(unsigned int ref);
 int gpg_apdu_put_key_data(unsigned int ref);
 
@@ -53,7 +53,7 @@ int gpg_apdu_put_key_data(unsigned int ref);
 /* ---                              PSO                               ---- */
 /* ----------------------------------------------------------------------- */
 
-int gpg_pso_derive_slot_seed(int slot, unsigned char *seed);
+int gpg_pso_derive_slot_seed(unsigned int slot, unsigned char *seed);
 int gpg_pso_derive_key_seed(unsigned char *Sn,
                             unsigned char *key_name,
                             unsigned int idx,
@@ -66,6 +66,7 @@ int gpg_pso_derive_key_seed_full(unsigned char *Sn,
                                  unsigned int Ski_len);
 bool gpg_rsa_exponent_is_valid(const unsigned char *e);
 void gpg_key_erase(gpg_key_t *key);
+bool gpg_key_is_present(const gpg_key_t *key);
 int gpg_apdu_pso(void);
 int gpg_apdu_internal_authenticate(void);
 

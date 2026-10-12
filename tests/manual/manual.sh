@@ -24,7 +24,7 @@ help() {
   echo
   echo "Options:"
   echo
-  echo "  -c <init|reset|reset_all|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|default>  : Requested command"
+  echo "  -c <init|reset|reset_all|switch|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|all|default>  : Requested command"
   echo "  -e     : Expert mode"
   echo "  -v     : Verbose mode"
   echo "  -h     : Displays this help"
@@ -56,6 +56,32 @@ reset_all() {
 
 #===============================================================================
 #
+#     switch - Use the card of the slot selected on the device
+#
+#===============================================================================
+switch() {
+  local card_status=""
+
+  # The slot change is not notified to the PC: restart scdaemon to read the new card
+  gpgconf --homedir "${gnupg_home_dir}" --kill scdaemon 2>/dev/null
+  gpg-connect-agent --homedir "${gnupg_home_dir}" "scd serialno" "learn --force" /bye >/dev/null
+  card_status=$(gpg --homedir "${gnupg_home_dir}" --card-status 2>/dev/null)
+  if [[ -z "${card_status}" ]]; then
+    echo "No card found"
+    return 1
+  fi
+  grep -E "^(Serial number|Key attributes|General key info)" <<< "${card_status}"
+  if grep "General key info" <<< "${card_status}" | grep -q "none"; then
+    # No default key from another slot
+    rm -f "${gnupg_home_dir}/gpg.conf"
+    echo "No key on this slot: generate them with '-c card', then run '-c default'"
+  else
+    default
+  fi
+}
+
+#===============================================================================
+#
 #     default - Set default key in conf file
 #
 #===============================================================================
@@ -68,6 +94,10 @@ default() {
 
   recipient=$(gpg --homedir "${gnupg_home_dir}" --card-status | grep "General key info" | awk  '{print $NF}')
 
+  if [[ -z "${recipient}" ]]; then
+    echo "No card found: default key not set"
+    return 1
+  fi
   if [[ ${recipient} =~ "none" ]]; then
     read -r -p "Enter default key name: " recipient
   fi
@@ -210,7 +240,11 @@ verify() {
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --verify foo.txt.gpg
+  if gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --verify foo.txt.gpg; then
+    echo "Success !"
+  else
+    echo "Signature error!"
+  fi
   rm -fr foo*
 }
 
@@ -232,6 +266,17 @@ sign_verify() {
 encrypt_decrypt() {
   encrypt
   decrypt
+}
+
+#===============================================================================
+#
+#     all - Run all tests (SIG, DEC, AUT key roundtrip)
+#
+#===============================================================================
+all() {
+  sign_verify
+  encrypt_decrypt
+  authenticate
 }
 
 #===============================================================================
@@ -288,7 +333,7 @@ while getopts ":c:evh" opt; do
 
     c)
       case ${OPTARG} in
-        init|reset|reset_all|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|default)
+        init|reset|reset_all|switch|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|all|default)
           CMD=${OPTARG}
           ;;
         *)

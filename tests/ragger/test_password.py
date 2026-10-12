@@ -241,7 +241,8 @@ def test_reset_with_resetting_code(backend: BackendInterface) -> None:
 
 
 # Row of the "Trust" choice in the PIN mode settings of touch devices
-TRUST_CHOICE = {DeviceType.FLEX: (430, 326), DeviceType.STAX: (350, 327), DeviceType.APEX_P: (270, 230)}
+TRUST_CHOICE = {DeviceType.FLEX: (430, 418), DeviceType.STAX: (350, 420), DeviceType.APEX_P: (270, 300)}
+FIXED_KEYPAD_CHOICE = {DeviceType.FLEX: (430, 234), DeviceType.STAX: (350, 233), DeviceType.APEX_P: (270, 160)}
 PIN_MODE_SETTING = {DeviceType.FLEX: (430, 325), DeviceType.STAX: (350, 320), DeviceType.APEX_P: (270, 235)}
 
 
@@ -309,9 +310,41 @@ def _enter_pin(device: Device, navigator: Navigator, pin: str) -> None:
         navigator.navigate(instructions, screen_change_before_first_instruction=False)
 
 
+def _use_fixed_keypad(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
+    """Select the fixed keypad in the PIN mode setting, which requires the User PIN"""
+
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW2)
+
+    # Settings / PIN mode / Fixed keypad
+    if device.is_nano:
+        navigator.navigate(
+            [NavInsID.RIGHT_CLICK, NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK],
+            screen_change_before_first_instruction=False,
+        )
+        navigator.navigate_until_text(
+            NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "Pin mode", screen_change_before_first_instruction=False
+        )
+        navigator.navigate_until_text(
+            NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "Fixed keypad", screen_change_before_first_instruction=False
+        )
+    else:
+        navigator.navigate(
+            [
+                NavInsID.USE_CASE_HOME_SETTINGS,
+                NavIns(NavInsID.TOUCH, PIN_MODE_SETTING[device.type]),
+                NavIns(NavInsID.TOUCH, FIXED_KEYPAD_CHOICE[device.type]),
+            ],
+            screen_change_before_first_instruction=False,
+        )
+    assert client.send_verify_pw(PassWord.PW2, reset=True).status == Errors.SW_OK
+
+
 # In this test we check that cancelling an on-device PIN change leaves the PIN not verified
 def test_change_pin_cancelled(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
     client = CommandSender(backend)
+    # The test enters the PIN at fixed keypad positions
+    _use_fixed_keypad(device, backend, navigator)
     header = struct.pack(">BBBB", ClaType.CLA_APP, InsType.INS_CHANGE_REF_DATA, 0, PassWord.PW1)
 
     with pytest.raises(ExceptionRAPDU) as err:
@@ -331,3 +364,29 @@ def test_change_pin_cancelled(device: Device, backend: BackendInterface, navigat
     with pytest.raises(ExceptionRAPDU) as err:
         client.send_verify_pw(PassWord.PW1)
     assert (err.value.status & 0xFFF0) == Errors.SW_VERIFY_FAILED
+
+
+# In this test we check that commands and data objects gated by a PIN not verified are refused with 6982
+def test_access_without_pin(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    for pwd in (PassWord.PW1, PassWord.PW2, PassWord.PW3):
+        rapdu = client.send_verify_pw(pwd, reset=True)
+        assert rapdu.status == Errors.SW_OK
+
+    for tag in (DataObject.DO_PRIVATE_03, DataObject.DO_PRIVATE_04, DataObject.DO_SIG_KEY):
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.get_data(tag)
+        assert err.value.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+
+    for tag in (DataObject.DO_PRIVATE_01, DataObject.DO_LOGIN):
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.put_data(tag, b"data")
+        assert err.value.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+
+    digest = bytes(32)
+    rapdu = client.sign(digest)
+    assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+    rapdu = client.authenticate(digest)
+    assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+    rapdu = client.generate_key(DataObject.DO_SIG_KEY)
+    assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED

@@ -28,9 +28,9 @@ include $(BOLOS_SDK)/Makefile.target
 APPNAME = OpenPGP
 
 # Application version
-APPVERSION_M = 2
-APPVERSION_N = 7
-APPVERSION_P = 4
+APPVERSION_M = 3
+APPVERSION_N = 0
+APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 DEFINES += SPEC_VERSION='"3.3.1"'
@@ -81,6 +81,13 @@ VARIANT_VALUES = OpenPGP
 
 # Enabling DEBUG flag will enable PRINTF and disable optimizations
 #DEBUG = 1
+
+# Keep the PIN keypad digits in a fixed order, for functional tests only
+KEYBOARD_NOT_SHUFFLED ?= 0
+ifneq ($(KEYBOARD_NOT_SHUFFLED), 0)
+    $(info KEYBOARD_NOT_SHUFFLED ENABLED)
+    DEFINES += KEYBOARD_NOT_SHUFFLED
+endif
 
 ########################################
 #     Application custom permissions   #

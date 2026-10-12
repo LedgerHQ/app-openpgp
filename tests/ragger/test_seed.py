@@ -7,7 +7,7 @@ This module provides Ragger tests for Signing feature with SEED mode
 import sys
 
 import pytest
-from application_client.app_def import DataObject, Errors, PassWord, PubkeyAlgo
+from application_client.app_def import DataObject, Errors, KeyGenMode, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
 from Crypto.PublicKey.ECC import EccKey
 from Crypto.PublicKey.RSA import RsaKey
@@ -34,7 +34,7 @@ def _gen_key(client: CommandSender, template: str) -> RsaKey | EccKey:
     assert rapdu.status == Errors.SW_OK
 
     # Generate the SIG Key Pair in SEED mode
-    generate_key(client, DataObject.DO_SIG_KEY, True)
+    generate_key(client, DataObject.DO_SIG_KEY, KeyGenMode.SEED_V2)
 
     key_algo, _ = get_key_attributes(client, DataObject.DO_SIG_ATTR)
 

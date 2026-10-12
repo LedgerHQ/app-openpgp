@@ -7,7 +7,7 @@ This module provides Ragger tests for private key backup and restore
 import struct
 
 import pytest
-from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord
+from application_client.app_def import ClaType, DataObject, Errors, InsType, KeyGenMode, PassWord
 from application_client.command_sender import CommandSender
 from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
@@ -92,11 +92,11 @@ def test_backup_restore(backend: BackendInterface) -> None:
     DSS.new(pubkey, "fips-186-3").verify(hash_obj, _sign_raw(client, hash_obj.digest()))
 
 
-def _gen_p256_sig_key(client: CommandSender):
+def _gen_p256_sig_key(client: CommandSender, mode: KeyGenMode = KeyGenMode.DEFAULT):
     check_pincode(client, PassWord.PW3)
     rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["nistp256"])
     assert rapdu.status == Errors.SW_OK
-    generate_key(client, DataObject.DO_SIG_KEY)
+    generate_key(client, DataObject.DO_SIG_KEY, mode)
     return get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
 
 
@@ -119,7 +119,7 @@ def test_backup_nonce_unique(backend: BackendInterface) -> None:
 # In this test we restore a backup produced in the v1 format
 def test_restore_v1_backup(backend: BackendInterface) -> None:
     client = CommandSender(backend)
-    pubkey = _gen_p256_sig_key(client)
+    pubkey = _gen_p256_sig_key(client, KeyGenMode.SEED_LEGACY)
 
     tampered = bytearray(BACKUP_V1_P256_SIG)
     tampered[-1] ^= 0x01

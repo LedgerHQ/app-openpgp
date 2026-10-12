@@ -141,19 +141,24 @@ Seeded keys are generated as follow:
 
 For a given keys slot n, starting from 1, a seed is first derived with the following path
 
- | ``Sn = BIP32_derive (/0x80475047/n)``
+ | ``Sn = BIP32_derive (/0x80475047'/n')``
+
+The last index is hardened, so that the seed of one slot gives no information on the other slots.
 
 **Step 2**:
 
-Then specific seeds are derived with the *SHA3-XOF* function for each of the 4 key:
+Then specific seeds are derived with the *SHAKE256* function for each key:
 
- | ``Sk[i] = SHA3-XOF(SHA256(Sn \| <key_name> \| int16(i)), length)``
+ | ``Sk[i] = SHAKE256(SHA256("kdf2" \| Sn \| <key_name> \| int16(i) \| int8(len(ctx)) \| ctx), length)``
 
 Where:
 
 - Sn is the dedicated slot seed from step 1.
-- key_name is one of 'sig ','dec ', 'aut ', 'sym0', each 4 characters.
+- key_name is one of 'sig ','dec ', 'aut ', each 4 characters.
 - i is the index, starting from 1, of the desired seed (see below)
+- ctx is the algorithm with the key size: the first 3 bytes of the key attributes for RSA
+  (algorithm and modulus size), the whole key attributes for ECC (algorithm and curve OID).
+- length is the output length, in bytes.
 
 **Step 3**:
 
@@ -166,6 +171,7 @@ Generate two seed Sp, Sq in step2 with:
 
 Generate two prime numbers p, q:
 
+- set the two most significant bits of Sp and Sq
 - p = next_prime(Sp)
 - q = next_prime(Sq)
 
@@ -180,12 +186,32 @@ Generate RSA key pair as usual:
 Generate one seed Sd in step2 with:
 
 - i = 1
-- length equals to curve size
+- length equals to twice the curve size
 
 Generate ECC key pair:
 
-- d = Sd
+- d = Sd mod curve order, on the curve size
+- for Curve25519, d is clamped as in RFC 7748
 - W = d.G
+
+*Legacy derivation*
+
+App versions up to 2.x derived the seeded keys differently, and this derivation is only kept
+to restore their keys (see P2 of GENERATE ASYMMETRIC KEY PAIR):
+
+- step 1 uses a non-hardened last index: ``Sn = BIP32_derive (/0x80475047'/n)``
+- step 2 hashes neither "kdf2" nor ctx: ``SHA256(Sn | <key_name> | int16(i))``
+- only the first length/8 bytes of the key buffer are derived:
+
+  - for RSA, the rest of Sp and Sq is zero, and only their most significant bit is set
+  - for ECC, the derivation is done over Sn, so d is these bytes followed by the rest of Sn,
+    without reduction nor clamping
+
+.. warning::
+
+   A legacy RSA key can be factored from its public key alone, and the legacy ECC keys of a
+   slot share most of their bytes. Keys restored with the legacy derivation should be replaced
+   by newly generated ones.
 
 *AES key generation*
 
@@ -332,8 +358,12 @@ Deterministic key derivation
 
 P2 parameter of GENERATE ASYMMETRIC KEY PAIR is set to (hex value):
 
-- 00 for true random key generation
-- 01 for seeded random key
+- 00 for the default generation: a seeded key when the Seed mode is *on*, a random key otherwise
+- 01 for a seeded key with the legacy derivation, to restore the keys of app versions up to 2.x
+- 02 for a seeded key, whatever the Seed mode
+
+A restore regenerates each key with 02 first, then with 01 when the key does not match the
+fingerprint of the backup; once a key matches, its value of P2 is tried first for the next keys.
 
 Deterministic random number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

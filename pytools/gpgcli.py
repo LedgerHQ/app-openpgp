@@ -20,6 +20,16 @@ import sys
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
 
+from gpgapp.credentials import (
+    ASK,
+    ENV_ADMIN_PIN,
+    ENV_NEW_ADMIN_PIN,
+    ENV_NEW_USER_PIN,
+    ENV_RESET_CODE,
+    ENV_USER_PIN,
+    get_pins,
+    get_secret,
+)
 from gpgapp.gpgcard import GPGCard, GPGCardExcpetion
 from gpgapp.gpgcmd import KEY_OPERATIONS, KEY_TEMPLATES, USER_SALUTATION, ErrorCodes, KeyTypes, PassWord
 
@@ -32,6 +42,8 @@ def get_argparser() -> Namespace:
 
     parser = ArgumentParser(
         description="Manage OpenPGP App on Ledger device",
+        epilog="PIN and code options given without value are read from their environment variable,\n"
+        + "or prompted. Giving the value on the command line exposes it in the process list.",
         formatter_class=RawTextHelpFormatter,
     )
     parser.add_argument("--info", action="store_true", help="Get and display card information")
@@ -39,7 +51,7 @@ def get_argparser() -> Namespace:
         "--reader",
         type=str,
         default="Ledger",
-        help="PCSC reader name (default is '%(default)s') or 'speculos'",
+        help="HID path of the device, or 'speculos' (default is '%(default)s', the only Ledger device connected)",
     )
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
@@ -51,13 +63,17 @@ def get_argparser() -> Namespace:
     )
 
     parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
-    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
-    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
-    parser.add_argument("--new-user-pin", metavar="PIN", help="Change User PIN")
-    parser.add_argument("--new-adm-pin", metavar="PIN", help="Change Admin PIN")
+    parser.add_argument(
+        "--adm-pin", metavar="PIN", nargs="?", const=ASK, help=f"Admin PIN (if pinpad not used), or ${ENV_ADMIN_PIN}"
+    )
+    parser.add_argument(
+        "--user-pin", metavar="PIN", nargs="?", const=ASK, help=f"User PIN (if pinpad not used), or ${ENV_USER_PIN}"
+    )
+    parser.add_argument("--new-user-pin", metavar="PIN", nargs="?", const=ASK, help=f"Change User PIN, or ${ENV_NEW_USER_PIN}")
+    parser.add_argument("--new-adm-pin", metavar="PIN", nargs="?", const=ASK, help=f"Change Admin PIN, or ${ENV_NEW_ADMIN_PIN}")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--reset-code", help="Update 'PW1 Resetting Code'")
-    group.add_argument("--reset-pw1", help="Reset the User PIN")
+    group.add_argument("--reset-code", nargs="?", const=ASK, help=f"Update 'PW1 Resetting Code', or ${ENV_RESET_CODE}")
+    group.add_argument("--reset-pw1", metavar="PIN", nargs="?", const=ASK, help=f"Reset the User PIN, or ${ENV_NEW_USER_PIN}")
 
     parser.add_argument("--serial", help="Update the 'serial' data (4 bytes)")
     parser.add_argument("--salutation", choices=list(USER_SALUTATION), help="Update 'salutation' data")
@@ -140,11 +156,33 @@ def verify_pins(gpgcard: GPGCard, user_pin: str, adm_pin: str, pinpad: bool) -> 
     """
 
     print("Verify PINs...")
-    if (
-        not gpgcard.verify_pin(PassWord.PW1, user_pin, pinpad)
-        or not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad)
-        or not gpgcard.verify_pin(PassWord.PW3, adm_pin, pinpad)
-    ):
+    verify_user_pin(gpgcard, user_pin, pinpad)
+    verify_admin_pin(gpgcard, adm_pin, pinpad)
+
+
+def verify_user_pin(gpgcard: GPGCard, user_pin: str, pinpad: bool) -> None:
+    """Verify the User pin code, for both PW1 and PW2
+
+    Args:
+        gpgcard (GPGCard): smartcard object
+        user_pin (str): User pin code
+        pinpad (bool): Indicates to use pinpad
+    """
+
+    if not gpgcard.verify_pin(PassWord.PW1, user_pin, pinpad) or not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad):
+        error(ErrorCodes.ERR_INTERNAL, "PIN not verified")
+
+
+def verify_admin_pin(gpgcard: GPGCard, adm_pin: str, pinpad: bool) -> None:
+    """Verify the Admin pin code
+
+    Args:
+        gpgcard (GPGCard): smartcard object
+        adm_pin (str): Admin pin code
+        pinpad (bool): Indicates to use pinpad
+    """
+
+    if not gpgcard.verify_pin(PassWord.PW3, adm_pin, pinpad):
         error(ErrorCodes.ERR_INTERNAL, "PIN not verified")
 
 
@@ -344,13 +382,26 @@ def entrypoint() -> None:
 
     # Arguments checking
     # ------------------
-    if not args.pinpad:
-        if not args.user_pin:
-            args.user_pin = "123456"
-            print(f"Using default 'userpin': {args.user_pin}")
-        if not args.adm_pin:
-            args.adm_pin = "12345678"
-            print(f"Using default 'admpin': {args.adm_pin}")
+    try:
+        get_pins(args, user=args.reset_pw1 is None)
+        if args.new_user_pin is not None:
+            args.new_user_pin = get_secret(args.new_user_pin, "--new-user-pin", ENV_NEW_USER_PIN, "New User PIN", confirm=True)
+            if not args.new_user_pin:
+                error(ErrorCodes.ERR_INTERNAL, f"Provide the new User PIN in ${ENV_NEW_USER_PIN}")
+        if args.new_adm_pin is not None:
+            args.new_adm_pin = get_secret(args.new_adm_pin, "--new-adm-pin", ENV_NEW_ADMIN_PIN, "New Admin PIN", confirm=True)
+            if not args.new_adm_pin:
+                error(ErrorCodes.ERR_INTERNAL, f"Provide the new Admin PIN in ${ENV_NEW_ADMIN_PIN}")
+        if args.reset_pw1 is not None:
+            args.reset_pw1 = get_secret(args.reset_pw1, "--reset-pw1", ENV_NEW_USER_PIN, "New User PIN", confirm=True)
+            if not args.reset_pw1:
+                error(ErrorCodes.ERR_INTERNAL, f"Provide the new User PIN in ${ENV_NEW_USER_PIN}")
+        elif args.reset_code is not None:
+            args.reset_code = get_secret(args.reset_code, "--reset-code", ENV_RESET_CODE, "Resetting Code", confirm=True)
+            if not args.reset_code:
+                error(ErrorCodes.ERR_INTERNAL, f"Provide the Resetting Code in ${ENV_RESET_CODE}")
+    except ValueError as err:
+        error(ErrorCodes.ERR_INTERNAL, str(err))
 
     if args.serial and len(args.serial) != 8:
         error(
@@ -375,7 +426,16 @@ def entrypoint() -> None:
         gpgcard.log_apdu(args.apdu)
         gpgcard.connect(args.reader)
 
-        verify_pins(gpgcard, args.user_pin, args.adm_pin, args.pinpad)
+        if args.reset_pw1:
+            # The User PIN may be blocked: reset it with the Admin PIN, then verify the new value
+            print("Verify PINs...")
+            verify_admin_pin(gpgcard, args.adm_pin, args.pinpad)
+            if not gpgcard.reset_PW1("", args.reset_pw1):
+                error(ErrorCodes.ERR_INTERNAL, "User PIN not reset")
+            args.user_pin = args.reset_pw1
+            verify_user_pin(gpgcard, args.user_pin, args.pinpad)
+        else:
+            verify_pins(gpgcard, args.user_pin, args.adm_pin, args.pinpad)
 
         if args.slot:
             gpgcard.select_slot(args.slot - 1)
@@ -391,15 +451,15 @@ def entrypoint() -> None:
         if args.lang:
             gpgcard.set_lang(args.lang)
 
-        if args.new_user_pin and not gpgcard.change_pin(PassWord.PW1, args.user_pin, args.new_user_pin):
-            error(ErrorCodes.ERR_INTERNAL, "User PIN not changed")
+        if args.new_user_pin:
+            if not gpgcard.change_pin(PassWord.PW1, args.user_pin, args.new_user_pin):
+                error(ErrorCodes.ERR_INTERNAL, "User PIN not changed")
+            # Changing the User PIN closes the PW2 session
+            args.user_pin = args.new_user_pin
+            verify_user_pin(gpgcard, args.user_pin, args.pinpad)
         if args.new_adm_pin and not gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin):
             error(ErrorCodes.ERR_INTERNAL, "Admin PIN not changed")
-        if args.reset_pw1:
-            # Reset the User PIN with Resetting Code
-            if not gpgcard.reset_PW1(args.reset_code, args.reset_pw1):
-                error(ErrorCodes.ERR_INTERNAL, "User PIN not reset")
-        elif args.reset_code:
+        if args.reset_code:
             # Use the Resetting code to set the value
             if not gpgcard.set_RC(args.reset_code):
                 error(ErrorCodes.ERR_INTERNAL, "Resetting Code not set")

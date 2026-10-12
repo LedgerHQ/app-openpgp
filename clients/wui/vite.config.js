@@ -4,8 +4,7 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // https://vite.dev/config/
 export default defineConfig({
-  // Relative base so the build works under the /app-openpgp/wui/ sub-path on
-  // GitHub Pages (no custom domain required).
+  // Relative base so the build works under the /wui/ sub-path of the Pages site.
   base: "./",
   // Open the browser automatically when the dev server starts.
   server: { open: true },

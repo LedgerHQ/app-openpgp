@@ -1,6 +1,6 @@
 {
     "ledgerDevTools.appSettings": {
-        "selectedDevice": "Nano S Plus",
+        "selectedDevice": "Stax",
         "testsList": [
             "test_backup.py::test_backup_restore",
             "test_backup.py::test_backup_nonce_unique",
@@ -34,6 +34,8 @@
             "test_key_import.py::test_import_truncated_key_data",
             "test_menus.py::test_menu_slot",
             "test_menus.py::test_menu_settings",
+            "test_menus.py::test_menu_template_change_cancelled",
+            "test_menus.py::test_menu_template_change_confirmed",
             "test_menus.py::test_home_name",
             "test_password.py::test_verify",
             "test_password.py::test_verify_wrong",
@@ -48,8 +50,13 @@
             "test_password.py::test_reset_with_resetting_code",
             "test_password.py::test_verify_trust_mode",
             "test_password.py::test_change_pin_cancelled",
+            "test_password.py::test_access_without_pin",
             "test_persistence.py::test_reset_survives_restart",
             "test_seed.py::test_seed_key",
+            "test_seed_kdf.py::test_seed_legacy",
+            "test_seed_kdf.py::test_seed_v2",
+            "test_seed_kdf.py::test_seed_default_is_v2",
+            "test_seed_kdf.py::test_seed_wrong_p2",
             "test_sign.py::test_sign",
             "test_sign.py::test_auth",
             "test_slot.py::test_slot",

@@ -16,7 +16,6 @@
  *****************************************************************************/
 
 #include "gpg_vars.h"
-#include "ccid_cmd.h"
 #include "ox_ec.h"
 
 #define SHORT(x) ((x) >> 8) & 0xFF, (x) & 0xFF
@@ -394,7 +393,8 @@ void gpg_init_session() {
     G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
     gpg_mse_reset();
     // pin conf
-    G_gpg_vstate.pinmode = N_gpg_pstate->config_pin[0];
+    G_gpg_vstate.pinmode = N_gpg_pstate->config_pin;
+    G_gpg_vstate.keypad_shuffle = N_gpg_pstate->keypad_shuffle;
     // seed conf
     G_gpg_vstate.seed_mode = 1;
 }
@@ -461,6 +461,7 @@ void gpg_install_slot(gpg_key_slot_t *slot) {
  */
 void gpg_install(unsigned char app_state) {
     gpg_pin_t pin;
+    bool keypad_shuffle;
 
     // full reset data
     nvm_write((void *) (N_gpg_pstate), NULL, sizeof(gpg_nv_state_t));
@@ -513,7 +514,10 @@ void gpg_install(unsigned char app_state) {
         // config pin
         G_gpg_vstate.work.io_buffer[0] = PIN_MODE_CONFIRM;
         nvm_write((void *) (&N_gpg_pstate->config_pin), G_gpg_vstate.work.io_buffer, 1);
-        gpg_activate_pinpad(3);
+        keypad_shuffle = true;
+        nvm_write((void *) (&N_gpg_pstate->keypad_shuffle),
+                  &keypad_shuffle,
+                  sizeof(keypad_shuffle));
 
         // default key template
         for (int s = 0; s < GPG_KEYS_SLOTS; s++) {
@@ -523,18 +527,4 @@ void gpg_install(unsigned char app_state) {
 
     // installation completed, the next start keeps this state
     nvm_write((void *) (N_gpg_pstate->magic), (void *) C_MAGIC, MAGIC_LENGTH);
-}
-
-/**
- * Setup pinpad configuration
- *
- * @param[in]  enabled pinpad configuration
- *
- * @return N/A
- *
- */
-void gpg_activate_pinpad(uint8_t enabled) {
-    uint8_t e = enabled ? 3 : 0;
-
-    io_usb_ccid_configure_pinpad(e);
 }

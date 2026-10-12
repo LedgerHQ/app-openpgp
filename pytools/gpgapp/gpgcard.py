@@ -19,6 +19,7 @@ import base64
 import binascii
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from hashlib import pbkdf2_hmac, sha1
@@ -28,8 +29,11 @@ from Crypto.Cipher import AES
 from Crypto.PublicKey.RSA import construct
 from Crypto.Random import get_random_bytes
 from ledgercomm import Transport  # type: ignore
+from ledgercomm.interfaces.hid_device import HID  # type: ignore
+from ledgercomm.transport import TransportType  # type: ignore
 
 # pylint: enable=import-error
+from gpgapp.fingerprint import key_fingerprint
 from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
     KEY_OPERATIONS,
     KEY_TEMPLATES,
@@ -42,10 +46,57 @@ from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
 )
 
 APDU_MAX_SIZE: int = 0xFE
+# Pause after a key generation, before the next command, for the device to settle
+KEY_GENERATION_SETTLE_S: float = 2.0
+# P2 of GEN ASYM KEY in SEED mode: legacy derivation of app 2.x, and current derivation
+SEED_MODE_LEGACY: int = 0x01
+SEED_MODE_V2: int = 0x02
 APDU_CHAINING_MODE: int = 0x10
 # Bounds of a response received through GET RESPONSE
 RESPONSE_MAX_SIZE: int = 0x4000
 RESPONSE_MAX_CHUNKS: int = 64
+# Reader name standing for the only connected Ledger device
+DEFAULT_READER: str = "Ledger"
+# OpenPGP AID: RID and application, then version, manufacturer, serial and RFU
+AID_LENGTH: int = 16
+AID_PREFIX: bytes = bytes.fromhex("D27600012401")
+AID_VERSION_MAJOR: int = 3
+AID_MANUFACTURER: bytes = bytes.fromhex("2C97")
+
+
+class _HIDTransport(Transport):
+    """Transport bound to a given HID device path"""
+
+    def __init__(self, path: bytes) -> None:  # pylint: disable=super-init-not-called
+        self.interface = TransportType.HID
+        self.com = HID()
+        self.com.path = path
+        self.com.open()
+
+
+def _hid_path(reader: str) -> bytes:
+    """Select the HID path of the reader
+
+    Args:
+        reader (str): HID path of the device, or DEFAULT_READER for the only connected Ledger device
+
+    Returns:
+        HID path of the device
+    """
+
+    try:
+        paths = sorted(set(HID.enumerate_devices()))
+    except AssertionError as err:
+        raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "No Ledger device found") from err
+    names = ", ".join(f"'{p.decode()}'" for p in paths)
+    if reader == DEFAULT_READER:
+        if len(paths) != 1:
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Several Ledger devices found, select one with --reader: {names}")
+        return paths[0]
+    for path in paths:
+        if path.decode() == reader:
+            return path
+    raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Reader '{reader}' not found, available: {names}")
 
 
 class GPGCardExcpetion(Exception):
@@ -210,12 +261,15 @@ class GPGCard:
         if device == "speculos":
             self.transport = Transport("tcp", server="127.0.0.1", port=9999, debug=False)
         else:
-            self.transport = Transport("hid")
+            self.transport = _HIDTransport(_hid_path(device))
         print("")
         # no PIN is sent before the OpenPGP application answers its selection
         _, sw = self.select()
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(sw, "OpenPGP application not selected")
+        aid = self._read_data(DataObject.DO_AID)
+        if len(aid) != AID_LENGTH or aid[0:6] != AID_PREFIX or aid[6] != AID_VERSION_MAJOR or aid[8:10] != AID_MANUFACTURER:
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Unexpected OpenPGP application identifier {aid.hex()}")
 
     def logout(self) -> None:
         """Clear PW1/PW2/PW3 verification state on the card.
@@ -628,13 +682,97 @@ class GPGCard:
         """Regenerate keys, based on seed mode"""
 
         for apdu_hex, name in (
-            (b"0047800102B600", "SIG"),
-            (b"0047800102B800", "DEC"),
-            (b"0047800102A400", "AUT"),
+            (b"0047800202B600", "SIG"),
+            (b"0047800202B800", "DEC"),
+            (b"0047800202A400", "AUT"),
         ):
-            _, sw = self._exchange(binascii.unhexlify(apdu_hex))
+            _, sw = self._generate_key(binascii.unhexlify(apdu_hex))
             if sw != ErrorCodes.ERR_SUCCESS:
                 raise GPGCardExcpetion(sw, f"{name} key generation failed, check seed mode is ON and PIN is verified")
+
+    def restore_seed_keys(self) -> None:
+        """Regenerate the restored keys from the device seed, checking the backup fingerprints
+
+        Each key the backup holds is generated with the current derivation, then with the
+        legacy one of app 2.x, until it matches its fingerprint; the derivation of a matching key
+        is tried first for the next ones. A key matching no derivation is erased, and has its
+        fingerprint and date cleared.
+        """
+
+        derivations = (SEED_MODE_V2, SEED_MODE_LEGACY)
+        failures: list[str] = []
+        for name, slot, key_tag, attr_tag, fp_tag, date_tag in (
+            (
+                "SIG",
+                self.data.sig,
+                DataObject.DO_SIG_KEY,
+                DataObject.DO_SIG_ATTR,
+                DataObject.DO_FINGERPRINT_WR_SIG,
+                DataObject.DO_DATES_WR_SIG,
+            ),
+            (
+                "DEC",
+                self.data.dec,
+                DataObject.DO_DEC_KEY,
+                DataObject.DO_DEC_ATTR,
+                DataObject.DO_FINGERPRINT_WR_DEC,
+                DataObject.DO_DATES_WR_DEC,
+            ),
+            (
+                "AUT",
+                self.data.aut,
+                DataObject.DO_AUT_KEY,
+                DataObject.DO_AUT_ATTR,
+                DataObject.DO_FINGERPRINT_WR_AUT,
+                DataObject.DO_DATES_WR_AUT,
+            ),
+        ):
+            if len(slot.fingerprint) != 20 or not any(slot.fingerprint):
+                continue
+            derivation, sw = self._seed_key_matching(slot, key_tag, derivations)
+            if derivation is not None:
+                derivations = (derivation, SEED_MODE_LEGACY if derivation == SEED_MODE_V2 else SEED_MODE_V2)
+                continue
+            if sw == ErrorCodes.ERR_SUCCESS:
+                failure = f"{name} does not match the backup (other recovery phrase or modified backup)"
+            else:
+                failure = f"{name} generation refused ({sw:04x})"
+            # Writing the key attributes erases the regenerated key
+            sw = self._put_data(attr_tag, slot.attribute)
+            if sw != ErrorCodes.ERR_SUCCESS:
+                failure += f", and not erased ({sw:04x})"
+            failures.append(failure)
+            self._put_data(fp_tag, bytes(20))
+            self._put_data(date_tag, bytes(4))
+        if failures:
+            raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Keys not restored: {'; '.join(failures)}")
+
+    def _seed_key_matching(self, slot: KeyInfo, key_tag: int, derivations: tuple[int, ...]) -> tuple[int | None, int]:
+        """Regenerate a key in SEED mode with each derivation in turn, until it matches its fingerprint
+
+        Args:
+            slot (KeyInfo):           Restored key information
+            key_tag (int):            Key to regenerate
+            derivations (tuple[int]): GEN ASYM KEY P2 values to try
+
+        Returns:
+            The derivation of the key matching the backup fingerprint, or None, and the status word
+            of the last generation when every generation was refused, or ERR_SUCCESS
+        """
+
+        date = int(slot.date.replace(tzinfo=UTC).timestamp())
+        refused = ErrorCodes.ERR_SUCCESS
+        generated = False
+        for p2 in derivations:
+            resp, sw = self._generate_key(bytes.fromhex(f"004780{p2:02x}02{key_tag:02x}00"))
+            if sw != ErrorCodes.ERR_SUCCESS:
+                refused = sw
+                continue
+            generated = True
+            pubkey = self._decode_tlv(self._decode_tlv(resp).get(DataObject.DO_PUB_KEY, b""))
+            if key_fingerprint(slot.attribute, pubkey, date) == slot.fingerprint:
+                return p2, ErrorCodes.ERR_SUCCESS
+        return None, ErrorCodes.ERR_SUCCESS if generated else refused
 
     ############### Information decoding ###############
     def decode_AID(self) -> dict:
@@ -1360,8 +1498,9 @@ class GPGCard:
             Public key decoded data bytes
         """
 
-        apdu = bytes.fromhex(f"0047{op:02x}{seed:02x}02{key:02x}00")
-        resp, sw = self._exchange(apdu)
+        p2 = SEED_MODE_V2 if seed else 0x00
+        apdu = bytes.fromhex(f"0047{op:02x}{p2:02x}02{key:02x}00")
+        resp, sw = self._generate_key(apdu) if op == KEY_OPERATIONS["Generate"] else self._exchange(apdu)
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Key operation error!")
         tags = self._decode_tlv(resp)
@@ -1453,6 +1592,20 @@ class GPGCard:
         if sw != ErrorCodes.ERR_SUCCESS and not long_resp:
             raise GPGCardExcpetion(sw, "")
         return resp, sw1, sw2
+
+    def _generate_key(self, apdu: bytes) -> tuple[bytes, int]:
+        """Send a GEN ASYM KEY command, then let the device settle before the next command
+
+        Args:
+            apdu (bytes): GEN ASYM KEY command
+
+        Returns:
+            Response data and status word
+        """
+
+        resp, sw = self._exchange(apdu)
+        time.sleep(KEY_GENERATION_SETTLE_S)
+        return resp, sw
 
     def _exchange(self, apdu: bytes, data: bytes = b"") -> tuple[bytes, int]:
         """Exchange APDU, and get the response

@@ -77,13 +77,13 @@ Device interaction itself is not unit-tested.
 
 ## Deployment
 
-Built as a static site and co-hosted on the project's existing GitHub Pages
-site: the `Generate GitHub Pages` workflow (`.github/workflows/pages.yml`)
+Built as a static site and co-hosted with the project documentation on its
+GitHub Pages site: the `Generate GitHub Pages` workflow (`.github/workflows/pages.yml`)
 builds this app and copies `dist/` into `doc/html/build/wui/`, so it is served
-at **`https://ledgerhq.github.io/app-openpgp/wui/`** and linked from the docs
-landing page. The Vite `base` is `./` (relative asset paths), so the build
-works at that sub-path without a custom domain. A dedicated domain (e.g.
-`openpgp.ledger.com`) could be added later via a `CNAME`.
+at **`https://openpgp.apps.ledger.com/wui/`** and linked from the docs landing page.
+That custom domain gives the app an origin of its own, so the WebHID permission
+granted to it is not shared with other sites. The Vite `base` is `./` (relative
+asset paths), so the build works under the `/wui/` sub-path.
 
 ## Known issues
 
