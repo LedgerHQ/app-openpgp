@@ -164,6 +164,55 @@ function checkFieldSize(name, value, max) {
 // User Interaction Flag values, from the least to the most protective.
 const UIF_LABEL = ["Disabled", "Enabled", "Permanently enabled"];
 
+// Full OpenPGP AID: RID and application, version, manufacturer, serial number, RFU
+const AID_PATTERN = /^D27600012401[0-9A-F]{20}$/i;
+// Key attributes the app accepts: RSA with a supported modulus size, or ECDH, ECDSA and
+// EdDSA with the OID of a supported curve, in at most 12 bytes
+const KEY_ATTRIBUTE_MAX_SIZE = 12;
+const RSA_ALGORITHM = 0x01;
+const RSA_SIZES = [2048, 3072, 4096];
+const ECC_ALGORITHMS = [0x12, 0x13, 0x16];
+const CURVE_OIDS = ["2a8648ce3d030107", "2b8104000a", "2b06010401da470f01", "2b060104019755010501"];
+// Cardholder salutations stored in a backup
+const SALUTATIONS = ["", "Male", "Female"];
+
+function parseText(value, name) {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") {
+    throw new Error(`Backup field "${name}" is invalid`);
+  }
+  return value;
+}
+
+// Integer from 0 to `max`, given as a JSON number or a decimal string
+function parseCount(value, name, max) {
+  const n = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+  if (!Number.isInteger(n) || n < 0 || n > max) {
+    throw new Error(`Backup field "${name}" is invalid`);
+  }
+  return n;
+}
+
+// RSA public exponent the app accepts: odd and at least 3
+function parseRsaExponent(value) {
+  const exponent = parseCount(value, "rsa_pub_exp", 0xffffffff);
+  if (exponent < 3 || exponent % 2 === 0) {
+    throw new Error(`Backup field "rsa_pub_exp" is invalid`);
+  }
+  return exponent;
+}
+
+function checkAttribute(attribute, slot) {
+  const valid =
+    attribute.length <= KEY_ATTRIBUTE_MAX_SIZE &&
+    (attribute[0] === RSA_ALGORITHM
+      ? attribute.length >= 3 && RSA_SIZES.includes(attribute.readUInt16BE(1))
+      : ECC_ALGORITHMS.includes(attribute[0]) && CURVE_OIDS.includes(attribute.subarray(1).toString("hex")));
+  if (!valid) {
+    throw new Error(`Backup field "${slot}.attribute" is invalid`);
+  }
+}
+
 function parseUif(value, slot) {
   if (!Number.isInteger(value) || value < 0 || value >= UIF_LABEL.length) {
     throw new Error(`Backup field "${slot}.uif" is invalid`);
@@ -183,7 +232,13 @@ export function parseBackup(json) {
     if (!p[slot]) throw new Error(`Backup is missing the "${slot}" key slot`);
   }
 
-  const fromb64 = (s) => Buffer.from(s || "", "base64");
+  const fromb64 = (s) => {
+    const bytes = Buffer.from(parseText(s, "base64 data"), "base64");
+    if (bytes.toString("base64") !== (s || "")) {
+      throw new Error("Backup holds invalid base64 data");
+    }
+    return bytes;
+  };
   const keySlot = (raw, name) => ({
     key: fromb64(raw.key),
     uif: parseUif(raw.uif, name),
@@ -194,20 +249,27 @@ export function parseBackup(json) {
     cert: raw.cert_b64 !== undefined ? fromb64(raw.cert_b64) : Buffer.from(raw.cert || "", "utf-8"),
   });
 
+  if (!AID_PATTERN.test(parseText(p.AID, "AID"))) {
+    throw new Error(`Backup field "AID" is invalid`);
+  }
+  if (!SALUTATIONS.includes(parseText(p.salutation, "salutation"))) {
+    throw new Error(`Backup field "salutation" is invalid`);
+  }
+
   const data = {
-    AID: p.AID || "",
+    AID: p.AID,
     PWStatus: fromb64(p.PW_status),
-    rsaPubExp: parseInt(p.rsa_pub_exp, 10) || 0,
-    digitalCounter: parseInt(p.digital_counter, 10) || 0,
+    rsaPubExp: parseRsaExponent(p.rsa_pub_exp),
+    digitalCounter: parseCount(p.digital_counter, "digital_counter", 0xffffff),
     private_01: fromb64(p.private_01),
     private_02: fromb64(p.private_02),
     private_03: fromb64(p.private_03),
     private_04: fromb64(p.private_04),
-    name: p.name || "",
-    login: p.login || "",
-    salutation: p.salutation || "",
-    url: p.url || "",
-    lang: p.lang || "",
+    name: parseText(p.name, "name"),
+    login: parseText(p.login, "login"),
+    salutation: parseText(p.salutation, "salutation"),
+    url: parseText(p.url, "url"),
+    lang: parseText(p.lang, "lang"),
     sig: keySlot(p.sig, "sig"),
     dec: keySlot(p.dec, "dec"),
     aut: keySlot(p.aut, "aut"),
@@ -226,6 +288,7 @@ export function parseBackup(json) {
     for (const field of ["attribute", "fingerprint", "cert", "key"]) {
       checkFieldSize(`${slot}.${field}`, data[slot][field], FIELD_MAX_SIZE[field]);
     }
+    checkAttribute(data[slot].attribute, slot);
     checkFieldSize(`${slot}.ca_fingerprint`, data[slot].ca_fingerprint, FIELD_MAX_SIZE.fingerprint);
     for (const field of ["fingerprint", "ca_fingerprint"]) {
       const { length } = data[slot][field];

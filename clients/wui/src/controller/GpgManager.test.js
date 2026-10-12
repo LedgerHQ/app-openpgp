@@ -13,6 +13,8 @@ const { default: GpgManager } = await import("./GpgManager");
 const { formatDate } = await import("./backupFormat");
 
 const OK = Buffer.from([0x90, 0x00]);
+// Backup fields every restore test needs, besides the PW status and the key slots
+const BACKUP_FIELDS = { version: 1, AID: "D2760001240103040000000100000000", rsa_pub_exp: 65537, digital_counter: 0 };
 const AID = Buffer.concat([Buffer.from("D2760001240103040000000100000000", "hex"), OK]);
 
 // Fake WebHID transport: answers SELECT and GET DATA AID, then replies to
@@ -91,9 +93,11 @@ describe("logout", () => {
 
 describe("restore", () => {
   const pwStatus = (pw1) => Buffer.from([pw1, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]);
+  const P256_ATTR = Buffer.from("132a8648ce3d030107", "hex");
   const backup = (pw1, uif) => {
-    const slot = { date: "1970-01-01 00:00:00", uif };
-    return JSON.stringify({ version: 1, PW_status: pwStatus(pw1).toString("base64"), sig: slot, dec: slot, aut: slot });
+    const slot = { date: "1970-01-01 00:00:00", uif, attribute: P256_ATTR.toString("base64") };
+    const pw = pwStatus(pw1).toString("base64");
+    return JSON.stringify({ ...BACKUP_FIELDS, PW_status: pw, sig: slot, dec: slot, aut: slot });
   };
 
   // Card with PW1 valid for one signature and UIF enabled on every key
@@ -101,7 +105,8 @@ describe("restore", () => {
     new FakeTransport(async (apdu) => {
       sent.push(apdu);
       if (apdu[1] === 0xca && apdu[3] === 0x6e) {
-        const discretionary = Buffer.concat([Buffer.from([0xc4, 0x07]), pwStatus(0)]);
+        const attributes = [0xc1, 0xc2, 0xc3].map((tag) => Buffer.concat([Buffer.from([tag, P256_ATTR.length]), P256_ATTR]));
+        const discretionary = Buffer.concat([Buffer.from([0xc4, 0x07]), pwStatus(0), ...attributes]);
         return Buffer.concat([Buffer.from([0x73, discretionary.length]), discretionary, OK]);
       }
       if (apdu[1] === 0xca && apdu[3] >= 0xd6 && apdu[3] <= 0xd8) return Buffer.from([0x01, 0x20, 0x90, 0x00]);
@@ -147,7 +152,7 @@ describe("restore fingerprints", () => {
 
   // Backup holding the signature key, and the same key as decryption key when `withDec`
   const backup = (withDec = false) => {
-    const empty = { date: "1970-01-01 00:00:00", uif: 0 };
+    const empty = { date: "1970-01-01 00:00:00", uif: 0, attribute: P256_ATTR.toString("base64") };
     const sig = {
       date: formatDate(P256_DATE),
       uif: 0,
@@ -155,14 +160,14 @@ describe("restore fingerprints", () => {
       fingerprint: Buffer.from(P256_FINGERPRINT, "hex").toString("base64"),
     };
     const pwStatus = Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]).toString("base64");
-    return JSON.stringify({ version: 1, PW_status: pwStatus, sig, dec: withDec ? sig : empty, aut: empty });
+    return JSON.stringify({ ...BACKUP_FIELDS, PW_status: pwStatus, sig, dec: withDec ? sig : empty, aut: empty });
   };
 
   // Card whose key public point is `point`, or absent when null, with the
   // signature key `attribute`; `generated` maps a generation P2 to the point it
   // gives, or to a status word, or is a function of the key tag and P2. Writing
   // key attributes erases the key, as the firmware does.
-  const card = (point, sent = [], generated = {}, attribute = P256_ATTR) =>
+  const card = (point, sent = [], generated = {}, attribute = P256_ATTR, decAttribute = P256_ATTR) =>
     new FakeTransport(async (apdu) => {
       sent.push(apdu);
       if (apdu[1] === 0xda && apdu[2] === 0x00 && apdu[3] >= 0xc1 && apdu[3] <= 0xc3) {
@@ -178,7 +183,12 @@ describe("restore fingerprints", () => {
       }
       if (apdu[1] === 0xca && apdu[3] === 0x6e) {
         const pw = Buffer.from([0xc4, 0x07, 0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]);
-        const discretionary = Buffer.concat([pw, Buffer.from([0xc1, attribute.length]), attribute]);
+        const attributes = [
+          [0xc1, attribute],
+          [0xc2, decAttribute],
+          [0xc3, P256_ATTR],
+        ].map(([tag, value]) => Buffer.concat([Buffer.from([tag, value.length]), value]));
+        const discretionary = Buffer.concat([pw, ...attributes]);
         return Buffer.concat([Buffer.from([0x73, discretionary.length]), discretionary, OK]);
       }
       if (apdu[1] === 0xca && apdu[3] >= 0xd6 && apdu[3] <= 0xd8) return Buffer.from([0x00, 0x20, 0x90, 0x00]);
@@ -197,9 +207,10 @@ describe("restore fingerprints", () => {
     generated = {},
     withDec = false,
     attribute = P256_ATTR,
-    confirm = async () => true
+    confirm = async () => true,
+    decAttribute = P256_ATTR
   ) => {
-    transports.push(card(point, sent, generated, attribute));
+    transports.push(card(point, sent, generated, attribute, decAttribute));
     const gpg = new GpgManager();
     gpg.generationDelay = 0;
     await gpg.connect();
@@ -268,6 +279,22 @@ describe("restore fingerprints", () => {
     expect(await restore(P256_POINT, [], true, { 0x02: P256_POINT }, false, RSA2048_ATTR, confirm)).toEqual([]);
     const [changes] = confirm.mock.calls[0];
     expect(changes.filter((c) => c.erased)).toEqual([]);
+  });
+
+  test("keeps the fingerprint of a card key the backup does not regenerate", async () => {
+    const sent = [];
+    expect(await restore(P256_POINT, sent, true, { 0x02: P256_POINT })).toEqual([]);
+    const fingerprintTags = sent.filter((apdu) => apdu[1] === 0xda && apdu[2] === 0x00).map((apdu) => apdu[3]);
+    expect(fingerprintTags).not.toContain(0xc8);
+    expect(fingerprintTags).not.toContain(0xc9);
+  });
+
+  test("asks before erasing a card key the backup does not regenerate", async () => {
+    const confirm = vi.fn(async () => false);
+    const args = [P256_POINT, [], true, { 0x02: P256_POINT }, false, P256_ATTR, confirm, RSA2048_ATTR];
+    expect(await restore(...args)).toBe(null);
+    const [changes] = confirm.mock.calls[0];
+    expect(changes.filter((c) => c.erased).map((c) => c.setting)).toEqual(["Decryption key"]);
   });
 
   test("does not rewrite unchanged attributes before regenerating", async () => {
