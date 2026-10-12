@@ -151,21 +151,6 @@ def error(code: int, msg: str) -> None:
 # ===============================================================================
 #          PIN codes verification
 # ===============================================================================
-def verify_pins(gpgcard: GPGCard, user_pin: str, adm_pin: str, pinpad: bool) -> None:
-    """Verify the pin codes
-
-    Args:
-        gpgcard (GPGCard): smartcard object
-        user_pin (str): User pin code
-        adm_pin (str): Admin pin code
-        pinpad (bool): Indicates to use pinpad
-    """
-
-    print("Verify PINs...")
-    verify_user_pin(gpgcard, user_pin, pinpad)
-    verify_admin_pin(gpgcard, adm_pin, pinpad)
-
-
 def verify_user_pin(gpgcard: GPGCard, user_pin: str, pinpad: bool) -> None:
     """Verify the User pin code, for both PW1 and PW2
 
@@ -383,10 +368,31 @@ def entrypoint() -> None:
     # -----------------
     args = get_argparser()
 
+    # PINs to verify: the User PIN (PW2) to select a slot, the Admin PIN (PW3) to write to the card
+    needs_user = args.slot is not None
+    needs_admin = bool(
+        args.salutation
+        or args.name
+        or args.url
+        or args.login
+        or args.lang
+        or args.serial
+        or args.reset_code
+        or args.reset
+        or args.set_templates
+        or args.set_fingerprints
+        or args.seed_key
+        or args.key_action == "Generate"
+    )
+
     # Arguments checking
     # ------------------
     try:
-        get_pins(args, user=args.reset_pw1 is None)
+        get_pins(
+            args,
+            user=args.reset_pw1 is None and (needs_user or args.new_user_pin is not None),
+            admin=needs_admin or args.new_adm_pin is not None or args.reset_pw1 is not None,
+        )
         if args.new_user_pin is not None:
             args.new_user_pin = get_secret(args.new_user_pin, "--new-user-pin", ENV_NEW_USER_PIN, "New User PIN", confirm=True)
             if not args.new_user_pin:
@@ -437,8 +443,12 @@ def entrypoint() -> None:
                 error(ErrorCodes.ERR_INTERNAL, "User PIN not reset")
             args.user_pin = args.reset_pw1
             verify_user_pin(gpgcard, args.user_pin, args.pinpad)
-        else:
-            verify_pins(gpgcard, args.user_pin, args.adm_pin, args.pinpad)
+        elif needs_user or needs_admin:
+            print("Verify PINs...")
+            if needs_user:
+                verify_user_pin(gpgcard, args.user_pin, args.pinpad)
+            if needs_admin:
+                verify_admin_pin(gpgcard, args.adm_pin, args.pinpad)
 
         if args.slot:
             gpgcard.select_slot(args.slot - 1)
