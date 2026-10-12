@@ -134,7 +134,7 @@ def get_argparser() -> Namespace:
 #          Error handler
 # ===============================================================================
 def error(code: int, msg: str) -> None:
-    """Print error message and exit
+    """Print error message and exit with status 1
 
     Args:
         msg (str): Message to display
@@ -144,8 +144,8 @@ def error(code: int, msg: str) -> None:
     if not msg:
         if code in ErrorCodes.err_list:
             msg = ErrorCodes.err_list[code]
-    print(f"\n### Error{scode}: {msg}\n")
-    sys.exit()
+    print(f"\n### Error{scode}: {msg}\n", file=sys.stderr)
+    sys.exit(1)
 
 
 # ===============================================================================
@@ -492,6 +492,8 @@ def entrypoint() -> None:
 
     except GPGCardExcpetion as err:
         error(err.code, err.message)
+    except (OSError, ValueError, KeyError) as err:
+        error(0, repr(err))
     finally:
         if gpgcard.transport is not None:
             try:
