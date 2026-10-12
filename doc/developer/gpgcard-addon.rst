@@ -266,28 +266,37 @@ In order to backup/restore private key the commands `put_data` and `get_data` ac
 `put_data` command accept the exact output of `get_data`. The `get_data` command
 return both the public and private key.
 
-For security and confidentiality, private key is returned encrypted in AES.
-The key used is derived according to previously described AES key derivation
-with name 'key'.
+For security and confidentiality, the private key is returned encrypted with AES-GCM.
+The 128-bit key is derived with the name 'key' from the seed of the slot. Everything before the encrypted private key is authenticated with it: the
+blob only restores on the same seed and slot, into the same key role and key attributes.
 
+The data payload (format version 3) is formatted as follow:
 
-The data payload is formatted as follow:
+  +-------+--------------------------------------------+
+  | size  | Description                                |
+  +=======+============================================+
+  | 1     | format version: 03                         |
+  +-------+--------------------------------------------+
+  | 12    | GCM nonce                                  |
+  +-------+--------------------------------------------+
+  | 2     | key reference: B6, B8 or A4                |
+  +-------+--------------------------------------------+
+  | 1     | key attributes size                        |
+  +-------+--------------------------------------------+
+  | var   | key attributes                             |
+  +-------+--------------------------------------------+
+  | 4     | public key size                            |
+  +-------+--------------------------------------------+
+  | var   | public key                                 |
+  +-------+--------------------------------------------+
+  | 4     | encrypted private key size, with the tag   |
+  +-------+--------------------------------------------+
+  | var   | encrypted private key, then 16-byte tag    |
+  +-------+--------------------------------------------+
 
-  +-------+--------------------------+
-  | size  | Description              |
-  +=======+==========================+
-  | 4     | OS Target ID             |
-  +-------+--------------------------+
-  | 4     | API Level                |
-  +-------+--------------------------+
-  | 4     | public key size          |
-  +-------+--------------------------+
-  | var   | public key               |
-  +-------+--------------------------+
-  | 4     | private key size         |
-  +-------+--------------------------+
-  | var   | encrypted private key    |
-  +-------+--------------------------+
+`put_data` also accepts the formats of older app versions, which start with the OS Target ID and
+the API Level, both ignored: version 2 (no key reference nor attributes), version 1 (no nonce field, nonce built from the slot and the key
+reference) and the AES-CBC format without version byte.
 
 APDU Modification
 -----------------

@@ -22,9 +22,10 @@
 /* Backup blob format version written by GET KEY DATA and expected by PUT KEY
  * DATA for the authenticated-encryption path.  Old blobs start with the
  * first byte of TARGET_ID (0x31 or 0x33 on Ledger devices), which is never
- * 0x01, so the first byte alone is an unambiguous version discriminant. */
+ * a version number, so the first byte alone is an unambiguous version discriminant. */
 #define BACKUP_FORMAT_V1     ((unsigned char) 0x01)
 #define BACKUP_FORMAT_V2     ((unsigned char) 0x02)
+#define BACKUP_FORMAT_V3     ((unsigned char) 0x03)
 #define GPG_BACKUP_TAG_LEN   16
 #define GPG_BACKUP_NONCE_LEN 12
 
@@ -1177,11 +1178,12 @@ static int gpg_get_key_data(unsigned int ref, cx_aes_gcm_context_t *gcm_ctx) {
 
     gpg_io_discard(1);
     CX_CHECK(cx_get_random_bytes(nonce, sizeof(nonce)));
-    // header authenticated by GCM tag (not encrypted)
-    gpg_io_insert_u8(BACKUP_FORMAT_V2);
-    gpg_io_insert_u32(TARGET_ID);
-    gpg_io_insert_u32(get_api_level());
+    // header authenticated by GCM tag (not encrypted), binding the key role and attributes
+    gpg_io_insert_u8(BACKUP_FORMAT_V3);
     gpg_io_insert(nonce, sizeof(nonce));
+    gpg_io_insert_u16(ref);
+    gpg_io_insert_u8(keygpg->attributes.length);
+    gpg_io_insert(keygpg->attributes.value, keygpg->attributes.length);
 
     switch (keygpg->attributes.value[0]) {
         case KEY_ID_RSA:
@@ -1274,7 +1276,7 @@ int gpg_apdu_get_key_data(unsigned int ref) {
     cx_aes_gcm_context_t gcm_ctx;
     int sw;
 
-    sw = gpg_init_gcm(&gcm_ctx, BACKUP_FORMAT_V2);
+    sw = gpg_init_gcm(&gcm_ctx, BACKUP_FORMAT_V3);
     if (sw == SWO_SUCCESS) {
         sw = gpg_get_key_data(ref, &gcm_ctx);
     }
@@ -1409,6 +1411,36 @@ end:
     return error;
 }
 
+/**
+ * Check that a v3 blob holds a key of the given role and of the current key attributes
+ *
+ * @param[in] ref destination key reference
+ * @param[in] keygpg destination key
+ *
+ * @return Status Word
+ *
+ */
+static int gpg_check_key_role(unsigned int ref, const gpg_key_t *keygpg) {
+    unsigned char attributes[GPG_KEY_ATTRIBUTES_LENGTH];
+    unsigned int blob_ref;
+    unsigned int len;
+
+    if (gpg_key_data_left() < 2 + 1) {
+        return SWO_WRONG_LENGTH;
+    }
+    blob_ref = gpg_io_fetch_u16();
+    len = gpg_io_fetch_u8();
+    if ((len > sizeof(attributes)) || (gpg_key_data_left() < len)) {
+        return SWO_WRONG_LENGTH;
+    }
+    gpg_io_fetch(attributes, len);
+    if ((blob_ref != ref) || (len != keygpg->attributes.length) ||
+        (memcmp(attributes, keygpg->attributes.value, len) != 0)) {
+        return SWO_INCORRECT_DATA;
+    }
+    return SWO_SUCCESS;
+}
+
 int gpg_apdu_put_key_data(unsigned int ref) {
     gpg_key_t *keygpg = NULL;
     int sw = SWO_UNKNOWN;
@@ -1432,28 +1464,37 @@ int gpg_apdu_put_key_data(unsigned int ref) {
         return SWO_WRONG_LENGTH;
     }
     version = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
-    if ((version == BACKUP_FORMAT_V1) || (version == BACKUP_FORMAT_V2)) {
+    if ((version == BACKUP_FORMAT_V1) || (version == BACKUP_FORMAT_V2) ||
+        (version == BACKUP_FORMAT_V3)) {
         // AES-GCM authenticated blob, with the nonce stored in the header from v2
         cx_aes_gcm_context_t gcm_ctx;
         unsigned char nonce[GPG_BACKUP_NONCE_LEN];
 
-        // version, TARGET_ID and api_level, then the nonce
-        if (gpg_key_data_left() <
-            1 + 4 + 4 + ((version == BACKUP_FORMAT_V2) ? GPG_BACKUP_NONCE_LEN : 0)) {
+        // version, TARGET_ID and api_level (not checked) up to v2, then the nonce from v2
+        if (gpg_key_data_left() < 1 + ((version == BACKUP_FORMAT_V3) ? 0 : 4 + 4) +
+                                      ((version == BACKUP_FORMAT_V1) ? 0 : GPG_BACKUP_NONCE_LEN)) {
             return SWO_WRONG_LENGTH;
+        }
+        gpg_io_fetch_u8();  // version
+        if (version != BACKUP_FORMAT_V3) {
+            gpg_io_fetch_u32();  // TARGET_ID
+            gpg_io_fetch_u32();  // api_level
+        }
+        if (version == BACKUP_FORMAT_V1) {
+            gpg_backup_nonce(ref, nonce);
+        } else {
+            gpg_io_fetch(nonce, sizeof(nonce));
+        }
+        if (version == BACKUP_FORMAT_V3) {
+            sw = gpg_check_key_role(ref, keygpg);
+            if (sw != SWO_SUCCESS) {
+                return sw;
+            }
         }
         sw = gpg_init_gcm(&gcm_ctx, version);
         if (sw != SWO_SUCCESS) {
             explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
             return sw;
-        }
-        gpg_io_fetch_u8();   // version
-        gpg_io_fetch_u32();  // TARGET_ID
-        gpg_io_fetch_u32();  // api_level
-        if (version == BACKUP_FORMAT_V2) {
-            gpg_io_fetch(nonce, sizeof(nonce));
-        } else {
-            gpg_backup_nonce(ref, nonce);
         }
 
         switch (keygpg->attributes.value[0]) {
@@ -1473,7 +1514,7 @@ int gpg_apdu_put_key_data(unsigned int ref) {
         }
         explicit_bzero(&gcm_ctx, sizeof(gcm_ctx));
     } else {
-        // legacy: AES-CBC blob (first byte is high byte of TARGET_ID, never 0x01 nor 0x02)
+        // legacy: AES-CBC blob (first byte is high byte of TARGET_ID, never a version number)
         cx_aes_key_t keyenc = {0};
 
         // TARGET_ID and api_level
