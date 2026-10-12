@@ -366,8 +366,12 @@ class GPGCard:
         return self._exchange(apdu)
 
     ############### API interfaces ###############
-    def get_all(self) -> None:
-        """Retrieve all Data Object values from the Card"""
+    def get_all(self, secrets: bool = False) -> None:
+        """Retrieve the Data Object values from the Card
+
+        Args:
+            secrets (bool): Also read the private DOs and the key backup blobs, for a backup
+        """
 
         self.data.reset()
         data: bytes | None = b""
@@ -452,6 +456,9 @@ class GPGCard:
             b_data = tags[DataObject.DO_SIG_COUNT]
             self.data.digital_counter = self._get_int(b_data, 3)
 
+        if not secrets:
+            return
+
         if self.data.ext_capabilities[0] & 0x08:
             self.data.private_01 = self._read_data(DataObject.DO_PRIVATE_01)
             self.data.private_02 = self._read_data(DataObject.DO_PRIVATE_02)
@@ -486,7 +493,7 @@ class GPGCard:
                 "cert_b64": _b64(slot.cert),
             }
 
-        self.get_all()
+        self.get_all(secrets=True)
         payload = {
             "version": 1,
             "AID": self.data.AID,
@@ -506,7 +513,10 @@ class GPGCard:
             "dec": _key_slot(self.data.dec),
             "aut": _key_slot(self.data.aut),
         }
+        # The private DOs and key blobs are only kept in memory until the file is written
+        self.data.reset()
         raw = json.dumps(payload, indent=2).encode("utf-8")
+        del payload
         if passphrase is not None:
             raw = _encrypt_backup(raw, passphrase)
         # never reuse an existing path, nor follow a link created in its place
@@ -1295,36 +1305,6 @@ class GPGCard:
         if attributes[0] == PubkeyAlgo.EDDSA:
             return "EDDSA"
         return ""
-
-    def decode_key(self, key: str) -> dict:
-        """Get key parameters
-
-        Args:
-            key (str): Key type (SIG, DC, AUT)
-
-        Return:
-            Key information dictionary
-        """
-
-        d = {}
-        offset: int = 0
-        key_data = self._get_key_object(key).key
-
-        d["OS Target ID"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):04x}"
-        offset += 4
-        d["API Level"] = str(int.from_bytes(key_data[offset : offset + 4], "big"))
-        offset += 4
-        size = int.from_bytes(key_data[offset : offset + 4], "big")
-        # Should be Public key here from doc, but only Public Exp from the code
-        d["Public exp size"] = str(size)
-        offset += 4
-        d["Public exp"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):06x}"
-        offset += size
-        size = int.from_bytes(key_data[offset : offset + 4], "big")
-        d["Private key size"] = str(size)
-        # offset += 4
-        # d["Private key encrypted"] = key_data[offset:offset + size].hex()
-        return d
 
     def asymmetric_key(self, key: str, action: str, derivation: int = 0) -> dict:
         """Asymmetric key operation

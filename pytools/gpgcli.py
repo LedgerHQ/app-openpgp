@@ -268,9 +268,6 @@ def get_info(gpgcard: GPGCard, display: bool = True) -> None:
         print(f"   - {'Creation date':18s}: {gpgcard.get_key_date(key)}")
         print(f"   - {'Attribute':18s}: {gpgcard.decode_attributes(key)}")
         print(f"   - {'Certificate':18s}: {gpgcard.get_key_cert(key)}")
-        print("   - Key:")
-        for k, v in gpgcard.decode_key(key).items():
-            print(f"     * {k:16s}: {v}")
 
 
 # ===============================================================================

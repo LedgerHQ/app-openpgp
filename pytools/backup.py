@@ -135,8 +135,6 @@ def entrypoint() -> None:
         if args.slot:
             gpgcard.select_slot(args.slot - 1)
 
-        gpgcard.get_all()
-
         if args.restore:
             gpgcard.restore(args.file, args.file_passphrase, seed_key=args.seed_key)
             print(f"Configuration restored from file '{args.file}'.")
