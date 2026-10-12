@@ -91,6 +91,85 @@ describe("logout", () => {
   });
 });
 
+describe("backup slot", () => {
+  const slotInfo = () => ({
+    key: Buffer.alloc(0),
+    uif: 0,
+    attribute: Buffer.alloc(0),
+    date: 0,
+    fingerprint: Buffer.alloc(0),
+    ca_fingerprint: Buffer.alloc(0),
+    cert: Buffer.alloc(0),
+  });
+  const cardInfo = () => ({
+    AID: "D2760001240103040000000100000000",
+    PWStatus: Buffer.alloc(7),
+    rsaPubExp: 65537,
+    digitalCounter: 0,
+    private_01: Buffer.alloc(0),
+    private_02: Buffer.alloc(0),
+    private_03: Buffer.alloc(0),
+    private_04: Buffer.alloc(0),
+    name: "",
+    login: "",
+    salutation: "",
+    url: "",
+    lang: "",
+    sig: slotInfo(),
+    dec: slotInfo(),
+    aut: slotInfo(),
+  });
+
+  // Card whose active slot is `active`; records the slot selections (PUT DATA 01F2)
+  const card = (active, selections) =>
+    new FakeTransport(async (apdu) => {
+      if (apdu[1] === 0xca && apdu[2] === 0x01 && apdu[3] === 0xf2) return Buffer.from([active, 0x90, 0x00]);
+      if (apdu[1] === 0xda && apdu[2] === 0x01 && apdu[3] === 0xf2) selections.push(apdu[5]);
+      return OK;
+    });
+
+  const connect = async (active, selections) => {
+    transports.push(card(active, selections));
+    const gpg = new GpgManager();
+    await gpg.connect();
+    return gpg;
+  };
+
+  test("reads the active slot", async () => {
+    const gpg = await connect(2, []);
+    expect(await gpg.activeSlot()).toBe(2);
+  });
+
+  test("rejects an unknown active slot", async () => {
+    const gpg = await connect(3, []);
+    await expect(gpg.activeSlot()).rejects.toThrow("Unexpected active slot");
+  });
+
+  test("selects the active slot again after the backup", async () => {
+    const selections = [];
+    const gpg = await connect(1, selections);
+    vi.spyOn(gpg, "getAll").mockResolvedValue(cardInfo());
+    await gpg.backup("123456", "12345678", 0);
+    expect(selections).toEqual([0, 1]);
+  });
+
+  test("selects the active slot again when the backup fails", async () => {
+    const selections = [];
+    const gpg = await connect(2, selections);
+    vi.spyOn(gpg, "getAll").mockRejectedValue(new Error("read failed"));
+    await expect(gpg.backup("123456", "12345678", 0)).rejects.toThrow("read failed");
+    expect(selections).toEqual([0, 2]);
+  });
+
+  test("keeps the slot when backing up the active one", async () => {
+    const selections = [];
+    const gpg = await connect(1, selections);
+    vi.spyOn(gpg, "getAll").mockResolvedValue(cardInfo());
+    await gpg.backup("123456", "12345678", 1);
+    expect(selections).toEqual([1]);
+  });
+});
+
 describe("restore", () => {
   const pwStatus = (pw1) => Buffer.from([pw1, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]);
   const P256_ATTR = Buffer.from("132a8648ce3d030107", "hex");

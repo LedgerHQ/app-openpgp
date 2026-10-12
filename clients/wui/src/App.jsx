@@ -202,6 +202,18 @@ export default function App() {
     setSlot("1");
   }
 
+  // Open the PIN dialog of `action` on the slot active on the card
+  async function openWithActiveSlot(action) {
+    try {
+      setSlot(mock ? "1" : String((await gpg.activeSlot()) + 1));
+    } catch (e) {
+      setNotice({ appearance: "error", title: "Unable to read the active slot", description: e.message });
+      return false;
+    }
+    setPinAction(action);
+    return true;
+  }
+
   async function onConnect() {
     setBusy(true);
     setFailures(null);
@@ -249,7 +261,7 @@ export default function App() {
       restoreContent.current = bytes;
       setIsEncryptedFile(isEncryptedBackup(bytes));
       setRegen(true);
-      setPinAction("restore");
+      openWithActiveSlot("restore");
     };
     reader.readAsArrayBuffer(file);
   }
@@ -417,7 +429,7 @@ export default function App() {
 
               {connected && (
                 <div className="flex flex-col gap-10">
-                  <Button appearance="accent" icon={CloudDownload} disabled={busy} onClick={() => setPinAction("backup")}>
+                  <Button appearance="accent" icon={CloudDownload} disabled={busy} onClick={() => openWithActiveSlot("backup")}>
                     Backup
                   </Button>
                   <Button appearance="base" icon={CloudUpload} disabled={busy} onClick={() => fileInput.current.click()}>

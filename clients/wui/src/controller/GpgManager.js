@@ -21,6 +21,8 @@ const SELECT_APDU = "00A4040006" + OPENPGP_AID;
 const GET_DATA_AID = "00CA004F00";
 // Full AID length, including the manufacturer and the serial number
 const AID_LENGTH = 16;
+// Number of key slots of the app
+const SLOT_COUNT = 3;
 
 // Password references (ISO 7816 / OpenPGP).
 export const PW = Object.freeze({
@@ -325,6 +327,25 @@ class GpgManager {
     }
   }
 
+  // Read the active key slot (GET DATA 0x01F2, 0-based index), readable without PIN.
+  async readSlot(t = this.transport) {
+    const index = checkLength("active slot", await getData(t, DO.SLOT_CUR), 1)[0];
+    if (index >= SLOT_COUNT) {
+      throw new Error(`Unexpected active slot (${index})`);
+    }
+    return index;
+  }
+
+  // Active key slot of the card, 0-based.
+  async activeSlot() {
+    const t = this._lock();
+    try {
+      return await this.readSlot(t);
+    } finally {
+      this._unlock();
+    }
+  }
+
   // Select the active key slot (PUT DATA 0x01F2, 0-based index). Requires PW2
   // verified and "Selection by APDU" enabled on the card.
   async selectSlot(index, t = this.transport) {
@@ -356,12 +377,20 @@ class GpgManager {
   }
 
   // Verify PINs, select the slot, and read the full card state into a backup.
+  // The slot active before the backup is selected again afterwards.
   async backup(userPin, adminPin, slot = 0) {
     const t = this._lock();
     try {
       await this.verifyPins(userPin, adminPin, t);
+      const active = await this.readSlot(t);
       await this.selectSlot(slot, t);
-      return buildBackup(await this.getAll(t));
+      try {
+        return buildBackup(await this.getAll(t));
+      } finally {
+        if (slot !== active) {
+          await this.selectSlot(active, t);
+        }
+      }
     } finally {
       await this._logout(t);
       this._unlock();
