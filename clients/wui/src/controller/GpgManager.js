@@ -90,6 +90,17 @@ const KEY_ROLES = [
   ["aut", DO.AUT_KEY],
 ];
 
+// Overwrite the Buffers of a card snapshot, key slots included, once it is no longer needed
+function wipeBuffers(object) {
+  for (const value of Object.values(object)) {
+    if (Buffer.isBuffer(value)) {
+      value.fill(0);
+    } else if (value && typeof value === "object") {
+      wipeBuffers(value);
+    }
+  }
+}
+
 // A backup key slot holds a key when its fingerprint is set
 function hasKey(slot) {
   return slot.fingerprint.length === FINGERPRINT_SIZE && slot.fingerprint.some((b) => b !== 0);
@@ -209,9 +220,14 @@ class GpgManager {
   // PIN verification (00 20 00 <pw> Lc <pin>). Returns success boolean.
   async verifyPin(pw, value, t = this.transport) {
     const pin = Buffer.from(value || "", "utf-8");
-    const header = Buffer.from([0x00, 0x20, 0x00, pw, pin.length]);
-    const { sw } = await exchange(t, Buffer.concat([header, pin]));
-    return sw === SW_SUCCESS;
+    const apdu = Buffer.concat([Buffer.from([0x00, 0x20, 0x00, pw, pin.length]), pin]);
+    try {
+      const { sw } = await exchange(t, apdu);
+      return sw === SW_SUCCESS;
+    } finally {
+      pin.fill(0);
+      apdu.fill(0);
+    }
   }
 
   // Read every data object needed for a backup, ported from gpgcard.py
@@ -306,7 +322,6 @@ class GpgManager {
     data.dec.key = await getData(t, DO.DEC_KEY, false, noKey);
     data.aut.key = await getData(t, DO.AUT_KEY, false, noKey);
 
-    this.data = data;
     return data;
   }
 
@@ -385,7 +400,12 @@ class GpgManager {
       const active = await this.readSlot(t);
       await this.selectSlot(slot, t);
       try {
-        return buildBackup(await this.getAll(t));
+        const data = await this.getAll(t);
+        try {
+          return buildBackup(data);
+        } finally {
+          wipeBuffers(data);
+        }
       } finally {
         if (slot !== active) {
           await this.selectSlot(active, t);
@@ -489,8 +509,9 @@ class GpgManager {
   // or null when not confirmed.
   async restore(userPin, adminPin, json, regenerateKeys = false, slot = 0, confirm = async () => true) {
     const t = this._lock();
+    let data = null;
     try {
-      const data = parseBackup(json);
+      data = parseBackup(json);
 
       await this.verifyPins(userPin, adminPin, t);
       await this.selectSlot(slot, t);
@@ -632,6 +653,9 @@ class GpgManager {
 
       return failures;
     } finally {
+      if (data) {
+        wipeBuffers(data);
+      }
       await this._logout(t);
       this._unlock();
     }

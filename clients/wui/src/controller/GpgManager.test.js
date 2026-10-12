@@ -161,6 +161,32 @@ describe("backup slot", () => {
     expect(selections).toEqual([0, 2]);
   });
 
+  test("wipes the card data once the backup is built", async () => {
+    const gpg = await connect(0, []);
+    const data = cardInfo();
+    data.private_03 = Buffer.from("secret DO");
+    data.sig.key = Buffer.from("key blob");
+    vi.spyOn(gpg, "getAll").mockResolvedValue(data);
+    const payload = await gpg.backup("123456", "12345678", 0);
+    expect(payload.private_03).toBe(Buffer.from("secret DO").toString("base64"));
+    expect(data.private_03.every((b) => b === 0)).toBe(true);
+    expect(data.sig.key.every((b) => b === 0)).toBe(true);
+    expect(Object.values(gpg).includes(data)).toBe(false);
+  });
+
+  test("wipes the PIN buffers after a VERIFY", async () => {
+    const gpg = await connect(0, []);
+    const sent = [];
+    const exchange = gpg.transport.exchange.bind(gpg.transport);
+    gpg.transport.exchange = async (apdu) => {
+      sent.push({ ins: apdu[1], apdu });
+      return exchange(apdu);
+    };
+    await gpg.verifyPin(0x81, "123456");
+    const verify = sent.find((frame) => frame.ins === 0x20);
+    expect(verify.apdu.every((b) => b === 0)).toBe(true);
+  });
+
   test("keeps the slot when backing up the active one", async () => {
     const selections = [];
     const gpg = await connect(1, selections);

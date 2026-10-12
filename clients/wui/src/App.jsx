@@ -159,6 +159,7 @@ export default function App() {
       setSerial(null);
       // Close any open PIN dialog so the notice below is visible.
       decideReview(false);
+      clearRestoreContent();
       setPinAction(null);
       setUserPin("");
       setAdminPin("");
@@ -193,7 +194,14 @@ export default function App() {
     if (resolve) resolve(accepted);
   }
 
+  // Drop the backup file read for a restore, overwriting its bytes
+  function clearRestoreContent() {
+    restoreContent.current?.fill(0);
+    restoreContent.current = null;
+  }
+
   function closePin() {
+    clearRestoreContent();
     setPinAction(null);
     setUserPin("");
     setAdminPin("");
@@ -236,6 +244,7 @@ export default function App() {
   }
 
   async function onDisconnect() {
+    clearRestoreContent();
     await gpg.disconnect();
     setConnected(false);
     setAid(null);
@@ -300,7 +309,6 @@ export default function App() {
           : new TextDecoder().decode(restoreContent.current);
         const f = await gpg.restore(userPin, adminPin, content, regen, parseInt(slot, 10) - 1, confirmChanges);
         closePin();
-        restoreContent.current = null;
         if (f === null) {
           setNotice({ appearance: "info", title: "Restore cancelled", description: "The card was not modified." });
           return;
