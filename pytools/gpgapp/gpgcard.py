@@ -562,12 +562,14 @@ class GPGCard:
             slot.ca_fingerprint = _fromb64(raw["ca_fingerprint"])
             slot.cert = _fromb64(raw["cert_b64"]) if "cert_b64" in raw else raw["cert"].encode("utf-8")
 
-        failures: list[tuple[str, int]] = []
-
         def _put(tag: DataObject, value: bytes) -> None:
             sw = self._put_data(tag, value)
             if sw != ErrorCodes.ERR_SUCCESS:
-                failures.append((tag.name, sw))
+                raise GPGCardExcpetion(
+                    sw,
+                    f"{tag.name} rejected by the card ({sw:04x}); the card may be partially restored:"
+                    " reset the app and restore again",
+                )
 
         _put(DataObject.DO_AID, bytes.fromhex(self.data.AID[20:28]))
         _put(DataObject.DO_PW_STATUS, self.data.PW_status)
@@ -616,6 +618,7 @@ class GPGCard:
         _put(DataObject.DO_DATES_WR_SIG, bdate)
         if not seed_key and self.data.sig.key:
             _put(DataObject.DO_SIG_KEY, self.data.sig.key)
+            self._check_restored_key("SIG", self.data.sig, DataObject.DO_SIG_KEY)
 
         _put(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
         _put(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
@@ -625,6 +628,7 @@ class GPGCard:
         _put(DataObject.DO_DATES_WR_DEC, bdate)
         if not seed_key and self.data.dec.key:
             _put(DataObject.DO_DEC_KEY, self.data.dec.key)
+            self._check_restored_key("DEC", self.data.dec, DataObject.DO_DEC_KEY)
 
         _put(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
         _put(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
@@ -634,10 +638,27 @@ class GPGCard:
         _put(DataObject.DO_DATES_WR_AUT, bdate)
         if not seed_key and self.data.aut.key:
             _put(DataObject.DO_AUT_KEY, self.data.aut.key)
+            self._check_restored_key("AUT", self.data.aut, DataObject.DO_AUT_KEY)
 
-        if failures:
-            names = ", ".join(f"{name} ({sw:04x})" for name, sw in failures)
-            raise GPGCardExcpetion(failures[0][1], f"{len(failures)} items rejected by the card: {names}")
+    def _check_restored_key(self, name: str, slot: KeyInfo, key_tag: int) -> None:
+        """Check that a key restored from its backup blob has the backup fingerprint
+
+        Args:
+            name (str):     Key name, for the error message
+            slot (KeyInfo): Restored key information
+            key_tag (int):  Restored key
+        """
+
+        if len(slot.fingerprint) != 20 or not any(slot.fingerprint):
+            return
+        pubkey = self._asym_key_pair(KEY_OPERATIONS["Read"], key_tag)
+        date = int(slot.date.replace(tzinfo=UTC).timestamp())
+        if key_fingerprint(slot.attribute, pubkey, date) != slot.fingerprint:
+            raise GPGCardExcpetion(
+                ErrorCodes.ERR_INTERNAL,
+                f"{name} key does not match the backup fingerprint; the card may be partially restored:"
+                " reset the app and restore again",
+            )
 
     def export_pub_key(self, pubkey: dict, file_name: str) -> None:
         """Export a Public key to file
