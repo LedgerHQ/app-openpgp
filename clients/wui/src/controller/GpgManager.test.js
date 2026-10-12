@@ -91,6 +91,98 @@ describe("logout", () => {
   });
 });
 
+describe("getAll", () => {
+  const tlv = (tag, value) => {
+    const t = tag > 0xff ? Buffer.from([tag >> 8, tag & 0xff]) : Buffer.from([tag]);
+    const l = value.length > 0x7f ? Buffer.from([0x81, value.length]) : Buffer.from([value.length]);
+    return Buffer.concat([t, l, value]);
+  };
+  const P256_ATTR = Buffer.from("132a8648ce3d030107", "hex");
+  const AID_BYTES = Buffer.from("D2760001240103040000000100000000", "hex");
+
+  // Discretionary data objects (73) of the card, each overridable or removable (null)
+  const discretionary = (overrides = {}) => {
+    const fields = {
+      0xc0: Buffer.from([0x00]),
+      0xc1: P256_ATTR,
+      0xc2: P256_ATTR,
+      0xc3: P256_ATTR,
+      0xc4: Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]),
+      0xc5: Buffer.alloc(60),
+      0xc6: Buffer.alloc(60),
+      0xcd: Buffer.alloc(12),
+      ...overrides,
+    };
+    return Buffer.concat(
+      Object.entries(fields)
+        .filter(([, value]) => value !== null)
+        .map(([tag, value]) => tlv(Number(tag), value))
+    );
+  };
+
+  const card = (overrides = {}, aid = AID_BYTES) => {
+    const transport = new FakeTransport(async (apdu) => {
+      const tag = (apdu[2] << 8) | apdu[3];
+      const reply = (value) => Buffer.concat([value, OK]);
+      if (apdu[1] !== 0xca) return OK;
+      switch (tag) {
+        case 0x006e:
+          return reply(tlv(0x73, discretionary(overrides)));
+        case 0x01f8:
+          return reply(Buffer.from([0x00, 0x01, 0x00, 0x01]));
+        case 0x00d6:
+        case 0x00d7:
+        case 0x00d8:
+          return reply(Buffer.from([0x00, 0x20]));
+        default:
+          return OK;
+      }
+    });
+    // The base fake answers GET DATA 4F itself: answer it with `aid` first
+    const exchange = transport.exchange.bind(transport);
+    transport.exchange = async (buffer) => {
+      const apdu = Buffer.from(buffer);
+      if (apdu[1] === 0xca && apdu[3] === 0x4f) return Buffer.concat([aid, OK]);
+      return exchange(buffer);
+    };
+    return transport;
+  };
+
+  const getAll = async (overrides, aid) => {
+    transports.push(card({}));
+    const gpg = new GpgManager();
+    await gpg.connect();
+    gpg.transport = card(overrides, aid);
+    return gpg.getAll();
+  };
+
+  test("reads a well-formed card", async () => {
+    const data = await getAll({});
+    expect(data.sig.attribute.equals(P256_ATTR)).toBe(true);
+    expect(data.PWStatus.length).toBe(7);
+  });
+
+  test.each([
+    ["PW status", { 0xc4: null }],
+    ["fingerprints", { 0xc5: null }],
+    ["fingerprints", { 0xc5: Buffer.alloc(40) }],
+    ["CA fingerprints", { 0xc6: Buffer.alloc(61) }],
+    ["key dates", { 0xcd: null }],
+    ["signature key attributes", { 0xc1: null }],
+    ["decryption key attributes", { 0xc2: Buffer.from([0x02, 0x08]) }],
+    ["authentication key attributes", { 0xc3: Buffer.alloc(13, 0x13) }],
+  ])("rejects an invalid %s", async (name, overrides) => {
+    await expect(getAll(overrides)).rejects.toThrow(name);
+  });
+
+  test.each([
+    ["short", AID_BYTES.subarray(0, 15)],
+    ["foreign", Buffer.from("A0000000030000000000000000000000", "hex")],
+  ])("rejects a %s AID", async (_, aid) => {
+    await expect(getAll({}, aid)).rejects.toThrow("AID");
+  });
+});
+
 describe("backup slot", () => {
   const slotInfo = () => ({
     key: Buffer.alloc(0),

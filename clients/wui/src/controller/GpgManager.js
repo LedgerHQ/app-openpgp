@@ -23,6 +23,18 @@ const GET_DATA_AID = "00CA004F00";
 const AID_LENGTH = 16;
 // Number of key slots of the app
 const SLOT_COUNT = 3;
+// Algorithm identifiers of the key attributes: RSA, ECDH, ECDSA, EdDSA
+const KEY_ALGORITHMS = [0x01, 0x12, 0x13, 0x16];
+// Largest key attributes value
+const KEY_ATTRIBUTES_MAX_SIZE = 12;
+
+// Key attributes read from the card, with a known algorithm
+function checkAttribute(name, value) {
+  if (!value || value.length === 0 || value.length > KEY_ATTRIBUTES_MAX_SIZE || !KEY_ALGORITHMS.includes(value[0])) {
+    throw new Error(`Unexpected ${name} key attributes from the device`);
+  }
+  return value;
+}
 
 // Password references (ISO 7816 / OpenPGP).
 export const PW = Object.freeze({
@@ -235,7 +247,10 @@ class GpgManager {
   async getAll(t = this.transport) {
     const data = newCardInfo();
 
-    data.AID = (await getData(t, DO.AID)).toString("hex").toUpperCase();
+    data.AID = checkLength("AID", await getData(t, DO.AID), AID_LENGTH).toString("hex").toUpperCase();
+    if (!data.AID.startsWith(OPENPGP_AID)) {
+      throw new Error(`Unexpected AID from the device (${data.AID})`);
+    }
     data.login = (await getData(t, DO.LOGIN)).toString("utf-8");
     data.url = (await getData(t, DO.URL)).toString("utf-8");
     data.histoBytes = await getData(t, DO.HIST);
@@ -259,36 +274,28 @@ class GpgManager {
     // Application Related Data (0x6E) -> discretionary data objects (0x73)
     tags = decodeTLV(await getData(t, DO.APP_DATA));
     if (tags[DO.EXT_LEN]) data.extLength = tags[DO.EXT_LEN];
-    if (tags[DO.DISCRET_DATA]) {
-      const d = decodeTLV(tags[DO.DISCRET_DATA]);
-      if (d[DO.EXT_CAP]) data.extCapabilities = d[DO.EXT_CAP];
-      if (d[DO.SIG_ATTR]) data.sig.attribute = d[DO.SIG_ATTR];
-      if (d[DO.DEC_ATTR]) data.dec.attribute = d[DO.DEC_ATTR];
-      if (d[DO.AUT_ATTR]) data.aut.attribute = d[DO.AUT_ATTR];
-      if (d[DO.PW_STATUS]) data.PWStatus = checkLength("PW status", d[DO.PW_STATUS], 7);
-
-      const fp = d[DO.FINGERPRINTS];
-      if (fp) {
-        checkLength("fingerprints", fp, 60);
-        data.sig.fingerprint = fp.slice(0, 20);
-        data.dec.fingerprint = fp.slice(20, 40);
-        data.aut.fingerprint = fp.slice(40, 60);
-      }
-      const ca = d[DO.CA_FINGERPRINTS];
-      if (ca) {
-        checkLength("CA fingerprints", ca, 60);
-        data.sig.ca_fingerprint = ca.slice(0, 20);
-        data.dec.ca_fingerprint = ca.slice(20, 40);
-        data.aut.ca_fingerprint = ca.slice(40, 60);
-      }
-      const dates = d[DO.KEY_DATES];
-      if (dates) {
-        checkLength("key dates", dates, 12);
-        data.sig.date = getInt(dates, 4, 0);
-        data.dec.date = getInt(dates, 4, 4);
-        data.aut.date = getInt(dates, 4, 8);
-      }
+    if (!tags[DO.DISCRET_DATA]) {
+      throw new Error("Missing discretionary data objects from the device");
     }
+    const d = decodeTLV(tags[DO.DISCRET_DATA]);
+    if (d[DO.EXT_CAP]) data.extCapabilities = d[DO.EXT_CAP];
+    data.sig.attribute = checkAttribute("signature", d[DO.SIG_ATTR]);
+    data.dec.attribute = checkAttribute("decryption", d[DO.DEC_ATTR]);
+    data.aut.attribute = checkAttribute("authentication", d[DO.AUT_ATTR]);
+    data.PWStatus = checkLength("PW status", d[DO.PW_STATUS], 7);
+
+    const fp = checkLength("fingerprints", d[DO.FINGERPRINTS], 60);
+    data.sig.fingerprint = fp.slice(0, 20);
+    data.dec.fingerprint = fp.slice(20, 40);
+    data.aut.fingerprint = fp.slice(40, 60);
+    const ca = checkLength("CA fingerprints", d[DO.CA_FINGERPRINTS], 60);
+    data.sig.ca_fingerprint = ca.slice(0, 20);
+    data.dec.ca_fingerprint = ca.slice(20, 40);
+    data.aut.ca_fingerprint = ca.slice(40, 60);
+    const dates = checkLength("key dates", d[DO.KEY_DATES], 12);
+    data.sig.date = getInt(dates, 4, 0);
+    data.dec.date = getInt(dates, 4, 4);
+    data.aut.date = getInt(dates, 4, 8);
 
     data.rsaPubExp = getInt(checkLength("RSA exponent", await getData(t, DO.RSA_EXP), 4), 4);
     // Certificate occurrences: 0 AUT, 1 DEC, 2 SIG
