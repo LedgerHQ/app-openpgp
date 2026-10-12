@@ -500,11 +500,18 @@ def entrypoint() -> None:
         error(0, repr(err))
     finally:
         if gpgcard.transport is not None:
+            cleared = True
             try:
                 gpgcard.logout()
             except GPGCardExcpetion:
-                pass
+                cleared = False
             gpgcard.disconnect()
+            if not cleared:
+                print(
+                    "\n### Error: the PIN session could not be cleared on the card; exit the OpenPGP app or unplug the device!\n",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
 
 
 if __name__ == "__main__":
