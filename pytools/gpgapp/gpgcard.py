@@ -678,15 +678,20 @@ class GPGCard:
         else:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Unsupported key type for export: {key_id}")
 
-    def seed_key(self) -> None:
-        """Regenerate keys, based on seed mode"""
+    def seed_key(self, derivation: int = SEED_MODE_V2) -> None:
+        """Regenerate keys from the device seed
 
-        for apdu_hex, name in (
-            (b"0047800202B600", "SIG"),
-            (b"0047800202B800", "DEC"),
-            (b"0047800202A400", "AUT"),
+        Args:
+            derivation (int): GEN ASYM KEY P2, SEED_MODE_V2 or SEED_MODE_LEGACY
+        """
+
+        for key, name in (
+            (DataObject.DO_SIG_KEY, "SIG"),
+            (DataObject.DO_DEC_KEY, "DEC"),
+            (DataObject.DO_AUT_KEY, "AUT"),
         ):
-            _, sw = self._generate_key(binascii.unhexlify(apdu_hex))
+            apdu = bytes.fromhex(f"004780{derivation:02x}02{key:02x}00")
+            _, sw = self._generate_key(apdu)
             if sw != ErrorCodes.ERR_SUCCESS:
                 raise GPGCardExcpetion(sw, f"{name} key generation failed, check seed mode is ON and PIN is verified")
 
@@ -1300,13 +1305,13 @@ class GPGCard:
         # d["Private key encrypted"] = key_data[offset:offset + size].hex()
         return d
 
-    def asymmetric_key(self, key: str, action: str, seed: bool = False) -> dict:
+    def asymmetric_key(self, key: str, action: str, derivation: int = 0) -> dict:
         """Asymmetric key operation
 
         Args:
             key (str):    Key type (SIG, DC, AUT)
             action (str): Generate or Read
-            seed (bool):  Seed mode
+            derivation (int): GEN ASYM KEY P2, 0 for the default generation
 
         Return:
             Public key information:
@@ -1347,7 +1352,7 @@ class GPGCard:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Invalid key ID in attribute!")
 
         d = {}
-        tags = self._asym_key_pair(op, b_key, seed)
+        tags = self._asym_key_pair(op, b_key, derivation)
 
         if attributes[0] == PubkeyAlgo.RSA:
             d["ID"] = f"RSA-{self._get_int(attributes, offset=1)}"
@@ -1486,20 +1491,19 @@ class GPGCard:
         _, sw = self._exchange(apdu, data)
         return sw
 
-    def _asym_key_pair(self, op: int, key: int, seed: bool = False) -> dict:
+    def _asym_key_pair(self, op: int, key: int, derivation: int = 0) -> dict:
         """Asymmetric key pair operation
 
         Args:
             op (int):  Operation to execute
             key (int): Key type
-            seed (bool): Seed mode
+            derivation (int): GEN ASYM KEY P2, 0 for the default generation
 
         Return:
             Public key decoded data bytes
         """
 
-        p2 = SEED_MODE_V2 if seed else 0x00
-        apdu = bytes.fromhex(f"0047{op:02x}{p2:02x}02{key:02x}00")
+        apdu = bytes.fromhex(f"0047{op:02x}{derivation:02x}02{key:02x}00")
         resp, sw = self._generate_key(apdu) if op == KEY_OPERATIONS["Generate"] else self._exchange(apdu)
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Key operation error!")
