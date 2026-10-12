@@ -267,7 +267,8 @@ In order to backup/restore private key the commands `put_data` and `get_data` ac
 return both the public and private key.
 
 For security and confidentiality, the private key is returned encrypted with AES-GCM.
-The 128-bit key is derived with the name 'key' from the seed of the slot. Everything before the encrypted private key is authenticated with it: the
+The 128-bit key is derived with the name 'key' from the seed of the slot, on the hardened path
+of the seeded keys. Everything before the encrypted private key is authenticated with it: the
 blob only restores on the same seed and slot, into the same key role and key attributes.
 
 The data payload (format version 3) is formatted as follow:
@@ -295,7 +296,8 @@ The data payload (format version 3) is formatted as follow:
   +-------+--------------------------------------------+
 
 `put_data` also accepts the formats of older app versions, which start with the OS Target ID and
-the API Level, both ignored: version 2 (no key reference nor attributes), version 1 (no nonce field, nonce built from the slot and the key
+the API Level, both ignored: version 2 (no key reference nor attributes, key derived on the
+non-hardened slot path), version 1 (no nonce field, nonce built from the slot and the key
 reference) and the AES-CBC format without version byte.
 
 APDU Modification

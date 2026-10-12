@@ -18,6 +18,7 @@
 #include "gpg_vars.h"
 #include "gpg_ux.h"
 #include "cx_errors.h"
+#include "bip32.h"
 
 /* Backup blob format version written by GET KEY DATA and expected by PUT KEY
  * DATA for the authenticated-encryption path.  Old blobs start with the
@@ -1099,13 +1100,18 @@ end:
 }
 
 /* Initialise an AES-GCM context with the slot-derived backup key of the given format.
+ * From v3, the key comes from the hardened slot seed of the v2 seeded keys.
  * The raw key bytes are wiped from the stack before returning. */
 static int gpg_init_gcm(cx_aes_gcm_context_t *ctx, unsigned char version) {
     unsigned char seed[32];
     cx_err_t error = CX_INTERNAL_ERROR;
+    unsigned int slot = G_gpg_vstate.slot;
     int sw;
 
-    sw = gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed);
+    if (version == BACKUP_FORMAT_V3) {
+        slot |= BIP32_HARDENED_MASK;
+    }
+    sw = gpg_pso_derive_slot_seed(slot, seed);
     if (sw != SWO_SUCCESS) {
         error = sw;
         goto end;
