@@ -113,6 +113,11 @@ ENABLE_NBGL_KEYPAD = 1
 ENABLE_NBGL_FOR_NANO_DEVICES = 1
 
 ########################################
+#          Security hardening          #
+########################################
+ENABLE_STACK_PROTECTOR = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # These advanced settings allow to disable some feature that are by
