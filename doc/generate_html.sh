@@ -11,7 +11,8 @@ mkdir -p "${OUT_DIR}"
 cp "${SCRIPT_DIR}/html/index.html" "${OUT_DIR}/index.html"
 cp "${CSS}" "${OUT_DIR}/style.css"
 
-# Options common to all pages (images and CSS are embedded for self-contained HTML)
+# Options common to all pages (images and CSS are embedded for self-contained HTML).
+# --sandbox would keep the images out: source.lua limits them to the doc directory instead.
 COMMON_OPTIONS=(
     "--standalone"
     "--embed-resources"
@@ -21,6 +22,7 @@ COMMON_OPTIONS=(
     "--to=html5"
     "--css=${CSS}"
     "--metadata=lang:en"
+    "--lua-filter=${SCRIPT_DIR}/source.lua"
     "--lua-filter=${SCRIPT_DIR}/admonitions.lua"
 )
 
