@@ -32,6 +32,7 @@
 #define LABEL_SECP256K1 "SECP 256K1"
 #define LABEL_SECP256R1 "SECP 256R1"
 #define LABEL_Ed25519   "Ed25519"
+#define LABEL_Cv25519   "Curve25519"
 
 #if defined(TARGET_NANOS2) || defined(TARGET_NANOX)
 #define ICON_APP C_gpg_14px

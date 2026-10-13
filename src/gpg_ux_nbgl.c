@@ -412,12 +412,20 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
 
+// The decryption key uses Curve25519 (ECDH) where the other keys use Ed25519
 #ifdef NO_DECRYPT_cv25519
 static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
                                               LABEL_RSA3072,
                                               LABEL_RSA4096,
                                               LABEL_SECP256K1,
                                               LABEL_SECP256R1};
+#else
+static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
+                                              LABEL_RSA3072,
+                                              LABEL_RSA4096,
+                                              LABEL_SECP256K1,
+                                              LABEL_SECP256R1,
+                                              LABEL_Cv25519};
 #endif
 // clang-format on
 
@@ -479,7 +487,7 @@ static uint32_t _getKeyType(const uint8_t key) {
                     break;
                 case CX_CURVE_Ed25519:
                 case CX_CURVE_Curve25519:
-                    // Both Ed25519 and Curve25519 are displayed as "Ed25519" in the UI
+                    // Same menu entry, labelled Curve25519 for the decryption key
                     token = TOKEN_TYPE_Ed25519;
                     break;
             }
@@ -667,13 +675,10 @@ static void template_cb(int token, uint8_t index, int page) {
         case TOKEN_TEMPLATE_AUT:
             G_gpg_vstate.ux_key = token;
             contents.type = CHOICES_LIST;
-#ifdef NO_DECRYPT_cv25519
             if (token == TOKEN_TEMPLATE_DEC) {
                 contents.content.choicesList.names = (const char *const *) keyTypeDecTexts;
                 contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeDecTexts);
-            } else
-#endif
-            {
+            } else {
                 contents.content.choicesList.names = (const char *const *) keyTypeTexts;
                 contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeTexts);
             }
@@ -738,7 +743,8 @@ static void ui_settings_template(void) {
                 subText = PIC(LABEL_SECP256R1);
                 break;
             case TOKEN_TYPE_Ed25519:
-                subText = PIC(LABEL_Ed25519);
+                subText = (TOKEN_TEMPLATE_SIG + i == TOKEN_TEMPLATE_DEC) ? PIC(LABEL_Cv25519)
+                                                                         : PIC(LABEL_Ed25519);
                 break;
             default:
                 break;
