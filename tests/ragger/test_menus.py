@@ -337,6 +337,17 @@ def test_menu_template_change_confirmed(device: Device, backend: BackendInterfac
 
 
 # In this test we check that the home screen only displays the current cardholder name
+def _refresh_home(device: Device, client: CommandSender, navigator: Navigator) -> None:
+    """Refuse a PIN confirmation to get back to a refreshed home screen"""
+    if device.is_nano:
+        nav_inst, valid_instr, text = NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "No"
+    else:
+        nav_inst, valid_instr, text = NavInsID.USE_CASE_REVIEW_REJECT, [NavInsID.USE_CASE_CHOICE_REJECT], "Confirm"
+    with pytest.raises(ExceptionRAPDU):
+        with client.send_verify_pw_with_confirmation(PassWord.PW1):
+            navigator.navigate_until_text(nav_inst, valid_instr, text, screen_change_after_last_instruction=False)
+
+
 def test_home_name(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
     client = CommandSender(backend)
     check_pincode(client, PassWord.PW3)
@@ -346,14 +357,20 @@ def test_home_name(device: Device, backend: BackendInterface, navigator: Navigat
     rapdu = client.put_data(DataObject.DO_CARD_NAME, b"Bob")
     assert rapdu.status == Errors.SW_OK
 
-    # Refuse a PIN confirmation to get back to a refreshed home screen
-    if device.is_nano:
-        nav_inst, valid_instr, text = NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "No"
-    else:
-        nav_inst, valid_instr, text = NavInsID.USE_CASE_REVIEW_REJECT, [NavInsID.USE_CASE_CHOICE_REJECT], "Confirm"
-    with pytest.raises(ExceptionRAPDU):
-        with client.send_verify_pw_with_confirmation(PassWord.PW1):
-            navigator.navigate_until_text(nav_inst, valid_instr, text, screen_change_after_last_instruction=False)
-
+    _refresh_home(device, client, navigator)
     backend.wait_for_text_on_screen("Bob")
     assert not backend.compare_screen_with_text("Bobxander")
+
+
+# In this test we check that a line break in the cardholder name cannot fake the ID line of the home screen
+@pytest.mark.parametrize("name", [b"Eve\nID: 12345678 / 3", b"Eve\xe9\nID: 12345678 / 3"], ids=["newline", "latin1"])
+def test_home_name_line_break(device: Device, backend: BackendInterface, navigator: Navigator, name: bytes) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.put_data(DataObject.DO_CARD_NAME, name)
+    assert rapdu.status == Errors.SW_OK
+
+    _refresh_home(device, client, navigator)
+    backend.wait_for_text_on_screen("Eve")
+    assert not backend.compare_screen_with_text("ID: 12345678")
+    assert backend.compare_screen_with_text("ID: .* / 1")

@@ -16,6 +16,8 @@
  *  limitations under the License.
  *****************************************************************************/
 
+#include <ctype.h>
+
 #include "os.h"
 #include "nbgl_use_case.h"
 
@@ -163,8 +165,9 @@ static void ui_home_init(void) {
     explicit_bzero(name, sizeof(name));
     if (name_len != 0) {
         memmove(name, (void *) (N_gpg_pstate->name.value), name_len);
+        // Printable ASCII only, as is_printable_string(): the name cannot move the ID line
         for (uint8_t i = 0; i < name_len; i++) {
-            if ((name[i] == '<') || (name[i] == '>')) {
+            if (!isprint((unsigned char) name[i]) || (name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
         }
