@@ -249,6 +249,36 @@ def test_signature_counter(backend: BackendInterface) -> None:
     assert _signature_count(client) == count + 1
 
 
+# In this test we check that only the generation of a signature key resets the signature counter
+@pytest.mark.parametrize(
+    "templates",
+    [("rsa2048", "rsa2048", "rsa2048"), ("nistp256", "cv25519", "nistp256")],
+    ids=["rsa", "ecc"],
+)
+def test_signature_counter_reset(backend: BackendInterface, templates: tuple[str, str, str]) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    for attr, template in zip((DataObject.DO_SIG_ATTR, DataObject.DO_DEC_ATTR, DataObject.DO_AUT_ATTR), templates, strict=True):
+        rapdu = client.set_template(attr, KEY_TEMPLATES[template])
+        assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+
+    check_pincode(client, PassWord.PW1)
+    digest = get_random_bytes(32)
+    if templates[0] == "rsa2048":
+        digest = SHA256_DIGEST_INFO + digest
+    assert client.sign(digest).status == Errors.SW_OK
+    count = _signature_count(client)
+    assert count > 0
+
+    generate_key(client, DataObject.DO_DEC_KEY)
+    generate_key(client, DataObject.DO_AUT_KEY)
+    assert _signature_count(client) == count
+
+    generate_key(client, DataObject.DO_SIG_KEY)
+    assert _signature_count(client) == 0
+
+
 # In this test we check that changing a key template keeps a permanently enabled UIF
 def test_uif_permanent_kept_on_template_change(backend: BackendInterface) -> None:
     client = CommandSender(backend)

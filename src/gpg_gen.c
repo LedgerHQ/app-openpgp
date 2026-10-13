@@ -427,7 +427,10 @@ static int gpg_gen_rsa_kyey(gpg_key_t *keygpg, uint8_t *name) {
     nvm_write(&keygpg->priv_key.rsa, rsa_priv, pkey_size);
     nvm_write(&keygpg->pub_key.rsa[0], rsa_pub->e, 4);
 
-    nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
+    // A new signature key restarts the signature counter
+    if (keygpg == &G_gpg_vstate.kslot->sig) {
+        nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
+    }
     gpg_io_clear();
     return SWO_SUCCESS;
 
@@ -587,7 +590,10 @@ static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
               sizeof(cx_ecfp_private_key_t));
     nvm_write(&keygpg->pub_key.ecfp, &G_gpg_vstate.work.ecfp.public, sizeof(cx_ecfp_public_key_t));
 
-    nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
+    // A new signature key restarts the signature counter
+    if (keygpg == &G_gpg_vstate.kslot->sig) {
+        nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
+    }
     gpg_io_clear();
     error = SWO_SUCCESS;
 
