@@ -166,7 +166,7 @@ static void ui_home_init(void) {
     if (name_len != 0) {
         memmove(name, (void *) (N_gpg_pstate->name.value), name_len);
         // Printable ASCII only, as is_printable_string(): the name cannot move the ID line
-        for (uint8_t i = 0; i < name_len; i++) {
+        for (unsigned int i = 0; i < name_len; i++) {
             if (!isprint((unsigned char) name[i]) || (name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
