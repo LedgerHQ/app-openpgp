@@ -6,7 +6,6 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 #define PRINTF(...)
-#define THROW(x)
 
 // send tx_len bytes (atr or rapdu) and retrieve the length of the next command apdu (over the
 // requested channel)
