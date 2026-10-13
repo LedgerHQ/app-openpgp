@@ -1088,15 +1088,13 @@ work properly. Add the following line to ``~/.bashrc`` file:
  | ``export GPG_TTY=$(tty)``
  | ``gpgconf --launch gpg-agent``
 
-It may be also necessary to setup the loopback pinentry options.
+If the PIN prompt does not show up when ``ssh`` uses the key, tell ``gpg-agent`` which terminal to use:
 
-Add the following line to your ``~/.gnupg/gpg-agent.conf``:
+ | ``gpg-connect-agent updatestartuptty /bye``
 
-    ``allow-loopback-pinentry``
-
-And add the following line to your ``~/.gnupg/gpg.conf``:
-
-    ``pinentry-mode loopback``
+Prefer the PIN entry on the device (``enable-pinpad-varlen``, see above). Do not enable the loopback
+pinentry (``allow-loopback-pinentry``, ``pinentry-mode loopback``) in your ``~/.gnupg``: it lets the
+calling program supply the PIN instead of the device or the pinentry.
 
 Then export your authentication public key. First execute the command:
  | ``gpg -k --with-subkey-fingerprint --with-keygrip john.doe@foo.com``.
@@ -1799,43 +1797,16 @@ Changing USB port might also help sometimes. Do not hesitate.
 
 **Q:** My mac is **STILL** not able to see my ``Ledger Token``
 
-**R:** This might be related to your CCID drivers.
-You can manually install a more recent version from this
-https://ccid.apdu.fr/files/ and install it this way:
+**R:** This might be related to your CCID drivers. First enable the IFD CCID driver shipped with
+macOS (see *macOS* in the CCID installation section above).
 
- | ``CCID_VERSION=1.5.4``
- | ``wget https://ccid.apdu.fr/files/ccid-${CCID_VERSION}.tar.bz2``
- | ``tar xzvf ccid-${CCID_VERSION}.tar.bz2``
- | ``cd ccid-${CCID_VERSION}``
- | ``./MacOSX/configure``
- | ``make``
- | ``make install``
+If you really need a more recent driver, get it from the project page https://ccid.apdu.fr/ and
+follow its build instructions. Before building it, check the signature of the archive, and the
+fingerprint of the signing key against the one published by the project:
 
-Installing the driver depends on ``libusb`` which can be installed using the following
-``brew install libusb``. It also requires static linking against it, if you use
-dynamic linking you will have the following output when using the ``./MacOSX/configure`` step:
+ | ``gpg --verify ccid-<version>.tar.xz.asc ccid-<version>.tar.xz``
 
- | ``/usr/local/Cellar/libusb/1.0.23/lib/libusb-1.0.0.dylib``
- | ``/usr/local/Cellar/libusb/1.0.23/lib/libusb-1.0.dylib``
- | ``*****************************``
- | ``Dynamic library libusb found in /usr/local/Cellar/libusb/1.0.23/lib``
- | ``*****************************``
- | ``Rename it to force a static link``
-
-You can use the following:
-
- | ``LIBUSB_VERSION=1.0.23``
- |
- | ``for f in /usr/local/Cellar/libusb/${LIBUSB_VERSION}/lib/*.dylib; do``
- |     ``mv $f $f.fake``
- | ``done``
- |
- | ``./MacOSX/configure``
- |
- | ``for f in /usr/local/Cellar/libusb/${LIBUSB_VERSION}/lib/*.dylib.fake; do``
- |     ``ORIG="$( echo $f | sed 's#.fake##g' )"``
- |     ``mv $f ${ORIG}``
- | ``done``
+Never install a driver whose signature does not verify: it handles every exchange with the device.
 
 
 References
