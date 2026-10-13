@@ -413,20 +413,12 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_Ed25519};
 
 // The decryption key uses Curve25519 (ECDH) where the other keys use Ed25519
-#ifdef NO_DECRYPT_cv25519
-static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
-                                              LABEL_RSA3072,
-                                              LABEL_RSA4096,
-                                              LABEL_SECP256K1,
-                                              LABEL_SECP256R1};
-#else
 static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
                                               LABEL_RSA3072,
                                               LABEL_RSA4096,
                                               LABEL_SECP256K1,
                                               LABEL_SECP256R1,
                                               LABEL_Cv25519};
-#endif
 // clang-format on
 
 /**
