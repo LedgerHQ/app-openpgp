@@ -508,10 +508,12 @@ int gpg_apdu_put_data(unsigned int ref) {
                       G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                       3);
             sw = SWO_SUCCESS;
+            // show or hide the slot selection of the home screen
+            ui_init();
             break;
 
         case 0x01F2:
-            if ((N_gpg_pstate->config_slot[2] & 1) == 0) {
+            if ((N_gpg_pstate->config_slot[2] & SLOT_SELECT_APDU) == 0) {
                 sw = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }

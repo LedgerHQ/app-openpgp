@@ -44,6 +44,9 @@
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
 #define GPG_KEYS_SLOTS     3
+// Slot selection methods allowed by byte 3 of DO 01F1
+#define SLOT_SELECT_APDU   0x01
+#define SLOT_SELECT_SCREEN 0x02
 
 #define GPG_KEY_ATTRIBUTES_LENGTH 12
 

@@ -29,6 +29,7 @@
 /* ---                        NBGL  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
 static void ui_home_init(void);
+static bool slot_select_by_screen(void);
 static void ui_menu_slot_action();
 static void ui_settings_template(void);
 static void ui_settings_seed(void);
@@ -218,7 +219,7 @@ static void ui_home_init(void) {
                                 setting_initPage,
                                 &settingContents,
                                 &infosList,
-                                &actionContent,
+                                slot_select_by_screen() ? &actionContent : NULL,
                                 app_exit);
 }
 
@@ -240,6 +241,14 @@ void ui_init(void) {
 //  ------------------------ SLOT UX --------------------------
 //  -----------------------------------------------------------
 
+/**
+ * @brief Tell whether DO 01F1 allows the slot selection on the screen
+ *
+ */
+static bool slot_select_by_screen(void) {
+    return (N_gpg_pstate->config_slot[2] & SLOT_SELECT_SCREEN) != 0;
+}
+
 // clang-format off
 enum {
     TOKEN_SLOT_SELECT = FIRST_USER_TOKEN,
@@ -256,6 +265,10 @@ enum {
  *
  */
 static void slot_cb(int token, uint8_t index) {
+    if ((token != TOKEN_SLOT_BACK) && !slot_select_by_screen()) {
+        ui_init();
+        return;
+    }
     switch (token) {
         case TOKEN_SLOT_BACK:
             ui_init();
