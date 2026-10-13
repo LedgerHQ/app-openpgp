@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // Content Security Policy of the built page: every resource comes from the WUI origin. Styles
 // stay inline-capable for the <style> elements the dialog components insert at run time.
@@ -34,8 +33,6 @@ export default defineConfig({
   plugins: [
     react(),
     contentSecurityPolicy,
-    // The APDU/TLV layer uses the Node Buffer API; expose a browser polyfill.
-    nodePolyfills({ include: ["buffer"], globals: { Buffer: true } }),
   ],
   test: {
     globals: true,
