@@ -14,6 +14,7 @@ tests/ragger/snapshots-tmp/
 # manual tests
 tests/manual/foo*
 tests/manual/gnupg
+tests/manual/work
 
 # Unit tests and code coverage
 tests/unit/build/
