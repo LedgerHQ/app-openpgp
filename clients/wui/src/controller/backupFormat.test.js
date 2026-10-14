@@ -262,7 +262,7 @@ describe("describeAttribute", () => {
   test.each([
     ["010800002001", "RSA 2048"],
     ["132a8648ce3d030107", "ECDSA NIST P-256"],
-    ["132a8648ce3d030107ff", "ECDSA NIST P-256"],
+    ["132a8648ce3d030107ff", "Unknown (132a8648ce3d030107ff)"],
     ["162b06010401da470f01", "EdDSA Ed25519"],
     ["122b060104019755010501", "ECDH Cv25519"],
     ["", "None"],

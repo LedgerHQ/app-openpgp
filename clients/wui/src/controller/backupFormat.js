@@ -326,8 +326,8 @@ export function describeAttribute(attribute) {
   const attr = Buffer.from(attribute || []);
   if (attr.length === 0) return "None";
   if (attr[0] === 0x01 && attr.length >= 3) return `RSA ${attr.readUInt16BE(1)}`;
-  // ECC: algorithm id, curve OID, then an optional 0xFF import format
-  const oid = attr.slice(1, attr[attr.length - 1] === 0xff ? -1 : undefined).toString("hex");
+  // ECC: algorithm id, then the curve OID
+  const oid = attr.subarray(1).toString("hex");
   const algo = ALGO_NAME[attr[0]];
   if (algo && CURVE_NAME[oid]) return `${algo} ${CURVE_NAME[oid]}`;
   return `Unknown (${attr.toString("hex")})`;
