@@ -62,6 +62,23 @@ AID_LENGTH: int = 16
 AID_PREFIX: bytes = bytes.fromhex("D27600012401")
 AID_VERSION_MAJOR: int = 3
 AID_MANUFACTURER: bytes = bytes.fromhex("2C97")
+# Key attributes the app accepts: RSA with a supported modulus size, or ECDH, ECDSA and
+# EdDSA with the OID of a curve the algorithm works on
+KEY_ATTRIBUTES_MAX_SIZE: int = 12
+RSA_MODULUS_SIZES: tuple[int, ...] = (2048, 3072, 4096)
+ECC_CURVE_OIDS: dict[int, tuple[str, ...]] = {
+    PubkeyAlgo.ECDH: ("2a8648ce3d030107", "2b8104000a", "2b060104019755010501"),
+    PubkeyAlgo.ECDSA: ("2a8648ce3d030107", "2b8104000a"),
+    PubkeyAlgo.EDDSA: ("2b06010401da470f01",),
+}
+
+
+def _valid_key_attributes(attribute: bytes) -> bool:
+    if not attribute or len(attribute) > KEY_ATTRIBUTES_MAX_SIZE:
+        return False
+    if attribute[0] == PubkeyAlgo.RSA:
+        return len(attribute) >= 3 and int.from_bytes(attribute[1:3], "big") in RSA_MODULUS_SIZES
+    return attribute[1:].hex() in ECC_CURVE_OIDS.get(attribute[0], ())
 
 
 class _HIDTransport(Transport):
@@ -572,6 +589,11 @@ class GPGCard:
             slot.fingerprint = _fromb64(raw["fingerprint"])
             slot.ca_fingerprint = _fromb64(raw["ca_fingerprint"])
             slot.cert = _fromb64(raw["cert_b64"]) if "cert_b64" in raw else raw["cert"].encode("utf-8")
+            if not _valid_key_attributes(slot.attribute):
+                raise GPGCardExcpetion(
+                    ErrorCodes.ERR_INTERNAL,
+                    f"Backup holds invalid {slot_name} key attributes; nothing restored",
+                )
 
         def _put(tag: DataObject, value: bytes) -> None:
             sw = self._put_data(tag, value)
