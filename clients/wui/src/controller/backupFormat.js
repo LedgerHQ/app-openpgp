@@ -2,6 +2,8 @@
 // JSON, kept byte-for-byte compatible with pytools/gpgapp/gpgcard.py `backup`
 // (version 1) so the CLI tool and this web UI can read each other's files.
 
+import { CURVE_OID } from "./dataObjects.js";
+
 // Format a UTC timestamp (seconds since epoch) as "YYYY-MM-DD HH:MM:SS",
 // matching Python's `str(datetime.utcfromtimestamp(n))`.
 export function formatDate(seconds) {
@@ -171,12 +173,10 @@ const AID_PATTERN = /^D27600012401[0-9A-F]{20}$/i;
 const KEY_ATTRIBUTE_MAX_SIZE = 12;
 const RSA_ALGORITHM = 0x01;
 const RSA_SIZES = [2048, 3072, 4096];
-const OID_P256 = "2a8648ce3d030107";
-const OID_SECP256K1 = "2b8104000a";
 const ECC_CURVE_OIDS = {
-  0x12: [OID_P256, OID_SECP256K1, "2b060104019755010501"],
-  0x13: [OID_P256, OID_SECP256K1],
-  0x16: ["2b06010401da470f01"],
+  0x12: [CURVE_OID.nistp256, CURVE_OID.secp256k1, CURVE_OID.cv25519],
+  0x13: [CURVE_OID.nistp256, CURVE_OID.secp256k1],
+  0x16: [CURVE_OID.ed25519],
 };
 // Cardholder salutations stored in a backup
 const SALUTATIONS = ["", "Male", "Female"];
@@ -310,15 +310,15 @@ export function parseBackup(json) {
 const ALGO_NAME = { 0x12: "ECDH", 0x13: "ECDSA", 0x16: "EdDSA" };
 
 const CURVE_NAME = {
-  "2a8648ce3d030107": "NIST P-256",
+  [CURVE_OID.nistp256]: "NIST P-256",
   "2b81040022": "NIST P-384",
   "2b81040023": "NIST P-521",
-  "2b8104000a": "secp256k1",
+  [CURVE_OID.secp256k1]: "secp256k1",
   "2b2403030208010107": "brainpoolP256r1",
   "2b240303020801010b": "brainpoolP384r1",
   "2b240303020801010d": "brainpoolP512r1",
-  "2b06010401da470f01": "Ed25519",
-  "2b060104019755010501": "Cv25519",
+  [CURVE_OID.ed25519]: "Ed25519",
+  [CURVE_OID.cv25519]: "Cv25519",
 };
 
 // Human readable key algorithm attributes (DO C1/C2/C3).
