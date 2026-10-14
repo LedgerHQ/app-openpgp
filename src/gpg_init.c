@@ -140,6 +140,45 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
 }
 
 /**
+ * Retrieve the curve of ECC key attributes
+ *
+ * @param[in]  attributes key attributes: algorithm id, then the curve OID
+ * @param[in]  len attributes length
+ *
+ * @return Found Curve, or CX_CURVE_NONE if not supported or not usable with the algorithm
+ *
+ */
+unsigned int gpg_attributes2curve(const unsigned char *attributes, unsigned int len) {
+    unsigned int curve = CX_CURVE_NONE;
+
+    if (len < 1) {
+        return CX_CURVE_NONE;
+    }
+    curve = gpg_oid2curve((unsigned char *) attributes + 1, len - 1);
+    switch (curve) {
+        case CX_CURVE_SECP256R1:
+        case CX_CURVE_SECP256K1:
+            if ((attributes[0] == KEY_ID_ECDSA) || (attributes[0] == KEY_ID_ECDH)) {
+                return curve;
+            }
+            break;
+        case CX_CURVE_Ed25519:
+            if (attributes[0] == KEY_ID_EDDSA) {
+                return curve;
+            }
+            break;
+        case CX_CURVE_Curve25519:
+            if (attributes[0] == KEY_ID_ECDH) {
+                return curve;
+            }
+            break;
+        default:
+            break;
+    }
+    return CX_CURVE_NONE;
+}
+
+/**
  * Check that a curve is the one of the key attributes
  *
  * @param[in]  key key whose attributes are checked
@@ -149,8 +188,7 @@ unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len) {
  *
  */
 bool gpg_key_curve_matches_attributes(const gpg_key_t *key, unsigned int curve) {
-    unsigned int attr_curve =
-        gpg_oid2curve((unsigned char *) key->attributes.value + 1, key->attributes.length - 1);
+    unsigned int attr_curve = gpg_attributes2curve(key->attributes.value, key->attributes.length);
     return (attr_curve != CX_CURVE_NONE) && (attr_curve == curve);
 }
 

@@ -561,7 +561,7 @@ static int gpg_gen_ecc_kyey(gpg_key_t *keygpg, uint8_t *name) {
     uint8_t seed[66] = {0};
     gpg_key_source_t source = KEY_SOURCE_RANDOM;
 
-    curve = gpg_oid2curve(keygpg->attributes.value + 1, keygpg->attributes.length - 1);
+    curve = gpg_attributes2curve(keygpg->attributes.value, keygpg->attributes.length);
     if (curve == CX_CURVE_NONE) {
         return SWO_REFERENCED_DATA_NOT_FOUND;
     }

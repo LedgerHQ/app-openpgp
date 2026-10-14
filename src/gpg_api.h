@@ -23,6 +23,7 @@
 /* ----------------------------------------------------------------------- */
 
 unsigned int gpg_oid2curve(unsigned char *oid, unsigned int len);
+unsigned int gpg_attributes2curve(const unsigned char *attributes, unsigned int len);
 bool gpg_key_curve_matches_attributes(const gpg_key_t *key, unsigned int curve);
 unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len);
 unsigned int gpg_curve2domainlen(unsigned int cv);
