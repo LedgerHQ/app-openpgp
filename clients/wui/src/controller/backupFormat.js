@@ -167,12 +167,17 @@ const UIF_LABEL = ["Disabled", "Enabled", "Permanently enabled"];
 // Full OpenPGP AID: RID and application, version, manufacturer, serial number, RFU
 const AID_PATTERN = /^D27600012401[0-9A-F]{20}$/i;
 // Key attributes the app accepts: RSA with a supported modulus size, or ECDH, ECDSA and
-// EdDSA with the OID of a supported curve, in at most 12 bytes
+// EdDSA with the OID of a curve the algorithm works on, in at most 12 bytes
 const KEY_ATTRIBUTE_MAX_SIZE = 12;
 const RSA_ALGORITHM = 0x01;
 const RSA_SIZES = [2048, 3072, 4096];
-const ECC_ALGORITHMS = [0x12, 0x13, 0x16];
-const CURVE_OIDS = ["2a8648ce3d030107", "2b8104000a", "2b06010401da470f01", "2b060104019755010501"];
+const OID_P256 = "2a8648ce3d030107";
+const OID_SECP256K1 = "2b8104000a";
+const ECC_CURVE_OIDS = {
+  0x12: [OID_P256, OID_SECP256K1, "2b060104019755010501"],
+  0x13: [OID_P256, OID_SECP256K1],
+  0x16: ["2b06010401da470f01"],
+};
 // Cardholder salutations stored in a backup
 const SALUTATIONS = ["", "Male", "Female"];
 
@@ -207,7 +212,7 @@ function checkAttribute(attribute, slot) {
     attribute.length <= KEY_ATTRIBUTE_MAX_SIZE &&
     (attribute[0] === RSA_ALGORITHM
       ? attribute.length >= 3 && RSA_SIZES.includes(attribute.readUInt16BE(1))
-      : ECC_ALGORITHMS.includes(attribute[0]) && CURVE_OIDS.includes(attribute.subarray(1).toString("hex")));
+      : (ECC_CURVE_OIDS[attribute[0]] ?? []).includes(attribute.subarray(1).toString("hex")));
   if (!valid) {
     throw new Error(`Backup field "${slot}.attribute" is invalid`);
   }

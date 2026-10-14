@@ -159,6 +159,8 @@ describe("parseBackup", () => {
     ["011000002001"],
     ["132a8648ce3d030107"],
     ["122b8104000a"],
+    ["132b8104000a"],
+    ["122a8648ce3d030107"],
     ["162b06010401da470f01"],
     ["122b060104019755010501"],
   ])("accepts the key attributes %s", (attribute) => {
@@ -200,6 +202,11 @@ describe("parseBackup", () => {
     ["sig.attribute", minimal({}, { attribute: Buffer.from("13", "hex").toString("base64") })],
     ["sig.attribute", minimal({}, { attribute: Buffer.from("132b81040022", "hex").toString("base64") })],
     ["sig.attribute", minimal({}, { attribute: Buffer.from("142a8648ce3d030107", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("162a8648ce3d030107", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("132b06010401da470f01", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("132b060104019755010501", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("162b060104019755010501", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("122b06010401da470f01", "hex").toString("base64") })],
     ["base64", minimal({ private_01: "AA" })],
     ["base64", minimal({ private_01: "!!!!" })],
   ])("rejects an invalid %s", (field, backup) => {

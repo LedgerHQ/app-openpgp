@@ -305,3 +305,24 @@ def test_truncated_key_attributes(backend: BackendInterface, attribute: bytes) -
         client.put_data(DataObject.DO_SIG_ATTR, attribute)
     assert err.value.status == Errors.SW_WRONG_LENGTH
     assert get_key_attributes(client, DataObject.DO_SIG_ATTR) == (PubkeyAlgo.RSA, 2048)
+
+
+# Valid curve OIDs used with an algorithm that does not work on the curve
+@pytest.mark.parametrize(
+    "attribute",
+    [
+        "162A8648CE3D030107",  # EdDSA on NIST P-256
+        "132B06010401DA470F01",  # ECDSA on Ed25519
+        "132B060104019755010501",  # ECDSA on Curve25519
+        "162B060104019755010501",  # EdDSA on Curve25519
+        "122B06010401DA470F01",  # ECDH on Ed25519
+    ],
+)
+def test_key_attributes_curve_mismatch(backend: BackendInterface, attribute: str) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.set_template(DataObject.DO_SIG_ATTR, attribute)
+    assert err.value.status == Errors.SW_WRONG_DATA
+    assert get_key_attributes(client, DataObject.DO_SIG_ATTR) == (PubkeyAlgo.RSA, 2048)

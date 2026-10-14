@@ -443,6 +443,29 @@ int gpg_select_slot(unsigned int slot) {
 }
 
 /**
+ * Check that a curve can be used with a key algorithm
+ *
+ * @param[in] algo  key algorithm id of the key attributes
+ * @param[in] curve curve of the key attributes
+ *
+ * @return true if the algorithm works on this curve
+ *
+ */
+static bool gpg_curve_fits_algorithm(unsigned char algo, unsigned int curve) {
+    switch (curve) {
+        case CX_CURVE_SECP256R1:
+        case CX_CURVE_SECP256K1:
+            return (algo == KEY_ID_ECDSA) || (algo == KEY_ID_ECDH);
+        case CX_CURVE_Ed25519:
+            return algo == KEY_ID_EDDSA;
+        case CX_CURVE_Curve25519:
+            return algo == KEY_ID_ECDH;
+        default:
+            return false;
+    }
+}
+
+/**
  * Write a DO (Data Object) to the card
  *
  * @param[in] ref DO tag
@@ -899,7 +922,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 case KEY_ID_EDDSA:
                     curve =
                         gpg_oid2curve(G_gpg_vstate.work.io_buffer + 1, G_gpg_vstate.io_length - 1);
-                    if (curve == CX_CURVE_NONE) {
+                    if (!gpg_curve_fits_algorithm(G_gpg_vstate.work.io_buffer[0], curve)) {
                         sw = SWO_INCORRECT_DATA;
                     } else {
                         sw = SWO_SUCCESS;
