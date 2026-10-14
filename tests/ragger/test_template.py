@@ -318,11 +318,24 @@ def test_truncated_key_attributes(backend: BackendInterface, attribute: bytes) -
         "122B06010401DA470F01",  # ECDH on Ed25519
     ],
 )
-def test_key_attributes_curve_mismatch(backend: BackendInterface, attribute: str) -> None:
+@pytest.mark.parametrize("key_attr", [DataObject.DO_SIG_ATTR, DataObject.DO_DEC_ATTR], ids=["sig", "dec"])
+def test_key_attributes_curve_mismatch(backend: BackendInterface, key_attr: DataObject, attribute: str) -> None:
     client = CommandSender(backend)
     check_pincode(client, PassWord.PW3)
 
     with pytest.raises(ExceptionRAPDU) as err:
-        client.set_template(DataObject.DO_SIG_ATTR, attribute)
+        client.set_template(key_attr, attribute)
     assert err.value.status == Errors.SW_WRONG_DATA
-    assert get_key_attributes(client, DataObject.DO_SIG_ATTR) == (PubkeyAlgo.RSA, 2048)
+    assert get_key_attributes(client, key_attr) == (PubkeyAlgo.RSA, 2048)
+
+
+# In this test we check that ECDH works on the Weierstrass curves
+@pytest.mark.parametrize("attribute", ["122A8648CE3D030107", "122B8104000A"], ids=["nistp256", "secp256k1"])
+def test_key_attributes_ecdh_weierstrass(backend: BackendInterface, attribute: str) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    rapdu = client.set_template(DataObject.DO_DEC_ATTR, attribute)
+    assert rapdu.status == Errors.SW_OK
+    assert get_key_attributes(client, DataObject.DO_DEC_ATTR) == (PubkeyAlgo.ECDH, 0)
+    generate_key(client, DataObject.DO_DEC_KEY)
