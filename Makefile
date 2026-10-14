@@ -138,6 +138,8 @@ DISABLE_OS_IO_STACK_USE = 1
 #        Main app configuration        #
 ########################################
 
+ENABLE_LINK_TIME_OPTIMIZATION = 1
+
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA
 # Historical Bytes is removed from Application Related Data
