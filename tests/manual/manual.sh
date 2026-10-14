@@ -7,7 +7,10 @@ exeName=$(readlink "$0")
 [[ -z ${exeName} ]] && exeName=$0
 dirName=$(dirname "${exeName}")
 
-gnupg_home_dir="$(realpath "${dirName}/gnupg")"
+# Every file of the tests stays next to the script, whatever the current directory
+base_dir="$(realpath "${dirName}")"
+gnupg_home_dir="${base_dir}/gnupg"
+work_dir="${base_dir}/work"
 
 VERBOSE=false
 EXPERT=false
@@ -30,6 +33,28 @@ help() {
   echo "  -h     : Displays this help"
   echo
   exit 1
+}
+
+#===============================================================================
+#
+#     private_dir - Create a private directory, refusing a symbolic link
+#
+#===============================================================================
+private_dir() {
+  if [[ -L "$1" ]]; then
+    echo "Refusing the symbolic link '$1'" >&2
+    return 1
+  fi
+  mkdir -p -- "$1" && chmod 700 -- "$1"
+}
+
+#===============================================================================
+#
+#     clean_work - Remove the files of the encrypt, sign and authenticate tests
+#
+#===============================================================================
+clean_work() {
+  rm -f -- "${work_dir}"/foo*
 }
 
 #===============================================================================
@@ -86,11 +111,7 @@ switch() {
 #
 #===============================================================================
 default() {
-  dir=$(basename "${gnupg_home_dir}")
-  if [[ ! -d "${dir}" ]]; then
-    mkdir "${dir}"
-    chmod 700 "${dir}"
-  fi
+  private_dir "${gnupg_home_dir}" || return 1
 
   recipient=$(gpg --homedir "${gnupg_home_dir}" --card-status | grep "General key info" | awk  '{print $NF}')
 
@@ -105,7 +126,7 @@ default() {
   {
     echo "default-key ${recipient}"
     echo "default-recipient ${recipient}"
-   } > "${dir}/gpg.conf"
+   } > "${gnupg_home_dir}/gpg.conf"
 }
 
 #===============================================================================
@@ -117,10 +138,9 @@ init() {
   reset
 
   # Cleanup old gnupg home directory
-  dir=$(basename "${gnupg_home_dir}")
-  rm -fr "${dir}" foo.txt*
-  mkdir "${dir}"
-  chmod 700 "${dir}"
+  rm -fr -- "${gnupg_home_dir}"
+  clean_work
+  private_dir "${gnupg_home_dir}" || return 1
 
   {
     echo reader-port \"Ledger token\"
@@ -129,22 +149,23 @@ init() {
     echo card-timeout 1
     echo disable-ccid
     echo pcsc-shared
-  } > "${dir}/scdaemon.conf"
+  } > "${gnupg_home_dir}/scdaemon.conf"
 
   if [[ ${EXPERT} == true ]]; then
+    # The trace holds the APDUs: keep it in the private gnupg home directory
     {
-      echo log-file /tmp/scd.log
+      echo log-file "${gnupg_home_dir}/scd.log"
       echo debug-level guru
       echo debug-all
-    } >> "${dir}/scdaemon.conf"
+    } >> "${gnupg_home_dir}/scdaemon.conf"
   fi
 
   # Enable ssh-agent emulation, needed to exercise the AUT key
   {
     echo enable-ssh-support
-  } > "${dir}/gpg-agent.conf"
+  } > "${gnupg_home_dir}/gpg-agent.conf"
 
-  gpgconf --reload scdaemon
+  gpgconf --homedir "${gnupg_home_dir}" --reload scdaemon
 }
 
 #===============================================================================
@@ -180,12 +201,13 @@ encrypt() {
   local verbose_mode=""
 
   reset
-  rm -fr foo*
-  echo CLEAR > foo.txt
+  private_dir "${work_dir}" || return 1
+  clean_work
+  echo CLEAR > "${work_dir}/foo.txt"
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --encrypt foo.txt
+  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --encrypt "${work_dir}/foo.txt"
 }
 
 #===============================================================================
@@ -195,20 +217,23 @@ encrypt() {
 #===============================================================================
 decrypt() {
   local verbose_mode=""
+  local ret
 
   reset
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --decrypt foo.txt.gpg > foo_dec.txt
-
   # Check with original clear file
-  if diff foo.txt foo_dec.txt >/dev/null; then
+  if gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --decrypt "${work_dir}/foo.txt.gpg" > "${work_dir}/foo_dec.txt" &&
+     diff "${work_dir}/foo.txt" "${work_dir}/foo_dec.txt" >/dev/null; then
     echo "Success !"
+    ret=0
   else
     echo "Decryption error!"
+    ret=1
   fi
-  rm -fr foo*
+  clean_work
+  return ${ret}
 }
 
 #===============================================================================
@@ -220,12 +245,13 @@ sign() {
   local verbose_mode=""
 
   reset
-  rm -fr foo*
-  echo CLEAR > foo.txt
+  private_dir "${work_dir}" || return 1
+  clean_work
+  echo CLEAR > "${work_dir}/foo.txt"
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --sign foo.txt
+  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --sign "${work_dir}/foo.txt"
 }
 
 #===============================================================================
@@ -235,17 +261,21 @@ sign() {
 #===============================================================================
 verify() {
   local verbose_mode=""
+  local ret
 
   reset
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  if gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --verify foo.txt.gpg; then
+  if gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --verify "${work_dir}/foo.txt.gpg"; then
     echo "Success !"
+    ret=0
   else
     echo "Signature error!"
+    ret=1
   fi
-  rm -fr foo*
+  clean_work
+  return ${ret}
 }
 
 #===============================================================================
@@ -254,8 +284,7 @@ verify() {
 #
 #===============================================================================
 sign_verify() {
-  sign
-  verify
+  sign && verify
 }
 
 #===============================================================================
@@ -264,8 +293,7 @@ sign_verify() {
 #
 #===============================================================================
 encrypt_decrypt() {
-  encrypt
-  decrypt
+  encrypt && decrypt
 }
 
 #===============================================================================
@@ -274,9 +302,7 @@ encrypt_decrypt() {
 #
 #===============================================================================
 all() {
-  sign_verify
-  encrypt_decrypt
-  authenticate
+  sign_verify && encrypt_decrypt && authenticate
 }
 
 #===============================================================================
@@ -285,8 +311,11 @@ all() {
 #
 #===============================================================================
 authenticate() {
+  local ret
+
   reset
-  rm -fr foo*
+  private_dir "${work_dir}" || return 1
+  clean_work
 
   # gpg-agent must expose the card auth key on its ssh socket
   export GNUPGHOME="${gnupg_home_dir}"
@@ -295,27 +324,30 @@ authenticate() {
   export SSH_AUTH_SOCK
 
   # Retrieve the public AUT key advertised by the card
-  if ! ssh-add -L > foo_auth.pub 2>/dev/null || [[ ! -s foo_auth.pub ]]; then
+  if ! ssh-add -L > "${work_dir}/foo_auth.pub" 2>/dev/null || [[ ! -s "${work_dir}/foo_auth.pub" ]]; then
     echo "No authentication key exposed by the card!"
     echo "(check the card 'Authentication key' and that the AUT key is generated)"
-    rm -fr foo*
+    clean_work
     return 1
   fi
 
-  [[ ${VERBOSE} == true ]] && cat foo_auth.pub
+  [[ ${VERBOSE} == true ]] && cat "${work_dir}/foo_auth.pub"
 
   # Sign a file with the card AUT key (via the agent), then verify it
-  echo CLEAR > foo.txt
-  echo "test@ledger.fr $(cat foo_auth.pub)" > foo_allowed
+  echo CLEAR > "${work_dir}/foo.txt"
+  echo "test@ledger.fr $(cat "${work_dir}/foo_auth.pub")" > "${work_dir}/foo_allowed"
 
-  ssh-keygen -Y sign -f foo_auth.pub -n file foo.txt
-
-  if ssh-keygen -Y verify -f foo_allowed -I test@ledger.fr -n file -s foo.txt.sig < foo.txt; then
+  if ssh-keygen -Y sign -f "${work_dir}/foo_auth.pub" -n file "${work_dir}/foo.txt" &&
+     ssh-keygen -Y verify -f "${work_dir}/foo_allowed" -I test@ledger.fr -n file \
+       -s "${work_dir}/foo.txt.sig" < "${work_dir}/foo.txt"; then
     echo "Success !"
+    ret=0
   else
     echo "Authentication error!"
+    ret=1
   fi
-  rm -fr foo*
+  clean_work
+  return ${ret}
 }
 
 #===============================================================================

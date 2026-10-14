@@ -140,6 +140,11 @@ export default function App() {
 
   const restoreContent = useRef(null);
   const fileInput = useRef(null);
+  // Pending read of a restore file, and the generation that invalidates older reads
+  const restoreReader = useRef(null);
+  const restoreGeneration = useRef(0);
+  // Name and SHA-256 of the file being restored, shown in the restore dialog
+  const [restoreFile, setRestoreFile] = useState(null);
   const regeneratingRef = useRef(false);
 
   // Release the device, and its WebHID permission, when the page is left
@@ -159,6 +164,7 @@ export default function App() {
       setSerial(null);
       // Close any open PIN dialog so the notice below is visible.
       decideReview(false);
+      clearRestoreContent();
       setPinAction(null);
       setUserPin("");
       setAdminPin("");
@@ -193,13 +199,48 @@ export default function App() {
     if (resolve) resolve(accepted);
   }
 
+  // Abort the pending read of a restore file, and ignore the reads started before
+  function cancelRestoreRead() {
+    restoreGeneration.current += 1;
+    restoreReader.current?.abort();
+    restoreReader.current = null;
+  }
+
+  // Drop the backup file read for a restore, overwriting its bytes
+  function clearRestoreContent() {
+    cancelRestoreRead();
+    restoreContent.current?.fill(0);
+    restoreContent.current = null;
+    setRestoreFile(null);
+  }
+
   function closePin() {
+    clearRestoreContent();
     setPinAction(null);
     setUserPin("");
     setAdminPin("");
     setFilePassphrase("");
     setIsEncryptedFile(false);
     setSlot("1");
+  }
+
+  // Open the PIN dialog of `action` on the slot active on the card, busy until the slot is read
+  async function openWithActiveSlot(action) {
+    setBusy(true);
+    try {
+      const active = mock ? "1" : String((await gpg.activeSlot()) + 1);
+      // The restore file is dropped on a disconnection during the read
+      if (action === "restore" && restoreContent.current === null) return false;
+      setSlot(active);
+    } catch (e) {
+      clearRestoreContent();
+      setNotice({ appearance: "error", title: "Unable to read the active slot", description: e.message });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+    setPinAction(action);
+    return true;
   }
 
   async function onConnect() {
@@ -224,6 +265,7 @@ export default function App() {
   }
 
   async function onDisconnect() {
+    clearRestoreContent();
     await gpg.disconnect();
     setConnected(false);
     setAid(null);
@@ -236,23 +278,43 @@ export default function App() {
   function onPickRestoreFile(event) {
     const file = event.target.files[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || busy) return;
     try {
       checkBackupFileSize(file.size);
     } catch (e) {
       setNotice({ appearance: "error", title: e.message });
       return;
     }
+    clearRestoreContent();
+    const generation = restoreGeneration.current;
     const reader = new FileReader();
-    reader.onload = () => {
+    restoreReader.current = reader;
+    setBusy(true);
+    const isCurrent = () => generation === restoreGeneration.current;
+    reader.onload = async () => {
+      if (!isCurrent()) return;
       const bytes = new Uint8Array(reader.result);
+      const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+      if (!isCurrent()) {
+        bytes.fill(0);
+        return;
+      }
+      restoreReader.current = null;
       restoreContent.current = bytes;
+      setRestoreFile({ name: file.name, digest: Array.from(hash, (b) => b.toString(16).padStart(2, "0")).join("") });
       setIsEncryptedFile(isEncryptedBackup(bytes));
       setRegen(true);
-      setPinAction("restore");
+      await openWithActiveSlot("restore");
+    };
+    reader.onerror = () => {
+      if (!isCurrent()) return;
+      restoreReader.current = null;
+      setBusy(false);
+      setNotice({ appearance: "error", title: "Unable to read the backup file" });
     };
     reader.readAsArrayBuffer(file);
   }
+
 
   async function submitPin(event) {
     event.preventDefault();
@@ -288,7 +350,6 @@ export default function App() {
           : new TextDecoder().decode(restoreContent.current);
         const f = await gpg.restore(userPin, adminPin, content, regen, parseInt(slot, 10) - 1, confirmChanges);
         closePin();
-        restoreContent.current = null;
         if (f === null) {
           setNotice({ appearance: "info", title: "Restore cancelled", description: "The card was not modified." });
           return;
@@ -417,7 +478,7 @@ export default function App() {
 
               {connected && (
                 <div className="flex flex-col gap-10">
-                  <Button appearance="accent" icon={CloudDownload} disabled={busy} onClick={() => setPinAction("backup")}>
+                  <Button appearance="accent" icon={CloudDownload} disabled={busy} onClick={() => openWithActiveSlot("backup")}>
                     Backup
                   </Button>
                   <Button appearance="base" icon={CloudUpload} disabled={busy} onClick={() => fileInput.current.click()}>
@@ -510,16 +571,16 @@ export default function App() {
               {review && (
                 <div className="flex flex-col gap-12">
                   <p className="body-2 text-base">
-                    This backup changes the following security settings of the card.
+                    This backup changes the following security settings and keys of the card.
                   </p>
                   {review.map((c) => (
                     <div key={c.setting} className="flex items-start gap-8">
-                      {c.weaker ? (
+                      {c.weaker || c.erased ? (
                         <Warning size={20} className="text-warning shrink-0" />
                       ) : (
                         <span className="body-3 text-muted shrink-0">•</span>
                       )}
-                      <span className={`body-3 ${c.weaker ? "text-warning" : "text-muted"}`}>
+                      <span className={`body-3 ${c.weaker || c.erased ? "text-warning" : "text-muted"}`}>
                         <span className="body-3-semi-bold">{c.setting}</span>: {c.from} → {c.to}
                         {c.weaker ? " (less protective)" : ""}
                       </span>
@@ -544,6 +605,13 @@ export default function App() {
                 onSubmit={submitPin}
                 className={busy ? "hidden" : "flex flex-col gap-16"}
               >
+                {pinAction === "restore" && restoreFile && (
+                  <div className="flex flex-col gap-4">
+                    <span className="body-3-semi-bold text-base">Backup file</span>
+                    <span className="body-3 text-muted break-all">{restoreFile.name}</span>
+                    <span className="body-4 text-muted break-all">SHA-256 {restoreFile.digest}</span>
+                  </div>
+                )}
                 {cfg?.showSlot && (
                   <div className="flex flex-col gap-8">
                     <span className="body-3-semi-bold text-base">Key slot</span>
@@ -606,7 +674,8 @@ export default function App() {
                     <span className="body-3 text-base">
                       Regenerate keys from the device seed
                       <span className="block body-4 text-muted mt-2">
-                        Requires SEED mode; may take a while.
+                        Requires SEED mode; may take a while. Otherwise the keys on the card are kept,
+                        unless the backup changes their algorithm.
                       </span>
                     </span>
                   </label>

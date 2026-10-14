@@ -24,7 +24,7 @@ describe("buildBackup", () => {
   const slot = () => ({
     key: Buffer.from([0xaa, 0xbb]),
     uif: 1,
-    attribute: Buffer.from([0x01, 0x08]),
+    attribute: Buffer.from("010800002001", "hex"),
     date: 0,
     fingerprint: Buffer.alloc(20, 0x11),
     ca_fingerprint: Buffer.alloc(20, 0x22),
@@ -32,7 +32,7 @@ describe("buildBackup", () => {
   });
 
   const data = {
-    AID: "D2760001240103xxxx",
+    AID: "D2760001240103040000000100000000",
     PWStatus: Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]),
     rsaPubExp: 65537,
     digitalCounter: 42,
@@ -136,11 +136,82 @@ describe("parseBackup", () => {
   });
 
   const minimal = (fields = {}, slotFields = {}) => {
-    const empty = { date: "1970-01-01 00:00:00", uif: 0 };
+    const attribute = Buffer.from("132a8648ce3d030107", "hex").toString("base64");
+    const empty = { date: "1970-01-01 00:00:00", uif: 0, attribute };
     const slot = { ...empty, ...slotFields };
     const pwStatus = Buffer.from([0x01, 0x7f, 0x7f, 0x7f, 0x03, 0x00, 0x03]).toString("base64");
-    return { version: 1, PW_status: pwStatus, sig: slot, dec: empty, aut: empty, ...fields };
+    return {
+      version: 1,
+      AID: "D2760001240103040000000100000000",
+      PW_status: pwStatus,
+      rsa_pub_exp: 65537,
+      digital_counter: 0,
+      sig: slot,
+      dec: empty,
+      aut: empty,
+      ...fields,
+    };
   };
+
+  test.each([
+    ["010800002001"],
+    ["010c00002001"],
+    ["011000002001"],
+    ["132a8648ce3d030107"],
+    ["122b8104000a"],
+    ["132b8104000a"],
+    ["122a8648ce3d030107"],
+    ["162b06010401da470f01"],
+    ["122b060104019755010501"],
+  ])("accepts the key attributes %s", (attribute) => {
+    const parsed = parseBackup(minimal({}, { attribute: Buffer.from(attribute, "hex").toString("base64") }));
+    expect(parsed.sig.attribute.toString("hex")).toBe(attribute);
+  });
+
+  test.each([[3], [65537], ["65537"], [0xffffffff]])("accepts the RSA exponent %s", (exponent) => {
+    expect(parseBackup(minimal({ rsa_pub_exp: exponent })).rsaPubExp).toBe(Number(exponent));
+  });
+
+  test("accepts a minimal backup", () => {
+    expect(parseBackup(minimal()).rsaPubExp).toBe(65537);
+  });
+
+  test.each([
+    ["AID", minimal({ AID: "D2760001240103040000000100000" })],
+    ["AID", minimal({ AID: "D27600012401030400000001000000ZZ" })],
+    ["AID", minimal({ AID: "A0000000030000000000000000000000" })],
+    ["AID", minimal({ AID: undefined })],
+    ["rsa_pub_exp", minimal({ rsa_pub_exp: -1 })],
+    ["rsa_pub_exp", minimal({ rsa_pub_exp: 2 ** 32 })],
+    ["rsa_pub_exp", minimal({ rsa_pub_exp: "0x10001" })],
+    ["rsa_pub_exp", minimal({ rsa_pub_exp: 1.5 })],
+    ["rsa_pub_exp", minimal({ rsa_pub_exp: 0 })],
+    ["rsa_pub_exp", minimal({ rsa_pub_exp: 1 })],
+    ["rsa_pub_exp", minimal({ rsa_pub_exp: 65536 })],
+    ["digital_counter", minimal({ digital_counter: 2 ** 24 })],
+    ["digital_counter", minimal({ digital_counter: undefined })],
+    ["salutation", minimal({ salutation: "Dr" })],
+    ["name", minimal({ name: 42 })],
+    ["sig.attribute", minimal({}, { attribute: "" })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("02080000", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("01", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("0108", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("010400002001", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("010800002001000000000000ff", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("132a8648ce3d030107ff", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("13", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("132b81040022", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("142a8648ce3d030107", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("162a8648ce3d030107", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("132b06010401da470f01", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("132b060104019755010501", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("162b060104019755010501", "hex").toString("base64") })],
+    ["sig.attribute", minimal({}, { attribute: Buffer.from("122b06010401da470f01", "hex").toString("base64") })],
+    ["base64", minimal({ private_01: "AA" })],
+    ["base64", minimal({ private_01: "!!!!" })],
+  ])("rejects an invalid %s", (field, backup) => {
+    expect(() => parseBackup(backup)).toThrow(field);
+  });
 
   test("reads the certificate of a backup without cert_b64 as UTF-8", () => {
     const parsed = parseBackup(minimal({}, { cert: "cert-é" }));
@@ -191,7 +262,7 @@ describe("describeAttribute", () => {
   test.each([
     ["010800002001", "RSA 2048"],
     ["132a8648ce3d030107", "ECDSA NIST P-256"],
-    ["132a8648ce3d030107ff", "ECDSA NIST P-256"],
+    ["132a8648ce3d030107ff", "Unknown (132a8648ce3d030107ff)"],
     ["162b06010401da470f01", "EdDSA Ed25519"],
     ["122b060104019755010501", "ECDH Cv25519"],
     ["", "None"],
@@ -230,5 +301,11 @@ describe("securityChanges", () => {
       from: "ECDSA NIST P-256",
       to: "RSA 2048",
     });
+  });
+
+  test("lists the erased keys after the settings", () => {
+    const changes = securityChanges(settings(0, 1), settings(0, 1, "010800002001"), ["sig", "aut"]);
+    expect(changes.filter((c) => c.erased).map((c) => c.setting)).toEqual(["Signature key", "Authentication key"]);
+    expect(changes.at(-1)).toMatchObject({ from: "On the card", to: "Erased, not restored" });
   });
 });

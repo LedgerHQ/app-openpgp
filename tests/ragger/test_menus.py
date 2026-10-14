@@ -8,7 +8,7 @@ from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import Navigator, NavIns, NavInsID
 from ragger.navigator.navigator import InstructionType
-from utils import ROOT_SCREENSHOT_PATH, check_pincode, generate_key, get_key_attributes
+from utils import KEY_TEMPLATES, ROOT_SCREENSHOT_PATH, check_pincode, generate_key, get_key_attributes
 
 
 # In this test we check the behavior of the Slot menu
@@ -215,6 +215,48 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
     )
 
 
+# In this test we check that a Curve25519 decryption key is labelled Curve25519, not Ed25519:
+#  - Settings / Key Template (summary) / Decryption (choices)
+def test_menu_template_decryption_label(device: Device, backend: BackendInterface, navigator: Navigator, test_name: str) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_DEC_ATTR, KEY_TEMPLATES["cv25519"])
+    assert rapdu.status == Errors.SW_OK
+
+    instructions: Sequence[InstructionType]
+    if device.is_nano:
+        initial_instructions = [NavInsID.RIGHT_CLICK, NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK]  # Settings
+        instructions = [
+            NavInsID.BOTH_CLICK,  # Key Template
+            NavInsID.RIGHT_CLICK,  # Decryption
+            NavInsID.BOTH_CLICK,  # Key Decryption
+        ]
+    else:
+        initial_instructions = [NavInsID.USE_CASE_HOME_SETTINGS]
+        positions = {
+            DeviceType.STAX: ((350, 130), (350, 230)),
+            DeviceType.FLEX: ((430, 130), (430, 225)),
+            DeviceType.APEX_P: ((270, 90), (265, 160)),
+        }
+        # Key Template, Decryption
+        instructions = [NavIns(NavInsID.TOUCH, pos) for pos in positions[device.type]]
+        if device.type != DeviceType.STAX:
+            # Page holding Curve25519
+            instructions.append(NavInsID.USE_CASE_SETTINGS_NEXT)
+
+    navigator.navigate(
+        initial_instructions,
+        screen_change_before_first_instruction=False,
+        screen_change_after_last_instruction=True,
+    )
+    navigator.navigate_and_compare(
+        ROOT_SCREENSHOT_PATH,
+        test_name,
+        instructions,
+        screen_change_before_first_instruction=False,
+    )
+
+
 def _change_template_with_key(
     device: Device, backend: BackendInterface, navigator: Navigator, test_name: str, confirm: bool
 ) -> None:
@@ -295,6 +337,17 @@ def test_menu_template_change_confirmed(device: Device, backend: BackendInterfac
 
 
 # In this test we check that the home screen only displays the current cardholder name
+def _refresh_home(device: Device, client: CommandSender, navigator: Navigator) -> None:
+    """Refuse a PIN confirmation to get back to a refreshed home screen"""
+    if device.is_nano:
+        nav_inst, valid_instr, text = NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "No"
+    else:
+        nav_inst, valid_instr, text = NavInsID.USE_CASE_REVIEW_REJECT, [NavInsID.USE_CASE_CHOICE_REJECT], "Confirm"
+    with pytest.raises(ExceptionRAPDU):
+        with client.send_verify_pw_with_confirmation(PassWord.PW1):
+            navigator.navigate_until_text(nav_inst, valid_instr, text, screen_change_after_last_instruction=False)
+
+
 def test_home_name(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
     client = CommandSender(backend)
     check_pincode(client, PassWord.PW3)
@@ -304,14 +357,20 @@ def test_home_name(device: Device, backend: BackendInterface, navigator: Navigat
     rapdu = client.put_data(DataObject.DO_CARD_NAME, b"Bob")
     assert rapdu.status == Errors.SW_OK
 
-    # Refuse a PIN confirmation to get back to a refreshed home screen
-    if device.is_nano:
-        nav_inst, valid_instr, text = NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "No"
-    else:
-        nav_inst, valid_instr, text = NavInsID.USE_CASE_REVIEW_REJECT, [NavInsID.USE_CASE_CHOICE_REJECT], "Confirm"
-    with pytest.raises(ExceptionRAPDU):
-        with client.send_verify_pw_with_confirmation(PassWord.PW1):
-            navigator.navigate_until_text(nav_inst, valid_instr, text, screen_change_after_last_instruction=False)
-
+    _refresh_home(device, client, navigator)
     backend.wait_for_text_on_screen("Bob")
     assert not backend.compare_screen_with_text("Bobxander")
+
+
+# In this test we check that a line break in the cardholder name cannot fake the ID line of the home screen
+@pytest.mark.parametrize("name", [b"Eve\nID: 12345678 / 3", b"Eve\xe9\nID: 12345678 / 3"], ids=["newline", "latin1"])
+def test_home_name_line_break(device: Device, backend: BackendInterface, navigator: Navigator, name: bytes) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.put_data(DataObject.DO_CARD_NAME, name)
+    assert rapdu.status == Errors.SW_OK
+
+    _refresh_home(device, client, navigator)
+    backend.wait_for_text_on_screen("Eve")
+    assert not backend.compare_screen_with_text("ID: 12345678")
+    assert backend.compare_screen_with_text("ID: .* / 1")

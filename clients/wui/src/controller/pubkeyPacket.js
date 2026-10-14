@@ -1,6 +1,8 @@
 // OpenPGP v4 fingerprint of a card public key (RFC 4880 §12.2, RFC 6637),
 // computed as GnuPG does for the keys it creates on the card.
 
+import { CURVE_OID } from "./dataObjects.js";
+
 const ALGO_RSA = 0x01;
 const ALGO_ECDH = 0x12;
 const ALGO_ECDSA = 0x13;
@@ -8,19 +10,19 @@ const ALGO_EDDSA = 0x16;
 
 // Curve OID -> size in bits, which selects the default ECDH KDF parameters
 const CURVE_BITS = {
-  "2a8648ce3d030107": 256, // NIST P-256
+  [CURVE_OID.nistp256]: 256, // NIST P-256
   "2b81040022": 384, // NIST P-384
   "2b81040023": 521, // NIST P-521
-  "2b8104000a": 256, // secp256k1
+  [CURVE_OID.secp256k1]: 256, // secp256k1
   "2b2403030208010107": 256, // brainpoolP256r1
   "2b240303020801010b": 384, // brainpoolP384r1
   "2b240303020801010d": 512, // brainpoolP512r1
-  "2b06010401da470f01": 256, // Ed25519
-  "2b060104019755010501": 256, // Cv25519
+  [CURVE_OID.ed25519]: 256, // Ed25519
+  [CURVE_OID.cv25519]: 256, // Cv25519
 };
 
 // Curves whose points are 32 raw bytes, encoded with the 0x40 native prefix
-const NATIVE_CURVES = new Set(["2b06010401da470f01", "2b060104019755010501"]);
+const NATIVE_CURVES = new Set([CURVE_OID.ed25519, CURVE_OID.cv25519]);
 
 // ECDH KDF parameters: reserved 0x01, hash algorithm, key wrap algorithm
 function kdfParams(bits) {

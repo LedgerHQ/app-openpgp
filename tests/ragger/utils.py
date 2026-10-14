@@ -279,28 +279,24 @@ def decode_tlv(tlv: bytes) -> dict:
     tags = {}
     offset = 0
     while offset < len(tlv):
-        # Parse tag
-        if (tlv[offset] & 0x1F) == 0x1F:
-            tag = (tlv[offset] << 8) | tlv[offset + 1]
-            offset += 2
-        else:
-            tag = tlv[offset]
-            offset += 1
-        # Parse length
+        # One or two byte tag, then a one byte length or 81/82 followed by the length
+        tag_len = 2 if (tlv[offset] & 0x1F) == 0x1F else 1
+        if offset + tag_len + 1 > len(tlv):
+            raise ValueError("Truncated TLV data")
+        tag = int.from_bytes(tlv[offset : offset + tag_len], "big")
+        offset += tag_len
         length = tlv[offset]
+        offset += 1
         if length & 0x80:
             num_bytes = length & 0x7F
-            if num_bytes == 1:
-                length = tlv[offset + 1]
-                offset += 2
-            elif num_bytes == 2:
-                length = (tlv[offset + 1] << 8) | tlv[offset + 2]
-                offset += 3
-            else:
-                raise ValueError(f"Unsupported length encoding: {num_bytes} bytes")
-        else:
-            offset += 1
-        # Extract value
+            if num_bytes not in (1, 2) or offset + num_bytes > len(tlv):
+                raise ValueError(f"Invalid TLV length for tag {tag:x}")
+            length = int.from_bytes(tlv[offset : offset + num_bytes], "big")
+            offset += num_bytes
+        if offset + length > len(tlv):
+            raise ValueError(f"Truncated TLV value for tag {tag:x}")
+        if tag in tags:
+            raise ValueError(f"Duplicate TLV tag {tag:x}")
         tags[tag] = tlv[offset : offset + length]
         offset += length
     return tags

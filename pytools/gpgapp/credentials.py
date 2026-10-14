@@ -61,12 +61,13 @@ def get_secret(value, option: str, env: str, prompt: str, confirm: bool = False)
     return secret or None
 
 
-def get_pins(args, user: bool = True) -> None:
+def get_pins(args, user: bool = True, admin: bool = True) -> None:
     """Resolve the User and Admin PINs of the parsed arguments, defaulting to the factory values
 
     Args:
         args: Parsed arguments, with 'pinpad', 'user_pin' and 'adm_pin'
-        user (bool): Resolve the User PIN too
+        user (bool): Resolve the User PIN
+        admin (bool): Resolve the Admin PIN
     """
 
     if args.pinpad:
@@ -76,7 +77,8 @@ def get_pins(args, user: bool = True) -> None:
         if not args.user_pin:
             args.user_pin = "123456"
             print(f"Using default 'userpin': {args.user_pin}")
-    args.adm_pin = get_secret(args.adm_pin, "--adm-pin", ENV_ADMIN_PIN, "Admin PIN (empty for default)")
-    if not args.adm_pin:
-        args.adm_pin = "12345678"
-        print(f"Using default 'admpin': {args.adm_pin}")
+    if admin:
+        args.adm_pin = get_secret(args.adm_pin, "--adm-pin", ENV_ADMIN_PIN, "Admin PIN (empty for default)")
+        if not args.adm_pin:
+            args.adm_pin = "12345678"
+            print(f"Using default 'admpin': {args.adm_pin}")

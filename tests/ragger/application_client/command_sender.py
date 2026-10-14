@@ -22,6 +22,10 @@ from application_client.app_def import (
     PubkeyAlgo,
 )
 
+# Limits of a response received with GET RESPONSE, as in the Web UI
+RESPONSE_MAX_SIZE = 0x4000
+RESPONSE_MAX_CHUNKS = 64
+
 
 class CommandSender:
     """Base class to send APDU to the selected backend"""
@@ -37,7 +41,7 @@ class CommandSender:
             Response APDU
         """
 
-        data = binascii.unhexlify(b"06D27600012401")
+        data = binascii.unhexlify(b"D27600012401")
         return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_SELECT, p1=0x04, data=data)
 
     def send_activate(self) -> RAPDU:
@@ -409,9 +413,13 @@ class CommandSender:
         cla = ClaType.CLA_APP
         ins = InsType.INS_GET_RESPONSE
         rdata = rapdu.data
+        chunks = 0
 
         # Receive long response
         while (rapdu.status & 0xFF00) == Errors.SW_CORRECT_LONG_RESPONSE:
+            chunks += 1
+            if chunks > RESPONSE_MAX_CHUNKS or len(rdata) > RESPONSE_MAX_SIZE:
+                raise ValueError("Response from the device is too long")
             data = bytes.fromhex(f"{cla:02x}{ins:02x}0000{(rapdu.status & 0xFF):02x}")
             try:
                 rapdu = self.backend.exchange_raw(data)

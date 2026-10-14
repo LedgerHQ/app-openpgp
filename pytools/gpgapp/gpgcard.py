@@ -34,7 +34,7 @@ from ledgercomm.transport import TransportType  # type: ignore
 
 # pylint: enable=import-error
 from gpgapp.fingerprint import key_fingerprint
-from gpgapp.gpgcmd import (  # type: ignore  # type: ignore
+from gpgapp.gpgcmd import (  # type: ignore
     KEY_OPERATIONS,
     KEY_TEMPLATES,
     USER_SALUTATION,
@@ -62,6 +62,23 @@ AID_LENGTH: int = 16
 AID_PREFIX: bytes = bytes.fromhex("D27600012401")
 AID_VERSION_MAJOR: int = 3
 AID_MANUFACTURER: bytes = bytes.fromhex("2C97")
+# Key attributes the app accepts: RSA with a supported modulus size, or ECDH, ECDSA and
+# EdDSA with the OID of a curve the algorithm works on
+KEY_ATTRIBUTES_MAX_SIZE: int = 12
+RSA_MODULUS_SIZES: tuple[int, ...] = (2048, 3072, 4096)
+ECC_CURVE_OIDS: dict[int, tuple[str, ...]] = {
+    PubkeyAlgo.ECDH: ("2a8648ce3d030107", "2b8104000a", "2b060104019755010501"),
+    PubkeyAlgo.ECDSA: ("2a8648ce3d030107", "2b8104000a"),
+    PubkeyAlgo.EDDSA: ("2b06010401da470f01",),
+}
+
+
+def _valid_key_attributes(attribute: bytes) -> bool:
+    if not attribute or len(attribute) > KEY_ATTRIBUTES_MAX_SIZE:
+        return False
+    if attribute[0] == PubkeyAlgo.RSA:
+        return len(attribute) >= 3 and int.from_bytes(attribute[1:3], "big") in RSA_MODULUS_SIZES
+    return attribute[1:].hex() in ECC_CURVE_OIDS.get(attribute[0], ())
 
 
 class _HIDTransport(Transport):
@@ -239,6 +256,7 @@ class CardInfo:
         self.private_01 = b""
         self.private_02 = b""
         self.private_03 = b""
+        self.private_04 = b""
 
 
 class GPGCard:
@@ -366,8 +384,12 @@ class GPGCard:
         return self._exchange(apdu)
 
     ############### API interfaces ###############
-    def get_all(self) -> None:
-        """Retrieve all Data Object values from the Card"""
+    def get_all(self, secrets: bool = False) -> None:
+        """Retrieve the Data Object values from the Card
+
+        Args:
+            secrets (bool): Also read the private DOs and the key backup blobs, for a backup
+        """
 
         self.data.reset()
         data: bytes | None = b""
@@ -452,6 +474,9 @@ class GPGCard:
             b_data = tags[DataObject.DO_SIG_COUNT]
             self.data.digital_counter = self._get_int(b_data, 3)
 
+        if not secrets:
+            return
+
         if self.data.ext_capabilities[0] & 0x08:
             self.data.private_01 = self._read_data(DataObject.DO_PRIVATE_01)
             self.data.private_02 = self._read_data(DataObject.DO_PRIVATE_02)
@@ -486,7 +511,7 @@ class GPGCard:
                 "cert_b64": _b64(slot.cert),
             }
 
-        self.get_all()
+        self.get_all(secrets=True)
         payload = {
             "version": 1,
             "AID": self.data.AID,
@@ -506,7 +531,10 @@ class GPGCard:
             "dec": _key_slot(self.data.dec),
             "aut": _key_slot(self.data.aut),
         }
+        # The private DOs and key blobs are only kept in memory until the file is written
+        self.data.reset()
         raw = json.dumps(payload, indent=2).encode("utf-8")
+        del payload
         if passphrase is not None:
             raw = _encrypt_backup(raw, passphrase)
         # never reuse an existing path, nor follow a link created in its place
@@ -561,13 +589,20 @@ class GPGCard:
             slot.fingerprint = _fromb64(raw["fingerprint"])
             slot.ca_fingerprint = _fromb64(raw["ca_fingerprint"])
             slot.cert = _fromb64(raw["cert_b64"]) if "cert_b64" in raw else raw["cert"].encode("utf-8")
-
-        failures: list[tuple[str, int]] = []
+            if not _valid_key_attributes(slot.attribute):
+                raise GPGCardExcpetion(
+                    ErrorCodes.ERR_INTERNAL,
+                    f"Backup holds invalid {slot_name} key attributes; nothing restored",
+                )
 
         def _put(tag: DataObject, value: bytes) -> None:
             sw = self._put_data(tag, value)
             if sw != ErrorCodes.ERR_SUCCESS:
-                failures.append((tag.name, sw))
+                raise GPGCardExcpetion(
+                    sw,
+                    f"{tag.name} rejected by the card ({sw:04x}); the card may be partially restored:"
+                    " reset the app and restore again",
+                )
 
         _put(DataObject.DO_AID, bytes.fromhex(self.data.AID[20:28]))
         _put(DataObject.DO_PW_STATUS, self.data.PW_status)
@@ -616,6 +651,7 @@ class GPGCard:
         _put(DataObject.DO_DATES_WR_SIG, bdate)
         if not seed_key and self.data.sig.key:
             _put(DataObject.DO_SIG_KEY, self.data.sig.key)
+            self._check_restored_key("SIG", self.data.sig, DataObject.DO_SIG_KEY)
 
         _put(DataObject.DO_CA_FINGERPRINT_WR_DEC, self.data.dec.ca_fingerprint)
         _put(DataObject.DO_FINGERPRINT_WR_DEC, self.data.dec.fingerprint)
@@ -625,6 +661,7 @@ class GPGCard:
         _put(DataObject.DO_DATES_WR_DEC, bdate)
         if not seed_key and self.data.dec.key:
             _put(DataObject.DO_DEC_KEY, self.data.dec.key)
+            self._check_restored_key("DEC", self.data.dec, DataObject.DO_DEC_KEY)
 
         _put(DataObject.DO_CA_FINGERPRINT_WR_AUT, self.data.aut.ca_fingerprint)
         _put(DataObject.DO_FINGERPRINT_WR_AUT, self.data.aut.fingerprint)
@@ -634,10 +671,27 @@ class GPGCard:
         _put(DataObject.DO_DATES_WR_AUT, bdate)
         if not seed_key and self.data.aut.key:
             _put(DataObject.DO_AUT_KEY, self.data.aut.key)
+            self._check_restored_key("AUT", self.data.aut, DataObject.DO_AUT_KEY)
 
-        if failures:
-            names = ", ".join(f"{name} ({sw:04x})" for name, sw in failures)
-            raise GPGCardExcpetion(failures[0][1], f"{len(failures)} items rejected by the card: {names}")
+    def _check_restored_key(self, name: str, slot: KeyInfo, key_tag: int) -> None:
+        """Check that a key restored from its backup blob has the backup fingerprint
+
+        Args:
+            name (str):     Key name, for the error message
+            slot (KeyInfo): Restored key information
+            key_tag (int):  Restored key
+        """
+
+        if len(slot.fingerprint) != 20 or not any(slot.fingerprint):
+            return
+        pubkey = self._asym_key_pair(KEY_OPERATIONS["Read"], key_tag)
+        date = int(slot.date.replace(tzinfo=UTC).timestamp())
+        if key_fingerprint(slot.attribute, pubkey, date) != slot.fingerprint:
+            raise GPGCardExcpetion(
+                ErrorCodes.ERR_INTERNAL,
+                f"{name} key does not match the backup fingerprint; the card may be partially restored:"
+                " reset the app and restore again",
+            )
 
     def export_pub_key(self, pubkey: dict, file_name: str) -> None:
         """Export a Public key to file
@@ -678,15 +732,20 @@ class GPGCard:
         else:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Unsupported key type for export: {key_id}")
 
-    def seed_key(self) -> None:
-        """Regenerate keys, based on seed mode"""
+    def seed_key(self, derivation: int = SEED_MODE_V2) -> None:
+        """Regenerate keys from the device seed
 
-        for apdu_hex, name in (
-            (b"0047800202B600", "SIG"),
-            (b"0047800202B800", "DEC"),
-            (b"0047800202A400", "AUT"),
+        Args:
+            derivation (int): GEN ASYM KEY P2, SEED_MODE_V2 or SEED_MODE_LEGACY
+        """
+
+        for key, name in (
+            (DataObject.DO_SIG_KEY, "SIG"),
+            (DataObject.DO_DEC_KEY, "DEC"),
+            (DataObject.DO_AUT_KEY, "AUT"),
         ):
-            _, sw = self._generate_key(binascii.unhexlify(apdu_hex))
+            apdu = bytes.fromhex(f"004780{derivation:02x}02{key:02x}00")
+            _, sw = self._generate_key(apdu)
             if sw != ErrorCodes.ERR_SUCCESS:
                 raise GPGCardExcpetion(sw, f"{name} key generation failed, check seed mode is ON and PIN is verified")
 
@@ -1270,43 +1329,13 @@ class GPGCard:
             return "EDDSA"
         return ""
 
-    def decode_key(self, key: str) -> dict:
-        """Get key parameters
-
-        Args:
-            key (str): Key type (SIG, DC, AUT)
-
-        Return:
-            Key information dictionary
-        """
-
-        d = {}
-        offset: int = 0
-        key_data = self._get_key_object(key).key
-
-        d["OS Target ID"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):04x}"
-        offset += 4
-        d["API Level"] = str(int.from_bytes(key_data[offset : offset + 4], "big"))
-        offset += 4
-        size = int.from_bytes(key_data[offset : offset + 4], "big")
-        # Should be Public key here from doc, but only Public Exp from the code
-        d["Public exp size"] = str(size)
-        offset += 4
-        d["Public exp"] = f"0x{int.from_bytes(key_data[offset : offset + 4], 'big'):06x}"
-        offset += size
-        size = int.from_bytes(key_data[offset : offset + 4], "big")
-        d["Private key size"] = str(size)
-        # offset += 4
-        # d["Private key encrypted"] = key_data[offset:offset + size].hex()
-        return d
-
-    def asymmetric_key(self, key: str, action: str, seed: bool = False) -> dict:
+    def asymmetric_key(self, key: str, action: str, derivation: int = 0) -> dict:
         """Asymmetric key operation
 
         Args:
             key (str):    Key type (SIG, DC, AUT)
             action (str): Generate or Read
-            seed (bool):  Seed mode
+            derivation (int): GEN ASYM KEY P2, 0 for the default generation
 
         Return:
             Public key information:
@@ -1347,7 +1376,7 @@ class GPGCard:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Invalid key ID in attribute!")
 
         d = {}
-        tags = self._asym_key_pair(op, b_key, seed)
+        tags = self._asym_key_pair(op, b_key, derivation)
 
         if attributes[0] == PubkeyAlgo.RSA:
             d["ID"] = f"RSA-{self._get_int(attributes, offset=1)}"
@@ -1486,20 +1515,19 @@ class GPGCard:
         _, sw = self._exchange(apdu, data)
         return sw
 
-    def _asym_key_pair(self, op: int, key: int, seed: bool = False) -> dict:
+    def _asym_key_pair(self, op: int, key: int, derivation: int = 0) -> dict:
         """Asymmetric key pair operation
 
         Args:
             op (int):  Operation to execute
             key (int): Key type
-            seed (bool): Seed mode
+            derivation (int): GEN ASYM KEY P2, 0 for the default generation
 
         Return:
             Public key decoded data bytes
         """
 
-        p2 = SEED_MODE_V2 if seed else 0x00
-        apdu = bytes.fromhex(f"0047{op:02x}{p2:02x}02{key:02x}00")
+        apdu = bytes.fromhex(f"0047{op:02x}{derivation:02x}02{key:02x}00")
         resp, sw = self._generate_key(apdu) if op == KEY_OPERATIONS["Generate"] else self._exchange(apdu)
         if sw != ErrorCodes.ERR_SUCCESS:
             raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Key operation error!")
@@ -1550,27 +1578,28 @@ class GPGCard:
         """
 
         tags = {}
-        while len(tlv):
-            offset = 0
-            length = 0
-            if (tlv[0] & 0x1F) == 0x1F:
-                tag = self._get_int(tlv)
-                offset = 2
-            else:
-                tag = tlv[0]
-                offset = 1
+        offset = 0
+        while offset < len(tlv):
+            # one or two byte tag, then a one byte length or 81/82 followed by the length
+            tag_len = 2 if (tlv[offset] & 0x1F) == 0x1F else 1
+            if offset + tag_len + 1 > len(tlv):
+                raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, "Truncated TLV data")
+            tag = int.from_bytes(tlv[offset : offset + tag_len], "big")
+            offset += tag_len
             length = tlv[offset]
+            offset += 1
             if length & 0x80:
-                if (length & 0x7F) == 1:
-                    length = tlv[offset + 1]
-                    offset += 2
-                elif (length & 0x7F) == 2:
-                    length = self._get_int(tlv, offset=offset + 1)
-                    offset += 3
-            else:
-                offset += 1
+                size = length & 0x7F
+                if size not in (1, 2) or offset + size > len(tlv):
+                    raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Invalid TLV length for tag {tag:x}")
+                length = int.from_bytes(tlv[offset : offset + size], "big")
+                offset += size
+            if offset + length > len(tlv):
+                raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Truncated TLV value for tag {tag:x}")
+            if tag in tags:
+                raise GPGCardExcpetion(ErrorCodes.ERR_INTERNAL, f"Duplicate TLV tag {tag:x}")
             tags[tag] = tlv[offset : offset + length]
-            tlv = tlv[offset + length :]
+            offset += length
         return tags
 
     def _transmit(self, data: bytes, long_resp: bool = False) -> tuple[bytes, int, int]:

@@ -249,6 +249,36 @@ def test_signature_counter(backend: BackendInterface) -> None:
     assert _signature_count(client) == count + 1
 
 
+# In this test we check that only the generation of a signature key resets the signature counter
+@pytest.mark.parametrize(
+    "templates",
+    [("rsa2048", "rsa2048", "rsa2048"), ("nistp256", "cv25519", "nistp256")],
+    ids=["rsa", "ecc"],
+)
+def test_signature_counter_reset(backend: BackendInterface, templates: tuple[str, str, str]) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    for attr, template in zip((DataObject.DO_SIG_ATTR, DataObject.DO_DEC_ATTR, DataObject.DO_AUT_ATTR), templates, strict=True):
+        rapdu = client.set_template(attr, KEY_TEMPLATES[template])
+        assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+
+    check_pincode(client, PassWord.PW1)
+    digest = get_random_bytes(32)
+    if templates[0] == "rsa2048":
+        digest = SHA256_DIGEST_INFO + digest
+    assert client.sign(digest).status == Errors.SW_OK
+    count = _signature_count(client)
+    assert count > 0
+
+    generate_key(client, DataObject.DO_DEC_KEY)
+    generate_key(client, DataObject.DO_AUT_KEY)
+    assert _signature_count(client) == count
+
+    generate_key(client, DataObject.DO_SIG_KEY)
+    assert _signature_count(client) == 0
+
+
 # In this test we check that changing a key template keeps a permanently enabled UIF
 def test_uif_permanent_kept_on_template_change(backend: BackendInterface) -> None:
     client = CommandSender(backend)
@@ -261,3 +291,51 @@ def test_uif_permanent_kept_on_template_change(backend: BackendInterface) -> Non
     rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["nistp256"])
     assert rapdu.status == Errors.SW_OK
     assert client.get_data(DataObject.DO_UIF_SIG).data == bytes([uif_permanent, button_feature])
+
+
+# Each attribute value follows a valid RSA 2048 one, whose bytes stay in the APDU buffer
+@pytest.mark.parametrize("attribute", [b"", b"\x01", b"\x01\x08"])
+def test_truncated_key_attributes(backend: BackendInterface, attribute: bytes) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.put_data(DataObject.DO_SIG_ATTR, attribute)
+    assert err.value.status == Errors.SW_WRONG_LENGTH
+    assert get_key_attributes(client, DataObject.DO_SIG_ATTR) == (PubkeyAlgo.RSA, 2048)
+
+
+# Valid curve OIDs used with an algorithm that does not work on the curve
+@pytest.mark.parametrize(
+    "attribute",
+    [
+        "162A8648CE3D030107",  # EdDSA on NIST P-256
+        "132B06010401DA470F01",  # ECDSA on Ed25519
+        "132B060104019755010501",  # ECDSA on Curve25519
+        "162B060104019755010501",  # EdDSA on Curve25519
+        "122B06010401DA470F01",  # ECDH on Ed25519
+    ],
+)
+@pytest.mark.parametrize("key_attr", [DataObject.DO_SIG_ATTR, DataObject.DO_DEC_ATTR], ids=["sig", "dec"])
+def test_key_attributes_curve_mismatch(backend: BackendInterface, key_attr: DataObject, attribute: str) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.set_template(key_attr, attribute)
+    assert err.value.status == Errors.SW_WRONG_DATA
+    assert get_key_attributes(client, key_attr) == (PubkeyAlgo.RSA, 2048)
+
+
+# In this test we check that ECDH works on the Weierstrass curves
+@pytest.mark.parametrize("attribute", ["122A8648CE3D030107", "122B8104000A"], ids=["nistp256", "secp256k1"])
+def test_key_attributes_ecdh_weierstrass(backend: BackendInterface, attribute: str) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    rapdu = client.set_template(DataObject.DO_DEC_ATTR, attribute)
+    assert rapdu.status == Errors.SW_OK
+    assert get_key_attributes(client, DataObject.DO_DEC_ATTR) == (PubkeyAlgo.ECDH, 0)
+    generate_key(client, DataObject.DO_DEC_KEY)

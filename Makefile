@@ -113,6 +113,11 @@ ENABLE_NBGL_KEYPAD = 1
 ENABLE_NBGL_FOR_NANO_DEVICES = 1
 
 ########################################
+#          Security hardening          #
+########################################
+ENABLE_STACK_PROTECTOR = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # These advanced settings allow to disable some feature that are by
@@ -132,6 +137,8 @@ DISABLE_OS_IO_STACK_USE = 1
 ########################################
 #        Main app configuration        #
 ########################################
+
+ENABLE_LINK_TIME_OPTIMIZATION = 1
 
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA

@@ -104,16 +104,16 @@ def entrypoint() -> None:
                 confirm=not args.restore,
             )
             if not args.file_passphrase:
-                print(f"Provide the file passphrase in ${ENV_FILE_PASSPHRASE}. Aborting!")
-                sys.exit()
+                print(f"Provide the file passphrase in ${ENV_FILE_PASSPHRASE}. Aborting!", file=sys.stderr)
+                sys.exit(1)
     except ValueError as err:
-        print(f"{err}. Aborting!")
-        sys.exit()
+        print(f"{err}. Aborting!", file=sys.stderr)
+        sys.exit(1)
 
     if args.restore is False:
         if Path(args.file).is_file():
-            print(f"Provided backup file '{args.file}' already exist. Aborting!")
-            sys.exit()
+            print(f"Provided backup file '{args.file}' already exist. Aborting!", file=sys.stderr)
+            sys.exit(1)
 
     # Processing
     # ----------
@@ -135,8 +135,6 @@ def entrypoint() -> None:
         if args.slot:
             gpgcard.select_slot(args.slot - 1)
 
-        gpgcard.get_all()
-
         if args.restore:
             gpgcard.restore(args.file, args.file_passphrase, seed_key=args.seed_key)
             print(f"Configuration restored from file '{args.file}'.")
@@ -154,14 +152,25 @@ def entrypoint() -> None:
                 )
 
     except GPGCardExcpetion as err:
-        print(f"\n### Error {err.code}: {err.message}!\n")
+        print(f"\n### Error {err.code}: {err.message}!\n", file=sys.stderr)
+        sys.exit(1)
+    except (OSError, ValueError, KeyError) as err:
+        print(f"\n### Error: {err!r}\n", file=sys.stderr)
+        sys.exit(1)
     finally:
         if gpgcard.transport is not None:
+            cleared = True
             try:
                 gpgcard.logout()
             except GPGCardExcpetion:
-                pass
+                cleared = False
             gpgcard.disconnect()
+            if not cleared:
+                print(
+                    "\n### Error: the PIN session could not be cleared on the card; exit the OpenPGP app or unplug the device!\n",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
 
 
 if __name__ == "__main__":

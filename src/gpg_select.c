@@ -54,6 +54,7 @@ int gpg_apdu_select() {
             G_gpg_vstate.verified_pin[2] = 0;
             G_gpg_vstate.verified_pin[3] = 0;
             G_gpg_vstate.verified_pin[4] = 0;
+            gpg_mse_reset();
         }
 
         gpg_io_discard(0);

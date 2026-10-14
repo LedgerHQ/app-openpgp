@@ -16,6 +16,8 @@
  *  limitations under the License.
  *****************************************************************************/
 
+#include <ctype.h>
+
 #include "os.h"
 #include "nbgl_use_case.h"
 
@@ -29,6 +31,7 @@
 /* ---                        NBGL  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
 static void ui_home_init(void);
+static bool slot_select_by_screen(void);
 static void ui_menu_slot_action();
 static void ui_settings_template(void);
 static void ui_settings_seed(void);
@@ -162,8 +165,9 @@ static void ui_home_init(void) {
     explicit_bzero(name, sizeof(name));
     if (name_len != 0) {
         memmove(name, (void *) (N_gpg_pstate->name.value), name_len);
-        for (uint8_t i = 0; i < name_len; i++) {
-            if ((name[i] == '<') || (name[i] == '>')) {
+        // Printable ASCII only, as is_printable_string(): the name cannot move the ID line
+        for (unsigned int i = 0; i < name_len; i++) {
+            if (!isprint((unsigned char) name[i]) || (name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
         }
@@ -218,7 +222,7 @@ static void ui_home_init(void) {
                                 setting_initPage,
                                 &settingContents,
                                 &infosList,
-                                &actionContent,
+                                slot_select_by_screen() ? &actionContent : NULL,
                                 app_exit);
 }
 
@@ -240,6 +244,14 @@ void ui_init(void) {
 //  ------------------------ SLOT UX --------------------------
 //  -----------------------------------------------------------
 
+/**
+ * @brief Tell whether DO 01F1 allows the slot selection on the screen
+ *
+ */
+static bool slot_select_by_screen(void) {
+    return (N_gpg_pstate->config_slot[2] & SLOT_SELECT_SCREEN) != 0;
+}
+
 // clang-format off
 enum {
     TOKEN_SLOT_SELECT = FIRST_USER_TOKEN,
@@ -256,6 +268,10 @@ enum {
  *
  */
 static void slot_cb(int token, uint8_t index) {
+    if ((token != TOKEN_SLOT_BACK) && !slot_select_by_screen()) {
+        ui_init();
+        return;
+    }
     switch (token) {
         case TOKEN_SLOT_BACK:
             ui_init();
@@ -412,13 +428,13 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
 
-#ifdef NO_DECRYPT_cv25519
+// The decryption key uses Curve25519 (ECDH) where the other keys use Ed25519
 static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
                                               LABEL_RSA3072,
                                               LABEL_RSA4096,
                                               LABEL_SECP256K1,
-                                              LABEL_SECP256R1};
-#endif
+                                              LABEL_SECP256R1,
+                                              LABEL_Cv25519};
 // clang-format on
 
 /**
@@ -479,7 +495,7 @@ static uint32_t _getKeyType(const uint8_t key) {
                     break;
                 case CX_CURVE_Ed25519:
                 case CX_CURVE_Curve25519:
-                    // Both Ed25519 and Curve25519 are displayed as "Ed25519" in the UI
+                    // Same menu entry, labelled Curve25519 for the decryption key
                     token = TOKEN_TYPE_Ed25519;
                     break;
             }
@@ -667,13 +683,10 @@ static void template_cb(int token, uint8_t index, int page) {
         case TOKEN_TEMPLATE_AUT:
             G_gpg_vstate.ux_key = token;
             contents.type = CHOICES_LIST;
-#ifdef NO_DECRYPT_cv25519
             if (token == TOKEN_TEMPLATE_DEC) {
                 contents.content.choicesList.names = (const char *const *) keyTypeDecTexts;
                 contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeDecTexts);
-            } else
-#endif
-            {
+            } else {
                 contents.content.choicesList.names = (const char *const *) keyTypeTexts;
                 contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeTexts);
             }
@@ -738,7 +751,8 @@ static void ui_settings_template(void) {
                 subText = PIC(LABEL_SECP256R1);
                 break;
             case TOKEN_TYPE_Ed25519:
-                subText = PIC(LABEL_Ed25519);
+                subText = (TOKEN_TEMPLATE_SIG + i == TOKEN_TEMPLATE_DEC) ? PIC(LABEL_Cv25519)
+                                                                         : PIC(LABEL_Ed25519);
                 break;
             default:
                 break;
@@ -1539,7 +1553,13 @@ void ui_menu_uifconfirm_display(unsigned int value) {
 
     switch (G_gpg_vstate.io_ins) {
         case INS_INTERNAL_AUTHENTICATE:
-            snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+            if (G_gpg_vstate.mse_aut == &G_gpg_vstate.kslot->aut) {
+                snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+            } else {
+                snprintf(G_gpg_vstate.menu,
+                         sizeof(G_gpg_vstate.menu),
+                         "Authentication with Decryption key");
+            }
             break;
         case INS_PSO:
             switch (G_gpg_vstate.io_p1p2) {
@@ -1550,7 +1570,13 @@ void ui_menu_uifconfirm_display(unsigned int value) {
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Encryption");
                     break;
                 case PSO_DEC:
-                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                    if (G_gpg_vstate.mse_dec == &G_gpg_vstate.kslot->dec) {
+                        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                    } else {
+                        snprintf(G_gpg_vstate.menu,
+                                 sizeof(G_gpg_vstate.menu),
+                                 "Decryption with Authentication key");
+                    }
                     break;
                 default:
                     break;

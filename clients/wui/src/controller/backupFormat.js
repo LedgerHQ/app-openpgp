@@ -2,6 +2,8 @@
 // JSON, kept byte-for-byte compatible with pytools/gpgapp/gpgcard.py `backup`
 // (version 1) so the CLI tool and this web UI can read each other's files.
 
+import { CURVE_OID } from "./dataObjects.js";
+
 // Format a UTC timestamp (seconds since epoch) as "YYYY-MM-DD HH:MM:SS",
 // matching Python's `str(datetime.utcfromtimestamp(n))`.
 export function formatDate(seconds) {
@@ -164,6 +166,58 @@ function checkFieldSize(name, value, max) {
 // User Interaction Flag values, from the least to the most protective.
 const UIF_LABEL = ["Disabled", "Enabled", "Permanently enabled"];
 
+// Full OpenPGP AID: RID and application, version, manufacturer, serial number, RFU
+const AID_PATTERN = /^D27600012401[0-9A-F]{20}$/i;
+// Key attributes the app accepts: RSA with a supported modulus size, or ECDH, ECDSA and
+// EdDSA with the OID of a curve the algorithm works on, in at most 12 bytes
+const KEY_ATTRIBUTE_MAX_SIZE = 12;
+const RSA_ALGORITHM = 0x01;
+const RSA_SIZES = [2048, 3072, 4096];
+const ECC_CURVE_OIDS = {
+  0x12: [CURVE_OID.nistp256, CURVE_OID.secp256k1, CURVE_OID.cv25519],
+  0x13: [CURVE_OID.nistp256, CURVE_OID.secp256k1],
+  0x16: [CURVE_OID.ed25519],
+};
+// Cardholder salutations stored in a backup
+const SALUTATIONS = ["", "Male", "Female"];
+
+function parseText(value, name) {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") {
+    throw new Error(`Backup field "${name}" is invalid`);
+  }
+  return value;
+}
+
+// Integer from 0 to `max`, given as a JSON number or a decimal string
+function parseCount(value, name, max) {
+  const n = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+  if (!Number.isInteger(n) || n < 0 || n > max) {
+    throw new Error(`Backup field "${name}" is invalid`);
+  }
+  return n;
+}
+
+// RSA public exponent the app accepts: odd and at least 3
+function parseRsaExponent(value) {
+  const exponent = parseCount(value, "rsa_pub_exp", 0xffffffff);
+  if (exponent < 3 || exponent % 2 === 0) {
+    throw new Error(`Backup field "rsa_pub_exp" is invalid`);
+  }
+  return exponent;
+}
+
+function checkAttribute(attribute, slot) {
+  const valid =
+    attribute.length <= KEY_ATTRIBUTE_MAX_SIZE &&
+    (attribute[0] === RSA_ALGORITHM
+      ? attribute.length >= 3 && RSA_SIZES.includes(attribute.readUInt16BE(1))
+      : (ECC_CURVE_OIDS[attribute[0]] ?? []).includes(attribute.subarray(1).toString("hex")));
+  if (!valid) {
+    throw new Error(`Backup field "${slot}.attribute" is invalid`);
+  }
+}
+
 function parseUif(value, slot) {
   if (!Number.isInteger(value) || value < 0 || value >= UIF_LABEL.length) {
     throw new Error(`Backup field "${slot}.uif" is invalid`);
@@ -183,7 +237,13 @@ export function parseBackup(json) {
     if (!p[slot]) throw new Error(`Backup is missing the "${slot}" key slot`);
   }
 
-  const fromb64 = (s) => Buffer.from(s || "", "base64");
+  const fromb64 = (s) => {
+    const bytes = Buffer.from(parseText(s, "base64 data"), "base64");
+    if (bytes.toString("base64") !== (s || "")) {
+      throw new Error("Backup holds invalid base64 data");
+    }
+    return bytes;
+  };
   const keySlot = (raw, name) => ({
     key: fromb64(raw.key),
     uif: parseUif(raw.uif, name),
@@ -194,20 +254,27 @@ export function parseBackup(json) {
     cert: raw.cert_b64 !== undefined ? fromb64(raw.cert_b64) : Buffer.from(raw.cert || "", "utf-8"),
   });
 
+  if (!AID_PATTERN.test(parseText(p.AID, "AID"))) {
+    throw new Error(`Backup field "AID" is invalid`);
+  }
+  if (!SALUTATIONS.includes(parseText(p.salutation, "salutation"))) {
+    throw new Error(`Backup field "salutation" is invalid`);
+  }
+
   const data = {
-    AID: p.AID || "",
+    AID: p.AID,
     PWStatus: fromb64(p.PW_status),
-    rsaPubExp: parseInt(p.rsa_pub_exp, 10) || 0,
-    digitalCounter: parseInt(p.digital_counter, 10) || 0,
+    rsaPubExp: parseRsaExponent(p.rsa_pub_exp),
+    digitalCounter: parseCount(p.digital_counter, "digital_counter", 0xffffff),
     private_01: fromb64(p.private_01),
     private_02: fromb64(p.private_02),
     private_03: fromb64(p.private_03),
     private_04: fromb64(p.private_04),
-    name: p.name || "",
-    login: p.login || "",
-    salutation: p.salutation || "",
-    url: p.url || "",
-    lang: p.lang || "",
+    name: parseText(p.name, "name"),
+    login: parseText(p.login, "login"),
+    salutation: parseText(p.salutation, "salutation"),
+    url: parseText(p.url, "url"),
+    lang: parseText(p.lang, "lang"),
     sig: keySlot(p.sig, "sig"),
     dec: keySlot(p.dec, "dec"),
     aut: keySlot(p.aut, "aut"),
@@ -226,6 +293,7 @@ export function parseBackup(json) {
     for (const field of ["attribute", "fingerprint", "cert", "key"]) {
       checkFieldSize(`${slot}.${field}`, data[slot][field], FIELD_MAX_SIZE[field]);
     }
+    checkAttribute(data[slot].attribute, slot);
     checkFieldSize(`${slot}.ca_fingerprint`, data[slot].ca_fingerprint, FIELD_MAX_SIZE.fingerprint);
     for (const field of ["fingerprint", "ca_fingerprint"]) {
       const { length } = data[slot][field];
@@ -242,15 +310,15 @@ export function parseBackup(json) {
 const ALGO_NAME = { 0x12: "ECDH", 0x13: "ECDSA", 0x16: "EdDSA" };
 
 const CURVE_NAME = {
-  "2a8648ce3d030107": "NIST P-256",
+  [CURVE_OID.nistp256]: "NIST P-256",
   "2b81040022": "NIST P-384",
   "2b81040023": "NIST P-521",
-  "2b8104000a": "secp256k1",
+  [CURVE_OID.secp256k1]: "secp256k1",
   "2b2403030208010107": "brainpoolP256r1",
   "2b240303020801010b": "brainpoolP384r1",
   "2b240303020801010d": "brainpoolP512r1",
-  "2b06010401da470f01": "Ed25519",
-  "2b060104019755010501": "Cv25519",
+  [CURVE_OID.ed25519]: "Ed25519",
+  [CURVE_OID.cv25519]: "Cv25519",
 };
 
 // Human readable key algorithm attributes (DO C1/C2/C3).
@@ -258,8 +326,8 @@ export function describeAttribute(attribute) {
   const attr = Buffer.from(attribute || []);
   if (attr.length === 0) return "None";
   if (attr[0] === 0x01 && attr.length >= 3) return `RSA ${attr.readUInt16BE(1)}`;
-  // ECC: algorithm id, curve OID, then an optional 0xFF import format
-  const oid = attr.slice(1, attr[attr.length - 1] === 0xff ? -1 : undefined).toString("hex");
+  // ECC: algorithm id, then the curve OID
+  const oid = attr.subarray(1).toString("hex");
   const algo = ALGO_NAME[attr[0]];
   if (algo && CURVE_NAME[oid]) return `${algo} ${CURVE_NAME[oid]}`;
   return `Unknown (${attr.toString("hex")})`;
@@ -272,8 +340,9 @@ function describePw1Mode(pwStatus) {
 const SLOT_LABEL = { sig: "Signature", dec: "Decryption", aut: "Authentication" };
 
 // Security settings of `current` (read from the card) that restoring `backup`
-// changes, each flagged when the new value is less protective.
-export function securityChanges(current, backup) {
+// changes, each flagged when the new value is less protective, then the keys
+// of `erasedKeys` ("sig", "dec", "aut") that the restore erases.
+export function securityChanges(current, backup, erasedKeys = []) {
   const changes = [];
   const add = (setting, from, to, weaker) => {
     if (from !== to) changes.push({ setting, from, to, weaker });
@@ -290,6 +359,9 @@ export function securityChanges(current, backup) {
     add(`${SLOT_LABEL[slot]} key confirmation`, UIF_LABEL[from] ?? `Unknown (${from})`, UIF_LABEL[to], to < from);
     const fromAttr = describeAttribute(current[slot].attribute);
     add(`${SLOT_LABEL[slot]} key algorithm`, fromAttr, describeAttribute(backup[slot].attribute), false);
+  }
+  for (const slot of erasedKeys) {
+    changes.push({ setting: `${SLOT_LABEL[slot]} key`, from: "On the card", to: "Erased, not restored", erased: true });
   }
   return changes;
 }
