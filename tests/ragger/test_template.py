@@ -291,3 +291,17 @@ def test_uif_permanent_kept_on_template_change(backend: BackendInterface) -> Non
     rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["nistp256"])
     assert rapdu.status == Errors.SW_OK
     assert client.get_data(DataObject.DO_UIF_SIG).data == bytes([uif_permanent, button_feature])
+
+
+# Each attribute value follows a valid RSA 2048 one, whose bytes stay in the APDU buffer
+@pytest.mark.parametrize("attribute", [b"", b"\x01", b"\x01\x08"])
+def test_truncated_key_attributes(backend: BackendInterface, attribute: bytes) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.put_data(DataObject.DO_SIG_ATTR, attribute)
+    assert err.value.status == Errors.SW_WRONG_LENGTH
+    assert get_key_attributes(client, DataObject.DO_SIG_ATTR) == (PubkeyAlgo.RSA, 2048)

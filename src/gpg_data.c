@@ -875,12 +875,18 @@ int gpg_apdu_put_data(unsigned int ref) {
             ptr_key = &G_gpg_vstate.kslot->aut;
             goto WRITE_ATTRIBUTES;
         WRITE_ATTRIBUTES:
-            if (G_gpg_vstate.io_length > 12) {
+            if ((G_gpg_vstate.io_length < 1) ||
+                (G_gpg_vstate.io_length > GPG_KEY_ATTRIBUTES_LENGTH)) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
             switch (G_gpg_vstate.work.io_buffer[0]) {
                 case KEY_ID_RSA:
+                    // Algorithm id, then the modulus size
+                    if (G_gpg_vstate.io_length < 3) {
+                        sw = SWO_WRONG_LENGTH;
+                        break;
+                    }
                     ksz = U2BE(G_gpg_vstate.work.io_buffer, 1);
                     if ((ksz != 2048) && (ksz != 3072) && (ksz != 4096)) {
                         sw = SWO_INCORRECT_DATA;
