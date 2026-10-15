@@ -152,7 +152,7 @@ def error(code: int, msg: str) -> None:
 #          PIN codes verification
 # ===============================================================================
 def verify_user_pin(gpgcard: GPGCard, user_pin: str, pinpad: bool) -> None:
-    """Verify the User pin code, for both PW1 and PW2
+    """Verify the User pin code for PW2 only, as required to select a slot
 
     Args:
         gpgcard (GPGCard): smartcard object
@@ -160,7 +160,7 @@ def verify_user_pin(gpgcard: GPGCard, user_pin: str, pinpad: bool) -> None:
         pinpad (bool): Indicates to use pinpad
     """
 
-    if not gpgcard.verify_pin(PassWord.PW1, user_pin, pinpad) or not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad):
+    if not gpgcard.verify_pin(PassWord.PW2, user_pin, pinpad):
         error(ErrorCodes.ERR_INTERNAL, "PIN not verified")
 
 
@@ -449,13 +449,14 @@ def entrypoint() -> None:
         gpgcard.connect(args.reader)
 
         if args.reset_pw1:
-            # The User PIN may be blocked: reset it with the Admin PIN, then verify the new value
+            # The User PIN may be blocked: reset it with the Admin PIN, then verify the new value to select a slot
             print("Verify PINs...")
             verify_admin_pin(gpgcard, args.adm_pin, args.pinpad)
             if not gpgcard.reset_PW1("", args.reset_pw1):
                 error(ErrorCodes.ERR_INTERNAL, "User PIN not reset")
             args.user_pin = args.reset_pw1
-            verify_user_pin(gpgcard, args.user_pin, args.pinpad)
+            if needs_user:
+                verify_user_pin(gpgcard, args.user_pin, args.pinpad)
         elif needs_user or needs_admin:
             print("Verify PINs...")
             if needs_user:
@@ -480,9 +481,6 @@ def entrypoint() -> None:
         if args.new_user_pin:
             if not gpgcard.change_pin(PassWord.PW1, args.user_pin, args.new_user_pin):
                 error(ErrorCodes.ERR_INTERNAL, "User PIN not changed")
-            # Changing the User PIN closes the PW2 session
-            args.user_pin = args.new_user_pin
-            verify_user_pin(gpgcard, args.user_pin, args.pinpad)
         if args.new_adm_pin:
             if not gpgcard.change_pin(PassWord.PW3, args.adm_pin, args.new_adm_pin):
                 error(ErrorCodes.ERR_INTERNAL, "Admin PIN not changed")
@@ -519,19 +517,12 @@ def entrypoint() -> None:
     except (OSError, ValueError, KeyError) as err:
         error(0, repr(err))
     finally:
-        if gpgcard.transport is not None:
-            cleared = True
-            try:
-                gpgcard.logout()
-            except GPGCardExcpetion:
-                cleared = False
-            gpgcard.disconnect()
-            if not cleared:
-                print(
-                    "\n### Error: the PIN session could not be cleared on the card; exit the OpenPGP app or unplug the device!\n",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+        if gpgcard.transport is not None and not gpgcard.close():
+            print(
+                "\n### Error: the PIN session could not be cleared on the card; exit the OpenPGP app or unplug the device!\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
 
 if __name__ == "__main__":

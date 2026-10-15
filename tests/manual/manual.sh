@@ -3,12 +3,15 @@
 # script to check OpenPGP Application features
 #
 
-exeName=$(readlink "$0")
-[[ -z ${exeName} ]] && exeName=$0
-dirName=$(dirname "${exeName}")
+exeName=$0
 
 # Every file of the tests stays next to the script, whatever the current directory
-base_dir="$(realpath "${dirName}")"
+script_path="$(realpath -e -- "${BASH_SOURCE[0]}")" || exit 1
+base_dir="$(dirname -- "${script_path}")"
+if [[ ! -f "${base_dir}/manual.sh" ]]; then
+  echo "Cannot locate the script directory" >&2
+  exit 1
+fi
 gnupg_home_dir="${base_dir}/gnupg"
 work_dir="${base_dir}/work"
 

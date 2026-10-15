@@ -9,12 +9,15 @@ import struct
 import pytest
 from application_client.app_def import ClaType, DataObject, Errors, InsType, KeyGenMode, PassWord
 from application_client.command_sender import CommandSender
+from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
+from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import DSS, pkcs1_15
 from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
 from ragger.utils import RAPDU
+from seed_kdf import derive_legacy, ecc_private, slot_seed
 from utils import KEY_TEMPLATES, SHA256_DIGEST_INFO, check_pincode, generate_key, get_ECDSA_pub_key, get_RSA_pub_key
 
 APDU_CHUNK_LEN = 0xFE
@@ -48,6 +51,41 @@ BACKUP_V2_P256_SIG = bytes.fromhex(
     "686fd56e96b764c01568d602f906f2951fb666adbafb4c3b9ff92e7e843c01a0b96af7cc62b3f0c16f79c2a5be51084f"
     "fe28917b75198e0da1f38b3ed653ecad8b"
 )
+
+# Legacy (AES-CBC) backup blob: TARGET_ID and API level, then the public and private EC key structures
+LEGACY_HEADER = struct.pack(">II", 0x33000004, 25)
+# Public key structure of the seeded (legacy derivation) NIST P-256 SIG key, taken from the v1 backup
+V1_PUBLIC_KEY_OFFSET = 1 + 4 + 4
+P256_LEGACY_SIG_PUBLIC = BACKUP_V1_P256_SIG[V1_PUBLIC_KEY_OFFSET + 4 : V1_PUBLIC_KEY_OFFSET + 4 + 0xAC]
+# SDK private key structure: curve, scalar length (little endian), then the scalar on 80 bytes
+CX_CURVE_SECP256R1 = 0x22
+EC_PRIVATE_SCALAR_SIZE = 80
+
+
+def _rsa2048_private(key: RSA.RsaKey) -> bytes:
+    """SDK RSA-2048 private key structure: size (little endian), private exponent and modulus"""
+
+    size = key.size_in_bytes()
+    return struct.pack("<I", size) + key.d.to_bytes(size, "big") + key.n.to_bytes(size, "big")
+
+
+def _legacy_backup(private: bytes, public: bytes = P256_LEGACY_SIG_PUBLIC, pad: bool = True) -> bytes:
+    """Legacy backup blob of the slot 1, encrypted with AES-CBC and a zero IV"""
+
+    seed = slot_seed(0)
+    key = derive_legacy(seed, "key", 1, 16) + seed[2:16]
+    plain = private + b"\x80" if pad else private
+    plain += bytes(-len(plain) % AES.block_size)
+    encrypted = AES.new(key, AES.MODE_CBC, iv=bytes(AES.block_size)).encrypt(plain)
+    return LEGACY_HEADER + struct.pack(">I", len(public)) + public + struct.pack(">I", len(encrypted)) + encrypted
+
+
+def _p256_legacy_private() -> bytes:
+    """Private key structure of the seeded (legacy derivation) NIST P-256 SIG key"""
+
+    attributes = bytes.fromhex(KEY_TEMPLATES["nistp256"])
+    d = ecc_private(0, "sig", "nistp256", attributes, False)
+    return struct.pack("<II", CX_CURVE_SECP256R1, len(d)) + d.ljust(EC_PRIVATE_SCALAR_SIZE, b"\x00")
 
 
 def _get_key_backup(backend: BackendInterface, client: CommandSender, key: DataObject) -> bytes:
@@ -163,6 +201,63 @@ def test_restore_v2_backup(backend: BackendInterface) -> None:
     check_pincode(client, PassWord.PW1)
     hash_obj = SHA256.new(get_random_bytes(16))
     DSS.new(pubkey, "fips-186-3").verify(hash_obj, _sign_raw(client, hash_obj.digest()))
+
+
+# In this test we restore a backup produced in the legacy format
+def test_restore_legacy_backup(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    pubkey = _gen_p256_sig_key(client, KeyGenMode.SEED_LEGACY)
+
+    _put_key_backup(backend, DataObject.DO_SIG_KEY, _legacy_backup(_p256_legacy_private()))
+    assert get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY) == pubkey
+
+    check_pincode(client, PassWord.PW1)
+    hash_obj = SHA256.new(get_random_bytes(16))
+    DSS.new(pubkey, "fips-186-3").verify(hash_obj, _sign_raw(client, hash_obj.digest()))
+
+
+# In this test we restore altered legacy backups, carrying another public key
+def test_restore_altered_legacy_backup(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    pubkey = _gen_p256_sig_key(client)
+    private = _p256_legacy_private()
+
+    blobs = {
+        "bad padding": _legacy_backup(private, pad=False),
+        "bad length": _legacy_backup(private[:-1]),
+        "altered ciphertext": _legacy_backup(private)[:-1] + b"\x00",
+    }
+    for name, blob in blobs.items():
+        # Every failure gives the same status, and the public key is left untouched
+        assert _put_key_backup_status(backend, DataObject.DO_SIG_KEY, blob) == Errors.SW_WRONG_DATA, name
+        assert get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY) == pubkey, name
+
+
+# In this test we restore a RSA key from a legacy backup, then from altered ones
+def test_restore_legacy_backup_rsa(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    key = RSA.generate(2048)
+    public = key.e.to_bytes(4, "big")
+
+    _put_key_backup(backend, DataObject.DO_SIG_KEY, _legacy_backup(_rsa2048_private(key), public))
+    assert get_RSA_pub_key(client, DataObject.DO_SIG_KEY).n == key.n
+
+    other = RSA.generate(2048)
+    for blob in (
+        _legacy_backup(_rsa2048_private(other), public, pad=False),
+        _legacy_backup(_rsa2048_private(other)[:-1], public),
+    ):
+        assert _put_key_backup_status(backend, DataObject.DO_SIG_KEY, blob) == Errors.SW_WRONG_DATA
+        assert get_RSA_pub_key(client, DataObject.DO_SIG_KEY).n == key.n
+
+    check_pincode(client, PassWord.PW1)
+    hash_obj = SHA256.new(get_random_bytes(16))
+    rapdu = client.sign(SHA256_DIGEST_INFO + hash_obj.digest())
+    assert rapdu.status == Errors.SW_OK
+    pkcs1_15.new(key.public_key()).verify(hash_obj, rapdu.data)
 
 
 # In this test we restore the backup of a key into another key role with the same attributes

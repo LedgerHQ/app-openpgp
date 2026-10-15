@@ -12,7 +12,7 @@ cp "${SCRIPT_DIR}/html/index.html" "${OUT_DIR}/index.html"
 cp "${CSS}" "${OUT_DIR}/style.css"
 
 # Options common to all pages (images and CSS are embedded for self-contained HTML).
-# --sandbox would keep the images out: source.lua limits them to the doc directory instead.
+# The sources are read in a sandbox; source.lua limits the embedded images to the doc directory.
 COMMON_OPTIONS=(
     "--standalone"
     "--embed-resources"
@@ -26,28 +26,24 @@ COMMON_OPTIONS=(
     "--lua-filter=${SCRIPT_DIR}/admonitions.lua"
 )
 
-echo "Generating app-openpgp.html..."
-pandoc "${COMMON_OPTIONS[@]}" \
-    --from=rst \
-    --resource-path="${SCRIPT_DIR}/user" \
-    --output="${OUT_DIR}/app-openpgp.html" \
-    --metadata title="App OpenPGP User Guide" \
-    "${SCRIPT_DIR}/user/app-openpgp.rst"
+# Convert a source page: read it in a sandbox (no included file), then write the HTML.
+# Usage: convert <format> <source, relative to the doc directory> <title>
+convert() {
+    local format="$1" src="${SCRIPT_DIR}/$2" title="$3"
+    local name
+    name="$(basename -- "${src%.*}")"
 
-echo "Generating gpgcard-addon.html..."
-pandoc "${COMMON_OPTIONS[@]}" \
-    --from=rst \
-    --resource-path="${SCRIPT_DIR}/developer" \
-    --output="${OUT_DIR}/gpgcard-addon.html" \
-    --metadata title="GPG Card Add-on Developer Guide" \
-    "${SCRIPT_DIR}/developer/gpgcard-addon.rst"
+    echo "Generating ${name}.html..."
+    pandoc --sandbox --fail-if-warnings --from="${format}" --to=json "${src}" |
+        pandoc "${COMMON_OPTIONS[@]}" \
+            --from=json \
+            --resource-path="$(dirname -- "${src}")" \
+            --output="${OUT_DIR}/${name}.html" \
+            --metadata title="${title}"
+}
 
-echo "Generating quick-test.html..."
-pandoc "${COMMON_OPTIONS[@]}" \
-    --from=markdown \
-    --resource-path="${SCRIPT_DIR}/developer" \
-    --output="${OUT_DIR}/quick-test.html" \
-    --metadata title="App OpenPGP Quick Test" \
-    "${SCRIPT_DIR}/developer/quick-test.md"
+convert rst user/app-openpgp.rst "App OpenPGP User Guide"
+convert rst developer/gpgcard-addon.rst "GPG Card Add-on Developer Guide"
+convert markdown developer/quick-test.md "App OpenPGP Quick Test"
 
 echo "Done. Output in ${OUT_DIR}/"

@@ -75,6 +75,32 @@ describe("disconnect", () => {
   });
 });
 
+describe("disconnect during an operation", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("closes the transport when the running operation does not end", async () => {
+    vi.useFakeTimers();
+    const transport = new FakeTransport(() => new Promise(() => {}));
+    let closed = false;
+    transport.close = async () => {
+      closed = true;
+    };
+    transports.push(transport);
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    gpg.backup("123456", "12345678");
+    const disconnecting = gpg.disconnect();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(closed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    await disconnecting;
+    expect(closed).toBe(true);
+  });
+});
+
 describe("logout", () => {
   test("leaves the PINs not verified after a backup, even when it fails", async () => {
     const sent = [];
@@ -120,7 +146,7 @@ describe("getAll", () => {
     );
   };
 
-  const card = (overrides = {}, aid = AID_BYTES) => {
+  const card = (overrides = {}, aid = AID_BYTES, keys = {}) => {
     const transport = new FakeTransport(async (apdu) => {
       const tag = (apdu[2] << 8) | apdu[3];
       const reply = (value) => Buffer.concat([value, OK]);
@@ -134,6 +160,10 @@ describe("getAll", () => {
         case 0x00d7:
         case 0x00d8:
           return reply(Buffer.from([0x00, 0x20]));
+        case 0x00b6:
+        case 0x00b8:
+        case 0x00a4:
+          return reply(keys[tag] ?? Buffer.alloc(0));
         default:
           return OK;
       }
@@ -148,13 +178,25 @@ describe("getAll", () => {
     return transport;
   };
 
-  const getAll = async (overrides, aid) => {
+  const getAll = async (overrides, aid, keys) => {
     transports.push(card({}));
     const gpg = new GpgManager();
     await gpg.connect();
-    gpg.transport = card(overrides, aid);
+    gpg.transport = card(overrides, aid, keys);
     return gpg.getAll();
   };
+
+  const u32 = (n) => Buffer.from([n >>> 24, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]);
+  // Public key and encrypted private key of a key backup, each with its length
+  const keyFields = Buffer.concat([u32(3), Buffer.alloc(3, 0x04), u32(5), Buffer.alloc(5, 0xee)]);
+  const keyBlobV3 = (ref = 0xb6, attribute = P256_ATTR) =>
+    Buffer.concat([
+      Buffer.from([0x03]),
+      Buffer.alloc(12, 0xaa),
+      Buffer.from([ref >> 8, ref & 0xff, attribute.length]),
+      attribute,
+      keyFields,
+    ]);
 
   test("reads a well-formed card", async () => {
     const data = await getAll({});
@@ -176,6 +218,29 @@ describe("getAll", () => {
   });
 
   test.each([
+    ["format 3", keyBlobV3()],
+    [
+      "format 2",
+      Buffer.concat([Buffer.from([0x02]), u32(0x33000004), u32(25), Buffer.alloc(12, 0xaa), keyFields]),
+    ],
+    ["format 1", Buffer.concat([Buffer.from([0x01]), u32(0x33000004), u32(25), keyFields])],
+    ["legacy", Buffer.concat([u32(0x33000004), u32(25), keyFields])],
+  ])("reads a %s key backup", async (_, blob) => {
+    const data = await getAll({}, AID_BYTES, { 0xb6: blob });
+    expect(data.sig.key.equals(blob)).toBe(true);
+  });
+
+  test.each([
+    ["truncated", keyBlobV3().subarray(0, 30)],
+    ["trailing bytes", Buffer.concat([keyBlobV3(), Buffer.from([0x00])])],
+    ["oversized length", Buffer.concat([keyBlobV3().subarray(0, 29), u32(0xffffffff)])],
+    ["other key reference", keyBlobV3(0xa4)],
+    ["other key attributes", keyBlobV3(0xb6, Buffer.from("16", "hex"))],
+  ])("rejects a key backup with %s", async (_, blob) => {
+    await expect(getAll({}, AID_BYTES, { 0xb6: blob })).rejects.toThrow("signature key backup");
+  });
+
+  test.each([
     ["short", AID_BYTES.subarray(0, 15)],
     ["foreign", Buffer.from("A0000000030000000000000000000000", "hex")],
   ])("rejects a %s AID", async (_, aid) => {
@@ -187,7 +252,7 @@ describe("backup slot", () => {
   const slotInfo = () => ({
     key: Buffer.alloc(0),
     uif: 0,
-    attribute: Buffer.alloc(0),
+    attribute: Buffer.from("132a8648ce3d030107", "hex"),
     date: 0,
     fingerprint: Buffer.alloc(0),
     ca_fingerprint: Buffer.alloc(0),
@@ -279,6 +344,19 @@ describe("backup slot", () => {
     expect(verify.apdu.every((b) => b === 0)).toBe(true);
   });
 
+  test.each([
+    ["RSA key attributes without modulus size", (data) => (data.sig.attribute = Buffer.from([0x01]))],
+    ["an unknown ECDSA curve", (data) => (data.dec.attribute = Buffer.from([0x13, 0xff]))],
+    ["an unknown UIF", (data) => (data.aut.uif = 0xff)],
+    ["a zero RSA exponent", (data) => (data.rsaPubExp = 0)],
+  ])("rejects a backup with %s", async (_, change) => {
+    const gpg = await connect(0, []);
+    const data = cardInfo();
+    change(data);
+    vi.spyOn(gpg, "getAll").mockResolvedValue(data);
+    await expect(gpg.backup("123456", "12345678", 0)).rejects.toThrow("Unexpected data from the device");
+  });
+
   test("keeps the slot when backing up the active one", async () => {
     const selections = [];
     const gpg = await connect(1, selections);
@@ -323,6 +401,33 @@ describe("restore", () => {
     const writes = sent.filter((apdu) => apdu[1] === 0xda && apdu[3] !== 0xf2);
     expect(writes).toEqual([]);
     expect(gpg.busy).toBe(false);
+  });
+
+  test("clears the PINs before closing the transport when disconnected during the review", async () => {
+    const events = [];
+    const transport = card([]);
+    const reply = transport.reply;
+    transport.reply = (apdu) => {
+      events.push(apdu.toString("hex"));
+      return reply(apdu);
+    };
+    transport.close = async () => events.push("close");
+    transports.push(transport);
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    let decide;
+    const confirm = () =>
+      new Promise((resolve) => {
+        decide = resolve;
+      });
+    const running = gpg.restore("123456", "12345678", backup(1, 0), false, 0, confirm);
+    await vi.waitFor(() => expect(decide).toBeDefined());
+
+    decide(false);
+    await gpg.disconnect();
+    expect(events.slice(-4)).toEqual(["0020ff8100", "0020ff8200", "0020ff8300", "close"]);
+    expect(await running).toBe(null);
   });
 
   test("does not ask for a confirmation when no security setting changes", async () => {
