@@ -27,6 +27,8 @@ const SLOT_COUNT = 3;
 const KEY_ALGORITHMS = [0x01, 0x12, 0x13, 0x16];
 // Largest key attributes value
 const KEY_ATTRIBUTES_MAX_SIZE = 12;
+// Longest wait, on a disconnection, for the running operation to clear the PINs
+const DISCONNECT_TIMEOUT_MS = 2000;
 
 // Key attributes read from the card, with a known algorithm
 function checkAttribute(name, value) {
@@ -160,6 +162,9 @@ class GpgManager {
     this.transport = null;
     this.connected = false;
     this.busy = false;
+    // Resolved when the running operation releases its lock
+    this._idle = Promise.resolve();
+    this._release = null;
     this.aid = null;
     this.serial = null;
     // Pause after a key generation, before the next command, for the device to settle
@@ -231,6 +236,15 @@ class GpgManager {
     this.connected = false;
     this.aid = null;
     this.serial = null;
+    if (this.busy) {
+      // Let the running operation clear the PINs on the transport before closing it
+      let timer;
+      const timeout = new Promise((resolve) => {
+        timer = setTimeout(resolve, DISCONNECT_TIMEOUT_MS);
+      });
+      await Promise.race([this._idle, timeout]);
+      clearTimeout(timer);
+    }
     if (this.transport) {
       try {
         await this.transport.close();
@@ -247,11 +261,16 @@ class GpgManager {
     if (this.busy) throw new Error("Device is busy");
     if (!this.transport) throw new Error("Device not connected");
     this.busy = true;
+    this._idle = new Promise((resolve) => {
+      this._release = resolve;
+    });
     return this.transport;
   }
 
   _unlock() {
     this.busy = false;
+    this._release?.();
+    this._release = null;
   }
 
   // Leave PW1, PW2 and PW3 not verified (VERIFY with P1=FF). Best effort: a

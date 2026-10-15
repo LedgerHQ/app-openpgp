@@ -75,6 +75,32 @@ describe("disconnect", () => {
   });
 });
 
+describe("disconnect during an operation", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("closes the transport when the running operation does not end", async () => {
+    vi.useFakeTimers();
+    const transport = new FakeTransport(() => new Promise(() => {}));
+    let closed = false;
+    transport.close = async () => {
+      closed = true;
+    };
+    transports.push(transport);
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    gpg.backup("123456", "12345678");
+    const disconnecting = gpg.disconnect();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(closed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    await disconnecting;
+    expect(closed).toBe(true);
+  });
+});
+
 describe("logout", () => {
   test("leaves the PINs not verified after a backup, even when it fails", async () => {
     const sent = [];
@@ -375,6 +401,33 @@ describe("restore", () => {
     const writes = sent.filter((apdu) => apdu[1] === 0xda && apdu[3] !== 0xf2);
     expect(writes).toEqual([]);
     expect(gpg.busy).toBe(false);
+  });
+
+  test("clears the PINs before closing the transport when disconnected during the review", async () => {
+    const events = [];
+    const transport = card([]);
+    const reply = transport.reply;
+    transport.reply = (apdu) => {
+      events.push(apdu.toString("hex"));
+      return reply(apdu);
+    };
+    transport.close = async () => events.push("close");
+    transports.push(transport);
+    const gpg = new GpgManager();
+    await gpg.connect();
+
+    let decide;
+    const confirm = () =>
+      new Promise((resolve) => {
+        decide = resolve;
+      });
+    const running = gpg.restore("123456", "12345678", backup(1, 0), false, 0, confirm);
+    await vi.waitFor(() => expect(decide).toBeDefined());
+
+    decide(false);
+    await gpg.disconnect();
+    expect(events.slice(-4)).toEqual(["0020ff8100", "0020ff8200", "0020ff8300", "close"]);
+    expect(await running).toBe(null);
   });
 
   test("does not ask for a confirmation when no security setting changes", async () => {
