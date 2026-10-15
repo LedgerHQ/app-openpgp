@@ -261,7 +261,7 @@ If you prefer not to, open a terminal and follow the steps below.
 Install the tests requirements:
 
 ```shell
-pip install -r tests/requirements.txt
+pip install -r tests/functional/requirements.txt
 ```
 
 Then you can:
