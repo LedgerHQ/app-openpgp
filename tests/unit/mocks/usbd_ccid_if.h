@@ -1,1 +1,0 @@
-#define PIN_OPR_APDU_CLA 0xEF

@@ -1,32 +1,34 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mocks.h"
+#include "os_io_legacy.h"
+#include "os_nvm.h"
+#include "fake_io.h"
 
-#define MOCK_IO_RX_FRAMES 8
+#define FAKE_IO_RX_FRAMES 8
 
-unsigned char G_io_apdu_buffer[IO_APDU_BUFFER_SIZE];
+unsigned char G_io_tx_buffer[OS_IO_BUFFER_SIZE + 1];
 
-unsigned char mock_io_tx[IO_APDU_BUFFER_SIZE];
-unsigned short mock_io_tx_len;
-unsigned char mock_io_flags;
+unsigned char fake_io_tx[OS_IO_BUFFER_SIZE + 1];
+unsigned short fake_io_tx_len;
+unsigned char fake_io_flags;
 
 static struct {
-    uint8_t data[IO_APDU_BUFFER_SIZE];
+    uint8_t data[OS_IO_BUFFER_SIZE + 1];
     size_t len;
-} rx_frames[MOCK_IO_RX_FRAMES];
+} rx_frames[FAKE_IO_RX_FRAMES];
 static size_t rx_count;
 static size_t rx_next;
 
-void mock_io_reset(void) {
+void fake_io_reset(void) {
     rx_count = 0;
     rx_next = 0;
-    mock_io_tx_len = 0;
-    mock_io_flags = 0;
+    fake_io_tx_len = 0;
+    fake_io_flags = 0;
 }
 
-void mock_io_push_rx(const uint8_t *frame, size_t len) {
-    if ((rx_count >= MOCK_IO_RX_FRAMES) || (len > IO_APDU_BUFFER_SIZE)) {
+void fake_io_push_rx(const uint8_t *frame, size_t len) {
+    if ((rx_count >= FAKE_IO_RX_FRAMES) || (len > sizeof(rx_frames[0].data))) {
         abort();
     }
     memcpy(rx_frames[rx_count].data, frame, len);
@@ -36,12 +38,12 @@ void mock_io_push_rx(const uint8_t *frame, size_t len) {
 
 // Record the transmitted frame, then receive the next staged frame (0 when none is left)
 unsigned short io_exchange(unsigned char channel_and_flags, unsigned short tx_len) {
-    if (tx_len > IO_APDU_BUFFER_SIZE) {
+    if (tx_len > sizeof(G_io_apdu_buffer)) {
         abort();
     }
-    memcpy(mock_io_tx, G_io_apdu_buffer, tx_len);
-    mock_io_tx_len = tx_len;
-    mock_io_flags = channel_and_flags;
+    memcpy(fake_io_tx, G_io_apdu_buffer, tx_len);
+    fake_io_tx_len = tx_len;
+    fake_io_flags = channel_and_flags;
     if (rx_next >= rx_count) {
         return 0;
     }
