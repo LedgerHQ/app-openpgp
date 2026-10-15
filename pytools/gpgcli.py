@@ -519,19 +519,12 @@ def entrypoint() -> None:
     except (OSError, ValueError, KeyError) as err:
         error(0, repr(err))
     finally:
-        if gpgcard.transport is not None:
-            cleared = True
-            try:
-                gpgcard.logout()
-            except GPGCardExcpetion:
-                cleared = False
-            gpgcard.disconnect()
-            if not cleared:
-                print(
-                    "\n### Error: the PIN session could not be cleared on the card; exit the OpenPGP app or unplug the device!\n",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+        if gpgcard.transport is not None and not gpgcard.close():
+            print(
+                "\n### Error: the PIN session could not be cleared on the card; exit the OpenPGP app or unplug the device!\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
 
 if __name__ == "__main__":

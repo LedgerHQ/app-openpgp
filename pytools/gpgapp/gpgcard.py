@@ -300,7 +300,10 @@ class GPGCard:
         errors = []
         for pw in (PassWord.PW1, PassWord.PW2, PassWord.PW3):
             apdu = bytes([0x00, 0x20, 0xFF, int(pw), 0x00])
-            _, sw = self._exchange(apdu)
+            try:
+                _, sw = self._exchange(apdu)
+            except Exception:
+                sw = 0
             if sw != ErrorCodes.ERR_SUCCESS:
                 errors.append((pw, sw))
         if errors:
@@ -310,6 +313,26 @@ class GPGCard:
         """Connect from the selected Reader"""
 
         self.transport.close()
+
+    def close(self) -> bool:
+        """Clear the PIN session on the card, then disconnect, whatever fails
+
+        Returns:
+            True when the PIN session of every role is cleared
+        """
+
+        cleared = False
+        try:
+            self.logout()
+            cleared = True
+        except Exception:
+            pass
+        finally:
+            try:
+                self.disconnect()
+            except Exception:
+                pass
+        return cleared
 
     ############### LOG interface ###############
     def log_apdu(self, log: bool) -> None:
