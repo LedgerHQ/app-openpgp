@@ -101,6 +101,41 @@ describe("restore file", () => {
     expect(screen.queryByText("first.json")).toBeNull();
     expect(screen.queryByText(/^SHA-256/)).toBeNull();
   });
+
+  test("overwrites the restore file when the page is left", async () => {
+    const { container } = render(<App />);
+    pick(container, backupFile("first.json"));
+    const reader = FakeReader.instances[0];
+    await act(() => reader.finish());
+    expect(await screen.findByText("first.json")).toBeTruthy();
+
+    await act(async () => window.dispatchEvent(new Event("pagehide")));
+    expect(new Uint8Array(reader.result).every((b) => b === 0)).toBe(true);
+    expect(screen.queryByText("first.json")).toBeNull();
+  });
+
+  test("aborts the read of a restore file when the page is left", async () => {
+    const { container } = render(<App />);
+    pick(container, backupFile("first.json"));
+    const reader = FakeReader.instances[0];
+
+    await act(async () => window.dispatchEvent(new Event("pagehide")));
+    expect(reader.aborted).toBe(true);
+
+    await act(() => reader.finish());
+    expect(screen.queryByText("first.json")).toBeNull();
+  });
+
+  test("overwrites the restore file when the app is unmounted", async () => {
+    const { container, unmount } = render(<App />);
+    pick(container, backupFile("first.json"));
+    const reader = FakeReader.instances[0];
+    await act(() => reader.finish());
+    expect(await screen.findByText("first.json")).toBeTruthy();
+
+    unmount();
+    expect(new Uint8Array(reader.result).every((b) => b === 0)).toBe(true);
+  });
 });
 
 describe("restore slot lookup", () => {

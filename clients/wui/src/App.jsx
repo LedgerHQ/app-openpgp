@@ -147,11 +147,21 @@ export default function App() {
   const [restoreFile, setRestoreFile] = useState(null);
   const regeneratingRef = useRef(false);
 
-  // Release the device, and its WebHID permission, when the page is left
+  // Drop the restore file and the PINs, and release the device and its WebHID permission, when the page is left
   useEffect(() => {
-    const release = () => gpg.disconnect();
+    const drop = () => {
+      decideReview(false);
+      closePin();
+    };
+    const release = () => {
+      drop();
+      gpg.disconnect();
+    };
     window.addEventListener("pagehide", release);
-    return () => window.removeEventListener("pagehide", release);
+    return () => {
+      window.removeEventListener("pagehide", release);
+      drop();
+    };
   }, []);
 
   useEffect(() => {
