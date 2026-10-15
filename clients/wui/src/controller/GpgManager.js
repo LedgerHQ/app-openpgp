@@ -36,6 +36,43 @@ function checkAttribute(name, value) {
   return value;
 }
 
+// Nonce size of the key backup formats 2 and 3
+const KEY_BACKUP_NONCE_SIZE = 12;
+
+// Encrypted key read for a backup: a header, then the public key and the encrypted private key,
+// each with a 4-byte length. The format 3 header binds the key reference and attributes; a blob
+// without format byte (legacy) starts with the 4-byte TARGET_ID.
+function checkKeyBlob(name, blob, ref, attribute) {
+  if (blob.length === 0) return blob;
+  const invalid = new Error(`Unexpected ${name} key backup from the device`);
+  let offset;
+  switch (blob[0]) {
+    case 0x01:
+      offset = 1 + 4 + 4;
+      break;
+    case 0x02:
+      offset = 1 + 4 + 4 + KEY_BACKUP_NONCE_SIZE;
+      break;
+    case 0x03: {
+      offset = 1 + KEY_BACKUP_NONCE_SIZE;
+      if (blob.length < offset + 3 || blob.readUInt16BE(offset) !== ref) throw invalid;
+      const end = offset + 3 + blob[offset + 2];
+      if (end > blob.length || !blob.subarray(offset + 3, end).equals(attribute)) throw invalid;
+      offset = end;
+      break;
+    }
+    default:
+      offset = 4 + 4;
+      break;
+  }
+  for (let field = 0; field < 2; field++) {
+    if (offset + 4 > blob.length) throw invalid;
+    offset += 4 + blob.readUInt32BE(offset);
+  }
+  if (offset !== blob.length) throw invalid;
+  return blob;
+}
+
 // Password references (ISO 7816 / OpenPGP).
 export const PW = Object.freeze({
   PW1: 0x81, // user PIN, single PSO:CDS
@@ -325,9 +362,13 @@ class GpgManager {
     // Encrypted private key material (only readable in SEED mode with PW3).
     // A slot without key has no key blob to read
     const noKey = [SW_CONDITIONS_NOT_SATISFIED];
-    data.sig.key = await getData(t, DO.SIG_KEY, false, noKey);
-    data.dec.key = await getData(t, DO.DEC_KEY, false, noKey);
-    data.aut.key = await getData(t, DO.AUT_KEY, false, noKey);
+    for (const [slot, name, ref] of [
+      [data.sig, "signature", DO.SIG_KEY],
+      [data.dec, "decryption", DO.DEC_KEY],
+      [data.aut, "authentication", DO.AUT_KEY],
+    ]) {
+      slot.key = checkKeyBlob(name, await getData(t, ref, false, noKey), ref, slot.attribute);
+    }
 
     return data;
   }
@@ -409,7 +450,14 @@ class GpgManager {
       try {
         const data = await this.getAll(t);
         try {
-          return buildBackup(data);
+          const backup = buildBackup(data);
+          // Only save a backup the restore accepts
+          try {
+            wipeBuffers(parseBackup(backup));
+          } catch (e) {
+            throw new Error(`Unexpected data from the device: ${e.message}`);
+          }
+          return backup;
         } finally {
           wipeBuffers(data);
         }
