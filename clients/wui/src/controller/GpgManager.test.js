@@ -188,14 +188,17 @@ describe("getAll", () => {
 
   const u32 = (n) => Buffer.from([n >>> 24, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]);
   // Public key and encrypted private key of a key backup, each with its length
-  const keyFields = Buffer.concat([u32(3), Buffer.alloc(3, 0x04), u32(5), Buffer.alloc(5, 0xee)]);
+  // Public key and encrypted private key of a P-256 key backup, each with its length: AES-GCM
+  // private key with its tag, or legacy AES-CBC padded private key
+  const keyFields = (encryptedSize = 88 + 16) =>
+    Buffer.concat([u32(172), Buffer.alloc(172, 0x04), u32(encryptedSize), Buffer.alloc(encryptedSize, 0xee)]);
   const keyBlobV3 = (ref = 0xb6, attribute = P256_ATTR) =>
     Buffer.concat([
       Buffer.from([0x03]),
       Buffer.alloc(12, 0xaa),
       Buffer.from([ref >> 8, ref & 0xff, attribute.length]),
       attribute,
-      keyFields,
+      keyFields(),
     ]);
 
   test("reads a well-formed card", async () => {
@@ -221,21 +224,44 @@ describe("getAll", () => {
     ["format 3", keyBlobV3()],
     [
       "format 2",
-      Buffer.concat([Buffer.from([0x02]), u32(0x33000004), u32(25), Buffer.alloc(12, 0xaa), keyFields]),
+      Buffer.concat([Buffer.from([0x02]), u32(0x33000004), u32(25), Buffer.alloc(12, 0xaa), keyFields()]),
     ],
-    ["format 1", Buffer.concat([Buffer.from([0x01]), u32(0x33000004), u32(25), keyFields])],
-    ["legacy", Buffer.concat([u32(0x33000004), u32(25), keyFields])],
+    ["format 1", Buffer.concat([Buffer.from([0x01]), u32(0x33000004), u32(25), keyFields()])],
+    ["legacy", Buffer.concat([u32(0x33000004), u32(25), keyFields(96)])],
   ])("reads a %s key backup", async (_, blob) => {
     const data = await getAll({}, AID_BYTES, { 0xb6: blob });
+    expect(data.sig.key.equals(blob)).toBe(true);
+  });
+
+  test("reads a format 3 RSA-2048 key backup", async () => {
+    const rsa = Buffer.from("010800002001", "hex");
+    const blob = Buffer.concat([
+      keyBlobV3(0xb6, rsa).subarray(0, 1 + 12 + 3 + rsa.length),
+      u32(4),
+      Buffer.from([0x00, 0x01, 0x00, 0x01]),
+      u32(4 + 2 * 256 + 16),
+      Buffer.alloc(4 + 2 * 256 + 16, 0xee),
+    ]);
+    const data = await getAll({ 0xc1: rsa }, AID_BYTES, { 0xb6: blob });
     expect(data.sig.key.equals(blob)).toBe(true);
   });
 
   test.each([
     ["truncated", keyBlobV3().subarray(0, 30)],
     ["trailing bytes", Buffer.concat([keyBlobV3(), Buffer.from([0x00])])],
-    ["oversized length", Buffer.concat([keyBlobV3().subarray(0, 29), u32(0xffffffff)])],
+    ["oversized length", Buffer.concat([keyBlobV3().subarray(0, 25), u32(0xffffffff)])],
     ["other key reference", keyBlobV3(0xa4)],
     ["other key attributes", keyBlobV3(0xb6, Buffer.from("16", "hex"))],
+    ["empty keys", Buffer.concat([keyBlobV3().subarray(0, 25), u32(0), u32(0)])],
+    [
+      "undersized public key",
+      Buffer.concat([keyBlobV3().subarray(0, 25), u32(65), Buffer.alloc(65), u32(104), Buffer.alloc(104)]),
+    ],
+    [
+      "private key without tag",
+      Buffer.concat([keyBlobV3().subarray(0, 25), u32(172), Buffer.alloc(172), u32(88), Buffer.alloc(88)]),
+    ],
+    ["legacy private key without padding", Buffer.concat([u32(0x33000004), u32(25), keyFields(88)])],
   ])("rejects a key backup with %s", async (_, blob) => {
     await expect(getAll({}, AID_BYTES, { 0xb6: blob })).rejects.toThrow("signature key backup");
   });
