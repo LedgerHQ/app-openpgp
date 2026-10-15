@@ -40,13 +40,34 @@ function checkAttribute(name, value) {
 
 // Nonce size of the key backup formats 2 and 3
 const KEY_BACKUP_NONCE_SIZE = 12;
+// AES-GCM tag of the key backup formats 1 to 3; AES block of the legacy format, padded (ISO 9797-1 M2)
+const KEY_BACKUP_TAG_SIZE = 16;
+const AES_BLOCK_SIZE = 16;
+// Sizes of the SDK key structures in a key backup: EC public and private keys, RSA public exponent
+const EC_PUBLIC_KEY_SIZE = 172;
+const EC_PRIVATE_KEY_SIZE = 88;
+const RSA_PUBLIC_EXPONENT_SIZE = 4;
+
+// Public key and private key structure sizes of a key, from its attributes
+function keyBlobSizes(attribute) {
+  if (attribute[0] !== 0x01) return [EC_PUBLIC_KEY_SIZE, EC_PRIVATE_KEY_SIZE];
+  if (attribute.length < 3) return null;
+  // size, private exponent and modulus
+  const modulusSize = attribute.readUInt16BE(1) / 8;
+  return [RSA_PUBLIC_EXPONENT_SIZE, 4 + 2 * modulusSize];
+}
 
 // Encrypted key read for a backup: a header, then the public key and the encrypted private key,
-// each with a 4-byte length. The format 3 header binds the key reference and attributes; a blob
-// without format byte (legacy) starts with the 4-byte TARGET_ID.
+// each with a 4-byte length and the size the device writes for the key attributes. The format 3
+// header binds the key reference and attributes; a blob without format byte (legacy) starts with
+// the 4-byte TARGET_ID.
 function checkKeyBlob(name, blob, ref, attribute) {
   if (blob.length === 0) return blob;
   const invalid = new Error(`Unexpected ${name} key backup from the device`);
+  const sizes = keyBlobSizes(attribute);
+  if (!sizes) throw invalid;
+  const [publicSize, privateSize] = sizes;
+  let encryptedSize = privateSize + KEY_BACKUP_TAG_SIZE;
   let offset;
   switch (blob[0]) {
     case 0x01:
@@ -65,11 +86,12 @@ function checkKeyBlob(name, blob, ref, attribute) {
     }
     default:
       offset = 4 + 4;
+      encryptedSize = (Math.floor(privateSize / AES_BLOCK_SIZE) + 1) * AES_BLOCK_SIZE;
       break;
   }
-  for (let field = 0; field < 2; field++) {
-    if (offset + 4 > blob.length) throw invalid;
-    offset += 4 + blob.readUInt32BE(offset);
+  for (const size of [publicSize, encryptedSize]) {
+    if (offset + 4 > blob.length || blob.readUInt32BE(offset) !== size) throw invalid;
+    offset += 4 + size;
   }
   if (offset !== blob.length) throw invalid;
   return blob;
