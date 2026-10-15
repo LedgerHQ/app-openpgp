@@ -44,6 +44,9 @@
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
 #define GPG_KEYS_SLOTS     3
+// Slot selection methods allowed by byte 3 of DO 01F1
+#define SLOT_SELECT_APDU   0x01
+#define SLOT_SELECT_SCREEN 0x02
 
 #define GPG_KEY_ATTRIBUTES_LENGTH 12
 
@@ -136,7 +139,9 @@ struct gpg_nv_state_s {
     unsigned char magic[MAGIC_LENGTH];
 
     /* pin mode */
-    unsigned char config_pin[1];
+    unsigned char config_pin;
+    /* keypad digits shuffled for on-screen PIN entry */
+    bool keypad_shuffle;
 
     /* 01F1 (01F2 is volatile)*/
     unsigned char config_slot[3];
@@ -265,6 +270,7 @@ struct gpg_v_state_s {
     unsigned char verified_pin[5];
     unsigned char pinmode;
     unsigned char pinmode_req;
+    bool keypad_shuffle;
 
     /* ux menus */
     char menu[112];
@@ -340,8 +346,11 @@ typedef enum {
 
 /* ---  P1/P2 constants  --- */
 #define GEN_ASYM_KEY          0x8000
+#define DEFAULT_GEN_MODE      0x00
 #define SEEDED_MODE           0x01
-#define GEN_ASYM_KEY_SEED     (GEN_ASYM_KEY | SEEDED_MODE)
+#define SEEDED_MODE_V2        0x02
+#define GEN_ASYM_KEY_SEED     (GEN_ASYM_KEY | SEEDED_MODE)  // legacy derivation, to restore keys
+#define GEN_ASYM_KEY_SEED_V2  (GEN_ASYM_KEY | SEEDED_MODE_V2)
 #define READ_ASYM_KEY         0x8100
 #define PSO_CDS               0x9e9a
 #define PSO_DEC               0x8086

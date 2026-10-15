@@ -20,6 +20,7 @@ import sys
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
 
+from gpgapp.credentials import ASK, ENV_ADMIN_PIN, ENV_FILE_PASSPHRASE, ENV_USER_PIN, get_pins, get_secret
 from gpgapp.gpgcard import GPGCard, GPGCardExcpetion, PassWord
 
 
@@ -31,22 +32,28 @@ def get_argparser() -> Namespace:
 
     parser = ArgumentParser(
         description="Backup/Restore OpenPGP App configuration",
-        epilog="Keys restore is only possible with SEED mode...",
+        epilog="Keys restore is only possible with SEED mode...\n"
+        + "PIN and passphrase options given without value are read from their environment variable,\n"
+        + "or prompted. Giving the value on the command line exposes it in the process list.",
         formatter_class=RawTextHelpFormatter,
     )
     parser.add_argument(
         "--reader",
         type=str,
         default="Ledger",
-        help="PCSC reader name (default is '%(default)s') or 'speculos'",
+        help="HID path of the device, or 'speculos' (default is '%(default)s', the only Ledger device connected)",
     )
 
     parser.add_argument("--apdu", action="store_true", help="Log APDU exchange")
     parser.add_argument("--slot", type=int, choices=range(1, 4), help="Select slot (1 to 3)")
 
     parser.add_argument("--pinpad", action="store_true", help="PIN validation delegated to pinpad")
-    parser.add_argument("--adm-pin", metavar="PIN", help="Admin PIN (if pinpad not used)")
-    parser.add_argument("--user-pin", metavar="PIN", help="User PIN (if pinpad not used)")
+    parser.add_argument(
+        "--adm-pin", metavar="PIN", nargs="?", const=ASK, help=f"Admin PIN (if pinpad not used), or ${ENV_ADMIN_PIN}"
+    )
+    parser.add_argument(
+        "--user-pin", metavar="PIN", nargs="?", const=ASK, help=f"User PIN (if pinpad not used), or ${ENV_USER_PIN}"
+    )
 
     parser.add_argument("--restore", action="store_true", help="Perform a Restore instead of Backup")
 
@@ -60,13 +67,15 @@ def get_argparser() -> Namespace:
     parser.add_argument(
         "--seed-key",
         action="store_true",
-        help="After Restore, regenerate all keys, based on seed mode",
+        help="After Restore, regenerate the backed up keys from the device seed and check their fingerprints",
     )
 
     parser.add_argument(
         "--file-passphrase",
         metavar="PASS",
-        help="Passphrase to encrypt (backup) or decrypt (restore) the backup file",
+        nargs="?",
+        const=ASK,
+        help=f"Passphrase to encrypt (backup) or decrypt (restore) the backup file, or ${ENV_FILE_PASSPHRASE}",
     )
 
     return parser.parse_args()
@@ -84,18 +93,27 @@ def entrypoint() -> None:
 
     # Arguments checking
     # ------------------
-    if not args.pinpad:
-        if not args.user_pin:
-            args.user_pin = "123456"
-            print(f"Using default 'userpin': {args.user_pin}")
-        if not args.adm_pin:
-            args.adm_pin = "12345678"
-            print(f"Using default 'admpin': {args.adm_pin}")
+    try:
+        get_pins(args)
+        if args.file_passphrase is not None:
+            args.file_passphrase = get_secret(
+                args.file_passphrase,
+                "--file-passphrase",
+                ENV_FILE_PASSPHRASE,
+                "File passphrase",
+                confirm=not args.restore,
+            )
+            if not args.file_passphrase:
+                print(f"Provide the file passphrase in ${ENV_FILE_PASSPHRASE}. Aborting!", file=sys.stderr)
+                sys.exit(1)
+    except ValueError as err:
+        print(f"{err}. Aborting!", file=sys.stderr)
+        sys.exit(1)
 
     if args.restore is False:
         if Path(args.file).is_file():
-            print(f"Provided backup file '{args.file}' already exist. Aborting!")
-            sys.exit()
+            print(f"Provided backup file '{args.file}' already exist. Aborting!", file=sys.stderr)
+            sys.exit(1)
 
     # Processing
     # ----------
@@ -117,28 +135,35 @@ def entrypoint() -> None:
         if args.slot:
             gpgcard.select_slot(args.slot - 1)
 
-        gpgcard.get_all()
-
         if args.restore:
             gpgcard.restore(args.file, args.file_passphrase, seed_key=args.seed_key)
             print(f"Configuration restored from file '{args.file}'.")
 
             if args.seed_key:
-                gpgcard.seed_key()
+                gpgcard.restore_seed_keys()
 
         else:
             gpgcard.backup(args.file, args.file_passphrase)
             print(f"Configuration saved in file '{args.file}'.")
+            if args.file_passphrase is None:
+                print(
+                    "Warning: the file is not encrypted, its private data objects and card details are readable."
+                    " Use --file-passphrase to encrypt it."
+                )
 
     except GPGCardExcpetion as err:
-        print(f"\n### Error {err.code}: {err.message}!\n")
+        print(f"\n### Error {err.code}: {err.message}!\n", file=sys.stderr)
+        sys.exit(1)
+    except (OSError, ValueError, KeyError) as err:
+        print(f"\n### Error: {err!r}\n", file=sys.stderr)
+        sys.exit(1)
     finally:
-        if gpgcard.transport is not None:
-            try:
-                gpgcard.logout()
-            except GPGCardExcpetion:
-                pass
-            gpgcard.disconnect()
+        if gpgcard.transport is not None and not gpgcard.close():
+            print(
+                "\n### Error: the PIN session could not be cleared on the card; exit the OpenPGP app or unplug the device!\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
 
 if __name__ == "__main__":

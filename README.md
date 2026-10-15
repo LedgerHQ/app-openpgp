@@ -116,9 +116,11 @@ to quickly **build** your apps, **test** them on **Speculos** and **load** them 
 - Make sure you have an X11 server running:
   - On Ubuntu Linux, it should be running by default.
   - On macOS, install and launch [XQuartz](https://www.xquartz.org/)
-    (make sure to go to XQuartz > Preferences > Security and check "Allow client connections").
+    (go to XQuartz > Preferences > Security and check "Allow connections from network clients"),
+    then allow only the local host with `xhost +localhost`. Never run `xhost +`.
   - On Windows, install and launch [VcXsrv](https://sourceforge.net/projects/vcxsrv/)
-    (make sure to configure it to disable access control).
+    with access control enabled (leave "Disable access control" unchecked),
+    and list only the address the container connects from in its `X0.hosts` file.
 - Install [VScode](https://code.visualstudio.com/download) and add [Ledger's extension](https://marketplace.visualstudio.com/items?itemName=LedgerHQ.ledger-dev-tools).
 - Open a terminal and clone `app-openpgp` with `git clone git@github.com:LedgerHQ/app-openpgp.git`.
 - Open the `app-openpgp` folder with VSCode.

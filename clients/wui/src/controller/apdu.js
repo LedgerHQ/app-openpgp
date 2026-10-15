@@ -76,32 +76,46 @@ export async function exchange(transport, apdu, data = Buffer.alloc(0)) {
     throw new Error(`Data too long for the device (${payload.length} bytes)`);
   }
 
-  let frame = header;
-  if (payload.length > 0) {
-    let rest = payload;
-    if (rest.length > APDU_MAX_SIZE) {
-      const chained = Buffer.from([
-        header[0] | APDU_CHAINING_MODE,
-        header[1],
-        header[2],
-        header[3],
-        APDU_MAX_SIZE,
-      ]);
-      while (rest.length > APDU_MAX_SIZE) {
-        const { sw } = parseResponse(
-          await transport.exchange(Buffer.concat([chained, rest.slice(0, APDU_MAX_SIZE)]))
-        );
-        // A refused frame aborts the chain: the rest must not be sent alone
-        if (sw !== SW_SUCCESS) {
-          return { data: Buffer.alloc(0), sw };
-        }
-        rest = rest.slice(APDU_MAX_SIZE);
-      }
+  // The command copies may carry PINs or private data: overwrite them once sent
+  const send = async (frame) => {
+    try {
+      return parseResponse(await transport.exchange(frame));
+    } finally {
+      frame.fill(0);
     }
-    frame = Buffer.concat([header, Buffer.from([rest.length]), rest]);
+  };
+
+  let response;
+  try {
+    let frame = header;
+    if (payload.length > 0) {
+      let rest = payload;
+      if (rest.length > APDU_MAX_SIZE) {
+        const chained = Buffer.from([
+          header[0] | APDU_CHAINING_MODE,
+          header[1],
+          header[2],
+          header[3],
+          APDU_MAX_SIZE,
+        ]);
+        while (rest.length > APDU_MAX_SIZE) {
+          const { sw } = await send(Buffer.concat([chained, rest.slice(0, APDU_MAX_SIZE)]));
+          // A refused frame aborts the chain: the rest must not be sent alone
+          if (sw !== SW_SUCCESS) {
+            return { data: Buffer.alloc(0), sw };
+          }
+          rest = rest.slice(APDU_MAX_SIZE);
+        }
+      }
+      frame = Buffer.concat([header, Buffer.from([rest.length]), rest]);
+    }
+    response = await send(frame);
+  } finally {
+    header.fill(0);
+    payload.fill(0);
   }
 
-  let { data: respData, sw } = parseResponse(await transport.exchange(frame));
+  let { data: respData, sw } = response;
 
   let chunks = 0;
   while (sw >> 8 === SW1_MORE_DATA) {

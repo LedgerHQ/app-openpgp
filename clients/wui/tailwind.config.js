@@ -9,4 +9,21 @@ export default {
     // Scan lumen's compiled components so Tailwind emits the classes they use.
     "./node_modules/@ledgerhq/lumen-ui-react/dist/**/*.js",
   ],
+  theme: {
+    extend: {
+      // The lumen preset names "Inter" alone: give it a fallback stack
+      fontFamily: {
+        sans: [
+          "Inter Variable",
+          "Inter",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+      },
+    },
+  },
 };

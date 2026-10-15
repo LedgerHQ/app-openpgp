@@ -18,16 +18,6 @@
 
 #include "gpg_vars.h"
 #include "gpg_ux.h"
-#include "ccid_cmd.h"
-
-/**
- * Reset CCID
- *
- */
-void ui_CCID_reset(void) {
-    io_usb_ccid_set_card_inserted(0);
-    io_usb_ccid_set_card_inserted(1);
-}
 
 /**
  * Reset app
@@ -39,5 +29,4 @@ void app_reset(void) {
     explicit_bzero(magic, MAGIC_LENGTH);
     nvm_write((void *) (N_gpg_pstate->magic), magic, MAGIC_LENGTH);
     gpg_init();
-    ui_CCID_reset();
 }

@@ -25,6 +25,13 @@ make clean && make BOLOS_SDK=$<device>_SDK      # replace <device> with the devi
 exit
 ```
 
+The functional tests enter PINs on the on-device keypad, whose digits are shuffled in production.
+Build with `KEYBOARD_NOT_SHUFFLED=1` to keep them in a fixed order:
+
+```shell
+make clean && make BOLOS_SDK=$<device>_SDK KEYBOARD_NOT_SHUFFLED=1
+```
+
 ### Run a simple test using the Speculos emulator
 
 You can use the following command to get your first experience with Ragger and Speculos

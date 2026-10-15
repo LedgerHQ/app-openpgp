@@ -29,9 +29,6 @@ void app_main(void) {
     io_flags = 0;
     volatile unsigned short sw = SWO_UNKNOWN;
 
-    // start communication with MCU
-    ui_CCID_reset();
-
     // set up
     io_init();
 

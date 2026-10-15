@@ -27,7 +27,8 @@
  *
  */
 static int gpg_check_access_ins() {
-    int sw = SWO_UNKNOWN;
+    // Denied unless the required PIN is verified
+    int sw = SWO_SECURITY_CONDITION_NOT_SATISFIED;
 
     switch (G_gpg_vstate.io_ins) {
         case INS_EXIT:
@@ -112,7 +113,8 @@ static int gpg_check_access_ins() {
  *
  */
 static int gpg_check_access_read_DO() {
-    int sw = SWO_UNKNOWN;
+    // Denied unless the required PIN is verified
+    int sw = SWO_SECURITY_CONDITION_NOT_SATISFIED;
 
     switch (G_gpg_vstate.io_p1p2) {
             // ALWAYS
@@ -190,7 +192,8 @@ static int gpg_check_access_read_DO() {
  *
  */
 static int gpg_check_access_write_DO() {
-    int sw = SWO_UNKNOWN;
+    // Denied unless the required PIN is verified
+    int sw = SWO_SECURITY_CONDITION_NOT_SATISFIED;
 
     switch (G_gpg_vstate.io_p1p2) {
         // PW2

@@ -110,12 +110,20 @@ export const USER_SALUTATION = Object.freeze({
   Female: "2",
 });
 
+// OIDs of the curves the app supports, hex encoded.
+export const CURVE_OID = Object.freeze({
+  nistp256: "2a8648ce3d030107",
+  secp256k1: "2b8104000a",
+  ed25519: "2b06010401da470f01",
+  cv25519: "2b060104019755010501",
+});
+
 // Key generation algorithm templates (tags C1/C2/C3 attribute values).
 export const KEY_TEMPLATES = Object.freeze({
   rsa2048: "010800002001",
   rsa3072: "010c00002001",
   rsa4096: "011000002001",
-  nistp256: "132a8648ce3d030107",
-  ed25519: "162b06010401da470f01",
-  cv25519: "122b060104019755010501",
+  nistp256: `13${CURVE_OID.nistp256}`,
+  ed25519: `16${CURVE_OID.ed25519}`,
+  cv25519: `12${CURVE_OID.cv25519}`,
 });

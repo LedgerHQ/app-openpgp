@@ -3,11 +3,17 @@
 # script to check OpenPGP Application features
 #
 
-exeName=$(readlink "$0")
-[[ -z ${exeName} ]] && exeName=$0
-dirName=$(dirname "${exeName}")
+exeName=$0
 
-gnupg_home_dir="$(realpath "${dirName}/gnupg")"
+# Every file of the tests stays next to the script, whatever the current directory
+script_path="$(realpath -e -- "${BASH_SOURCE[0]}")" || exit 1
+base_dir="$(dirname -- "${script_path}")"
+if [[ ! -f "${base_dir}/manual.sh" ]]; then
+  echo "Cannot locate the script directory" >&2
+  exit 1
+fi
+gnupg_home_dir="${base_dir}/gnupg"
+work_dir="${base_dir}/work"
 
 VERBOSE=false
 EXPERT=false
@@ -24,12 +30,34 @@ help() {
   echo
   echo "Options:"
   echo
-  echo "  -c <init|reset|reset_all|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|default>  : Requested command"
+  echo "  -c <init|reset|reset_all|switch|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|all|default>  : Requested command"
   echo "  -e     : Expert mode"
   echo "  -v     : Verbose mode"
   echo "  -h     : Displays this help"
   echo
   exit 1
+}
+
+#===============================================================================
+#
+#     private_dir - Create a private directory, refusing a symbolic link
+#
+#===============================================================================
+private_dir() {
+  if [[ -L "$1" ]]; then
+    echo "Refusing the symbolic link '$1'" >&2
+    return 1
+  fi
+  mkdir -p -- "$1" && chmod 700 -- "$1"
+}
+
+#===============================================================================
+#
+#     clean_work - Remove the files of the encrypt, sign and authenticate tests
+#
+#===============================================================================
+clean_work() {
+  rm -f -- "${work_dir}"/foo*
 }
 
 #===============================================================================
@@ -56,18 +84,44 @@ reset_all() {
 
 #===============================================================================
 #
+#     switch - Use the card of the slot selected on the device
+#
+#===============================================================================
+switch() {
+  local card_status=""
+
+  # The slot change is not notified to the PC: restart scdaemon to read the new card
+  gpgconf --homedir "${gnupg_home_dir}" --kill scdaemon 2>/dev/null
+  gpg-connect-agent --homedir "${gnupg_home_dir}" "scd serialno" "learn --force" /bye >/dev/null
+  card_status=$(gpg --homedir "${gnupg_home_dir}" --card-status 2>/dev/null)
+  if [[ -z "${card_status}" ]]; then
+    echo "No card found"
+    return 1
+  fi
+  grep -E "^(Serial number|Key attributes|General key info)" <<< "${card_status}"
+  if grep "General key info" <<< "${card_status}" | grep -q "none"; then
+    # No default key from another slot
+    rm -f "${gnupg_home_dir}/gpg.conf"
+    echo "No key on this slot: generate them with '-c card', then run '-c default'"
+  else
+    default
+  fi
+}
+
+#===============================================================================
+#
 #     default - Set default key in conf file
 #
 #===============================================================================
 default() {
-  dir=$(basename "${gnupg_home_dir}")
-  if [[ ! -d "${dir}" ]]; then
-    mkdir "${dir}"
-    chmod 700 "${dir}"
-  fi
+  private_dir "${gnupg_home_dir}" || return 1
 
   recipient=$(gpg --homedir "${gnupg_home_dir}" --card-status | grep "General key info" | awk  '{print $NF}')
 
+  if [[ -z "${recipient}" ]]; then
+    echo "No card found: default key not set"
+    return 1
+  fi
   if [[ ${recipient} =~ "none" ]]; then
     read -r -p "Enter default key name: " recipient
   fi
@@ -75,7 +129,7 @@ default() {
   {
     echo "default-key ${recipient}"
     echo "default-recipient ${recipient}"
-   } > "${dir}/gpg.conf"
+   } > "${gnupg_home_dir}/gpg.conf"
 }
 
 #===============================================================================
@@ -87,10 +141,9 @@ init() {
   reset
 
   # Cleanup old gnupg home directory
-  dir=$(basename "${gnupg_home_dir}")
-  rm -fr "${dir}" foo.txt*
-  mkdir "${dir}"
-  chmod 700 "${dir}"
+  rm -fr -- "${gnupg_home_dir}"
+  clean_work
+  private_dir "${gnupg_home_dir}" || return 1
 
   {
     echo reader-port \"Ledger token\"
@@ -99,22 +152,23 @@ init() {
     echo card-timeout 1
     echo disable-ccid
     echo pcsc-shared
-  } > "${dir}/scdaemon.conf"
+  } > "${gnupg_home_dir}/scdaemon.conf"
 
   if [[ ${EXPERT} == true ]]; then
+    # The trace holds the APDUs: keep it in the private gnupg home directory
     {
-      echo log-file /tmp/scd.log
+      echo log-file "${gnupg_home_dir}/scd.log"
       echo debug-level guru
       echo debug-all
-    } >> "${dir}/scdaemon.conf"
+    } >> "${gnupg_home_dir}/scdaemon.conf"
   fi
 
   # Enable ssh-agent emulation, needed to exercise the AUT key
   {
     echo enable-ssh-support
-  } > "${dir}/gpg-agent.conf"
+  } > "${gnupg_home_dir}/gpg-agent.conf"
 
-  gpgconf --reload scdaemon
+  gpgconf --homedir "${gnupg_home_dir}" --reload scdaemon
 }
 
 #===============================================================================
@@ -150,12 +204,13 @@ encrypt() {
   local verbose_mode=""
 
   reset
-  rm -fr foo*
-  echo CLEAR > foo.txt
+  private_dir "${work_dir}" || return 1
+  clean_work
+  echo CLEAR > "${work_dir}/foo.txt"
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --encrypt foo.txt
+  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --encrypt "${work_dir}/foo.txt"
 }
 
 #===============================================================================
@@ -165,20 +220,23 @@ encrypt() {
 #===============================================================================
 decrypt() {
   local verbose_mode=""
+  local ret
 
   reset
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --decrypt foo.txt.gpg > foo_dec.txt
-
   # Check with original clear file
-  if diff foo.txt foo_dec.txt >/dev/null; then
+  if gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --decrypt "${work_dir}/foo.txt.gpg" > "${work_dir}/foo_dec.txt" &&
+     diff "${work_dir}/foo.txt" "${work_dir}/foo_dec.txt" >/dev/null; then
     echo "Success !"
+    ret=0
   else
     echo "Decryption error!"
+    ret=1
   fi
-  rm -fr foo*
+  clean_work
+  return ${ret}
 }
 
 #===============================================================================
@@ -190,12 +248,13 @@ sign() {
   local verbose_mode=""
 
   reset
-  rm -fr foo*
-  echo CLEAR > foo.txt
+  private_dir "${work_dir}" || return 1
+  clean_work
+  echo CLEAR > "${work_dir}/foo.txt"
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --sign foo.txt
+  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --sign "${work_dir}/foo.txt"
 }
 
 #===============================================================================
@@ -205,13 +264,21 @@ sign() {
 #===============================================================================
 verify() {
   local verbose_mode=""
+  local ret
 
   reset
 
   [[ ${VERBOSE} == true ]] && verbose_mode="--verbose"
 
-  gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --verify foo.txt.gpg
-  rm -fr foo*
+  if gpg --homedir "${gnupg_home_dir}" ${verbose_mode} --verify "${work_dir}/foo.txt.gpg"; then
+    echo "Success !"
+    ret=0
+  else
+    echo "Signature error!"
+    ret=1
+  fi
+  clean_work
+  return ${ret}
 }
 
 #===============================================================================
@@ -220,8 +287,7 @@ verify() {
 #
 #===============================================================================
 sign_verify() {
-  sign
-  verify
+  sign && verify
 }
 
 #===============================================================================
@@ -230,8 +296,16 @@ sign_verify() {
 #
 #===============================================================================
 encrypt_decrypt() {
-  encrypt
-  decrypt
+  encrypt && decrypt
+}
+
+#===============================================================================
+#
+#     all - Run all tests (SIG, DEC, AUT key roundtrip)
+#
+#===============================================================================
+all() {
+  sign_verify && encrypt_decrypt && authenticate
 }
 
 #===============================================================================
@@ -240,8 +314,11 @@ encrypt_decrypt() {
 #
 #===============================================================================
 authenticate() {
+  local ret
+
   reset
-  rm -fr foo*
+  private_dir "${work_dir}" || return 1
+  clean_work
 
   # gpg-agent must expose the card auth key on its ssh socket
   export GNUPGHOME="${gnupg_home_dir}"
@@ -250,27 +327,30 @@ authenticate() {
   export SSH_AUTH_SOCK
 
   # Retrieve the public AUT key advertised by the card
-  if ! ssh-add -L > foo_auth.pub 2>/dev/null || [[ ! -s foo_auth.pub ]]; then
+  if ! ssh-add -L > "${work_dir}/foo_auth.pub" 2>/dev/null || [[ ! -s "${work_dir}/foo_auth.pub" ]]; then
     echo "No authentication key exposed by the card!"
     echo "(check the card 'Authentication key' and that the AUT key is generated)"
-    rm -fr foo*
+    clean_work
     return 1
   fi
 
-  [[ ${VERBOSE} == true ]] && cat foo_auth.pub
+  [[ ${VERBOSE} == true ]] && cat "${work_dir}/foo_auth.pub"
 
   # Sign a file with the card AUT key (via the agent), then verify it
-  echo CLEAR > foo.txt
-  echo "test@ledger.fr $(cat foo_auth.pub)" > foo_allowed
+  echo CLEAR > "${work_dir}/foo.txt"
+  echo "test@ledger.fr $(cat "${work_dir}/foo_auth.pub")" > "${work_dir}/foo_allowed"
 
-  ssh-keygen -Y sign -f foo_auth.pub -n file foo.txt
-
-  if ssh-keygen -Y verify -f foo_allowed -I test@ledger.fr -n file -s foo.txt.sig < foo.txt; then
+  if ssh-keygen -Y sign -f "${work_dir}/foo_auth.pub" -n file "${work_dir}/foo.txt" &&
+     ssh-keygen -Y verify -f "${work_dir}/foo_allowed" -I test@ledger.fr -n file \
+       -s "${work_dir}/foo.txt.sig" < "${work_dir}/foo.txt"; then
     echo "Success !"
+    ret=0
   else
     echo "Authentication error!"
+    ret=1
   fi
-  rm -fr foo*
+  clean_work
+  return ${ret}
 }
 
 #===============================================================================
@@ -288,7 +368,7 @@ while getopts ":c:evh" opt; do
 
     c)
       case ${OPTARG} in
-        init|reset|reset_all|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|default)
+        init|reset|reset_all|switch|card|status|encrypt|decrypt|encrypt_decrypt|sign|verify|sign_verify|authenticate|all|default)
           CMD=${OPTARG}
           ;;
         *)

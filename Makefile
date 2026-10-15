@@ -28,9 +28,9 @@ include $(BOLOS_SDK)/Makefile.target
 APPNAME = OpenPGP
 
 # Application version
-APPVERSION_M = 2
-APPVERSION_N = 7
-APPVERSION_P = 4
+APPVERSION_M = 3
+APPVERSION_N = 0
+APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 DEFINES += SPEC_VERSION='"3.3.1"'
@@ -82,6 +82,13 @@ VARIANT_VALUES = OpenPGP
 # Enabling DEBUG flag will enable PRINTF and disable optimizations
 #DEBUG = 1
 
+# Keep the PIN keypad digits in a fixed order, for functional tests only
+KEYBOARD_NOT_SHUFFLED ?= 0
+ifneq ($(KEYBOARD_NOT_SHUFFLED), 0)
+    $(info KEYBOARD_NOT_SHUFFLED ENABLED)
+    DEFINES += KEYBOARD_NOT_SHUFFLED
+endif
+
 ########################################
 #     Application custom permissions   #
 ########################################
@@ -106,6 +113,11 @@ ENABLE_NBGL_KEYPAD = 1
 ENABLE_NBGL_FOR_NANO_DEVICES = 1
 
 ########################################
+#          Security hardening          #
+########################################
+ENABLE_STACK_PROTECTOR = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # These advanced settings allow to disable some feature that are by
@@ -125,6 +137,8 @@ DISABLE_OS_IO_STACK_USE = 1
 ########################################
 #        Main app configuration        #
 ########################################
+
+ENABLE_LINK_TIME_OPTIMIZATION = 1
 
 DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA

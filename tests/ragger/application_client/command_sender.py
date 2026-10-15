@@ -17,9 +17,14 @@ from application_client.app_def import (
     DataObject,
     Errors,
     InsType,
+    KeyGenMode,
     PassWord,
     PubkeyAlgo,
 )
+
+# Limits of a response received with GET RESPONSE, as in the Web UI
+RESPONSE_MAX_SIZE = 0x4000
+RESPONSE_MAX_CHUNKS = 64
 
 
 class CommandSender:
@@ -36,7 +41,7 @@ class CommandSender:
             Response APDU
         """
 
-        data = binascii.unhexlify(b"06D27600012401")
+        data = binascii.unhexlify(b"D27600012401")
         return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_SELECT, p1=0x04, data=data)
 
     def send_activate(self) -> RAPDU:
@@ -275,20 +280,20 @@ class CommandSender:
             Response APDU
         """
 
-        return self.__key(0x81, key, False)
+        return self.__key(0x81, key)
 
-    def generate_key(self, key: DataObject, seed: bool = False) -> RAPDU:
+    def generate_key(self, key: DataObject, mode: KeyGenMode = KeyGenMode.DEFAULT) -> RAPDU:
         """APDU Generate Asymmetric Key pair
 
         Args:
-            key (DataObject): Tag identifying the key to process
-            seed (bool):      Generate a key in SEED mode
+            key (DataObject):  Tag identifying the key to process
+            mode (KeyGenMode): Random or seeded generation
 
         Returns:
             Response APDU
         """
 
-        return self.__key(0x80, key, seed)
+        return self.__key(0x80, key, mode)
 
     def authenticate(self, frame: bytes) -> RAPDU:
         """APDU Internal Authenticate
@@ -408,9 +413,13 @@ class CommandSender:
         cla = ClaType.CLA_APP
         ins = InsType.INS_GET_RESPONSE
         rdata = rapdu.data
+        chunks = 0
 
         # Receive long response
         while (rapdu.status & 0xFF00) == Errors.SW_CORRECT_LONG_RESPONSE:
+            chunks += 1
+            if chunks > RESPONSE_MAX_CHUNKS or len(rdata) > RESPONSE_MAX_SIZE:
+                raise ValueError("Response from the device is too long")
             data = bytes.fromhex(f"{cla:02x}{ins:02x}0000{(rapdu.status & 0xFF):02x}")
             try:
                 rapdu = self.backend.exchange_raw(data)
@@ -454,20 +463,19 @@ class CommandSender:
         # Receive long response
         return self.get_long_response(rapdu)
 
-    def __key(self, p1: int, key: DataObject, seed: bool = False) -> RAPDU:
+    def __key(self, p1: int, key: DataObject, p2: int = KeyGenMode.DEFAULT) -> RAPDU:
         """APDU Asymmetric Key pair
 
         Args:
             p1 (int):         Value for P1 parameter in APDU
             key (DataObject): Tag identifying the key
-            seed (bool):      Generate a key in SEED mode
+            p2 (int):         Value for P2 parameter in APDU
 
         Returns:
             Response APDU
         """
 
         data = bytes.fromhex(f"{key:02x}00")
-        p2 = 0x01 if seed else 0x00
         try:
             rapdu = self.backend.exchange(
                 cla=ClaType.CLA_APP,

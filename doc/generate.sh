@@ -18,8 +18,14 @@ OPTIONS=(
     "--toc"
     "--number-sections"
     "--template=template.latex"
+    "--lua-filter=${SCRIPT_DIR}/source.lua"
     "--lua-filter=${SCRIPT_DIR}/admonitions.lua"
 )
+
+# pandoc --sandbox does not cover the LaTeX run: keep pdflatex in the doc directory, without shell.
+# The shared files of the doc directory (logo) are found through the TeX search path.
+export openin_any=p openout_any=p shell_escape=f
+export TEXINPUTS="${SCRIPT_DIR}:"
 
 for name in "${NAMES[@]}"; do
     dir="${SCRIPT_DIR}/$(dirname -- "${name}")"

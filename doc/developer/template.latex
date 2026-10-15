@@ -412,7 +412,7 @@ $endif$
   {\scshape\LARGE Ledger SAS \par}
   \vspace{2cm}
 
-  \includegraphics{../LogoLedger.png}
+  \includegraphics{LogoLedger.png}
 
   \vspace{1cm}
   {\Large\itshape\url {https://github.com/LedgerHQ/app-openpgp}\par}

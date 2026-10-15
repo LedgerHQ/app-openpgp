@@ -16,6 +16,8 @@
  *  limitations under the License.
  *****************************************************************************/
 
+#include <ctype.h>
+
 #include "os.h"
 #include "nbgl_use_case.h"
 
@@ -29,6 +31,7 @@
 /* ---                        NBGL  UI layout                          --- */
 /* ----------------------------------------------------------------------- */
 static void ui_home_init(void);
+static bool slot_select_by_screen(void);
 static void ui_menu_slot_action();
 static void ui_settings_template(void);
 static void ui_settings_seed(void);
@@ -162,8 +165,9 @@ static void ui_home_init(void) {
     explicit_bzero(name, sizeof(name));
     if (name_len != 0) {
         memmove(name, (void *) (N_gpg_pstate->name.value), name_len);
-        for (uint8_t i = 0; i < name_len; i++) {
-            if ((name[i] == '<') || (name[i] == '>')) {
+        // Printable ASCII only, as is_printable_string(): the name cannot move the ID line
+        for (unsigned int i = 0; i < name_len; i++) {
+            if (!isprint((unsigned char) name[i]) || (name[i] == '<') || (name[i] == '>')) {
                 name[i] = ' ';
             }
         }
@@ -218,7 +222,7 @@ static void ui_home_init(void) {
                                 setting_initPage,
                                 &settingContents,
                                 &infosList,
-                                &actionContent,
+                                slot_select_by_screen() ? &actionContent : NULL,
                                 app_exit);
 }
 
@@ -240,6 +244,14 @@ void ui_init(void) {
 //  ------------------------ SLOT UX --------------------------
 //  -----------------------------------------------------------
 
+/**
+ * @brief Tell whether DO 01F1 allows the slot selection on the screen
+ *
+ */
+static bool slot_select_by_screen(void) {
+    return (N_gpg_pstate->config_slot[2] & SLOT_SELECT_SCREEN) != 0;
+}
+
 // clang-format off
 enum {
     TOKEN_SLOT_SELECT = FIRST_USER_TOKEN,
@@ -256,16 +268,16 @@ enum {
  *
  */
 static void slot_cb(int token, uint8_t index) {
+    if ((token != TOKEN_SLOT_BACK) && !slot_select_by_screen()) {
+        ui_init();
+        return;
+    }
     switch (token) {
         case TOKEN_SLOT_BACK:
             ui_init();
             break;
         case TOKEN_SLOT_SELECT:
-            if (index != G_gpg_vstate.slot) {
-                G_gpg_vstate.slot = index;
-                G_gpg_vstate.kslot = (gpg_key_slot_t *) &N_gpg_pstate->keys[G_gpg_vstate.slot];
-                gpg_mse_reset();
-                ui_CCID_reset();
+            if ((index != G_gpg_vstate.slot) && (gpg_select_slot(index) == SWO_SUCCESS)) {
 #ifdef SCREEN_SIZE_NANO
                 slot_initPage = index;
                 ui_menu_slot_action();
@@ -416,13 +428,13 @@ static const char* const keyTypeTexts[] = {LABEL_RSA2048,
                                            LABEL_SECP256R1,
                                            LABEL_Ed25519};
 
-#ifdef NO_DECRYPT_cv25519
+// The decryption key uses Curve25519 (ECDH) where the other keys use Ed25519
 static const char* const keyTypeDecTexts[] = {LABEL_RSA2048,
                                               LABEL_RSA3072,
                                               LABEL_RSA4096,
                                               LABEL_SECP256K1,
-                                              LABEL_SECP256R1};
-#endif
+                                              LABEL_SECP256R1,
+                                              LABEL_Cv25519};
 // clang-format on
 
 /**
@@ -483,7 +495,7 @@ static uint32_t _getKeyType(const uint8_t key) {
                     break;
                 case CX_CURVE_Ed25519:
                 case CX_CURVE_Curve25519:
-                    // Both Ed25519 and Curve25519 are displayed as "Ed25519" in the UI
+                    // Same menu entry, labelled Curve25519 for the decryption key
                     token = TOKEN_TYPE_Ed25519;
                     break;
             }
@@ -493,6 +505,52 @@ static uint32_t _getKeyType(const uint8_t key) {
             break;
     }
     return token;
+}
+
+// Template change waiting for the confirmation to delete the existing key
+static struct {
+    uint8_t slot;
+    uint8_t key;
+    LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
+} G_template_pending;
+
+/**
+ * @brief Key of the active slot designated by a template token
+ *
+ * @param[in] token template token
+ * @return key, or NULL for an unknown token
+ *
+ */
+static gpg_key_t *template_key(uint8_t token) {
+    switch (token) {
+        case TOKEN_TEMPLATE_SIG:
+            return &G_gpg_vstate.kslot->sig;
+        case TOKEN_TEMPLATE_DEC:
+            return &G_gpg_vstate.kslot->dec;
+        case TOKEN_TEMPLATE_AUT:
+            return &G_gpg_vstate.kslot->aut;
+        default:
+            return NULL;
+    }
+}
+
+/**
+ * @brief Template change confirmation callback
+ *
+ * @param[in] confirm indicate if the user accepts to delete the existing key
+ *
+ */
+static void template_confirm_cb(bool confirm) {
+    gpg_key_t *dest = template_key(G_template_pending.key);
+
+    if (confirm && (dest != NULL) && (G_template_pending.slot == G_gpg_vstate.slot)) {
+        gpg_key_erase(dest);
+        nvm_write(&dest->attributes,
+                  &G_template_pending.attributes,
+                  sizeof(G_template_pending.attributes));
+    }
+    explicit_bzero(&G_template_pending, sizeof(G_template_pending));
+    ui_settings_template();
 }
 
 /**
@@ -578,22 +636,27 @@ static void template_key_cb(int token, uint8_t index, int page) {
                 break;
         }
 
-        switch (G_gpg_vstate.ux_key) {
-            case TOKEN_TEMPLATE_SIG:
-                dest = &G_gpg_vstate.kslot->sig;
-                break;
-            case TOKEN_TEMPLATE_DEC:
-                dest = &G_gpg_vstate.kslot->dec;
-                break;
-            case TOKEN_TEMPLATE_AUT:
-                dest = &G_gpg_vstate.kslot->aut;
-                break;
-        }
-
+        dest = template_key(G_gpg_vstate.ux_key);
         if (dest && attributes.value[0] &&
             memcmp(&dest->attributes, &attributes, sizeof(attributes)) != 0) {
-            gpg_key_erase(dest);
-            nvm_write(&dest->attributes, &attributes, sizeof(attributes));
+            G_template_pending.slot = G_gpg_vstate.slot;
+            G_template_pending.key = G_gpg_vstate.ux_key;
+            memmove(&G_template_pending.attributes, &attributes, sizeof(attributes));
+            if (gpg_key_is_present(dest)) {
+                snprintf(G_gpg_vstate.menu,
+                         sizeof(G_gpg_vstate.menu),
+                         "The %s key will be deleted",
+                         (const char *) PIC(keyNameTexts[G_gpg_vstate.ux_key - FIRST_USER_TOKEN]));
+                nbgl_useCaseChoice(NULL,
+                                   "Change template",
+                                   G_gpg_vstate.menu,
+                                   "Yes, delete key",
+                                   "Cancel",
+                                   template_confirm_cb);
+            } else {
+                template_confirm_cb(true);
+            }
+            return;
         }
     }
     ui_settings_template();
@@ -620,13 +683,10 @@ static void template_cb(int token, uint8_t index, int page) {
         case TOKEN_TEMPLATE_AUT:
             G_gpg_vstate.ux_key = token;
             contents.type = CHOICES_LIST;
-#ifdef NO_DECRYPT_cv25519
             if (token == TOKEN_TEMPLATE_DEC) {
                 contents.content.choicesList.names = (const char *const *) keyTypeDecTexts;
                 contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeDecTexts);
-            } else
-#endif
-            {
+            } else {
                 contents.content.choicesList.names = (const char *const *) keyTypeTexts;
                 contents.content.choicesList.nbChoices = ARRAYLEN(keyTypeTexts);
             }
@@ -691,7 +751,8 @@ static void ui_settings_template(void) {
                 subText = PIC(LABEL_SECP256R1);
                 break;
             case TOKEN_TYPE_Ed25519:
-                subText = PIC(LABEL_Ed25519);
+                subText = (TOKEN_TEMPLATE_SIG + i == TOKEN_TEMPLATE_DEC) ? PIC(LABEL_Cv25519)
+                                                                         : PIC(LABEL_Ed25519);
                 break;
             default:
                 break;
@@ -825,6 +886,43 @@ void trust_cb(bool confirm) {
     }
 }
 
+// PIN mode choices: the On Screen mode comes with a shuffled or a fixed keypad
+enum {
+    PIN_CHOICE_SCREEN_RANDOM,
+    PIN_CHOICE_SCREEN,
+    PIN_CHOICE_CONFIRM,
+    PIN_CHOICE_TRUST,
+    PIN_CHOICE_NB,
+};
+
+static const char *const PinNameTexts[PIN_CHOICE_NB] = {
+    "Random keypad",
+    "Fixed keypad",
+    "Confirm Only",
+    "Trust",
+};
+
+/**
+ * @brief PIN mode choice matching a mode and a keypad shuffling
+ *
+ * @param[in] mode PIN mode
+ * @param[in] shuffle keypad shuffling
+ * @return PIN mode choice
+ *
+ */
+static uint8_t pin_choice(uint8_t mode, bool shuffle) {
+    switch (mode) {
+        case PIN_MODE_SCREEN:
+            return shuffle ? PIN_CHOICE_SCREEN_RANDOM : PIN_CHOICE_SCREEN;
+        case PIN_MODE_CONFIRM:
+            return PIN_CHOICE_CONFIRM;
+        case PIN_MODE_TRUST:
+            return PIN_CHOICE_TRUST;
+        default:
+            return PIN_CHOICE_NB;
+    }
+}
+
 /**
  * @brief Pin Action callback
  *
@@ -834,16 +932,32 @@ void trust_cb(bool confirm) {
  */
 static void pin_cb(int token, uint8_t index) {
     const char *err = NULL;
+    uint8_t mode = PIN_MODE_MAX;
+
     G_gpg_vstate.pinmode_req = 0xFF;
     switch (token) {
         case TOKEN_PIN_BACK:
             ui_home_init();
             break;
         case TOKEN_PIN_SET:
-            if (G_gpg_vstate.pinmode == index) {
+            if (pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle) == index) {
                 break;
             }
             switch (index) {
+                case PIN_CHOICE_SCREEN_RANDOM:
+                case PIN_CHOICE_SCREEN:
+                    mode = PIN_MODE_SCREEN;
+                    break;
+                case PIN_CHOICE_CONFIRM:
+                    mode = PIN_MODE_CONFIRM;
+                    break;
+                case PIN_CHOICE_TRUST:
+                    mode = PIN_MODE_TRUST;
+                    break;
+                default:
+                    return;
+            }
+            switch (mode) {
                 case PIN_MODE_SCREEN:
                 case PIN_MODE_CONFIRM:
                     if ((gpg_pin_is_verified(PIN_ID_PW1) == 0) &&
@@ -864,8 +978,8 @@ static void pin_cb(int token, uint8_t index) {
 #ifdef SCREEN_SIZE_NANO
             pin_initPage = index;
 #endif
-            if ((G_gpg_vstate.pinmode != PIN_MODE_TRUST) && (index == PIN_MODE_TRUST)) {
-                G_gpg_vstate.pinmode_req = index;
+            if ((G_gpg_vstate.pinmode != PIN_MODE_TRUST) && (mode == PIN_MODE_TRUST)) {
+                G_gpg_vstate.pinmode_req = mode;
                 nbgl_useCaseChoice(NULL,
                                    "TRUST mode",
                                    "This mode won't request any more PINs "
@@ -875,7 +989,12 @@ static void pin_cb(int token, uint8_t index) {
                                    "Cancel",
                                    trust_cb);
             } else {
-                G_gpg_vstate.pinmode = index;
+                G_gpg_vstate.pinmode = mode;
+                if (index == PIN_CHOICE_SCREEN_RANDOM) {
+                    G_gpg_vstate.keypad_shuffle = true;
+                } else if (index == PIN_CHOICE_SCREEN) {
+                    G_gpg_vstate.keypad_shuffle = false;
+                }
 #ifdef SCREEN_SIZE_NANO
                 ui_settings_pin();
 #endif
@@ -885,21 +1004,20 @@ static void pin_cb(int token, uint8_t index) {
             if (G_gpg_vstate.pinmode == PIN_MODE_TRUST) {
                 ui_info(DEFAULT_MODE, NOT_ALLOWED, ui_settings_pin, false);
                 break;
-            } else if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin[0]) {
-                // set new mode
-                nvm_write((void *) (&N_gpg_pstate->config_pin[0]), &G_gpg_vstate.pinmode, 1);
-                gpg_activate_pinpad(3);
+            }
+            if (G_gpg_vstate.pinmode != N_gpg_pstate->config_pin) {
+                nvm_write((void *) (&N_gpg_pstate->config_pin), &G_gpg_vstate.pinmode, 1);
+            }
+            if (G_gpg_vstate.keypad_shuffle != N_gpg_pstate->keypad_shuffle) {
+                nvm_write((void *) (&N_gpg_pstate->keypad_shuffle),
+                          &G_gpg_vstate.keypad_shuffle,
+                          sizeof(G_gpg_vstate.keypad_shuffle));
             }
             ui_settings_pin();
             break;
     }
 }
 
-static const char *const PinNameTexts[PIN_MODE_MAX] = {
-    "On Screen",
-    "Confirm Only",
-    "Trust",
-};
 #ifdef SCREEN_SIZE_NANO
 /**
  * @brief Pin Configuration callback
@@ -909,25 +1027,30 @@ static const char *const PinNameTexts[PIN_MODE_MAX] = {
  *
  */
 static bool pin_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
-    static char *names[PIN_MODE_MAX] = {0};
-    static char text[PIN_MODE_MAX][32];
+    static char *names[PIN_CHOICE_NB] = {0};
+    static char text[PIN_CHOICE_NB][32];
+    uint8_t current = pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle);
+    uint8_t def = pin_choice(N_gpg_pstate->config_pin, N_gpg_pstate->keypad_shuffle);
     uint32_t pin;
 
+    if (current >= PIN_CHOICE_NB) {
+        return false;
+    }
     switch (page) {
         case 0:
-            for (pin = 0; pin < PIN_MODE_MAX; pin++) {
-                if (G_gpg_vstate.pinmode == pin) {
+            for (pin = 0; pin < PIN_CHOICE_NB; pin++) {
+                if (current == pin) {
                     snprintf(text[pin],
                              sizeof(text[pin]),
                              "[%s]\n%s",
                              (const char *) PIC(PinNameTexts[pin]),
-                             (N_gpg_pstate->config_pin[0] == pin) ? "(default)" : " ");
+                             (def == pin) ? "(default)" : " ");
                 } else {
                     snprintf(text[pin],
                              sizeof(text[pin]),
                              "%s\n%s",
                              (const char *) PIC(PinNameTexts[pin]),
-                             (N_gpg_pstate->config_pin[0] == pin) ? "(default)" : " ");
+                             (def == pin) ? "(default)" : " ");
                 }
                 names[pin] = text[pin];
             }
@@ -935,14 +1058,11 @@ static bool pin_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
             content->type = CHOICES_LIST;
             content->choicesList.names = (const char *const *) names;
             content->choicesList.token = TOKEN_PIN_SET;
-            content->choicesList.nbChoices = PIN_MODE_MAX;
-            content->choicesList.initChoice = G_gpg_vstate.pinmode;
+            content->choicesList.nbChoices = PIN_CHOICE_NB;
+            content->choicesList.initChoice = current;
             break;
         case 1:
-            snprintf(text[0],
-                     sizeof(text[0]),
-                     "Set %s",
-                     (const char *) PIC(PinNameTexts[G_gpg_vstate.pinmode]));
+            snprintf(text[0], sizeof(text[0]), "Set %s", (const char *) PIC(PinNameTexts[current]));
             content->type = INFO_BUTTON;
             content->infoButton.text = "Set Default Mode";
             content->infoButton.buttonText = text[0];
@@ -963,24 +1083,25 @@ static void ui_settings_pin(void) {
 #ifdef SCREEN_SIZE_WALLET
     static nbgl_layoutRadioChoice_t choices = {0};
     nbgl_layoutButton_t buttonInfo = {0};
-    static char *names[PIN_MODE_MAX] = {0};
-    static char text[PIN_MODE_MAX][32];
+    static char *names[PIN_CHOICE_NB] = {0};
+    static char text[PIN_CHOICE_NB][32];
+    uint8_t def = pin_choice(N_gpg_pstate->config_pin, N_gpg_pstate->keypad_shuffle);
     uint32_t pin;
 
     ui_setting_header("PIN mode", TOKEN_PIN_BACK, pin_cb);
 
-    for (pin = 0; pin < PIN_MODE_MAX; pin++) {
+    for (pin = 0; pin < PIN_CHOICE_NB; pin++) {
         snprintf(text[pin],
                  sizeof(text[pin]),
                  "%s %s",
                  (const char *) PIC(PinNameTexts[pin]),
-                 (N_gpg_pstate->config_pin[0] == pin) ? "[default]" : "");
+                 (def == pin) ? "[default]" : "");
         names[pin] = text[pin];
     }
     choices.names = (const char *const *) names;
     choices.localized = false;
-    choices.nbChoices = PIN_MODE_MAX;
-    choices.initChoice = G_gpg_vstate.pinmode;
+    choices.nbChoices = PIN_CHOICE_NB;
+    choices.initChoice = pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle);
     choices.token = TOKEN_PIN_SET;
     nbgl_layoutAddRadioChoice(layoutCtx, &choices);
 
@@ -1304,6 +1425,7 @@ static void pinback_cb(void) {
 void ui_menu_pinentry_display(unsigned int step) {
     uint8_t minLen;
     char line[10];
+    bool shuffled = G_gpg_vstate.keypad_shuffle;
 
     G_gpg_vstate.ui_pending = 1;
     // Init the page title
@@ -1335,11 +1457,14 @@ void ui_menu_pinentry_display(unsigned int step) {
 
     minLen =
         (G_gpg_vstate.ux_pinconfirm_p2 == PIN_ID_PW3) ? GPG_MIN_PW3_LENGTH : GPG_MIN_PW1_LENGTH;
+#ifdef KEYBOARD_NOT_SHUFFLED
+    shuffled = false;
+#endif
     // Draw the keypad
     nbgl_useCaseKeypad(G_gpg_vstate.menu,
                        minLen,
                        GPG_MAX_PW_LENGTH,
-                       false,
+                       shuffled,
                        true,
                        pinentry_validate_cb,
                        pinback_cb);
@@ -1428,7 +1553,13 @@ void ui_menu_uifconfirm_display(unsigned int value) {
 
     switch (G_gpg_vstate.io_ins) {
         case INS_INTERNAL_AUTHENTICATE:
-            snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+            if (G_gpg_vstate.mse_aut == &G_gpg_vstate.kslot->aut) {
+                snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+            } else {
+                snprintf(G_gpg_vstate.menu,
+                         sizeof(G_gpg_vstate.menu),
+                         "Authentication with Decryption key");
+            }
             break;
         case INS_PSO:
             switch (G_gpg_vstate.io_p1p2) {
@@ -1439,7 +1570,13 @@ void ui_menu_uifconfirm_display(unsigned int value) {
                     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Encryption");
                     break;
                 case PSO_DEC:
-                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                    if (G_gpg_vstate.mse_dec == &G_gpg_vstate.kslot->dec) {
+                        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                    } else {
+                        snprintf(G_gpg_vstate.menu,
+                                 sizeof(G_gpg_vstate.menu),
+                                 "Decryption with Authentication key");
+                    }
                     break;
                 default:
                     break;

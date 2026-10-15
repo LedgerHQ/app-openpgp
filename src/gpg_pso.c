@@ -277,7 +277,6 @@ int gpg_apdu_pso() {
     unsigned int t, l, ksz;
     unsigned int cnt, pad_byte;
     unsigned int msg_len;
-    unsigned int curve;
     cx_aes_key_t *aes_key = NULL;
     cx_rsa_private_key_t *rsa_key = NULL;
     cx_ecfp_private_key_t *ecfp_key = NULL;
@@ -426,12 +425,8 @@ int gpg_apdu_pso() {
                         break;
                     }
                     ecfp_key = &G_gpg_vstate.mse_dec->priv_key.ecfp;
-                    curve = gpg_oid2curve(G_gpg_vstate.mse_dec->attributes.value + 1,
-                                          G_gpg_vstate.mse_dec->attributes.length - 1);
-                    if (ecfp_key->curve != curve) {
-                        PRINTF("[PSO] - PSO:DEC:ECDH - Wrong curve %d != %d\n",
-                               ecfp_key->curve,
-                               curve);
+                    if (!gpg_key_curve_matches_attributes(G_gpg_vstate.mse_dec, ecfp_key->curve)) {
+                        PRINTF("[PSO] - PSO:DEC:ECDH - Wrong curve %d\n", ecfp_key->curve);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -468,7 +463,7 @@ int gpg_apdu_pso() {
                         break;
                     }
 
-                    if (curve == CX_CURVE_Curve25519) {
+                    if (ecfp_key->curve == CX_CURVE_Curve25519) {
                         uint8_t raw_public_key[65];
                         uint8_t secret[32];
                         uint8_t i;

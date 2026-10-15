@@ -141,19 +141,24 @@ Seeded keys are generated as follow:
 
 For a given keys slot n, starting from 1, a seed is first derived with the following path
 
- | ``Sn = BIP32_derive (/0x80475047/n)``
+ | ``Sn = BIP32_derive (/0x80475047'/n')``
+
+The last index is hardened, so that the seed of one slot gives no information on the other slots.
 
 **Step 2**:
 
-Then specific seeds are derived with the *SHA3-XOF* function for each of the 4 key:
+Then specific seeds are derived with the *SHAKE256* function for each key:
 
- | ``Sk[i] = SHA3-XOF(SHA256(Sn \| <key_name> \| int16(i)), length)``
+ | ``Sk[i] = SHAKE256(SHA256("kdf2" \| Sn \| <key_name> \| int16(i) \| int8(len(ctx)) \| ctx), length)``
 
 Where:
 
 - Sn is the dedicated slot seed from step 1.
-- key_name is one of 'sig ','dec ', 'aut ', 'sym0', each 4 characters.
+- key_name is one of 'sig ','dec ', 'aut ', each 4 characters.
 - i is the index, starting from 1, of the desired seed (see below)
+- ctx is the algorithm with the key size: the first 3 bytes of the key attributes for RSA
+  (algorithm and modulus size), the whole key attributes for ECC (algorithm and curve OID).
+- length is the output length, in bytes.
 
 **Step 3**:
 
@@ -166,6 +171,7 @@ Generate two seed Sp, Sq in step2 with:
 
 Generate two prime numbers p, q:
 
+- set the two most significant bits of Sp and Sq
 - p = next_prime(Sp)
 - q = next_prime(Sq)
 
@@ -180,12 +186,32 @@ Generate RSA key pair as usual:
 Generate one seed Sd in step2 with:
 
 - i = 1
-- length equals to curve size
+- length equals to twice the curve size
 
 Generate ECC key pair:
 
-- d = Sd
+- d = Sd mod curve order, on the curve size
+- for Curve25519, d is clamped as in RFC 7748
 - W = d.G
+
+*Legacy derivation*
+
+App versions up to 2.x derived the seeded keys differently, and this derivation is only kept
+to restore their keys (see P2 of GENERATE ASYMMETRIC KEY PAIR):
+
+- step 1 uses a non-hardened last index: ``Sn = BIP32_derive (/0x80475047'/n)``
+- step 2 hashes neither "kdf2" nor ctx: ``SHA256(Sn | <key_name> | int16(i))``
+- only the first length/8 bytes of the key buffer are derived:
+
+  - for RSA, the rest of Sp and Sq is zero, and only their most significant bit is set
+  - for ECC, the derivation is done over Sn, so d is these bytes followed by the rest of Sn,
+    without reduction nor clamping
+
+.. warning::
+
+   A legacy RSA key can be factored from its public key alone, and the legacy ECC keys of a
+   slot share most of their bytes. Keys restored with the legacy derivation should be replaced
+   by newly generated ones.
 
 *AES key generation*
 
@@ -220,14 +246,6 @@ For a given length *L* and seed *S*:
 - generate r = SHA3-XOF(SHA256(Sr \| 'rnd' \| S), L)
 - return r
 
-**Seeded prime number generation**:
-
-For a given length *L* and seed *S*:
-
-- generate r as for "Seeded random number"
-- generate rp = next_prime(r)
-- return rp
-
 Key Backup & Restore
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -240,28 +258,39 @@ In order to backup/restore private key the commands `put_data` and `get_data` ac
 `put_data` command accept the exact output of `get_data`. The `get_data` command
 return both the public and private key.
 
-For security and confidentiality, private key is returned encrypted in AES.
-The key used is derived according to previously described AES key derivation
-with name 'key'.
+For security and confidentiality, the private key is returned encrypted with AES-GCM.
+The 128-bit key is derived with the name 'key' from the seed of the slot, on the hardened path
+of the seeded keys. Everything before the encrypted private key is authenticated with it: the
+blob only restores on the same seed and slot, into the same key role and key attributes.
 
+The data payload (format version 3) is formatted as follow:
 
-The data payload is formatted as follow:
+  +-------+--------------------------------------------+
+  | size  | Description                                |
+  +=======+============================================+
+  | 1     | format version: 03                         |
+  +-------+--------------------------------------------+
+  | 12    | GCM nonce                                  |
+  +-------+--------------------------------------------+
+  | 2     | key reference: B6, B8 or A4                |
+  +-------+--------------------------------------------+
+  | 1     | key attributes size                        |
+  +-------+--------------------------------------------+
+  | var   | key attributes                             |
+  +-------+--------------------------------------------+
+  | 4     | public key size                            |
+  +-------+--------------------------------------------+
+  | var   | public key                                 |
+  +-------+--------------------------------------------+
+  | 4     | encrypted private key size, with the tag   |
+  +-------+--------------------------------------------+
+  | var   | encrypted private key, then 16-byte tag    |
+  +-------+--------------------------------------------+
 
-  +-------+--------------------------+
-  | size  | Description              |
-  +=======+==========================+
-  | 4     | OS Target ID             |
-  +-------+--------------------------+
-  | 4     | API Level                |
-  +-------+--------------------------+
-  | 4     | public key size          |
-  +-------+--------------------------+
-  | var   | public key               |
-  +-------+--------------------------+
-  | 4     | private key size         |
-  +-------+--------------------------+
-  | var   | encrypted private key    |
-  +-------+--------------------------+
+`put_data` also accepts the formats of older app versions, which start with the OS Target ID and
+the API Level, both ignored: version 2 (no key reference nor attributes, key derived on the
+non-hardened slot path), version 1 (no nonce field, nonce built from the slot and the key
+reference) and the AES-CBC format without version byte.
 
 APDU Modification
 -----------------
@@ -332,24 +361,31 @@ Deterministic key derivation
 
 P2 parameter of GENERATE ASYMMETRIC KEY PAIR is set to (hex value):
 
-- 00 for true random key generation
-- 01 for seeded random key
+- 00 for the default generation: a seeded key when the Seed mode is *on*, a random key otherwise
+- 01 for a seeded key with the legacy derivation, to restore the keys of app versions up to 2.x
+- 02 for a seeded key, whatever the Seed mode
+
+A restore regenerates each key with 02 first, then with 01 when the key does not match the
+fingerprint of the backup; once a key matches, its value of P2 is tried first for the next keys.
 
 Deterministic random number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-P1 parameter of GET CHALLENGE is a bit-field encoded as follow:
+P1 parameter of GET CHALLENGE selects one of these modes, any other value is rejected:
 
-  +----+----+----+----+----+----+----+----+-------------------------+
-  | b8 | b7 | b6 | b5 | b4 | b3 | b2 | b1 | Meaning                 |
-  +----+----+----+----+----+----+----+----+-------------------------+
-  | \- | \- | \- | \- | \- | \- | \- | x  | seeded random           |
-  +----+----+----+----+----+----+----+----+-------------------------+
-  | \- | \- | \- | \- | \- | \- | x  | \- | prime random            |
-  +----+----+----+----+----+----+----+----+-------------------------+
+  +------+-----------------------------------------------------------+
+  | P1   | Meaning                                                   |
+  +======+===========================================================+
+  | 00   | random number, of Le bytes                                |
+  +------+-----------------------------------------------------------+
+  | 01   | seeded random number: the data field contains the seed S, |
+  |      | and P2 the length L                                       |
+  +------+-----------------------------------------------------------+
+  | 02   | random prime number, of Le bytes                          |
+  +------+-----------------------------------------------------------+
 
-When *seeded mode* is set, data field contains the seed and P2 contains
-the length of random bytes to generate.
+GET CHALLENGE requires no PIN of the app: like every command, it is only processed while the device
+is unlocked.
 
 
 Other minor add-on

@@ -1,6 +1,14 @@
+/* Inter, the font of the lumen design tokens, served with the page */
+@import "@fontsource-variable/inter";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* The lumen typography uses this variable, which names "Inter" alone */
+:root {
+  --font-family-font: theme("fontFamily.sans");
+}
 
 /* Lumen's Dialog uses the Tailwind v4 class `translate-[-50%]` which maps to
    the CSS `translate` property.  This project runs Tailwind v3 where that
