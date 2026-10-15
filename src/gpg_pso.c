@@ -132,9 +132,11 @@ static void gpg_pso_reset_PW1() {
 static int gpg_sign(gpg_key_t *sigkey) {
     cx_err_t error = CX_INTERNAL_ERROR;
     cx_rsa_private_key_t *rsa_key = NULL;
-    unsigned int ksz, l;
+    size_t ksz;
+    unsigned int l;
     cx_ecfp_private_key_t *ecfp_key = NULL;
-    unsigned int s_len, i, rs_len, info;
+    size_t s_len;
+    unsigned int i, rs_len, info;
     unsigned char *rs;
 
     switch (sigkey->attributes.value[0]) {
@@ -274,7 +276,8 @@ end:
  */
 int gpg_apdu_pso() {
     cx_err_t error = CX_INTERNAL_ERROR;
-    unsigned int t, l, ksz;
+    unsigned int t, l;
+    size_t ksz;
     unsigned int cnt, pad_byte;
     unsigned int msg_len;
     cx_aes_key_t *aes_key = NULL;

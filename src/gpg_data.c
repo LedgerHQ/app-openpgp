@@ -1300,7 +1300,7 @@ static int gpg_put_key_data_legacy_rsa(gpg_key_t *keygpg, cx_aes_key_t *keyenc) 
     unsigned int enc_len = 0;
     unsigned int offset = 0;
     unsigned int ksz = 0;
-    unsigned int dec_len = 0;
+    size_t dec_len = 0;
     unsigned char pub_e[4];
     cx_rsa_private_key_t *key = NULL;
     int sw = SWO_INCORRECT_DATA;
@@ -1364,7 +1364,7 @@ static int gpg_put_key_data_legacy_ec(gpg_key_t *keygpg, cx_aes_key_t *keyenc) {
     unsigned int enc_len = 0;
     unsigned int offset = 0;
     unsigned int pub_offset = 0;
-    unsigned int dec_len = 0;
+    size_t dec_len = 0;
     unsigned char *priv = NULL;
     int sw = SWO_INCORRECT_DATA;
 
