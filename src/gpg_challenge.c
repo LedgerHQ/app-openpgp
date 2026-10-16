@@ -28,6 +28,7 @@ int gpg_apdu_get_challenge() {
     unsigned int olen;
     cx_err_t error = CX_INTERNAL_ERROR;
     unsigned char Sr[64];
+    unsigned char chain[32] = {0};
 
     switch (G_gpg_vstate.io_p1) {
         case CHALLENGE_NOMINAL:
@@ -47,9 +48,7 @@ int gpg_apdu_get_challenge() {
     if (G_gpg_vstate.io_p1 == SEEDED_MODE) {
         // Ledger Add-on: Seeded random
         unsigned int path[2];
-        unsigned char chain[32] = {0};
 
-        explicit_bzero(chain, 32);
         path[0] = 0x80475047;
         path[1] = 0x0F0F0F0F;
         CX_CHECK(os_derive_bip32_no_throw(CX_CURVE_SECP256K1, path, 2, Sr, chain));
@@ -86,6 +85,7 @@ int gpg_apdu_get_challenge() {
 
 end:
     explicit_bzero(&Sr, sizeof(Sr));
+    explicit_bzero(chain, sizeof(chain));
     if (error != CX_OK) {
         return error;
     }
