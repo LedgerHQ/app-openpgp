@@ -393,7 +393,7 @@ int gpg_apdu_pso() {
                     }
 
                     if ((rsa_key == NULL) || (rsa_key->size != ksz)) {
-                        PRINTF("[PSO] - Wrong RSA key size %d != %d\n", rsa_key->size, ksz);
+                        PRINTF("[PSO] - No RSA key of size %d\n", ksz);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
