@@ -23,8 +23,27 @@ set(FAKES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/fakes)
 
 set(FAKE_SOURCES
     ${FAKES_DIR}/fake_assert.c
+    ${FAKES_DIR}/fake_sdk.c
     ${FAKES_DIR}/fake_io.c
 )
+
+# SDK services replaced by CMock mocks
+set(CRYPTO_MOCK_HEADERS
+    ${SDK_DIR}/include/os_random.h
+    ${SDK_DIR}/include/os_utils.h
+    ${SDK_DIR}/lib_cxng/include/lcx_aes.h
+    ${SDK_DIR}/lib_cxng/include/lcx_aes_gcm.h
+    ${SDK_DIR}/lib_cxng/include/lcx_ecfp.h
+    ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+    ${SDK_DIR}/lib_cxng/include/lcx_math.h
+    ${SDK_DIR}/lib_cxng/include/lcx_rng.h
+    ${SDK_DIR}/lib_cxng/include/lcx_rsa.h
+    ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+    ${SDK_DIR}/lib_cxng/include/lcx_sha3.h
+)
+
+# CMock checks for NULL the arguments that SDK headers declare nonnull
+set(MOCK_COMPILE_OPTIONS -Wno-nonnull-compare)
 
 set(UT_INCLUDE_DIRS
     ${FAKES_DIR}
@@ -71,8 +90,25 @@ add_custom_command(TARGET generate_coverage POST_BUILD
 ledger_unit_tests_add_test(
     NAME         test_io
     SOURCES      ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_vars.c
+                 ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_data
+    SOURCES      ${APP_DIR}/gpg_data.c
+                 ${APP_DIR}/gpg_gen.c
+                 ${APP_DIR}/gpg_init.c
+                 ${APP_DIR}/gpg_io.c
+                 ${APP_DIR}/gpg_mse.c
+                 ${APP_DIR}/gpg_pin.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
