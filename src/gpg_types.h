@@ -68,7 +68,6 @@
 #define KEY_ID_EDDSA 22  // Edwards-curve Digital Signature Algorithm
 
 struct gpg_pin_s {
-    unsigned int ref;
     // initial pin length, 0 means not set
     unsigned int length;
     unsigned int counter;

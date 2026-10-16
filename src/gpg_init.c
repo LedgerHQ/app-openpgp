@@ -522,14 +522,12 @@ void gpg_install(unsigned char app_state) {
         memmove(pin.value, C_sha256_PW1, sizeof(C_sha256_PW1));
         pin.length = GPG_MIN_PW1_LENGTH;
         pin.counter = 3;
-        pin.ref = PIN_ID_PW1;
         nvm_write((void *) (&N_gpg_pstate->PW1), &pin, sizeof(gpg_pin_t));
 
         // default PW3: 1 2 3 4 5 6 7 8
         memmove(pin.value, C_sha256_PW2, sizeof(C_sha256_PW2));
         pin.length = GPG_MIN_PW3_LENGTH;
         pin.counter = 3;
-        pin.ref = PIN_ID_PW3;
         nvm_write((void *) (&N_gpg_pstate->PW3), &pin, sizeof(gpg_pin_t));
 
         // PWs status

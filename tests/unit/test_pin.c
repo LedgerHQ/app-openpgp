@@ -119,25 +119,16 @@ static void test_pin_references(void) {
 static void test_pin_set(void) {
     gpg_pin_t *pw1 = gpg_pin_get_pin(PIN_ID_PW1);
 
-    TEST_ASSERT_EQUAL_UINT(PIN_ID_PW1, pw1->ref);
     TEST_ASSERT_EQUAL_UINT(strlen(PW1_DEFAULT), pw1->length);
     TEST_ASSERT_EQUAL_UINT(3, pw1->counter);
-}
-
-static void test_pin_set_reference(void) {
-    // Set from the PIN location, whatever was stored before
-    gpg_pin_t *rc = gpg_pin_get_pin(PIN_ID_RC);
-
-    TEST_ASSERT_EQUAL_UINT(0, rc->ref);
-    store_pin(rc, RC_DEFAULT);
-    TEST_ASSERT_EQUAL_UINT(PIN_ID_RC, rc->ref);
-    TEST_ASSERT_EQUAL_UINT(PIN_ID_PW3, gpg_pin_get_pin(PIN_ID_PW3)->ref);
 }
 
 static void test_pin_set_unknown(void) {
     gpg_pin_t other = {0};
 
+    // Only the PIN locations of the persistent state can be set, and nothing is written
     TEST_ASSERT_LEDGER_ASSERT(gpg_pin_set(&other, (unsigned char *) PW1_DEFAULT, 6));
+    TEST_ASSERT_EACH_EQUAL_UINT8(0, (const uint8_t *) &other, sizeof(other));
 }
 
 static void test_verified_status(void) {
@@ -376,22 +367,6 @@ static void test_change_new_pin_length(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW3, PW3_DEFAULT));
 }
 
-static void test_change_ignores_stored_reference(void) {
-    // A corrupted stored reference does not disable the checks
-    gpg_pin_get_pin(PIN_ID_PW1)->ref = 0;
-    gpg_pin_get_pin(PIN_ID_PW3)->ref = 0x42;
-
-    TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, change(PIN_ID_PW1, PW1_DEFAULT "11111"));
-    TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, change(PIN_ID_PW3, PW3_DEFAULT "1111111"));
-
-    gpg_pin_get_pin(PIN_ID_PW1)->ref = 0;
-    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW1, PW1_DEFAULT));
-    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW2, PW1_DEFAULT));
-    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, change(PIN_ID_PW1, PW1_DEFAULT "1111111"));
-    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
-    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW2));
-}
-
 static void test_change_blocked(void) {
     gpg_pin_get_pin(PIN_ID_PW3)->counter = 0;
     TEST_ASSERT_EQUAL_HEX16(SWO_AUTH_METHOD_BLOCKED, change(PIN_ID_PW3, PW3_DEFAULT "87654321"));
@@ -496,7 +471,6 @@ int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_pin_references);
     RUN_TEST(test_pin_set);
-    RUN_TEST(test_pin_set_reference);
     RUN_TEST(test_pin_set_unknown);
     RUN_TEST(test_verified_status);
     RUN_TEST(test_verify);
@@ -519,7 +493,6 @@ int main(void) {
     RUN_TEST(test_change_pw3);
     RUN_TEST(test_change_wrong_pin);
     RUN_TEST(test_change_new_pin_length);
-    RUN_TEST(test_change_ignores_stored_reference);
     RUN_TEST(test_change_blocked);
     RUN_TEST(test_change_on_device);
     RUN_TEST(test_change_leaves_pin_not_verified);

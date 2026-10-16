@@ -157,15 +157,15 @@ int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     cx_sha256_t sha256;
     cx_err_t error = CX_INTERNAL_ERROR;
     gpg_pin_t newpin = {0};
+    unsigned int ref = gpg_pin_get_ref(pin);
 
-    newpin.ref = gpg_pin_get_ref(pin);
     cx_sha256_init(&sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &sha256, CX_LAST, pin_val, pin_len, newpin.value, 32));
     newpin.length = pin_len;
     newpin.counter = 3;
 
     nvm_write(pin, &newpin, sizeof(gpg_pin_t));
-    if (newpin.ref == PIN_ID_PW1) {
+    if (ref == PIN_ID_PW1) {
         // PW2 shares the PW1 value: its session was opened with the previous value
         gpg_pin_set_verified(PIN_ID_PW2, 0);
     }
