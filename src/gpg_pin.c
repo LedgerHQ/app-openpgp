@@ -62,7 +62,8 @@ static int gpg_pin_get_state_index(unsigned int pinref) {
 }
 
 /**
- * Compare the PinCode hash and handle the associated counter
+ * Compare the PinCode hash and handle the associated counter,
+ * without changing the verification status
  *
  * @param[in]  pin PinCode reference to check
  * @param[in]  pin_val PinCode value
@@ -71,7 +72,7 @@ static int gpg_pin_get_state_index(unsigned int pinref) {
  * @return Status Word
  *
  */
-static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, int pin_len) {
+int gpg_pin_check_value(gpg_pin_t *pin, const unsigned char *pin_val, unsigned int pin_len) {
     unsigned int counter;
     cx_err_t error = CX_INTERNAL_ERROR;
 
@@ -115,7 +116,7 @@ end:
 int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len) {
     int sw = SWO_UNKNOWN;
     gpg_pin_set_verified(pinID, 0);
-    sw = gpg_pin_check_internal(pin, pin_val, pin_len);
+    sw = gpg_pin_check_value(pin, pin_val, pin_len);
     if (sw == SWO_SUCCESS) {
         gpg_pin_set_verified(pinID, 1);
     }
@@ -316,8 +317,9 @@ int gpg_apdu_change_ref_data() {
         return 0;
     }
 
+    // The current PIN is checked without opening a session
     len = MIN(G_gpg_vstate.io_length, pin->length);
-    sw = gpg_pin_check(pin, pin->ref, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+    sw = gpg_pin_check_value(pin, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
     if (sw != SWO_SUCCESS) {
         return sw;
     }
@@ -360,10 +362,9 @@ int gpg_apdu_reset_retry_counter() {
         // avoid any-overflow without giving info
         rc_len = MIN(G_gpg_vstate.io_length, pin_rc->length);
         pw1_len = G_gpg_vstate.io_length - rc_len;
-        sw = gpg_pin_check(pin_rc,
-                           pin_rc->ref,
-                           G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                           rc_len);
+        sw = gpg_pin_check_value(pin_rc,
+                                 G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                 rc_len);
         if (sw != SWO_SUCCESS) {
             return sw;
         }

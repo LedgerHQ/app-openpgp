@@ -101,6 +101,7 @@ gpg_pin_t *gpg_pin_get_pin(int id);
 int gpg_pin_is_verified(int pinID);
 void gpg_pin_set_verified(int pinID, int verified);
 int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len);
+int gpg_pin_check_value(gpg_pin_t *pin, const unsigned char *pin_val, unsigned int pin_len);
 int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
 
 /* ----------------------------------------------------------------------- */

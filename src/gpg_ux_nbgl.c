@@ -1340,9 +1340,9 @@ static void pinentry_validate_cb(const uint8_t *pinentry, uint8_t length) {
         case INS_CHANGE_REFERENCE_DATA:
             switch (G_gpg_vstate.ux_step) {
                 case 0:
-                    // Check Current pin code
+                    // Check Current pin code, without opening a session
                     pin = gpg_pin_get_pin(G_gpg_vstate.ux_pinconfirm_p2);
-                    sw = gpg_pin_check(pin, G_gpg_vstate.ux_pinconfirm_p2, pinentry, length);
+                    sw = gpg_pin_check_value(pin, pinentry, length);
                     gpg_io_discard(1);
                     if (sw == SWO_AUTH_METHOD_BLOCKED) {
                         gpg_io_insert_u16(sw);

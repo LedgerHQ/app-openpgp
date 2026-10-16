@@ -355,6 +355,30 @@ static void test_change_on_device(void) {
     TEST_ASSERT_EQUAL_HEX8(PIN_ID_PW1, G_gpg_vstate.ux_pinconfirm_p2);
 }
 
+static void test_change_leaves_pin_not_verified(void) {
+    // Checking the current PIN does not open a session, whatever the result
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW3, PW3_DEFAULT));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, change(PIN_ID_PW3, PW3_DEFAULT "87654321"));
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW3));
+
+    TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, change(PIN_ID_PW1, PW1_DEFAULT "11111"));
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, change(PIN_ID_PW1, PW1_DEFAULT "1111111"));
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW2));
+}
+
+static void test_check_value(void) {
+    gpg_pin_t *pw1 = gpg_pin_get_pin(PIN_ID_PW1);
+
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS,
+                            gpg_pin_check_value(pw1, (const unsigned char *) PW1_DEFAULT, 6));
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SECURITY_CONDITION_NOT_SATISFIED,
+                            gpg_pin_check_value(pw1, (const unsigned char *) "000000", 6));
+    TEST_ASSERT_EQUAL_UINT(2, counter(PIN_ID_PW1));
+}
+
 static void test_change_bad_reference(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, change(0x85, PW1_DEFAULT "1111111"));
 }
@@ -376,6 +400,8 @@ static void test_reset_with_code(void) {
     TEST_ASSERT_EQUAL_UINT(3, counter(PIN_ID_PW1));
     TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
     TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW2));
+    // The Resetting Code is only checked for this command
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_RC));
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW1, "2222222"));
 }
 
@@ -443,6 +469,8 @@ int main(void) {
     RUN_TEST(test_change_new_pin_length);
     RUN_TEST(test_change_blocked);
     RUN_TEST(test_change_on_device);
+    RUN_TEST(test_change_leaves_pin_not_verified);
+    RUN_TEST(test_check_value);
     RUN_TEST(test_change_bad_reference);
     RUN_TEST(test_reset_with_code);
     RUN_TEST(test_reset_wrong_code);
