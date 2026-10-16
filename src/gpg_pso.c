@@ -296,6 +296,7 @@ int gpg_apdu_pso() {
     cx_aes_key_t *aes_key = NULL;
     cx_rsa_private_key_t *rsa_key = NULL;
     cx_ecfp_private_key_t *ecfp_key = NULL;
+    uint8_t secret[32];
 
     // UIF HANDLE
     switch (G_gpg_vstate.io_p1p2) {
@@ -481,7 +482,6 @@ int gpg_apdu_pso() {
 
                     if (ecfp_key->curve == CX_CURVE_Curve25519) {
                         uint8_t raw_public_key[65];
-                        uint8_t secret[32];
                         uint8_t i;
 
                         if (l != 32) {
@@ -547,6 +547,7 @@ int gpg_apdu_pso() {
             break;
     }
 end:
+    explicit_bzero(secret, sizeof(secret));
     return error;
 }
 
