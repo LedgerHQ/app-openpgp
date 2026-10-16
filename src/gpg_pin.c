@@ -165,7 +165,7 @@ int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     newpin.counter = 3;
 
     nvm_write(pin, &newpin, sizeof(gpg_pin_t));
-    if (pin->ref == PIN_ID_PW1) {
+    if (newpin.ref == PIN_ID_PW1) {
         // PW2 shares the PW1 value: its session was opened with the previous value
         gpg_pin_set_verified(PIN_ID_PW2, 0);
     }
@@ -313,14 +313,16 @@ int gpg_apdu_verify() {
 int gpg_apdu_change_ref_data() {
     int sw = SWO_UNKNOWN;
     gpg_pin_t *pin;
+    unsigned int ref;
     int len, newlen;
 
     pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
     if (pin == NULL) {
         return SWO_INCORRECT_DATA;
     }
+    ref = gpg_pin_get_ref(pin);
 
-    gpg_pin_set_verified(pin->ref, 0);
+    gpg_pin_set_verified(ref, 0);
 
     // --- PW1/PW3 pin ---
     if (gpg_pin_is_blocked(pin)) {
@@ -343,9 +345,8 @@ int gpg_apdu_change_ref_data() {
     }
 
     newlen = G_gpg_vstate.io_length - len;
-    if ((newlen > GPG_MAX_PW_LENGTH) ||
-        ((pin->ref == PIN_ID_PW1) && (newlen < GPG_MIN_PW1_LENGTH)) ||
-        ((pin->ref == PIN_ID_PW3) && (newlen < GPG_MIN_PW3_LENGTH))) {
+    if ((newlen > GPG_MAX_PW_LENGTH) || ((ref == PIN_ID_PW1) && (newlen < GPG_MIN_PW1_LENGTH)) ||
+        ((ref == PIN_ID_PW3) && (newlen < GPG_MIN_PW3_LENGTH))) {
         return SWO_INCORRECT_DATA;
     }
     sw = gpg_pin_set(pin, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + len, newlen);
