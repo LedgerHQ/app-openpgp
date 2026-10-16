@@ -48,14 +48,13 @@ int gpg_apdu_select() {
         G_gpg_vstate.DO_current = 0;
         G_gpg_vstate.DO_reccord = 0;
         G_gpg_vstate.DO_offset = 0;
+        // PINs stay verified until the card is reset: only the first selection opens a session
         if (G_gpg_vstate.selected == 0) {
-            G_gpg_vstate.verified_pin[0] = 0;
-            G_gpg_vstate.verified_pin[1] = 0;
-            G_gpg_vstate.verified_pin[2] = 0;
-            G_gpg_vstate.verified_pin[3] = 0;
-            G_gpg_vstate.verified_pin[4] = 0;
-            gpg_mse_reset();
+            explicit_bzero(G_gpg_vstate.verified_pin, sizeof(G_gpg_vstate.verified_pin));
+            G_gpg_vstate.selected = 1;
         }
+        // the default keys are restored on every selection
+        gpg_mse_reset();
 
         gpg_io_discard(0);
         if (N_gpg_pstate->histo[HISTO_OFFSET_STATE] != STATE_ACTIVATE) {
