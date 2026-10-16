@@ -257,3 +257,18 @@ ledger_unit_tests_add_test(
     COMPILE_DEFS ${UT_COMPILE_DEFS}
     COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
+
+ledger_unit_tests_add_test(
+    NAME         test_ux
+    SOURCES      ${APP_DIR}/gpg_ux.c
+                 ${APP_DIR}/gpg_ux_msg.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${APP_DIR}/gpg_api.h
+                 ${SDK_DIR}/lib_nbgl/include/nbgl_use_case.h
+                 ${SDK_DIR}/lib_nbgl/include/nbgl_layout.h
+                 ${SDK_DIR}/lib_standard_app/main_std_app.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
