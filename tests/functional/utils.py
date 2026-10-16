@@ -183,6 +183,33 @@ def get_ECDSA_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
     return ECC.construct(curve="P-256", point_x=bytes_to_long(x), point_y=bytes_to_long(y))
 
 
+P256_ORDER = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+
+
+def verify_ecdsa_p256(pubkey: ECC.EccKey, digest: bytes, signature: bytes) -> bool:
+    """Verify a r || s P-256 signature of a digest, left-padded or truncated to 32 bytes
+
+    Args:
+        pubkey (EccKey):   P-256 public key
+        digest (bytes):    Digest given to the card
+        signature (bytes): r || s, 32 bytes each
+
+    Returns:
+        True if the signature is valid
+    """
+
+    assert len(signature) == 64
+    r = int.from_bytes(signature[:32], "big")
+    s = int.from_bytes(signature[32:], "big")
+    if not (0 < r < P256_ORDER and 0 < s < P256_ORDER):
+        return False
+    z = int.from_bytes(digest[:32].rjust(32, b"\x00"), "big")
+    w = pow(s, -1, P256_ORDER)
+    generator = ECC.construct(curve="P-256", d=1).pointQ
+    point = generator * (z * w % P256_ORDER) + pubkey.pointQ * (r * w % P256_ORDER)
+    return int(point.x) % P256_ORDER == r
+
+
 def get_RSA_pub_key(client: CommandSender, key_tag: DataObject) -> RSA.RsaKey:
     """Read the Public Key and generate a RsaKey object
 

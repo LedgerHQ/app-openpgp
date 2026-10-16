@@ -109,14 +109,11 @@ def _put_key_backup(backend: BackendInterface, key: DataObject, data: bytes) -> 
 
 
 def _sign_raw(client: CommandSender, digest: bytes) -> bytes:
-    # MPI encoding 0x00 || r || 0x00 || s is only unambiguous when r and s are full length
-    for _ in range(8):
-        rapdu = client.sign(digest)
-        assert rapdu.status == Errors.SW_OK
-        sig = rapdu.data
-        if len(sig) == 2 * (P256_COORD_LEN + 1):
-            return sig[1 : P256_COORD_LEN + 1] + sig[P256_COORD_LEN + 2 :]
-    pytest.fail("No full length ECDSA signature received")
+    # r || s, each on the curve size
+    rapdu = client.sign(digest)
+    assert rapdu.status == Errors.SW_OK
+    assert len(rapdu.data) == 2 * P256_COORD_LEN
+    return rapdu.data
 
 
 # In this test we back up a private key and restore it

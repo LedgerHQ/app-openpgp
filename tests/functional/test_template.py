@@ -24,6 +24,7 @@ from utils import (
     get_EDDSA_pub_key,
     get_key_attributes,
     get_RSA_pub_key,
+    verify_ecdsa_p256,
 )
 
 
@@ -127,20 +128,26 @@ def test_ecdsa_digest_length(backend: BackendInterface) -> None:
         assert rapdu.status == Errors.SW_OK
         generate_key(client, key)
 
+    sig_pubkey = get_ECDSA_pub_key(client, DataObject.DO_SIG_KEY)
+    aut_pubkey = get_ECDSA_pub_key(client, DataObject.DO_AUT_KEY)
     check_pincode(client, PassWord.PW1)
     check_pincode(client, PassWord.PW2)
     curve_len = 32
-    for length in (0, 1, curve_len - 1):
-        rapdu = client.sign(get_random_bytes(length))
-        assert rapdu.status == Errors.SW_WRONG_LENGTH
-        rapdu = client.authenticate(get_random_bytes(length))
-        assert rapdu.status == Errors.SW_WRONG_LENGTH
 
-    for length in (curve_len, 2 * curve_len):
-        rapdu = client.sign(get_random_bytes(length))
+    rapdu = client.sign(b"")
+    assert rapdu.status == Errors.SW_WRONG_LENGTH
+    rapdu = client.authenticate(b"")
+    assert rapdu.status == Errors.SW_WRONG_LENGTH
+
+    # Shorter digests are left-padded with zeros, longer ones truncated to the curve length
+    for length in (1, curve_len - 1, curve_len, 2 * curve_len):
+        digest = get_random_bytes(length)
+        rapdu = client.sign(digest)
         assert rapdu.status == Errors.SW_OK
-        rapdu = client.authenticate(get_random_bytes(length))
+        assert verify_ecdsa_p256(sig_pubkey, digest, rapdu.data)
+        rapdu = client.authenticate(digest)
         assert rapdu.status == Errors.SW_OK
+        assert verify_ecdsa_p256(aut_pubkey, digest, rapdu.data)
 
 
 # In this test we check the RSA public exponent configuration used for key generation
@@ -240,7 +247,7 @@ def test_signature_counter(backend: BackendInterface) -> None:
     curve_len = 32
 
     count = _signature_count(client)
-    rapdu = client.sign(get_random_bytes(curve_len - 1))
+    rapdu = client.sign(b"")
     assert rapdu.status == Errors.SW_WRONG_LENGTH
     assert _signature_count(client) == count
 
