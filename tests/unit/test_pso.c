@@ -320,13 +320,37 @@ static void test_sign_single_use_pw1(void) {
     TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
 }
 
+// RSA private operation on any DigestInfo
+static cx_err_t fake_rsa_sign_any(const cx_rsa_private_key_t *key,
+                                  uint32_t mode,
+                                  cx_md_t hashID,
+                                  const uint8_t *mesg,
+                                  size_t mesg_len,
+                                  uint8_t *dec,
+                                  size_t *dec_len,
+                                  int num_calls) {
+    (void) key;
+    (void) mode;
+    (void) hashID;
+    (void) num_calls;
+    TEST_ASSERT_EQUAL_UINT(RSA2048_LEN, mesg_len);
+    TEST_ASSERT_EQUAL_HEX8(0x00, mesg[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x01, mesg[1]);
+    memset(dec, 0xAB, RSA2048_LEN);
+    *dec_len = RSA2048_LEN;
+    return CX_OK;
+}
+
 static void test_sign_rsa_too_long(void) {
-    static uint8_t data[RSA2048_LEN - 10];
+    // At most 40% of the modulus
+    static uint8_t data[(RSA2048_LEN * 40 / 100) + 1];
 
     set_rsa2048(&G_gpg_vstate.kslot->sig);
-    // At least 11 bytes of PKCS#1 v1.5 padding
     TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, pso(PSO_CDS, data, sizeof(data)));
     TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.kslot->sig_count);
+
+    cx_rsa_decrypt_no_throw_StubWithCallback(fake_rsa_sign_any);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, pso(PSO_CDS, data, sizeof(data) - 1));
 }
 
 static void test_sign_rsa_no_key(void) {
@@ -739,6 +763,19 @@ static void test_authenticate_rsa(void) {
     assert_response_length(RSA2048_LEN);
 }
 
+static void test_authenticate_rsa_too_long(void) {
+    // At most 40% of the modulus
+    static uint8_t data[(RSA2048_LEN * 40 / 100) + 1];
+
+    set_rsa2048(&G_gpg_vstate.kslot->aut);
+    command(0x0000, data, sizeof(data));
+    TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, gpg_apdu_internal_authenticate());
+
+    cx_rsa_decrypt_no_throw_StubWithCallback(fake_rsa_sign_any);
+    command(0x0000, data, sizeof(data) - 1);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_apdu_internal_authenticate());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_uif_sign);
@@ -771,5 +808,6 @@ int main(void) {
     RUN_TEST(test_ecdh_malformed);
     RUN_TEST(test_ecdh_wrong_point_size);
     RUN_TEST(test_authenticate_rsa);
+    RUN_TEST(test_authenticate_rsa_too_long);
     return UNITY_END();
 }

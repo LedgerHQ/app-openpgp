@@ -160,10 +160,9 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 break;
             }
 
-            // sign — require at least 11 bytes of PKCS#1 v1.5 overhead (00 01
-            // [PS>=8] 00) so that l = ksz - io_length >= 11 and the write to
-            // io_buffer[l-1] is never out-of-bounds (CWE-787).
-            if (G_gpg_vstate.io_length > ksz - 11) {
+            // DigestInfo of at most 40% of the modulus, which leaves room for the PKCS#1 v1.5
+            // padding
+            if (G_gpg_vstate.io_length > ksz * 40 / 100) {
                 error = SWO_WRONG_LENGTH;
                 break;
             }
@@ -560,10 +559,5 @@ int gpg_apdu_internal_authenticate() {
         G_gpg_vstate.UIF_flags = 0;
     }
 
-    if (G_gpg_vstate.mse_aut->attributes.value[0] == KEY_ID_RSA) {
-        if (G_gpg_vstate.io_length > U2BE(G_gpg_vstate.mse_aut->attributes.value, 1) * 40 / 100) {
-            return SWO_WRONG_LENGTH;
-        }
-    }
     return gpg_sign(G_gpg_vstate.mse_aut);
 }
