@@ -185,16 +185,16 @@ static void test_cardholder_data_lengths(void) {
 /* ----------------------------------------------------------------------- */
 
 static void test_serial(void) {
-    const uint8_t serial[] = {0x12, 0x34, 0x56, 0x78};
+    const uint8_t serial[] = {0x12, 0x34, 0x56, 0x78, 0x9A};
 
-    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(0x4F, serial, sizeof(serial)));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(0x4F, serial, 4));
     TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, put_data(0x4F, serial, 3));
     TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, put_data(0x4F, serial, 5));
 
     // Full AID: 10 bytes of RID and version, the serial, then 0000
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_apdu_get_data(0x004F));
     TEST_ASSERT_EQUAL_UINT(16, G_gpg_vstate.io_length);
-    TEST_ASSERT_EQUAL_HEX8_ARRAY(serial, G_gpg_vstate.work.io_buffer + 10, sizeof(serial));
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(serial, G_gpg_vstate.work.io_buffer + 10, 4);
 }
 
 static void test_fingerprints(void) {
