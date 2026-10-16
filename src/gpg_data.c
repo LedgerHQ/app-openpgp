@@ -723,30 +723,30 @@ int gpg_apdu_put_data(unsigned int ref) {
                     break;
                 }
                 ksz = gpg_curve2domainlen(curve);
-                if (len_p > l) {
+                if ((len_p == 0) || (len_p > ksz) || (len_p > l)) {
                     sw = SWO_INCORRECT_DATA;
                     break;
                 }
-                if (ksz == len_p) {
-                    G_gpg_vstate.work.ecfp.private.curve = curve;
-                    G_gpg_vstate.work.ecfp.private.d_len = ksz;
-                    memmove(G_gpg_vstate.work.ecfp.private.d,
-                            G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                            ksz);
-                    CX_CHECK(cx_ecfp_generate_pair_no_throw(curve,
-                                                            &G_gpg_vstate.work.ecfp.public,
-                                                            &G_gpg_vstate.work.ecfp.private,
-                                                            1));
-                    nvm_write(&keygpg->pub_key.ecfp,
-                              &G_gpg_vstate.work.ecfp.public,
-                              sizeof(cx_ecfp_public_key_t));
-                    nvm_write(&keygpg->priv_key.ecfp,
-                              &G_gpg_vstate.work.ecfp.private,
-                              sizeof(cx_ecfp_private_key_t));
-                    if (reset_cnt) {
-                        reset_cnt = 0;
-                        nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
-                    }
+                // The private key may come without its leading zero bytes
+                G_gpg_vstate.work.ecfp.private.curve = curve;
+                G_gpg_vstate.work.ecfp.private.d_len = ksz;
+                explicit_bzero(G_gpg_vstate.work.ecfp.private.d, ksz - len_p);
+                memmove(G_gpg_vstate.work.ecfp.private.d + ksz - len_p,
+                        G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                        len_p);
+                CX_CHECK(cx_ecfp_generate_pair_no_throw(curve,
+                                                        &G_gpg_vstate.work.ecfp.public,
+                                                        &G_gpg_vstate.work.ecfp.private,
+                                                        1));
+                nvm_write(&keygpg->pub_key.ecfp,
+                          &G_gpg_vstate.work.ecfp.public,
+                          sizeof(cx_ecfp_public_key_t));
+                nvm_write(&keygpg->priv_key.ecfp,
+                          &G_gpg_vstate.work.ecfp.private,
+                          sizeof(cx_ecfp_private_key_t));
+                if (reset_cnt) {
+                    reset_cnt = 0;
+                    nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
                 }
                 sw = SWO_SUCCESS;
             }

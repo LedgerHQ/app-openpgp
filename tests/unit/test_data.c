@@ -534,6 +534,41 @@ static void test_import_ecc(void) {
     TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.kslot->sig_count);
 }
 
+static void test_import_ecc_short_key(void) {
+    uint8_t buf[64];
+    uint8_t expected[32] = {0};
+    size_t len = ecc_key_import(buf, KEY_AUT, 31);
+
+    set_ed25519_attributes(&G_gpg_vstate.kslot->aut);
+    memcpy(expected + 1, buf + len - 31, 31);
+
+    // Restored with its leading zero byte
+    cx_ecfp_generate_pair_no_throw_ExpectAnyArgsAndReturn(CX_OK);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(0x3FFF, buf, len));
+    TEST_ASSERT_EQUAL_UINT(32, G_gpg_vstate.kslot->aut.priv_key.ecfp.d_len);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, G_gpg_vstate.kslot->aut.priv_key.ecfp.d, 32);
+}
+
+static void test_import_ecc_wrong_length(void) {
+    uint8_t buf[64];
+    size_t len;
+
+    set_ed25519_attributes(&G_gpg_vstate.kslot->aut);
+    memset((void *) &G_gpg_vstate.kslot->aut.priv_key,
+           0xA5,
+           sizeof(G_gpg_vstate.kslot->aut.priv_key));
+
+    len = ecc_key_import(buf, KEY_AUT, 33);
+    TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, put_data(0x3FFF, buf, len));
+    len = ecc_key_import(buf, KEY_AUT, 0);
+    TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, put_data(0x3FFF, buf, len));
+
+    // The previous key is kept
+    TEST_ASSERT_EACH_EQUAL_HEX8(0xA5,
+                                (const uint8_t *) &G_gpg_vstate.kslot->aut.priv_key,
+                                sizeof(G_gpg_vstate.kslot->aut.priv_key));
+}
+
 static void test_import_no_attributes(void) {
     uint8_t buf[64];
     size_t len = ecc_key_import(buf, KEY_DEC, 32);
@@ -717,6 +752,8 @@ int main(void) {
     RUN_TEST(test_pw_status_bytes);
     RUN_TEST(test_signature_counter);
     RUN_TEST(test_import_ecc);
+    RUN_TEST(test_import_ecc_short_key);
+    RUN_TEST(test_import_ecc_wrong_length);
     RUN_TEST(test_import_no_attributes);
     RUN_TEST(test_import_bad_headers);
     RUN_TEST(test_import_rsa_bad_parts);
