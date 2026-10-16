@@ -159,3 +159,20 @@ ledger_unit_tests_add_test(
     COMPILE_DEFS ${UT_COMPILE_DEFS}
     COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
+
+ledger_unit_tests_add_test(
+    NAME         test_backup
+    SOURCES      ${APP_DIR}/gpg_data.c
+                 ${APP_DIR}/gpg_gen.c
+                 ${APP_DIR}/gpg_init.c
+                 ${APP_DIR}/gpg_io.c
+                 ${APP_DIR}/gpg_mse.c
+                 ${APP_DIR}/gpg_pin.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)

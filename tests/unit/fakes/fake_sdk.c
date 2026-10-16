@@ -26,7 +26,7 @@ void os_longjmp(unsigned int exception) {
     abort();
 }
 
-// Seed derivation is not emulated: tests reaching it must mock their caller
+// Deterministic stand-in for the seed derivation: a 32-byte key depending on the path
 void os_perso_derive_node_with_seed_key(unsigned int mode,
                                         cx_curve_t curve,
                                         const unsigned int *path,
@@ -35,15 +35,21 @@ void os_perso_derive_node_with_seed_key(unsigned int mode,
                                         unsigned char *chain,
                                         unsigned char *seed_key,
                                         unsigned int seed_key_length) {
+    unsigned int tag = 0;
+
     (void) mode;
     (void) curve;
-    (void) path;
-    (void) pathLength;
-    (void) privateKey;
-    (void) chain;
     (void) seed_key;
     (void) seed_key_length;
-    TEST_FAIL_MESSAGE("Unexpected seed derivation");
+    for (unsigned int i = 0; i < pathLength; i++) {
+        tag = (tag * 31) + path[i];
+    }
+    for (unsigned int i = 0; i < 32; i++) {
+        privateKey[i] = (unsigned char) (tag + (i * 7));
+        if (chain != NULL) {
+            chain[i] = (unsigned char) (tag ^ i);
+        }
+    }
 }
 
 // Curve parameters are not emulated: tests reaching them must mock their caller
