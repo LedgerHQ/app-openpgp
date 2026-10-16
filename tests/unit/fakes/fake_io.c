@@ -5,30 +5,23 @@
 #include "os_nvm.h"
 #include "fake_io.h"
 
-#define FAKE_IO_RX_FRAMES 8
-
 unsigned char G_io_tx_buffer[OS_IO_BUFFER_SIZE + 1];
 
-unsigned char fake_io_tx[OS_IO_BUFFER_SIZE + 1];
-unsigned short fake_io_tx_len;
-unsigned char fake_io_flags;
+fake_io_frame_t fake_io_tx[FAKE_IO_MAX_FRAMES];
+size_t fake_io_tx_count;
 
-static struct {
-    uint8_t data[OS_IO_BUFFER_SIZE + 1];
-    size_t len;
-} rx_frames[FAKE_IO_RX_FRAMES];
+static fake_io_frame_t rx_frames[FAKE_IO_MAX_FRAMES];
 static size_t rx_count;
 static size_t rx_next;
 
 void fake_io_reset(void) {
     rx_count = 0;
     rx_next = 0;
-    fake_io_tx_len = 0;
-    fake_io_flags = 0;
+    fake_io_tx_count = 0;
 }
 
 void fake_io_push_rx(const uint8_t *frame, size_t len) {
-    if ((rx_count >= FAKE_IO_RX_FRAMES) || (len > sizeof(rx_frames[0].data))) {
+    if ((rx_count >= FAKE_IO_MAX_FRAMES) || (len > sizeof(rx_frames[0].data))) {
         abort();
     }
     memcpy(rx_frames[rx_count].data, frame, len);
@@ -38,12 +31,13 @@ void fake_io_push_rx(const uint8_t *frame, size_t len) {
 
 // Record the transmitted frame, then receive the next staged frame (0 when none is left)
 unsigned short io_exchange(unsigned char channel_and_flags, unsigned short tx_len) {
-    if (tx_len > sizeof(G_io_apdu_buffer)) {
+    if ((tx_len > sizeof(G_io_apdu_buffer)) || (fake_io_tx_count >= FAKE_IO_MAX_FRAMES)) {
         abort();
     }
-    memcpy(fake_io_tx, G_io_apdu_buffer, tx_len);
-    fake_io_tx_len = tx_len;
-    fake_io_flags = channel_and_flags;
+    memcpy(fake_io_tx[fake_io_tx_count].data, G_io_apdu_buffer, tx_len);
+    fake_io_tx[fake_io_tx_count].len = tx_len;
+    fake_io_tx[fake_io_tx_count].flags = channel_and_flags;
+    fake_io_tx_count++;
     if (rx_next >= rx_count) {
         return 0;
     }
