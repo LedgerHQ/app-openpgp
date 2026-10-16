@@ -92,7 +92,7 @@ int gpg_pin_check_value(gpg_pin_t *pin, const unsigned char *pin_val, unsigned i
                               pin_len,
                               G_gpg_vstate.work.md.H,
                               sizeof(G_gpg_vstate.work.md.H)));
-    if (memcmp(G_gpg_vstate.work.md.H, pin->value, 32)) {
+    if (os_secure_memcmp(G_gpg_vstate.work.md.H, pin->value, sizeof(pin->value)) != 0) {
         error = (counter == 0) ? SWO_AUTH_METHOD_BLOCKED : SWO_SECURITY_CONDITION_NOT_SATISFIED;
     } else {
         counter = 3;

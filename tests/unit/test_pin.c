@@ -9,6 +9,7 @@
 #include "Mockgpg_ux.h"
 #include "Mocklcx_hash.h"
 #include "Mocklcx_sha256.h"
+#include "Mockos_utils.h"
 
 #define PW1_DEFAULT "123456"
 #define PW3_DEFAULT "12345678"
@@ -33,6 +34,11 @@ static cx_err_t fake_sha256(cx_hash_t *hash,
     return CX_OK;
 }
 
+static char fake_secure_memcmp(const void *src1, const void *src2, size_t length, int num_calls) {
+    (void) num_calls;
+    return (char) (memcmp(src1, src2, length) != 0);
+}
+
 static void store_pin(gpg_pin_t *pin, const char *value) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_pin_set(pin, (unsigned char *) value, strlen(value)));
 }
@@ -43,6 +49,8 @@ void setUp(void) {
     Mockgpg_ux_Init();
     Mocklcx_hash_Init();
     Mocklcx_sha256_Init();
+    Mockos_utils_Init();
+    os_secure_memcmp_StubWithCallback(fake_secure_memcmp);
     cx_sha256_init_no_throw_IgnoreAndReturn(CX_OK);
     cx_hash_no_throw_StubWithCallback(fake_sha256);
 
@@ -55,6 +63,7 @@ void tearDown(void) {
     Mockgpg_ux_Destroy();
     Mocklcx_hash_Destroy();
     Mocklcx_sha256_Destroy();
+    Mockos_utils_Destroy();
 }
 
 // Load a received command, as left by gpg_io_do()
@@ -200,6 +209,15 @@ static void test_verify_consumes_try_first(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW1, PW1_DEFAULT));
     TEST_ASSERT_EQUAL_UINT(1, counter_when_hashed);
     TEST_ASSERT_EQUAL_UINT(3, counter(PIN_ID_PW1));
+}
+
+static void test_verify_secure_compare(void) {
+    // The PIN hash is compared with the constant-time comparison of the SDK
+    os_secure_memcmp_StubWithCallback(NULL);
+    os_secure_memcmp_ExpectAnyArgsAndReturn(1);
+
+    TEST_ASSERT_EQUAL_HEX16(SWO_SECURITY_CONDITION_NOT_SATISFIED, verify(PIN_ID_PW1, PW1_DEFAULT));
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
 }
 
 static void test_verify_hash_error(void) {
@@ -468,6 +486,7 @@ int main(void) {
     RUN_TEST(test_verify);
     RUN_TEST(test_verify_wrong_pin);
     RUN_TEST(test_verify_consumes_try_first);
+    RUN_TEST(test_verify_secure_compare);
     RUN_TEST(test_verify_hash_error);
     RUN_TEST(test_verify_blocked);
     RUN_TEST(test_verify_wrong_pin_clears_status);

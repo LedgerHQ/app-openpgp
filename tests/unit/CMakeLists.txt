@@ -119,7 +119,8 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_io.c
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
-    MOCK_HEADERS ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+    MOCK_HEADERS ${SDK_DIR}/include/os_utils.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_hash.h
                  ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
