@@ -18,6 +18,8 @@
 #ifndef GPG_TYPES_H
 #define GPG_TYPES_H
 
+#include "os.h"
+#include "cx.h"
 #include "lcx_sha3.h"
 #include "usbd_ccid_if.h"
 #include "status_words.h"
