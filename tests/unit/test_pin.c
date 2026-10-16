@@ -162,6 +162,41 @@ static void test_verify_wrong_pin(void) {
     TEST_ASSERT_EQUAL_UINT(3, counter(PIN_ID_PW1));
 }
 
+static unsigned int counter_when_hashed;
+
+static cx_err_t spy_sha256(cx_hash_t *hash,
+                           uint32_t mode,
+                           const uint8_t *in,
+                           size_t len,
+                           uint8_t *out,
+                           size_t out_len,
+                           int num_calls) {
+    counter_when_hashed = gpg_pin_get_pin(PIN_ID_PW1)->counter;
+    return fake_sha256(hash, mode, in, len, out, out_len, num_calls);
+}
+
+static void test_verify_consumes_try_first(void) {
+    // The try is already counted in NVRAM when the PIN is checked
+    cx_hash_no_throw_StubWithCallback(spy_sha256);
+
+    TEST_ASSERT_EQUAL_HEX16(SWO_SECURITY_CONDITION_NOT_SATISFIED, verify(PIN_ID_PW1, "000000"));
+    TEST_ASSERT_EQUAL_UINT(2, counter_when_hashed);
+
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW1, PW1_DEFAULT));
+    TEST_ASSERT_EQUAL_UINT(1, counter_when_hashed);
+    TEST_ASSERT_EQUAL_UINT(3, counter(PIN_ID_PW1));
+}
+
+static void test_verify_hash_error(void) {
+    // A failed check still costs the try
+    cx_hash_no_throw_StubWithCallback(NULL);
+    cx_hash_no_throw_ExpectAnyArgsAndReturn(CX_INTERNAL_ERROR);
+
+    TEST_ASSERT_EQUAL_HEX32(CX_INTERNAL_ERROR, verify(PIN_ID_PW1, PW1_DEFAULT));
+    TEST_ASSERT_EQUAL_UINT(2, counter(PIN_ID_PW1));
+    TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
+}
+
 static void test_verify_blocked(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SECURITY_CONDITION_NOT_SATISFIED, verify(PIN_ID_PW3, "00000000"));
     TEST_ASSERT_EQUAL_HEX16(SWO_SECURITY_CONDITION_NOT_SATISFIED, verify(PIN_ID_PW3, "00000000"));
@@ -376,6 +411,8 @@ int main(void) {
     RUN_TEST(test_verified_status);
     RUN_TEST(test_verify);
     RUN_TEST(test_verify_wrong_pin);
+    RUN_TEST(test_verify_consumes_try_first);
+    RUN_TEST(test_verify_hash_error);
     RUN_TEST(test_verify_blocked);
     RUN_TEST(test_verify_wrong_pin_clears_status);
     RUN_TEST(test_verify_status_request);

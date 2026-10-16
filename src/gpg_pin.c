@@ -79,7 +79,10 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, 
         return SWO_AUTH_METHOD_BLOCKED;
     }
 
+    // The try is consumed in NVRAM before the check, so that an interrupted check costs it
     counter = pin->counter - 1;
+    nvm_write(&(pin->counter), &counter, sizeof(counter));
+
     cx_sha256_init(&G_gpg_vstate.work.md.sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
                               CX_LAST,
@@ -91,13 +94,11 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, 
         error = (counter == 0) ? SWO_AUTH_METHOD_BLOCKED : SWO_SECURITY_CONDITION_NOT_SATISFIED;
     } else {
         counter = 3;
+        nvm_write(&(pin->counter), &counter, sizeof(counter));
         error = SWO_SUCCESS;
     }
 
 end:
-    if (counter != pin->counter) {
-        nvm_write(&(pin->counter), &counter, sizeof(int));
-    }
     return error;
 }
 
