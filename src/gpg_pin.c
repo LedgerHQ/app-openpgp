@@ -263,8 +263,6 @@ int gpg_apdu_verify() {
         return sw;
     }
 
-    gpg_io_discard(1);
-
     // STATUS REQUEST
     if ((G_gpg_vstate.io_p1 == PIN_VERIFY) && G_gpg_vstate.io_length == 0) {
         if (gpg_pin_is_verified(G_gpg_vstate.io_p2)) {
@@ -273,12 +271,17 @@ int gpg_apdu_verify() {
         return SWO_VERIFY_FAILED | pin->counter;
     }
 
-    // RESET REQUEST
-    if ((G_gpg_vstate.io_p1 == PIN_NOT_VERIFIED) && G_gpg_vstate.io_length == 0) {
+    // RESET REQUEST, without data
+    if (G_gpg_vstate.io_p1 == PIN_NOT_VERIFIED) {
+        if (G_gpg_vstate.io_length != 0) {
+            gpg_io_discard(1);
+            return SWO_WRONG_LENGTH;
+        }
         gpg_pin_set_verified(G_gpg_vstate.io_p2, 0);
         return SWO_SUCCESS;
     }
 
+    gpg_io_discard(1);
     return SWO_INCORRECT_DATA;
 }
 

@@ -233,11 +233,24 @@ static void test_verify_reset_request(void) {
     TEST_ASSERT_FALSE(gpg_pin_is_verified(PIN_ID_PW1));
 }
 
+static void test_verify_reset_with_data(void) {
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW1, PW1_DEFAULT));
+
+    // The reset request has no data
+    command(CLA_APP_DEF, PIN_NOT_VERIFIED, PIN_ID_PW1, PW1_DEFAULT);
+    TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, gpg_apdu_verify());
+    TEST_ASSERT_TRUE(gpg_pin_is_verified(PIN_ID_PW1));
+    TEST_ASSERT_EACH_EQUAL_UINT8(0, G_gpg_vstate.work.io_buffer, GPG_IO_BUFFER_LENGTH);
+}
+
 static void test_verify_bad_parameters(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, verify(0x85, PW1_DEFAULT));
 
     command(CLA_APP_DEF, 0x01, PIN_ID_PW1, NULL);
     TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, gpg_apdu_verify());
+    command(CLA_APP_DEF, 0x01, PIN_ID_PW1, PW1_DEFAULT);
+    TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, gpg_apdu_verify());
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_length);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -417,6 +430,7 @@ int main(void) {
     RUN_TEST(test_verify_wrong_pin_clears_status);
     RUN_TEST(test_verify_status_request);
     RUN_TEST(test_verify_reset_request);
+    RUN_TEST(test_verify_reset_with_data);
     RUN_TEST(test_verify_bad_parameters);
     RUN_TEST(test_verify_pinpad_screen);
     RUN_TEST(test_verify_pinpad_confirm);
