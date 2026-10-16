@@ -133,6 +133,7 @@ ledger_unit_tests_add_test(
     SOURCES      ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${APP_DIR}/gpg_api.h
+                 ${APP_DIR}/gpg_ux.h
                  ${SDK_DIR}/lib_standard_app/main_std_app.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}

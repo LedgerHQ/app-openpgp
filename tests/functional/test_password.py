@@ -14,7 +14,7 @@ from ledgered.devices import Device, DeviceType
 from ragger.backend import BackendInterface
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import Navigator, NavIns, NavInsID
-from utils import check_pincode, util_navigate
+from utils import ROOT_SCREENSHOT_PATH, check_pincode, util_navigate
 
 
 # In this test we check the card Password verification
@@ -390,3 +390,89 @@ def test_access_without_pin(backend: BackendInterface) -> None:
     assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
     rapdu = client.generate_key(DataObject.DO_SIG_KEY)
     assert rapdu.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+
+
+def _block_pw3(client: CommandSender) -> None:
+    for _ in range(3):
+        with pytest.raises(ExceptionRAPDU):
+            client.send_verify_pw(PassWord.PW3, "00000000")
+
+
+def _confirm_terminate(
+    device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path | None, confirm: bool
+) -> None:
+    """Answer the TERMINATE DF confirmation, comparing the screens when test_name is given"""
+    if device.is_nano:
+        nav_inst, valid_instr = NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK]
+        text = "Yes, reset" if confirm else "Cancel"
+    else:
+        nav_inst = NavInsID.USE_CASE_REVIEW_REJECT
+        valid_instr = [NavInsID.USE_CASE_CHOICE_CONFIRM if confirm else NavInsID.USE_CASE_CHOICE_REJECT]
+        text = "Factory Reset"
+    # The confirmation may already be displayed
+    backend.wait_for_text_on_screen("Factory Reset")
+    if test_name is None:
+        navigator.navigate_until_text(
+            nav_inst,
+            valid_instr,
+            text,
+            screen_change_before_first_instruction=False,
+            screen_change_after_last_instruction=False,
+        )
+    else:
+        navigator.navigate_until_text_and_compare(
+            nav_inst,
+            valid_instr,
+            text,
+            ROOT_SCREENSHOT_PATH,
+            test_name,
+            screen_change_before_first_instruction=False,
+            screen_change_after_last_instruction=False,
+        )
+
+
+# In this test we check that TERMINATE DF requires PW3 while it is not blocked
+def test_terminate_pw3_not_verified(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.send_terminate()
+    assert err.value.status == Errors.SW_CONDITIONS_NOT_SATISFIED
+
+
+# In this test we check that a blocked PW3 lets the user confirm TERMINATE DF on the device
+def test_terminate_pw3_blocked(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
+    client = CommandSender(backend)
+    _block_pw3(client)
+
+    with client.send_terminate_with_confirmation():
+        _confirm_terminate(device, backend, navigator, test_name, confirm=True)
+    response = client.get_async_response()
+    assert response and response.status == Errors.SW_OK
+
+    # Back to the default PINs
+    rapdu = client.send_activate()
+    assert rapdu.status == Errors.SW_OK
+    rapdu = client.send_verify_pw(PassWord.PW3, "12345678")
+    assert rapdu.status == Errors.SW_OK
+
+
+# In this test we check that the user can refuse TERMINATE DF with a blocked PW3
+def test_terminate_pw3_blocked_refused(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
+    client = CommandSender(backend)
+    _block_pw3(client)
+
+    with pytest.raises(ExceptionRAPDU) as err:
+        with client.send_terminate_with_confirmation():
+            _confirm_terminate(device, backend, navigator, test_name, confirm=False)
+    assert err.value.status == Errors.SW_SECURITY_STATUS_NOT_SATISFIED
+
+    # Still active, with PW3 blocked
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.send_verify_pw(PassWord.PW3, "12345678")
+    assert err.value.status == Errors.SW_AUTH_METHOD_BLOCKED
+
+    # Reset the application for the next tests
+    with client.send_terminate_with_confirmation():
+        _confirm_terminate(device, backend, navigator, None, confirm=True)
+    assert client.send_activate().status == Errors.SW_OK

@@ -1259,6 +1259,42 @@ static void ui_reset(void) {
                        reset_cb);
 }
 
+/* ---------------------------- TERMINATE DF UX ----------------------------- */
+
+/**
+ * @brief TERMINATE DF confirmation callback
+ *
+ * @param[in] confirm indicate if the user press 'Yes, reset' or 'Cancel'
+ *
+ */
+static void terminate_confirm_cb(bool confirm) {
+    G_gpg_vstate.ui_pending = 0;
+    gpg_io_discard(1);
+    if (confirm) {
+        gpg_install(STATE_TERMINATE);
+        gpg_init_session();
+    }
+    gpg_io_insert_u16(confirm ? SWO_SUCCESS : SWO_SECURITY_CONDITION_NOT_SATISFIED);
+    gpg_io_do(IO_RETURN_AFTER_TX);
+    ui_init();
+}
+
+/**
+ * TERMINATE DF confirmation page, when PW3 is blocked
+ *
+ */
+void ui_menu_terminate_display(void) {
+    G_gpg_vstate.ui_pending = 1;
+    nbgl_useCaseChoice(NULL,
+                       "Factory Reset",
+                       "Admin PIN is blocked.\n"
+                       "The computer requests to delete ALL keys and reset the app.\n"
+                       "Are you sure?",
+                       "Yes, reset",
+                       "Cancel",
+                       terminate_confirm_cb);
+}
+
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
 
 /**

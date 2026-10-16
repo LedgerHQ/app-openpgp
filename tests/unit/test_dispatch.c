@@ -8,6 +8,7 @@
 #undef gpg_dispatch
 
 #include "Mockgpg_api.h"
+#include "Mockgpg_ux.h"
 #include "Mockmain_std_app.h"
 
 // Verification status of PW1, PW2, PW3 and RC, by PIN reference
@@ -32,6 +33,7 @@ void setUp(void) {
     N_gpg_pstate->histo[HISTO_OFFSET_STATE] = STATE_ACTIVATE;
 
     Mockgpg_api_Init();
+    Mockgpg_ux_Init();
     Mockmain_std_app_Init();
     gpg_pin_is_verified_StubWithCallback(fake_is_verified);
     gpg_pin_set_verified_StubWithCallback(fake_set_verified);
@@ -40,8 +42,10 @@ void setUp(void) {
 
 void tearDown(void) {
     Mockgpg_api_Verify();
+    Mockgpg_ux_Verify();
     Mockmain_std_app_Verify();
     Mockgpg_api_Destroy();
+    Mockgpg_ux_Destroy();
     Mockmain_std_app_Destroy();
 }
 
@@ -119,13 +123,26 @@ static void test_activate(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, dispatch(INS_ACTIVATE_FILE, 0x00, 0x00));
 }
 
+static gpg_pin_t pw3;
+
 static void test_terminate(void) {
+    // PW3 neither verified nor blocked
+    gpg_pin_get_pin_ExpectAndReturn(PIN_ID_PW3, &pw3);
+    gpg_pin_is_blocked_ExpectAndReturn(&pw3, 0);
     TEST_ASSERT_EQUAL_HEX16(SWO_CONDITIONS_NOT_SATISFIED, dispatch(INS_TERMINATE_DF, 0x00, 0x00));
 
     verified[PIN_ID_PW3] = 1;
     gpg_install_Expect(STATE_TERMINATE);
     gpg_init_session_Expect();
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, dispatch(INS_TERMINATE_DF, 0x00, 0x00));
+}
+
+static void test_terminate_pw3_blocked(void) {
+    // Confirmed on the device, which then sends the status word
+    gpg_pin_get_pin_ExpectAndReturn(PIN_ID_PW3, &pw3);
+    gpg_pin_is_blocked_ExpectAndReturn(&pw3, 1);
+    ui_menu_terminate_display_Expect();
+    TEST_ASSERT_EQUAL_HEX16(SWO_NO_RESPONSE, dispatch(INS_TERMINATE_DF, 0x00, 0x00));
 }
 
 /* ----------------------------------------------------------------------- */
@@ -463,6 +480,7 @@ int main(void) {
     RUN_TEST(test_terminated);
     RUN_TEST(test_activate);
     RUN_TEST(test_terminate);
+    RUN_TEST(test_terminate_pw3_blocked);
     RUN_TEST(test_verify);
     RUN_TEST(test_change_reference_data);
     RUN_TEST(test_reset_retry_counter);

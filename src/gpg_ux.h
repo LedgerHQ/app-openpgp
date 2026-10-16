@@ -45,6 +45,7 @@
 void app_reset(void);
 void ui_init(void);
 void ui_menu_pinconfirm_display(unsigned int value);
+void ui_menu_terminate_display(void);
 void ui_menu_pinentry_display(unsigned int value);
 void ui_menu_uifconfirm_display(unsigned int value);
 

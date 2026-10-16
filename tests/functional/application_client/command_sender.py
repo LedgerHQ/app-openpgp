@@ -62,6 +62,17 @@ class CommandSender:
 
         return self.backend.exchange(cla=ClaType.CLA_APP, ins=InsType.INS_TERMINATE_DF)
 
+    @contextmanager
+    def send_terminate_with_confirmation(self) -> Generator[None, None, None]:
+        """APDU Terminate - confirmed on the device, when PW3 is blocked
+
+        Returns:
+            Response APDU
+        """
+
+        with self.backend.exchange_async(cla=ClaType.CLA_APP, ins=InsType.INS_TERMINATE_DF) as response:
+            yield response
+
     ############### API interfaces ###############
     def get_data(self, tag: DataObject) -> RAPDU:
         """APDU Get Data
