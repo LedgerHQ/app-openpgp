@@ -331,6 +331,16 @@ static void test_uif_refused(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SECURITY_ISSUE, sent_sw);
 }
 
+static void test_uif_blocks_commands(void) {
+    // No other command can run, nor replace the operation, while the prompt is shown
+    show_uif_for_digest_a();
+    TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.ui_pending);
+
+    gpg_apdu_pso_StubWithCallback(check_snapshot_pso);
+    uif_confirm_cb(true);
+    TEST_ASSERT_EQUAL_UINT8(0, G_gpg_vstate.ui_pending);
+}
+
 /* ----------------------------------------------------------------------- */
 /* PIN mode settings                                                       */
 /* ----------------------------------------------------------------------- */
@@ -421,6 +431,7 @@ int main(void) {
     RUN_TEST(test_terminate_refused);
     RUN_TEST(test_uif_confirmed);
     RUN_TEST(test_uif_refused);
+    RUN_TEST(test_uif_blocks_commands);
     RUN_TEST(test_pin_mode_trust_requires_pw3);
     RUN_TEST(test_pin_mode_screen_requires_pw1);
     RUN_TEST(test_pin_mode_default);

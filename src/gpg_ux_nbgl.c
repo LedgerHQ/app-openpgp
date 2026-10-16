@@ -1547,6 +1547,7 @@ static uif_snapshot_t G_uif_snapshot;
 void uif_confirm_cb(bool confirm) {
     unsigned int sw = SWO_SECURITY_ISSUE;
 
+    G_gpg_vstate.ui_pending = 0;
     if (confirm) {
         /* Restore the exact APDU state that was shown to the user, discarding
          * any APDU the host may have sent while the prompt was pending. */
@@ -1587,6 +1588,7 @@ void uif_confirm_cb(bool confirm) {
 void ui_menu_uifconfirm_display(unsigned int value) {
     UNUSED(value);
 
+    G_gpg_vstate.ui_pending = 1;
     switch (G_gpg_vstate.io_ins) {
         case INS_INTERNAL_AUTHENTICATE:
             if (G_gpg_vstate.mse_aut == &G_gpg_vstate.kslot->aut) {
