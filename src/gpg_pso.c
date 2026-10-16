@@ -197,10 +197,17 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 error = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
-            // longer digests are truncated to the curve length
-            if (G_gpg_vstate.io_length < ksz) {
+            if (G_gpg_vstate.io_length == 0) {
                 error = SWO_WRONG_LENGTH;
                 break;
+            }
+            // shorter digests are left-padded with zeros, longer ones truncated to the curve length
+            if (G_gpg_vstate.io_length < ksz) {
+                l = ksz - G_gpg_vstate.io_length;
+                memmove(G_gpg_vstate.work.io_buffer + l,
+                        G_gpg_vstate.work.io_buffer,
+                        G_gpg_vstate.io_length);
+                memset(G_gpg_vstate.work.io_buffer, 0, l);
             }
             s_len = 256;
             CX_CHECK(cx_ecdsa_sign_no_throw(ecfp_key,

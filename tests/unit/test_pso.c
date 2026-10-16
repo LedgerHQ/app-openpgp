@@ -159,6 +159,7 @@ static cx_err_t fake_rsa_decrypt(const cx_rsa_private_key_t *key,
 static uint8_t ecdsa_r[ECC_LEN];
 static uint8_t ecdsa_s[ECC_LEN];
 static size_t ecdsa_hash_len;
+static uint8_t ecdsa_hash[ECC_LEN];
 
 static size_t der_integer(uint8_t *out, const uint8_t *value, size_t len) {
     size_t skip = 0;
@@ -193,6 +194,7 @@ static cx_err_t fake_ecdsa_sign(const cx_ecfp_private_key_t *pvkey,
     (void) hash;
     (void) num_calls;
     ecdsa_hash_len = hash_len;
+    memcpy(ecdsa_hash, hash, sizeof(ecdsa_hash));
     n += der_integer(sig + n, ecdsa_r, sizeof(ecdsa_r));
     n += der_integer(sig + n, ecdsa_s, sizeof(ecdsa_s));
     sig[0] = 0x30;
@@ -389,7 +391,24 @@ static void test_sign_ecdsa_digest_length(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, pso(PSO_CDS, digest, sizeof(digest)));
     TEST_ASSERT_EQUAL_UINT(ECC_LEN, ecdsa_hash_len);
 
-    TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, pso(PSO_CDS, digest, ECC_LEN - 1));
+    TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, pso(PSO_CDS, digest, 0));
+}
+
+static void test_sign_ecdsa_short_digest(void) {
+    // A shorter digest is left-padded with zeros
+    uint8_t digest[28];
+    uint8_t expected[ECC_LEN] = {0};
+
+    set_ecdsa_p256(&G_gpg_vstate.kslot->sig);
+    memset(digest, 0xD1, sizeof(digest));
+    memcpy(expected + ECC_LEN - sizeof(digest), digest, sizeof(digest));
+    memset(ecdsa_r, 0x11, sizeof(ecdsa_r));
+    memset(ecdsa_s, 0x22, sizeof(ecdsa_s));
+
+    cx_ecdsa_sign_no_throw_StubWithCallback(fake_ecdsa_sign);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, pso(PSO_CDS, digest, sizeof(digest)));
+    TEST_ASSERT_EQUAL_UINT(ECC_LEN, ecdsa_hash_len);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, ecdsa_hash, ECC_LEN);
 }
 
 static void check_ecdsa_signature(void) {
@@ -787,6 +806,7 @@ int main(void) {
     RUN_TEST(test_sign_rsa_no_key);
     RUN_TEST(test_sign_crypto_error);
     RUN_TEST(test_sign_ecdsa_digest_length);
+    RUN_TEST(test_sign_ecdsa_short_digest);
     RUN_TEST(test_sign_ecdsa);
     RUN_TEST(test_sign_ecdsa_short_integers);
     RUN_TEST(test_sign_ecdsa_bad_signature);
