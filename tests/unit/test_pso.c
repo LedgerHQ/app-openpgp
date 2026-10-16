@@ -368,6 +368,91 @@ static void test_sign_ecdsa_digest_length(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, pso(PSO_CDS, digest, ECC_LEN - 1));
 }
 
+static void check_ecdsa_signature(void) {
+    // r || s, each on the curve size
+    uint8_t expected[2 * ECC_LEN];
+
+    memcpy(expected, ecdsa_r, ECC_LEN);
+    memcpy(expected + ECC_LEN, ecdsa_s, ECC_LEN);
+    assert_response_length(sizeof(expected));
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, G_gpg_vstate.work.io_buffer, sizeof(expected));
+}
+
+static void test_sign_ecdsa(void) {
+    uint8_t digest[ECC_LEN] = {0};
+
+    set_ecdsa_p256(&G_gpg_vstate.kslot->sig);
+    cx_ecdsa_sign_no_throw_StubWithCallback(fake_ecdsa_sign);
+
+    // r with its high bit set, s without
+    memset(ecdsa_r, 0x81, sizeof(ecdsa_r));
+    memset(ecdsa_s, 0x22, sizeof(ecdsa_s));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, pso(PSO_CDS, digest, sizeof(digest)));
+    check_ecdsa_signature();
+}
+
+static void test_sign_ecdsa_short_integers(void) {
+    uint8_t digest[ECC_LEN] = {0};
+
+    set_ecdsa_p256(&G_gpg_vstate.kslot->sig);
+    cx_ecdsa_sign_no_throw_StubWithCallback(fake_ecdsa_sign);
+
+    // r shorter than the curve size
+    memset(ecdsa_r, 0x33, sizeof(ecdsa_r));
+    ecdsa_r[0] = 0x00;
+    memset(ecdsa_s, 0x92, sizeof(ecdsa_s));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, pso(PSO_CDS, digest, sizeof(digest)));
+    check_ecdsa_signature();
+
+    // s shorter than the curve size, with its high bit set after the leading zero
+    memset(ecdsa_r, 0x33, sizeof(ecdsa_r));
+    memset(ecdsa_s, 0x92, sizeof(ecdsa_s));
+    ecdsa_s[0] = 0x00;
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, pso(PSO_CDS, digest, sizeof(digest)));
+    check_ecdsa_signature();
+
+    // Both shorter, by several bytes
+    memset(ecdsa_r, 0x33, sizeof(ecdsa_r));
+    memset(ecdsa_r, 0x00, 3);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, pso(PSO_CDS, digest, sizeof(digest)));
+    check_ecdsa_signature();
+}
+
+static cx_err_t fake_ecdsa_bad_der(const cx_ecfp_private_key_t *pvkey,
+                                   uint32_t mode,
+                                   cx_md_t hashID,
+                                   const uint8_t *hash,
+                                   size_t hash_len,
+                                   uint8_t *sig,
+                                   size_t *sig_len,
+                                   uint32_t *info,
+                                   int num_calls) {
+    // r on 33 significant bytes
+    const uint8_t der[] = {0x30, 0x25, 0x02, 0x21, 0x01, 0x00};
+
+    (void) pvkey;
+    (void) mode;
+    (void) hashID;
+    (void) hash;
+    (void) hash_len;
+    (void) num_calls;
+    memset(sig, 0x11, 64);
+    memcpy(sig, der, sizeof(der));
+    *sig_len = 2 + 0x25;
+    *info = 0;
+    return CX_OK;
+}
+
+static void test_sign_ecdsa_bad_signature(void) {
+    uint8_t digest[ECC_LEN] = {0};
+
+    set_ecdsa_p256(&G_gpg_vstate.kslot->sig);
+    G_gpg_vstate.kslot->sig_count = 7;
+    cx_ecdsa_sign_no_throw_StubWithCallback(fake_ecdsa_bad_der);
+    TEST_ASSERT_EQUAL_HEX32(CX_INTERNAL_ERROR, pso(PSO_CDS, digest, sizeof(digest)));
+    TEST_ASSERT_EQUAL_UINT(7, G_gpg_vstate.kslot->sig_count);
+}
+
 static void test_sign_ecdsa_curve_mismatch(void) {
     uint8_t digest[ECC_LEN] = {0};
 
@@ -665,6 +750,9 @@ int main(void) {
     RUN_TEST(test_sign_rsa_no_key);
     RUN_TEST(test_sign_crypto_error);
     RUN_TEST(test_sign_ecdsa_digest_length);
+    RUN_TEST(test_sign_ecdsa);
+    RUN_TEST(test_sign_ecdsa_short_integers);
+    RUN_TEST(test_sign_ecdsa_bad_signature);
     RUN_TEST(test_sign_ecdsa_curve_mismatch);
     RUN_TEST(test_sign_eddsa);
     RUN_TEST(test_sign_eddsa_too_long);

@@ -212,22 +212,29 @@ static int gpg_sign(gpg_key_t *sigkey) {
                                             RS,
                                             &s_len,
                                             &info));
-            // re-encode r,s in MPI format
+            // r || s from the DER signature, each left-padded to the curve size
             gpg_io_discard(0);
-
-            rs_len = RS[3];
-            rs = &RS[4];
-
+            rs = RS + 2;
             for (i = 0; i < 2; i++) {
-                if (*rs == 0) {
+                if (rs[0] != 0x02) {
+                    error = CX_INTERNAL_ERROR;
+                    goto end;
+                }
+                rs_len = rs[1];
+                rs += 2;
+                while ((rs_len > ksz) && (*rs == 0)) {
                     rs++;
                     rs_len--;
                 }
-                gpg_io_insert_u8(0);
+                if (rs_len > ksz) {
+                    error = CX_INTERNAL_ERROR;
+                    goto end;
+                }
+                for (l = rs_len; l < ksz; l++) {
+                    gpg_io_insert_u8(0);
+                }
                 gpg_io_insert(rs, rs_len);
-                rs = rs + rs_len;
-                rs_len = rs[1];
-                rs += 2;
+                rs += rs_len;
             }
             error = SWO_SUCCESS;
             break;
