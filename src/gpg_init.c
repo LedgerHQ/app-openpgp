@@ -47,11 +47,11 @@ const unsigned char C_OID_SECP256K1[5] = {0x2B, 0x81, 0x04, 0x00, 0x0A};
 /* Unsupported (yet) Curves
 // brainpool 256t1: 1.3.36.3.3.2.8.1.1.8
 const unsigned char C_OID_BRAINPOOL256T1[9] = {
-  0x2B,0x24,0x03,0x03,0x02,0x08,0x01,0x01,0x07
+  0x2B,0x24,0x03,0x03,0x02,0x08,0x01,0x01,0x08
 };
 // brainpool 256r1: 1.3.36.3.3.2.8.1.1.7
 const unsigned char C_OID_BRAINPOOL256R1[9] = {
-  0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x08
+  0x2B, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x07
 };
 // brainpool 384r1: 1.3.36.3.3.2.8.1.1.11
 const unsigned char C_OID_BRAINPOOL384R1[9] = {
@@ -220,17 +220,21 @@ unsigned char *gpg_curve2oid(unsigned int cv, unsigned int *len) {
           *len = sizeof(C_OID_SECP521R1);
           return   (unsigned char*)PIC(C_OID_SECP521R1);
 
+        case CX_CURVE_BrainPoolP256T1:
+          *len = sizeof(C_OID_BRAINPOOL256T1);
+          return   (unsigned char*)PIC(C_OID_BRAINPOOL256T1);
+
         case CX_CURVE_BrainPoolP256R1:
-          *len = sizeof(C_OID_SECP256R1);
-          return   (unsigned char*)PIC(C_OID_SECP256R1);
+          *len = sizeof(C_OID_BRAINPOOL256R1);
+          return   (unsigned char*)PIC(C_OID_BRAINPOOL256R1);
 
         case CX_CURVE_BrainPoolP384R1:
-          *len = sizeof(C_OID_SECP384R1);
-          return   (unsigned char*)PIC(C_OID_SECP384R1);
+          *len = sizeof(C_OID_BRAINPOOL384R1);
+          return   (unsigned char*)PIC(C_OID_BRAINPOOL384R1);
 
         case CX_CURVE_BrainPoolP512R1:
-          *len = sizeof(C_OID_SECP521R1);
-          return   (unsigned char*)PIC(C_OID_SECP521R1);
+          *len = sizeof(C_OID_BRAINPOOL512R1);
+          return   (unsigned char*)PIC(C_OID_BRAINPOOL512R1);
         */
         case CX_CURVE_Ed25519:
             *len = sizeof(C_OID_Ed25519);
@@ -404,12 +408,12 @@ const unsigned char C_default_AlgoAttr_dec[]   = {
 };
 #endif
 
-// sha256 0x3132343536
+// sha256 0x313233343536
 const unsigned char C_sha256_PW1[] = {
     0x8d, 0x96, 0x9e, 0xef, 0x6e, 0xca, 0xd3, 0xc2, 0x9a, 0x3a, 0x62, 0x92, 0x80, 0xe6, 0x86, 0xcf,
     0x0c, 0x3f, 0x5d, 0x5a, 0x86, 0xaf, 0xf3, 0xca, 0x12, 0x02, 0x0c, 0x92, 0x3a, 0xdc, 0x6c, 0x92,
 };
-// sha256 0x31323435363738
+// sha256 0x3132333435363738
 const unsigned char C_sha256_PW2[] = {
     0xef, 0x79, 0x7c, 0x81, 0x18, 0xf0, 0x2d, 0xfb, 0x64, 0x96, 0x07, 0xdd, 0x5d, 0x3f, 0x8c, 0x76,
     0x23, 0x04, 0x8c, 0x9c, 0x06, 0x3d, 0x53, 0x2c, 0xc9, 0x5c, 0x5e, 0xd7, 0xa8, 0x98, 0xa6, 0x4f,
