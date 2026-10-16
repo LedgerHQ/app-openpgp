@@ -17,6 +17,7 @@
 
 #include "gpg_vars.h"
 #include "gpg_ux.h"
+#include "ledger_assert.h"
 
 /**
  * Get Pin structure from reference ID value
@@ -124,6 +125,25 @@ int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsig
 }
 
 /**
+ * Get the reference ID of a Pin structure from its location
+ *
+ * @param[in]  pin Pin structure
+ *
+ * @return PinCode reference ID
+ *
+ */
+static unsigned int gpg_pin_get_ref(const gpg_pin_t *pin) {
+    if (pin == gpg_pin_get_pin(PIN_ID_PW1)) {
+        return PIN_ID_PW1;
+    }
+    if (pin == gpg_pin_get_pin(PIN_ID_PW3)) {
+        return PIN_ID_PW3;
+    }
+    LEDGER_ASSERT(pin == gpg_pin_get_pin(PIN_ID_RC), "Unknown PIN!");
+    return PIN_ID_RC;
+}
+
+/**
  * Set the PinCode value in NVRam
  *
  * @param[in]  pin PinCode reference to set
@@ -138,9 +158,7 @@ int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     cx_err_t error = CX_INTERNAL_ERROR;
     gpg_pin_t newpin = {0};
 
-    // Preserve the logical PIN reference so that subsequent operations
-    // (length checks, verified-state indexing) stay consistent (CWE-457).
-    newpin.ref = pin->ref;
+    newpin.ref = gpg_pin_get_ref(pin);
     cx_sha256_init(&sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &sha256, CX_LAST, pin_val, pin_len, newpin.value, 32));
     newpin.length = pin_len;

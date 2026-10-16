@@ -33,8 +33,7 @@ static cx_err_t fake_sha256(cx_hash_t *hash,
     return CX_OK;
 }
 
-static void store_pin(gpg_pin_t *pin, unsigned int ref, const char *value) {
-    pin->ref = ref;
+static void store_pin(gpg_pin_t *pin, const char *value) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_pin_set(pin, (unsigned char *) value, strlen(value)));
 }
 
@@ -47,8 +46,8 @@ void setUp(void) {
     cx_sha256_init_no_throw_IgnoreAndReturn(CX_OK);
     cx_hash_no_throw_StubWithCallback(fake_sha256);
 
-    store_pin(gpg_pin_get_pin(PIN_ID_PW1), PIN_ID_PW1, PW1_DEFAULT);
-    store_pin(gpg_pin_get_pin(PIN_ID_PW3), PIN_ID_PW3, PW3_DEFAULT);
+    store_pin(gpg_pin_get_pin(PIN_ID_PW1), PW1_DEFAULT);
+    store_pin(gpg_pin_get_pin(PIN_ID_PW3), PW3_DEFAULT);
 }
 
 void tearDown(void) {
@@ -114,6 +113,22 @@ static void test_pin_set(void) {
     TEST_ASSERT_EQUAL_UINT(PIN_ID_PW1, pw1->ref);
     TEST_ASSERT_EQUAL_UINT(strlen(PW1_DEFAULT), pw1->length);
     TEST_ASSERT_EQUAL_UINT(3, pw1->counter);
+}
+
+static void test_pin_set_reference(void) {
+    // Set from the PIN location, whatever was stored before
+    gpg_pin_t *rc = gpg_pin_get_pin(PIN_ID_RC);
+
+    TEST_ASSERT_EQUAL_UINT(0, rc->ref);
+    store_pin(rc, RC_DEFAULT);
+    TEST_ASSERT_EQUAL_UINT(PIN_ID_RC, rc->ref);
+    TEST_ASSERT_EQUAL_UINT(PIN_ID_PW3, gpg_pin_get_pin(PIN_ID_PW3)->ref);
+}
+
+static void test_pin_set_unknown(void) {
+    gpg_pin_t other = {0};
+
+    TEST_ASSERT_LEDGER_ASSERT(gpg_pin_set(&other, (unsigned char *) PW1_DEFAULT, 6));
 }
 
 static void test_verified_status(void) {
@@ -392,7 +407,7 @@ static void block_pw1(void) {
 }
 
 static void test_reset_with_code(void) {
-    store_pin(gpg_pin_get_pin(PIN_ID_RC), PIN_ID_RC, RC_DEFAULT);
+    store_pin(gpg_pin_get_pin(PIN_ID_RC), RC_DEFAULT);
     block_pw1();
     gpg_pin_set_verified(PIN_ID_PW2, 1);
 
@@ -406,7 +421,7 @@ static void test_reset_with_code(void) {
 }
 
 static void test_reset_wrong_code(void) {
-    store_pin(gpg_pin_get_pin(PIN_ID_RC), PIN_ID_RC, RC_DEFAULT);
+    store_pin(gpg_pin_get_pin(PIN_ID_RC), RC_DEFAULT);
 
     TEST_ASSERT_EQUAL_HEX16(SWO_SECURITY_CONDITION_NOT_SATISFIED,
                             reset_with_code("00000000"
@@ -433,7 +448,7 @@ static void test_reset_with_pw3(void) {
 }
 
 static void test_reset_new_pin_length(void) {
-    store_pin(gpg_pin_get_pin(PIN_ID_RC), PIN_ID_RC, RC_DEFAULT);
+    store_pin(gpg_pin_get_pin(PIN_ID_RC), RC_DEFAULT);
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, verify(PIN_ID_PW3, PW3_DEFAULT));
 
     TEST_ASSERT_EQUAL_HEX16(SWO_INCORRECT_DATA, reset_with_code(RC_DEFAULT "22222"));
@@ -447,6 +462,8 @@ int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_pin_references);
     RUN_TEST(test_pin_set);
+    RUN_TEST(test_pin_set_reference);
+    RUN_TEST(test_pin_set_unknown);
     RUN_TEST(test_verified_status);
     RUN_TEST(test_verify);
     RUN_TEST(test_verify_wrong_pin);
