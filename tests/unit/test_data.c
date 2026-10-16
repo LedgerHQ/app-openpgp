@@ -129,6 +129,26 @@ static void test_login_url_max_length(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, put_data(0x5F50, value, sizeof(value)));
 }
 
+static void test_do_length(void) {
+    const uint8_t value[] = {'B', 'o', 'b'};
+    static const unsigned int refs[] = {0x5B, 0x5E, 0x5F2D, 0x5F50, 0x7F21};
+    volatile unsigned int *lengths[] = {
+        &N_gpg_pstate->name.length,
+        &N_gpg_pstate->login.length,
+        &N_gpg_pstate->lang.length,
+        &N_gpg_pstate->keys[0].url.length,
+        &N_gpg_pstate->keys[0].aut.CA.length,
+    };
+
+    // The stored length does not depend on the current offset in the IO buffer
+    for (size_t i = 0; i < sizeof(refs) / sizeof(refs[0]); i++) {
+        gpg_io_discard(1);
+        gpg_io_insert(value, sizeof(value));
+        TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_apdu_put_data(refs[i]));
+        TEST_ASSERT_EQUAL_UINT(sizeof(value), *lengths[i]);
+    }
+}
+
 static void test_cardholder_data(void) {
     const uint8_t name[] = "Doe<<John";
     const uint8_t lang[] = "fren";
@@ -728,6 +748,7 @@ int main(void) {
     RUN_TEST(test_login_and_url);
     RUN_TEST(test_url_per_slot);
     RUN_TEST(test_login_url_max_length);
+    RUN_TEST(test_do_length);
     RUN_TEST(test_cardholder_data);
     RUN_TEST(test_cardholder_data_lengths);
     RUN_TEST(test_serial);

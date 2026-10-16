@@ -55,6 +55,18 @@ static unsigned int gpg_key_data_left() {
     return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
 }
 
+/**
+ * Store the received data length as the length of a DO
+ *
+ * @param[out] length DO length in NVRAM
+ *
+ */
+static void gpg_write_do_length(volatile unsigned int *length) {
+    unsigned int len = G_gpg_vstate.io_length;
+
+    nvm_write((void *) length, &len, sizeof(len));
+}
+
 static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
                                    cx_aes_gcm_context_t *gcm_ctx,
                                    unsigned char *nonce) {
@@ -489,7 +501,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write(ptr_v,
                       G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                       G_gpg_vstate.io_length);
-            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            gpg_write_do_length(ptr_l);
             sw = SWO_SUCCESS;
             break;
             /*  ----------------- Config key slot ----------------- */
@@ -767,9 +779,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->name.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->name.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->name.length);
             sw = SWO_SUCCESS;
             break;
             /* Login data */
@@ -781,9 +791,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->login.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->login.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->login.length);
             sw = SWO_SUCCESS;
             break;
             /* Language preferences */
@@ -795,9 +803,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->lang.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->lang.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->lang.length);
             sw = SWO_SUCCESS;
             break;
             /* salutation */
@@ -820,9 +826,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->keys[G_gpg_vstate.slot].url.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->keys[G_gpg_vstate.slot].url.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->keys[G_gpg_vstate.slot].url.length);
             sw = SWO_SUCCESS;
             break;
 
@@ -854,7 +858,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 break;
             }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            gpg_write_do_length(ptr_l);
             sw = SWO_SUCCESS;
             break;
 
@@ -913,7 +917,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             if (sw == SWO_SUCCESS) {
                 gpg_key_erase(ptr_key);
                 nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-                nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+                gpg_write_do_length(ptr_l);
             }
             break;
 
