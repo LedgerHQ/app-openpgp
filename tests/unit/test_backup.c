@@ -442,13 +442,37 @@ static void test_restore_bad_reference(void) {
 /* Older formats                                                           */
 /* ----------------------------------------------------------------------- */
 
-// Build a v1 or v2 GCM blob of an Ed25519 key, as written by older versions
+// Public and private parts of a key, as stored in the backup blobs
+static void key_parts(const gpg_key_t *key,
+                      const uint8_t **pub,
+                      size_t *pub_len,
+                      const uint8_t **priv,
+                      size_t *priv_len) {
+    if (key->attributes.value[0] == KEY_ID_RSA) {
+        *pub = (const uint8_t *) key->pub_key.rsa;
+        *pub_len = sizeof(key->pub_key.rsa);
+        *priv = (const uint8_t *) &key->priv_key.rsa2048;
+        *priv_len = sizeof(cx_rsa_2048_private_key_t);
+    } else {
+        *pub = (const uint8_t *) &key->pub_key.ecfp640;
+        *pub_len = sizeof(cx_ecfp_640_public_key_t);
+        *priv = (const uint8_t *) &key->priv_key.ecfp640;
+        *priv_len = sizeof(cx_ecfp_640_private_key_t);
+    }
+}
+
+// Build a v1 or v2 GCM blob, as written by older versions
 static size_t build_gcm_blob(unsigned char version, unsigned int ref, const gpg_key_t *key) {
     unsigned char seed[32];
     uint8_t nonce[NONCE_LEN] = {0};
+    const uint8_t *pub;
+    const uint8_t *priv;
+    size_t pub_len;
+    size_t priv_len;
     size_t n = 0;
     size_t aad_len;
 
+    key_parts(key, &pub, &pub_len, &priv, &priv_len);
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed));
     if (version == 1) {
         TEST_ASSERT_EQUAL_HEX16(
@@ -475,24 +499,23 @@ static size_t build_gcm_blob(unsigned char version, unsigned int ref, const gpg_
         memcpy(blob + n, nonce, sizeof(nonce));
         n += sizeof(nonce);
     }
-    U4BE_ENCODE(blob, n, sizeof(cx_ecfp_640_public_key_t));
+    U4BE_ENCODE(blob, n, pub_len);
     n += 4;
-    memcpy(blob + n, (const void *) &key->pub_key.ecfp640, sizeof(cx_ecfp_640_public_key_t));
-    n += sizeof(cx_ecfp_640_public_key_t);
+    memcpy(blob + n, pub, pub_len);
+    n += pub_len;
     aad_len = n;
-    U4BE_ENCODE(blob, n, sizeof(cx_ecfp_640_private_key_t) + TAG_LEN);
+    U4BE_ENCODE(blob, n, priv_len + TAG_LEN);
     n += 4;
-    gcm_encrypt((const uint8_t *) &key->priv_key.ecfp640,
-                sizeof(cx_ecfp_640_private_key_t),
+    gcm_encrypt(priv,
+                priv_len,
                 nonce,
                 sizeof(nonce),
                 blob,
                 aad_len,
                 blob + n,
-                blob + n + sizeof(cx_ecfp_640_private_key_t),
+                blob + n + priv_len,
                 TAG_LEN);
-    n += sizeof(cx_ecfp_640_private_key_t) + TAG_LEN;
-    return n;
+    return n + priv_len + TAG_LEN;
 }
 
 static void check_older_format(unsigned char version) {
@@ -532,12 +555,17 @@ static void test_restore_v1_tampered(void) {
     }
 }
 
-// Build a legacy AES-CBC blob of an Ed25519 key
+// Build a legacy AES-CBC blob
 static size_t build_legacy_blob(const gpg_key_t *key) {
     unsigned char seed[32];
     cx_aes_key_t keyenc;
+    const uint8_t *pub;
+    const uint8_t *priv;
+    size_t pub_len;
+    size_t priv_len;
     size_t n = 0;
 
+    key_parts(key, &pub, &pub_len, &priv, &priv_len);
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_pso_derive_slot_seed(G_gpg_vstate.slot, seed));
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS,
                             gpg_pso_derive_key_seed(seed, (unsigned char *) "key ", 1, seed, 16));
@@ -548,14 +576,11 @@ static size_t build_legacy_blob(const gpg_key_t *key) {
     n += 4;
     U4BE_ENCODE(blob, n, 25);  // API level
     n += 4;
-    U4BE_ENCODE(blob, n, sizeof(cx_ecfp_640_public_key_t));
+    U4BE_ENCODE(blob, n, pub_len);
     n += 4;
-    memcpy(blob + n, (const void *) &key->pub_key.ecfp640, sizeof(cx_ecfp_640_public_key_t));
-    n += sizeof(cx_ecfp_640_public_key_t);
-    size_t enc_len = legacy_encrypt(&keyenc,
-                                    (const uint8_t *) &key->priv_key.ecfp640,
-                                    sizeof(cx_ecfp_640_private_key_t),
-                                    blob + n + 4);
+    memcpy(blob + n, pub, pub_len);
+    n += pub_len;
+    size_t enc_len = legacy_encrypt(&keyenc, priv, priv_len, blob + n + 4);
     U4BE_ENCODE(blob, n, enc_len);
     return n + 4 + enc_len;
 }
@@ -584,6 +609,92 @@ static void test_restore_legacy_truncated(void) {
     }
 }
 
+/* ----------------------------------------------------------------------- */
+/* Older formats of RSA keys                                               */
+/* ----------------------------------------------------------------------- */
+
+typedef size_t (*build_blob_t)(unsigned char version, const gpg_key_t *key);
+
+static size_t build_v1(unsigned char version, const gpg_key_t *key) {
+    (void) version;
+    return build_gcm_blob(1, KEY_SIG, key);
+}
+
+static size_t build_v2(unsigned char version, const gpg_key_t *key) {
+    (void) version;
+    return build_gcm_blob(2, KEY_SIG, key);
+}
+
+static size_t build_legacy(unsigned char version, const gpg_key_t *key) {
+    (void) version;
+    return build_legacy_blob(key);
+}
+
+static const build_blob_t RSA_FORMATS[] = {build_v1, build_v2, build_legacy};
+
+static void test_restore_rsa_older_formats(void) {
+    gpg_key_t saved;
+
+    for (size_t i = 0; i < sizeof(RSA_FORMATS) / sizeof(RSA_FORMATS[0]); i++) {
+        set_rsa2048(&G_gpg_vstate.kslot->sig);
+        memcpy(&saved, (const void *) &G_gpg_vstate.kslot->sig, sizeof(saved));
+        blob_len = RSA_FORMATS[i](0, &saved);
+        erase_key(&G_gpg_vstate.kslot->sig);
+
+        TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, restore(KEY_SIG, blob, blob_len));
+        TEST_ASSERT_EQUAL_MEMORY(&saved.priv_key.rsa2048,
+                                 &G_gpg_vstate.kslot->sig.priv_key.rsa2048,
+                                 sizeof(saved.priv_key.rsa2048));
+        TEST_ASSERT_EQUAL_MEMORY(saved.pub_key.rsa, G_gpg_vstate.kslot->sig.pub_key.rsa, 4);
+    }
+}
+
+static void test_restore_rsa_wrong_size(void) {
+    gpg_key_t saved;
+
+    // The restored key must have the size of the key attributes
+    for (size_t i = 0; i < sizeof(RSA_FORMATS) / sizeof(RSA_FORMATS[0]); i++) {
+        set_rsa2048(&G_gpg_vstate.kslot->sig);
+        memcpy(&saved, (const void *) &G_gpg_vstate.kslot->sig, sizeof(saved));
+        saved.priv_key.rsa2048.size = RSA2048 - 1;
+        blob_len = RSA_FORMATS[i](0, &saved);
+        erase_key(&G_gpg_vstate.kslot->sig);
+
+        check_restore_refused(KEY_SIG, &G_gpg_vstate.kslot->sig, blob, blob_len);
+    }
+}
+
+static void test_restore_rsa_other_modulus(void) {
+    const uint8_t rsa3072[] = {KEY_ID_RSA, 0x0C, 0x00, 0x00, 0x20, 0x00};
+    gpg_key_t saved;
+
+    // A RSA-2048 blob for a slot set up for RSA-3072
+    for (size_t i = 0; i < sizeof(RSA_FORMATS) / sizeof(RSA_FORMATS[0]); i++) {
+        set_rsa2048(&G_gpg_vstate.kslot->sig);
+        memcpy(&saved, (const void *) &G_gpg_vstate.kslot->sig, sizeof(saved));
+        blob_len = RSA_FORMATS[i](0, &saved);
+        erase_key(&G_gpg_vstate.kslot->sig);
+        memcpy((void *) G_gpg_vstate.kslot->sig.attributes.value, rsa3072, sizeof(rsa3072));
+
+        check_restore_refused(KEY_SIG, &G_gpg_vstate.kslot->sig, blob, blob_len);
+    }
+}
+
+static void test_restore_rsa_older_formats_truncated(void) {
+    gpg_key_t saved;
+
+    for (size_t i = 0; i < sizeof(RSA_FORMATS) / sizeof(RSA_FORMATS[0]); i++) {
+        set_rsa2048(&G_gpg_vstate.kslot->sig);
+        memcpy(&saved, (const void *) &G_gpg_vstate.kslot->sig, sizeof(saved));
+        blob_len = RSA_FORMATS[i](0, &saved);
+        erase_key(&G_gpg_vstate.kslot->sig);
+
+        for (size_t len = 0; len < blob_len; len++) {
+            check_restore_refused(KEY_SIG, &G_gpg_vstate.kslot->sig, blob, len);
+        }
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_restore_rsa);
@@ -602,5 +713,9 @@ int main(void) {
     RUN_TEST(test_restore_v1_tampered);
     RUN_TEST(test_restore_legacy);
     RUN_TEST(test_restore_legacy_truncated);
+    RUN_TEST(test_restore_rsa_older_formats);
+    RUN_TEST(test_restore_rsa_wrong_size);
+    RUN_TEST(test_restore_rsa_other_modulus);
+    RUN_TEST(test_restore_rsa_older_formats_truncated);
     return UNITY_END();
 }
