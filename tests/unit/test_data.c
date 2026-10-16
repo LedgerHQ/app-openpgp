@@ -701,19 +701,38 @@ static void test_import_rsa(void) {
 /* AES keys and Resetting Code                                             */
 /* ----------------------------------------------------------------------- */
 
+static const unsigned int AES_KEY_REFS[] = {0xD1, 0xD2, 0xD5};
+
 static void test_aes_key(void) {
+    static const size_t lengths[] = {16, 24, 32};
     const uint8_t key[32] = {0};
 
-    cx_aes_init_key_no_throw_ExpectAnyArgsAndReturn(CX_OK);
-    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(0xD5, key, 16));
+    for (size_t i = 0; i < sizeof(AES_KEY_REFS) / sizeof(AES_KEY_REFS[0]); i++) {
+        for (size_t j = 0; j < sizeof(lengths) / sizeof(lengths[0]); j++) {
+            cx_aes_init_key_no_throw_ExpectAnyArgsAndReturn(CX_OK);
+            TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(AES_KEY_REFS[i], key, lengths[j]));
+        }
+    }
 }
 
-static void test_aes_key_rejected(void) {
-    const uint8_t key[17] = {0};
+static void test_aes_key_wrong_length(void) {
+    static const size_t lengths[] = {0, 15, 17, 33};
+    const uint8_t key[33] = {0};
+
+    // Rejected before reaching the crypto library
+    for (size_t i = 0; i < sizeof(AES_KEY_REFS) / sizeof(AES_KEY_REFS[0]); i++) {
+        for (size_t j = 0; j < sizeof(lengths) / sizeof(lengths[0]); j++) {
+            TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, put_data(AES_KEY_REFS[i], key, lengths[j]));
+        }
+    }
+}
+
+static void test_aes_key_crypto_error(void) {
+    const uint8_t key[16] = {0};
 
     // The crypto library error is returned as is
-    cx_aes_init_key_no_throw_ExpectAnyArgsAndReturn(CX_INVALID_PARAMETER);
-    TEST_ASSERT_EQUAL_HEX32(CX_INVALID_PARAMETER, put_data(0xD5, key, sizeof(key)));
+    cx_aes_init_key_no_throw_ExpectAnyArgsAndReturn(CX_INTERNAL_ERROR);
+    TEST_ASSERT_EQUAL_HEX32(CX_INTERNAL_ERROR, put_data(0xD5, key, sizeof(key)));
 }
 
 static void test_sm_keys(void) {
@@ -780,7 +799,8 @@ int main(void) {
     RUN_TEST(test_import_rsa_bad_parts);
     RUN_TEST(test_import_rsa);
     RUN_TEST(test_aes_key);
-    RUN_TEST(test_aes_key_rejected);
+    RUN_TEST(test_aes_key_wrong_length);
+    RUN_TEST(test_aes_key_crypto_error);
     RUN_TEST(test_sm_keys);
     RUN_TEST(test_resetting_code_lengths);
     RUN_TEST(test_resetting_code_clear);

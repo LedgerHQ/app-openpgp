@@ -989,6 +989,19 @@ int gpg_apdu_put_data(unsigned int ref) {
             pkey = &G_gpg_vstate.kslot->AES_dec;
             goto init_aes_key;
         init_aes_key:
+            switch (G_gpg_vstate.io_length) {
+                case 16:
+                case 24:
+                case 32:
+                    sw = SWO_SUCCESS;
+                    break;
+                default:
+                    sw = SWO_WRONG_LENGTH;
+                    break;
+            }
+            if (sw != SWO_SUCCESS) {
+                break;
+            }
             CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer,
                                               G_gpg_vstate.io_length,
                                               &aes_key));
