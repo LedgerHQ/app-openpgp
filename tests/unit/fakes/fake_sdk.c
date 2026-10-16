@@ -52,14 +52,15 @@ void os_perso_derive_node_with_seed_key(unsigned int mode,
     }
 }
 
-// Curve parameters are not emulated: tests reaching them must mock their caller
+// Deterministic stand-in for the curve parameters: 0xFF bytes, then 0xFE as the last one
 cx_err_t cx_ecdomain_parameter(cx_curve_t cv, cx_curve_dom_param_t id, uint8_t *p, uint32_t p_len) {
     (void) cv;
     (void) id;
-    (void) p;
-    (void) p_len;
-    TEST_FAIL_MESSAGE("Unexpected curve parameter request");
-    return CX_INTERNAL_ERROR;
+    memset(p, 0xFF, p_len);
+    if (p_len != 0) {
+        p[p_len - 1] = 0xFE;
+    }
+    return CX_OK;
 }
 
 // Curve parameters lengths of the curves supported by the app

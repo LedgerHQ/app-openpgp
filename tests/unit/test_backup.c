@@ -6,6 +6,7 @@
 
 #include "gpg_vars.h"
 #include "fake_assert.h"
+#include "fake_digest.h"
 #include "Mockgpg_ux.h"
 #include "Mocklcx_aes.h"
 #include "Mocklcx_aes_gcm.h"
@@ -23,64 +24,6 @@ static const uint8_t ATTR_RSA2048[] = {KEY_ID_RSA, 0x08, 0x00, 0x00, 0x20, 0x00}
 /* ----------------------------------------------------------------------- */
 /* Crypto stand-ins                                                        */
 /* ----------------------------------------------------------------------- */
-
-// Toy hash: the same input always gives the same digest
-static uint32_t hash_acc;
-
-static cx_err_t fake_sha256_init(cx_sha256_t *hash, int num_calls) {
-    (void) hash;
-    (void) num_calls;
-    hash_acc = 0;
-    return CX_OK;
-}
-
-static cx_err_t fake_hash(cx_hash_t *hash,
-                          uint32_t mode,
-                          const uint8_t *in,
-                          size_t len,
-                          uint8_t *out,
-                          size_t out_len,
-                          int num_calls) {
-    (void) hash;
-    (void) num_calls;
-    for (size_t i = 0; i < len; i++) {
-        hash_acc = (hash_acc * 31) + in[i];
-    }
-    if (mode & CX_LAST) {
-        for (size_t i = 0; i < out_len; i++) {
-            out[i] = (uint8_t) ((hash_acc >> ((i % 4) * 8)) ^ i);
-        }
-        hash_acc = 0;
-    }
-    return CX_OK;
-}
-
-// Toy SHAKE256: writes the requested number of bits from the last input
-static size_t shake_bits;
-static uint8_t shake_in[32];
-
-static cx_err_t fake_shake_init(cx_sha3_t *hash, size_t out_size, int num_calls) {
-    (void) hash;
-    (void) num_calls;
-    shake_bits = out_size;
-    return CX_OK;
-}
-
-static cx_err_t fake_sha3_update(cx_sha3_t *ctx, const uint8_t *data, size_t len, int num_calls) {
-    (void) ctx;
-    (void) num_calls;
-    memcpy(shake_in, data, (len < sizeof(shake_in)) ? len : sizeof(shake_in));
-    return CX_OK;
-}
-
-static cx_err_t fake_sha3_final(cx_sha3_t *ctx, uint8_t *digest, int num_calls) {
-    (void) ctx;
-    (void) num_calls;
-    for (size_t i = 0; i < shake_bits / 8; i++) {
-        digest[i] = shake_in[i % sizeof(shake_in)] ^ 0xA5 ^ (uint8_t) i;
-    }
-    return CX_OK;
-}
 
 static cx_err_t fake_random(void *buffer, size_t len, int num_calls) {
     (void) num_calls;
@@ -266,11 +209,7 @@ void setUp(void) {
     Mocklcx_sha256_Init();
     Mocklcx_sha3_Init();
     Mockos_random_Init();
-    cx_sha256_init_no_throw_StubWithCallback(fake_sha256_init);
-    cx_hash_no_throw_StubWithCallback(fake_hash);
-    cx_shake256_init_no_throw_StubWithCallback(fake_shake_init);
-    cx_sha3_update_StubWithCallback(fake_sha3_update);
-    cx_sha3_final_StubWithCallback(fake_sha3_final);
+    fake_digest_install();
     cx_get_random_bytes_StubWithCallback(fake_random);
     cx_aes_gcm_init_Ignore();
     cx_aes_gcm_set_key_StubWithCallback(fake_gcm_set_key);
@@ -409,7 +348,7 @@ static void test_backup_full_key_derivation(void) {
     // The backup key is derived on its full 128 bits
     set_ed25519(&G_gpg_vstate.kslot->dec);
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, backup(KEY_DEC));
-    TEST_ASSERT_EQUAL_UINT(128, shake_bits);
+    TEST_ASSERT_EQUAL_UINT(128, fake_shake_bits);
     TEST_ASSERT_EQUAL_UINT(16, gcm_key_len);
 }
 
