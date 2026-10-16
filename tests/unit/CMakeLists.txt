@@ -239,3 +239,21 @@ ledger_unit_tests_add_test(
     COMPILE_DEFS ${UT_COMPILE_DEFS}
     COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
+
+ledger_unit_tests_add_test(
+    NAME         test_init
+    SOURCES      ${APP_DIR}/gpg_init.c
+                 ${APP_DIR}/gpg_io.c
+                 ${APP_DIR}/gpg_mse.c
+                 ${APP_DIR}/gpg_pin.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${SDK_DIR}/include/os_utils.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_rng.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
