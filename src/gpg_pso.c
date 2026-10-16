@@ -132,9 +132,11 @@ static void gpg_pso_reset_PW1() {
 static int gpg_sign(gpg_key_t *sigkey) {
     cx_err_t error = CX_INTERNAL_ERROR;
     cx_rsa_private_key_t *rsa_key = NULL;
-    unsigned int ksz, l;
+    size_t ksz;
+    unsigned int l;
     cx_ecfp_private_key_t *ecfp_key = NULL;
-    unsigned int s_len, i, rs_len, info;
+    size_t s_len;
+    unsigned int i, rs_len, info;
     unsigned char *rs;
 
     switch (sigkey->attributes.value[0]) {
@@ -158,10 +160,9 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 break;
             }
 
-            // sign — require at least 11 bytes of PKCS#1 v1.5 overhead (00 01
-            // [PS>=8] 00) so that l = ksz - io_length >= 11 and the write to
-            // io_buffer[l-1] is never out-of-bounds (CWE-787).
-            if (G_gpg_vstate.io_length > ksz - 11) {
+            // DigestInfo of at most 40% of the modulus, which leaves room for the PKCS#1 v1.5
+            // padding
+            if (G_gpg_vstate.io_length > ksz * 40 / 100) {
                 error = SWO_WRONG_LENGTH;
                 break;
             }
@@ -196,10 +197,17 @@ static int gpg_sign(gpg_key_t *sigkey) {
                 error = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
-            // longer digests are truncated to the curve length
-            if (G_gpg_vstate.io_length < ksz) {
+            if (G_gpg_vstate.io_length == 0) {
                 error = SWO_WRONG_LENGTH;
                 break;
+            }
+            // shorter digests are left-padded with zeros, longer ones truncated to the curve length
+            if (G_gpg_vstate.io_length < ksz) {
+                l = ksz - G_gpg_vstate.io_length;
+                memmove(G_gpg_vstate.work.io_buffer + l,
+                        G_gpg_vstate.work.io_buffer,
+                        G_gpg_vstate.io_length);
+                memset(G_gpg_vstate.work.io_buffer, 0, l);
             }
             s_len = 256;
             CX_CHECK(cx_ecdsa_sign_no_throw(ecfp_key,
@@ -210,22 +218,29 @@ static int gpg_sign(gpg_key_t *sigkey) {
                                             RS,
                                             &s_len,
                                             &info));
-            // re-encode r,s in MPI format
+            // r || s from the DER signature, each left-padded to the curve size
             gpg_io_discard(0);
-
-            rs_len = RS[3];
-            rs = &RS[4];
-
+            rs = RS + 2;
             for (i = 0; i < 2; i++) {
-                if (*rs == 0) {
+                if (rs[0] != 0x02) {
+                    error = CX_INTERNAL_ERROR;
+                    goto end;
+                }
+                rs_len = rs[1];
+                rs += 2;
+                while ((rs_len > ksz) && (*rs == 0)) {
                     rs++;
                     rs_len--;
                 }
-                gpg_io_insert_u8(0);
+                if (rs_len > ksz) {
+                    error = CX_INTERNAL_ERROR;
+                    goto end;
+                }
+                for (l = rs_len; l < ksz; l++) {
+                    gpg_io_insert_u8(0);
+                }
                 gpg_io_insert(rs, rs_len);
-                rs = rs + rs_len;
-                rs_len = rs[1];
-                rs += 2;
+                rs += rs_len;
             }
             error = SWO_SUCCESS;
             break;
@@ -274,12 +289,14 @@ end:
  */
 int gpg_apdu_pso() {
     cx_err_t error = CX_INTERNAL_ERROR;
-    unsigned int t, l, ksz;
+    unsigned int t, l;
+    size_t ksz;
     unsigned int cnt, pad_byte;
     unsigned int msg_len;
     cx_aes_key_t *aes_key = NULL;
     cx_rsa_private_key_t *rsa_key = NULL;
     cx_ecfp_private_key_t *ecfp_key = NULL;
+    uint8_t secret[32];
 
     // UIF HANDLE
     switch (G_gpg_vstate.io_p1p2) {
@@ -376,7 +393,7 @@ int gpg_apdu_pso() {
                     }
 
                     if ((rsa_key == NULL) || (rsa_key->size != ksz)) {
-                        PRINTF("[PSO] - Wrong RSA key size %d != %d\n", rsa_key->size, ksz);
+                        PRINTF("[PSO] - No RSA key of size %d\n", ksz);
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
@@ -465,7 +482,6 @@ int gpg_apdu_pso() {
 
                     if (ecfp_key->curve == CX_CURVE_Curve25519) {
                         uint8_t raw_public_key[65];
-                        uint8_t secret[32];
                         uint8_t i;
 
                         if (l != 32) {
@@ -531,6 +547,7 @@ int gpg_apdu_pso() {
             break;
     }
 end:
+    explicit_bzero(secret, sizeof(secret));
     return error;
 }
 
@@ -550,10 +567,5 @@ int gpg_apdu_internal_authenticate() {
         G_gpg_vstate.UIF_flags = 0;
     }
 
-    if (G_gpg_vstate.mse_aut->attributes.value[0] == KEY_ID_RSA) {
-        if (G_gpg_vstate.io_length > U2BE(G_gpg_vstate.mse_aut->attributes.value, 1) * 40 / 100) {
-            return SWO_WRONG_LENGTH;
-        }
-    }
     return gpg_sign(G_gpg_vstate.mse_aut);
 }

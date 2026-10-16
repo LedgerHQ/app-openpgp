@@ -70,7 +70,7 @@ static void ui_info(const char *msg1, const char *msg2, nbgl_callback_t cb, bool
     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s\n%s", msg1, msg2);
 
     nbgl_useCaseStatus((const char *) G_gpg_vstate.menu, isSuccess, cb);
-};
+}
 
 #ifdef SCREEN_SIZE_WALLET
 /**
@@ -1259,6 +1259,42 @@ static void ui_reset(void) {
                        reset_cb);
 }
 
+/* ---------------------------- TERMINATE DF UX ----------------------------- */
+
+/**
+ * @brief TERMINATE DF confirmation callback
+ *
+ * @param[in] confirm indicate if the user press 'Yes, reset' or 'Cancel'
+ *
+ */
+static void terminate_confirm_cb(bool confirm) {
+    G_gpg_vstate.ui_pending = 0;
+    gpg_io_discard(1);
+    if (confirm) {
+        gpg_install(STATE_TERMINATE);
+        gpg_init_session();
+    }
+    gpg_io_insert_u16(confirm ? SWO_SUCCESS : SWO_SECURITY_CONDITION_NOT_SATISFIED);
+    gpg_io_do(IO_RETURN_AFTER_TX);
+    ui_init();
+}
+
+/**
+ * TERMINATE DF confirmation page, when PW3 is blocked
+ *
+ */
+void ui_menu_terminate_display(void) {
+    G_gpg_vstate.ui_pending = 1;
+    nbgl_useCaseChoice(NULL,
+                       "Factory Reset",
+                       "Admin PIN is blocked.\n"
+                       "The computer requests to delete ALL keys and reset the app.\n"
+                       "Are you sure?",
+                       "Yes, reset",
+                       "Cancel",
+                       terminate_confirm_cb);
+}
+
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
 
 /**
@@ -1340,9 +1376,9 @@ static void pinentry_validate_cb(const uint8_t *pinentry, uint8_t length) {
         case INS_CHANGE_REFERENCE_DATA:
             switch (G_gpg_vstate.ux_step) {
                 case 0:
-                    // Check Current pin code
+                    // Check Current pin code, without opening a session
                     pin = gpg_pin_get_pin(G_gpg_vstate.ux_pinconfirm_p2);
-                    sw = gpg_pin_check(pin, G_gpg_vstate.ux_pinconfirm_p2, pinentry, length);
+                    sw = gpg_pin_check_value(pin, pinentry, length);
                     gpg_io_discard(1);
                     if (sw == SWO_AUTH_METHOD_BLOCKED) {
                         gpg_io_insert_u16(sw);
@@ -1511,6 +1547,7 @@ static uif_snapshot_t G_uif_snapshot;
 void uif_confirm_cb(bool confirm) {
     unsigned int sw = SWO_SECURITY_ISSUE;
 
+    G_gpg_vstate.ui_pending = 0;
     if (confirm) {
         /* Restore the exact APDU state that was shown to the user, discarding
          * any APDU the host may have sent while the prompt was pending. */
@@ -1551,6 +1588,7 @@ void uif_confirm_cb(bool confirm) {
 void ui_menu_uifconfirm_display(unsigned int value) {
     UNUSED(value);
 
+    G_gpg_vstate.ui_pending = 1;
     switch (G_gpg_vstate.io_ins) {
         case INS_INTERNAL_AUTHENTICATE:
             if (G_gpg_vstate.mse_aut == &G_gpg_vstate.kslot->aut) {

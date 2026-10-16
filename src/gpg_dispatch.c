@@ -18,6 +18,7 @@
 #include "gpg_ux.h"
 #include "gpg_vars.h"
 #include "main_std_app.h"
+#include "status_words.h"
 
 /**
  * Check INS access condition
@@ -298,12 +299,17 @@ int gpg_dispatch() {
 
         case INS_TERMINATE_DF:
             gpg_io_discard(0);
-            if (!gpg_pin_is_verified(PIN_ID_PW3)) {
-                return SWO_CONDITIONS_NOT_SATISFIED;
+            if (gpg_pin_is_verified(PIN_ID_PW3)) {
+                gpg_install(STATE_TERMINATE);
+                gpg_init_session();
+                return SWO_SUCCESS;
             }
-            gpg_install(STATE_TERMINATE);
-            gpg_init_session();
-            return SWO_SUCCESS;
+            // A blocked PW3 can no longer be presented: the user confirms on the device instead
+            if (gpg_pin_is_blocked(gpg_pin_get_pin(PIN_ID_PW3))) {
+                ui_menu_terminate_display();
+                return SWO_NO_RESPONSE;
+            }
+            return SWO_CONDITIONS_NOT_SATISFIED;
     }
 
     /* Other commands allowed if not terminated */

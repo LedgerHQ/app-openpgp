@@ -55,6 +55,18 @@ static unsigned int gpg_key_data_left() {
     return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
 }
 
+/**
+ * Store the received data length as the length of a DO
+ *
+ * @param[out] length DO length in NVRAM
+ *
+ */
+static void gpg_write_do_length(volatile unsigned int *length) {
+    unsigned int len = G_gpg_vstate.io_length;
+
+    nvm_write((void *) length, &len, sizeof(len));
+}
+
 static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
                                    cx_aes_gcm_context_t *gcm_ctx,
                                    unsigned char *nonce) {
@@ -489,7 +501,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write(ptr_v,
                       G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                       G_gpg_vstate.io_length);
-            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            gpg_write_do_length(ptr_l);
             sw = SWO_SUCCESS;
             break;
             /*  ----------------- Config key slot ----------------- */
@@ -723,30 +735,30 @@ int gpg_apdu_put_data(unsigned int ref) {
                     break;
                 }
                 ksz = gpg_curve2domainlen(curve);
-                if (len_p > l) {
+                if ((len_p == 0) || (len_p > ksz) || (len_p > l)) {
                     sw = SWO_INCORRECT_DATA;
                     break;
                 }
-                if (ksz == len_p) {
-                    G_gpg_vstate.work.ecfp.private.curve = curve;
-                    G_gpg_vstate.work.ecfp.private.d_len = ksz;
-                    memmove(G_gpg_vstate.work.ecfp.private.d,
-                            G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                            ksz);
-                    CX_CHECK(cx_ecfp_generate_pair_no_throw(curve,
-                                                            &G_gpg_vstate.work.ecfp.public,
-                                                            &G_gpg_vstate.work.ecfp.private,
-                                                            1));
-                    nvm_write(&keygpg->pub_key.ecfp,
-                              &G_gpg_vstate.work.ecfp.public,
-                              sizeof(cx_ecfp_public_key_t));
-                    nvm_write(&keygpg->priv_key.ecfp,
-                              &G_gpg_vstate.work.ecfp.private,
-                              sizeof(cx_ecfp_private_key_t));
-                    if (reset_cnt) {
-                        reset_cnt = 0;
-                        nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
-                    }
+                // The private key may come without its leading zero bytes
+                G_gpg_vstate.work.ecfp.private.curve = curve;
+                G_gpg_vstate.work.ecfp.private.d_len = ksz;
+                explicit_bzero(G_gpg_vstate.work.ecfp.private.d, ksz - len_p);
+                memmove(G_gpg_vstate.work.ecfp.private.d + ksz - len_p,
+                        G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                        len_p);
+                CX_CHECK(cx_ecfp_generate_pair_no_throw(curve,
+                                                        &G_gpg_vstate.work.ecfp.public,
+                                                        &G_gpg_vstate.work.ecfp.private,
+                                                        1));
+                nvm_write(&keygpg->pub_key.ecfp,
+                          &G_gpg_vstate.work.ecfp.public,
+                          sizeof(cx_ecfp_public_key_t));
+                nvm_write(&keygpg->priv_key.ecfp,
+                          &G_gpg_vstate.work.ecfp.private,
+                          sizeof(cx_ecfp_private_key_t));
+                if (reset_cnt) {
+                    reset_cnt = 0;
+                    nvm_write(&G_gpg_vstate.kslot->sig_count, &reset_cnt, sizeof(unsigned int));
                 }
                 sw = SWO_SUCCESS;
             }
@@ -767,9 +779,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->name.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->name.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->name.length);
             sw = SWO_SUCCESS;
             break;
             /* Login data */
@@ -781,9 +791,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->login.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->login.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->login.length);
             sw = SWO_SUCCESS;
             break;
             /* Language preferences */
@@ -795,9 +803,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->lang.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->lang.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->lang.length);
             sw = SWO_SUCCESS;
             break;
             /* salutation */
@@ -820,9 +826,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             nvm_write((void *) N_gpg_pstate->keys[G_gpg_vstate.slot].url.value,
                       G_gpg_vstate.work.io_buffer,
                       G_gpg_vstate.io_length);
-            nvm_write((void *) &N_gpg_pstate->keys[G_gpg_vstate.slot].url.length,
-                      &G_gpg_vstate.io_length,
-                      sizeof(unsigned int));
+            gpg_write_do_length(&N_gpg_pstate->keys[G_gpg_vstate.slot].url.length);
             sw = SWO_SUCCESS;
             break;
 
@@ -854,7 +858,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 break;
             }
             nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-            nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+            gpg_write_do_length(ptr_l);
             sw = SWO_SUCCESS;
             break;
 
@@ -913,7 +917,7 @@ int gpg_apdu_put_data(unsigned int ref) {
             if (sw == SWO_SUCCESS) {
                 gpg_key_erase(ptr_key);
                 nvm_write(ptr_v, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-                nvm_write(ptr_l, &G_gpg_vstate.io_length, sizeof(unsigned int));
+                gpg_write_do_length(ptr_l);
             }
             break;
 
@@ -985,6 +989,19 @@ int gpg_apdu_put_data(unsigned int ref) {
             pkey = &G_gpg_vstate.kslot->AES_dec;
             goto init_aes_key;
         init_aes_key:
+            switch (G_gpg_vstate.io_length) {
+                case 16:
+                case 24:
+                case 32:
+                    sw = SWO_SUCCESS;
+                    break;
+                default:
+                    sw = SWO_WRONG_LENGTH;
+                    break;
+            }
+            if (sw != SWO_SUCCESS) {
+                break;
+            }
             CX_CHECK(cx_aes_init_key_no_throw(G_gpg_vstate.work.io_buffer,
                                               G_gpg_vstate.io_length,
                                               &aes_key));
@@ -1300,7 +1317,7 @@ static int gpg_put_key_data_legacy_rsa(gpg_key_t *keygpg, cx_aes_key_t *keyenc) 
     unsigned int enc_len = 0;
     unsigned int offset = 0;
     unsigned int ksz = 0;
-    unsigned int dec_len = 0;
+    size_t dec_len = 0;
     unsigned char pub_e[4];
     cx_rsa_private_key_t *key = NULL;
     int sw = SWO_INCORRECT_DATA;
@@ -1364,7 +1381,7 @@ static int gpg_put_key_data_legacy_ec(gpg_key_t *keygpg, cx_aes_key_t *keyenc) {
     unsigned int enc_len = 0;
     unsigned int offset = 0;
     unsigned int pub_offset = 0;
-    unsigned int dec_len = 0;
+    size_t dec_len = 0;
     unsigned char *priv = NULL;
     int sw = SWO_INCORRECT_DATA;
 

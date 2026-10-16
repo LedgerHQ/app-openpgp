@@ -449,7 +449,7 @@ unsigned int gpg_io_do(unsigned int io_flags) {
             G_gpg_vstate.io_length -= tx;
             G_gpg_vstate.io_offset += tx;
             G_io_apdu_buffer[tx] = (SWO_RESPONSE_BYTES_AVAILABLE >> 8) & 0xFF;
-            if (G_gpg_vstate.io_length > MAX_OUT - 2) {
+            if (G_gpg_vstate.io_length > MAX_OUT) {
                 xx = MAX_OUT - 2;
             } else {
                 xx = G_gpg_vstate.io_length - 2;

@@ -17,6 +17,7 @@
 
 #include "gpg_vars.h"
 #include "gpg_ux.h"
+#include "ledger_assert.h"
 
 /**
  * Get Pin structure from reference ID value
@@ -62,7 +63,8 @@ static int gpg_pin_get_state_index(unsigned int pinref) {
 }
 
 /**
- * Compare the PinCode hash and handle the associated counter
+ * Compare the PinCode hash and handle the associated counter,
+ * without changing the verification status
  *
  * @param[in]  pin PinCode reference to check
  * @param[in]  pin_val PinCode value
@@ -71,7 +73,7 @@ static int gpg_pin_get_state_index(unsigned int pinref) {
  * @return Status Word
  *
  */
-static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, int pin_len) {
+int gpg_pin_check_value(gpg_pin_t *pin, const unsigned char *pin_val, unsigned int pin_len) {
     unsigned int counter;
     cx_err_t error = CX_INTERNAL_ERROR;
 
@@ -79,7 +81,10 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, 
         return SWO_AUTH_METHOD_BLOCKED;
     }
 
+    // The try is consumed in NVRAM before the check, so that an interrupted check costs it
     counter = pin->counter - 1;
+    nvm_write(&(pin->counter), &counter, sizeof(counter));
+
     cx_sha256_init(&G_gpg_vstate.work.md.sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &G_gpg_vstate.work.md.sha256,
                               CX_LAST,
@@ -87,17 +92,15 @@ static int gpg_pin_check_internal(gpg_pin_t *pin, const unsigned char *pin_val, 
                               pin_len,
                               G_gpg_vstate.work.md.H,
                               sizeof(G_gpg_vstate.work.md.H)));
-    if (memcmp(G_gpg_vstate.work.md.H, pin->value, 32)) {
+    if (os_secure_memcmp(G_gpg_vstate.work.md.H, pin->value, sizeof(pin->value)) != 0) {
         error = (counter == 0) ? SWO_AUTH_METHOD_BLOCKED : SWO_SECURITY_CONDITION_NOT_SATISFIED;
     } else {
         counter = 3;
+        nvm_write(&(pin->counter), &counter, sizeof(counter));
         error = SWO_SUCCESS;
     }
 
 end:
-    if (counter != pin->counter) {
-        nvm_write(&(pin->counter), &counter, sizeof(int));
-    }
     return error;
 }
 
@@ -114,11 +117,30 @@ end:
 int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len) {
     int sw = SWO_UNKNOWN;
     gpg_pin_set_verified(pinID, 0);
-    sw = gpg_pin_check_internal(pin, pin_val, pin_len);
+    sw = gpg_pin_check_value(pin, pin_val, pin_len);
     if (sw == SWO_SUCCESS) {
         gpg_pin_set_verified(pinID, 1);
     }
     return sw;
+}
+
+/**
+ * Get the reference ID of a Pin structure from its location
+ *
+ * @param[in]  pin Pin structure
+ *
+ * @return PinCode reference ID
+ *
+ */
+static unsigned int gpg_pin_get_ref(const gpg_pin_t *pin) {
+    if (pin == gpg_pin_get_pin(PIN_ID_PW1)) {
+        return PIN_ID_PW1;
+    }
+    if (pin == gpg_pin_get_pin(PIN_ID_PW3)) {
+        return PIN_ID_PW3;
+    }
+    LEDGER_ASSERT(pin == gpg_pin_get_pin(PIN_ID_RC), "Unknown PIN!");
+    return PIN_ID_RC;
 }
 
 /**
@@ -135,17 +157,15 @@ int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len) {
     cx_sha256_t sha256;
     cx_err_t error = CX_INTERNAL_ERROR;
     gpg_pin_t newpin = {0};
+    unsigned int ref = gpg_pin_get_ref(pin);
 
-    // Preserve the logical PIN reference so that subsequent operations
-    // (length checks, verified-state indexing) stay consistent (CWE-457).
-    newpin.ref = pin->ref;
     cx_sha256_init(&sha256);
     CX_CHECK(cx_hash_no_throw((cx_hash_t *) &sha256, CX_LAST, pin_val, pin_len, newpin.value, 32));
     newpin.length = pin_len;
     newpin.counter = 3;
 
     nvm_write(pin, &newpin, sizeof(gpg_pin_t));
-    if (pin->ref == PIN_ID_PW1) {
+    if (ref == PIN_ID_PW1) {
         // PW2 shares the PW1 value: its session was opened with the previous value
         gpg_pin_set_verified(PIN_ID_PW2, 0);
     }
@@ -262,8 +282,6 @@ int gpg_apdu_verify() {
         return sw;
     }
 
-    gpg_io_discard(1);
-
     // STATUS REQUEST
     if ((G_gpg_vstate.io_p1 == PIN_VERIFY) && G_gpg_vstate.io_length == 0) {
         if (gpg_pin_is_verified(G_gpg_vstate.io_p2)) {
@@ -272,12 +290,17 @@ int gpg_apdu_verify() {
         return SWO_VERIFY_FAILED | pin->counter;
     }
 
-    // RESET REQUEST
-    if ((G_gpg_vstate.io_p1 == PIN_NOT_VERIFIED) && G_gpg_vstate.io_length == 0) {
+    // RESET REQUEST, without data
+    if (G_gpg_vstate.io_p1 == PIN_NOT_VERIFIED) {
+        if (G_gpg_vstate.io_length != 0) {
+            gpg_io_discard(1);
+            return SWO_WRONG_LENGTH;
+        }
         gpg_pin_set_verified(G_gpg_vstate.io_p2, 0);
         return SWO_SUCCESS;
     }
 
+    gpg_io_discard(1);
     return SWO_INCORRECT_DATA;
 }
 
@@ -290,14 +313,16 @@ int gpg_apdu_verify() {
 int gpg_apdu_change_ref_data() {
     int sw = SWO_UNKNOWN;
     gpg_pin_t *pin;
+    unsigned int ref;
     int len, newlen;
 
     pin = gpg_pin_get_pin(G_gpg_vstate.io_p2);
     if (pin == NULL) {
         return SWO_INCORRECT_DATA;
     }
+    ref = gpg_pin_get_ref(pin);
 
-    gpg_pin_set_verified(pin->ref, 0);
+    gpg_pin_set_verified(ref, 0);
 
     // --- PW1/PW3 pin ---
     if (gpg_pin_is_blocked(pin)) {
@@ -312,16 +337,16 @@ int gpg_apdu_change_ref_data() {
         return 0;
     }
 
+    // The current PIN is checked without opening a session
     len = MIN(G_gpg_vstate.io_length, pin->length);
-    sw = gpg_pin_check(pin, pin->ref, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+    sw = gpg_pin_check_value(pin, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
     if (sw != SWO_SUCCESS) {
         return sw;
     }
 
     newlen = G_gpg_vstate.io_length - len;
-    if ((newlen > GPG_MAX_PW_LENGTH) ||
-        ((pin->ref == PIN_ID_PW1) && (newlen < GPG_MIN_PW1_LENGTH)) ||
-        ((pin->ref == PIN_ID_PW3) && (newlen < GPG_MIN_PW3_LENGTH))) {
+    if ((newlen > GPG_MAX_PW_LENGTH) || ((ref == PIN_ID_PW1) && (newlen < GPG_MIN_PW1_LENGTH)) ||
+        ((ref == PIN_ID_PW3) && (newlen < GPG_MIN_PW3_LENGTH))) {
         return SWO_INCORRECT_DATA;
     }
     sw = gpg_pin_set(pin, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset + len, newlen);
@@ -356,10 +381,9 @@ int gpg_apdu_reset_retry_counter() {
         // avoid any-overflow without giving info
         rc_len = MIN(G_gpg_vstate.io_length, pin_rc->length);
         pw1_len = G_gpg_vstate.io_length - rc_len;
-        sw = gpg_pin_check(pin_rc,
-                           pin_rc->ref,
-                           G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                           rc_len);
+        sw = gpg_pin_check_value(pin_rc,
+                                 G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                 rc_len);
         if (sw != SWO_SUCCESS) {
             return sw;
         }

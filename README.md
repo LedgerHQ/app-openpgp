@@ -261,7 +261,7 @@ If you prefer not to, open a terminal and follow the steps below.
 Install the tests requirements:
 
 ```shell
-pip install -r tests/requirements.txt
+pip install -r tests/functional/requirements.txt
 ```
 
 Then you can:
@@ -339,7 +339,8 @@ The flow processed in [GitHub Actions](https://github.com/features/actions) is t
   in the repository [ledger-app-workflow](https://github.com/LedgerHQ/ledger-app-workflows)
 - Code formatting with [clang-format](http://clang.llvm.org/docs/ClangFormat.html)
 - Compilation of the application for all Ledger hardware in [ledger-app-builder](https://github.com/LedgerHQ/ledger-app-builder)
-- Unit tests of C functions with [cmocka](https://cmocka.org/) (see [tests/unit/](tests/unit/))
+- Unit tests of C functions with [Unity](https://github.com/ThrowTheSwitch/Unity)
+  and [CMock](https://github.com/ThrowTheSwitch/CMock) (see [tests/unit/](tests/unit/))
 - End-to-end tests with [Speculos](https://github.com/LedgerHQ/speculos) emulator
   and [ragger](https://github.com/LedgerHQ/ragger) (see [tests/](tests/))
 - Code coverage with [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html)/[lcov](http://ltp.sourceforge.net/coverage/lcov.php)
