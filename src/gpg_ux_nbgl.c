@@ -70,7 +70,7 @@ static void ui_info(const char *msg1, const char *msg2, nbgl_callback_t cb, bool
     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s\n%s", msg1, msg2);
 
     nbgl_useCaseStatus((const char *) G_gpg_vstate.menu, isSuccess, cb);
-};
+}
 
 #ifdef SCREEN_SIZE_WALLET
 /**
