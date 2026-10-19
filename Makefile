@@ -140,7 +140,6 @@ DISABLE_OS_IO_STACK_USE = 1
 
 ENABLE_LINK_TIME_OPTIMIZATION = 1
 
-DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA
 # Historical Bytes is removed from Application Related Data
 # The response payload size (246 bytes) triggers a transport

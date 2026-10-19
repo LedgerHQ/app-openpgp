@@ -67,7 +67,6 @@ set(UT_COMPILE_DEFS
     APPVERSION="a.b.c"
     SPEC_VERSION="3.3.1"
     HAVE_RSA
-    "CUSTOM_IO_APDU_BUFFER_SIZE=(255+5+64)"
 )
 
 #######################################################################
