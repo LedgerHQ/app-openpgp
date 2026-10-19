@@ -24,7 +24,6 @@
 #include "gpg_vars.h"
 #include "gpg_ux_msg.h"
 #include "gpg_ux.h"
-#include "usbd_ccid_if.h"
 #include "os_io_seph_cmd.h"
 
 /* ----------------------------------------------------------------------- */

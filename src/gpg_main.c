@@ -18,7 +18,6 @@
 #include "gpg_vars.h"
 #include "gpg_ux.h"
 #include "io.h"
-#include "usbd_ccid_if.h"
 
 /* ----------------------------------------------------------------------- */
 /* ---                            Application Entry                    --- */
@@ -26,8 +25,7 @@
 
 void app_main(void) {
     unsigned int io_flags = 0;
-    io_flags = 0;
-    volatile unsigned short sw = SWO_UNKNOWN;
+    unsigned short sw = SWO_UNKNOWN;
 
     // set up
     io_init();

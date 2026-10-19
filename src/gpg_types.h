@@ -25,9 +25,7 @@
 #include "status_words.h"
 #include "nbgl_layout.h"
 
-/* cannot send more that F0 bytes in CCID, why? do not know for now
- *  So set up length to F0 minus 2 bytes for SW
- */
+// Largest APDU response, status word included, announced in the extended length information
 #define GPG_APDU_LENGTH 0xFE
 
 /* big private DO */

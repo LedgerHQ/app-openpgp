@@ -123,7 +123,6 @@ void gpg_io_discard(int clear);
 void gpg_io_clear(void);
 void gpg_io_set_offset(unsigned int offset);
 void gpg_io_mark(void);
-void gpg_io_rewind(void);
 void gpg_io_inserted(unsigned int len);
 void gpg_io_insert(unsigned char const *buffer, unsigned int len);
 void gpg_io_insert_u32(unsigned int v32);
