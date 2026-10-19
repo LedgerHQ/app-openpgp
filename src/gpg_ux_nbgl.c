@@ -74,18 +74,30 @@ static void ui_info(const char *msg1, const char *msg2, nbgl_callback_t cb, bool
 
 #ifdef SCREEN_SIZE_WALLET
 /**
- * @brief Display Setting page header
+ * @brief Display a Setting page with radio choices and a "Set default" button
  *
  * @param[in] title page title
  * @param[in] back_token token for back button
  * @param[in] touch_cb action callback
+ * @param[in] names choices texts
+ * @param[in] nb_choices number of choices
+ * @param[in] init_choice choice selected at display
+ * @param[in] select_token token for a choice selection
+ * @param[in] default_token token for the "Set default" button
  *
  */
-static void ui_setting_header(const char *title,
-                              uint8_t back_token,
-                              nbgl_layoutTouchCallback_t touch_cb) {
+static void ui_setting_radio_page(const char *title,
+                                  uint8_t back_token,
+                                  nbgl_layoutTouchCallback_t touch_cb,
+                                  const char *const *names,
+                                  uint8_t nb_choices,
+                                  uint8_t init_choice,
+                                  uint8_t select_token,
+                                  uint8_t default_token) {
     nbgl_layoutDescription_t layoutDescription = {0};
     nbgl_layoutHeader_t headerDesc = {0};
+    nbgl_layoutRadioChoice_t choices = {0};
+    nbgl_layoutButton_t buttonInfo = {0};
 
     layoutDescription.onActionCallback = touch_cb;
     layoutDescription.modal = false;
@@ -97,6 +109,23 @@ static void ui_setting_header(const char *title,
     headerDesc.backAndText.tuneId = TUNE_TAP_CASUAL;
     nbgl_layoutAddHeader(layoutCtx, &headerDesc);
     nbgl_layoutAddSeparationLine(layoutCtx);
+
+    choices.names = names;
+    choices.localized = false;
+    choices.nbChoices = nb_choices;
+    choices.initChoice = init_choice;
+    choices.token = select_token;
+    nbgl_layoutAddRadioChoice(layoutCtx, &choices);
+
+    buttonInfo.fittingContent = false;
+    buttonInfo.onBottom = true;
+    buttonInfo.style = BLACK_BACKGROUND;
+    buttonInfo.text = "Set default";
+    buttonInfo.token = default_token;
+    buttonInfo.tuneId = TUNE_TAP_CASUAL;
+    nbgl_layoutAddButton(layoutCtx, &buttonInfo);
+
+    nbgl_layoutDraw(layoutCtx);
 }
 #endif  // SCREEN_SIZE_WALLET
 
@@ -351,13 +380,9 @@ static bool slot_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
  */
 static void ui_menu_slot_action(void) {
 #ifdef SCREEN_SIZE_WALLET
-    nbgl_layoutRadioChoice_t choices = {0};
-    nbgl_layoutButton_t buttonInfo = {0};
     static char *names[GPG_KEYS_SLOTS] = {0};
     static char text[GPG_KEYS_SLOTS][32];
     uint32_t slot;
-
-    ui_setting_header("Slots configuration", TOKEN_SLOT_BACK, slot_cb);
 
     for (slot = 0; slot < GPG_KEYS_SLOTS; slot++) {
         snprintf(text[slot],
@@ -367,22 +392,14 @@ static void ui_menu_slot_action(void) {
                  (N_gpg_pstate->config_slot[1] == slot) ? "[default]" : "");
         names[slot] = text[slot];
     }
-    choices.names = (const char *const *) names;
-    choices.localized = false;
-    choices.nbChoices = GPG_KEYS_SLOTS;
-    choices.initChoice = G_gpg_vstate.slot;
-    choices.token = TOKEN_SLOT_SELECT;
-    nbgl_layoutAddRadioChoice(layoutCtx, &choices);
-
-    buttonInfo.fittingContent = false;
-    buttonInfo.onBottom = true;
-    buttonInfo.style = BLACK_BACKGROUND;
-    buttonInfo.text = "Set default";
-    buttonInfo.token = TOKEN_SLOT_DEF;
-    buttonInfo.tuneId = TUNE_TAP_CASUAL;
-    nbgl_layoutAddButton(layoutCtx, &buttonInfo);
-
-    nbgl_layoutDraw(layoutCtx);
+    ui_setting_radio_page("Slots configuration",
+                          TOKEN_SLOT_BACK,
+                          slot_cb,
+                          (const char *const *) names,
+                          GPG_KEYS_SLOTS,
+                          G_gpg_vstate.slot,
+                          TOKEN_SLOT_SELECT,
+                          TOKEN_SLOT_DEF);
 #else   // SCREEN_SIZE_WALLET
     nbgl_useCaseNavigableContent("Slots configuration",
                                  slot_initPage,
@@ -1081,14 +1098,10 @@ static bool pin_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
  */
 static void ui_settings_pin(void) {
 #ifdef SCREEN_SIZE_WALLET
-    static nbgl_layoutRadioChoice_t choices = {0};
-    nbgl_layoutButton_t buttonInfo = {0};
     static char *names[PIN_CHOICE_NB] = {0};
     static char text[PIN_CHOICE_NB][32];
     uint8_t def = pin_choice(N_gpg_pstate->config_pin, N_gpg_pstate->keypad_shuffle);
     uint32_t pin;
-
-    ui_setting_header("PIN mode", TOKEN_PIN_BACK, pin_cb);
 
     for (pin = 0; pin < PIN_CHOICE_NB; pin++) {
         snprintf(text[pin],
@@ -1098,22 +1111,14 @@ static void ui_settings_pin(void) {
                  (def == pin) ? "[default]" : "");
         names[pin] = text[pin];
     }
-    choices.names = (const char *const *) names;
-    choices.localized = false;
-    choices.nbChoices = PIN_CHOICE_NB;
-    choices.initChoice = pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle);
-    choices.token = TOKEN_PIN_SET;
-    nbgl_layoutAddRadioChoice(layoutCtx, &choices);
-
-    buttonInfo.fittingContent = false;
-    buttonInfo.onBottom = true;
-    buttonInfo.style = BLACK_BACKGROUND;
-    buttonInfo.text = "Set default";
-    buttonInfo.token = TOKEN_PIN_DEF;
-    buttonInfo.tuneId = TUNE_TAP_CASUAL;
-    nbgl_layoutAddButton(layoutCtx, &buttonInfo);
-
-    nbgl_layoutDraw(layoutCtx);
+    ui_setting_radio_page("PIN mode",
+                          TOKEN_PIN_BACK,
+                          pin_cb,
+                          (const char *const *) names,
+                          PIN_CHOICE_NB,
+                          pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle),
+                          TOKEN_PIN_SET,
+                          TOKEN_PIN_DEF);
 #else   // SCREEN_SIZE_WALLET
     nbgl_useCaseNavigableContent("PIN mode", pin_initPage, 2, ui_home_init, pin_cfg_cb, pin_cb);
 #endif  // SCREEN_SIZE_WALLET
