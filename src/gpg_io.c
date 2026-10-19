@@ -510,6 +510,71 @@ static bool gpg_io_check_lc(unsigned int rx) {
 }
 
 /**
+ * Tell whether a received frame is a GET RESPONSE
+ *
+ * @param[in]  rx received frame length
+ *
+ */
+static bool gpg_io_is_get_response(unsigned int rx) {
+    return (rx >= 4) && (G_io_apdu_buffer[OFFSET_CLA] == CLA_APP_DEF) &&
+           (G_io_apdu_buffer[OFFSET_INS] == INS_GET_RESPONSE) &&
+           (G_io_apdu_buffer[OFFSET_P1] == GET_RESPONSE) &&
+           (G_io_apdu_buffer[OFFSET_P2] == GET_RESPONSE);
+}
+
+// Response data left to send on the next GET RESPONSE, after an asynchronous reply
+static bool gpg_io_out_pending;
+
+/**
+ * Send the response from the current offset, in parts announced by 61xx
+ *
+ * @param[in]  io_flags IO_RETURN_AFTER_TX to send only the next part, then return
+ *
+ * @return  length of the command received after the response,
+ *          0 with IO_RETURN_AFTER_TX
+ *
+ */
+static unsigned int gpg_io_send(unsigned int io_flags) {
+    unsigned int rx;
+
+    while (G_gpg_vstate.io_length > MAX_OUT) {
+        unsigned int tx, xx;
+        // send chunk
+        tx = MAX_OUT - 2;
+        memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, tx);
+        G_gpg_vstate.io_length -= tx;
+        G_gpg_vstate.io_offset += tx;
+        G_io_apdu_buffer[tx] = (SWO_RESPONSE_BYTES_AVAILABLE >> 8) & 0xFF;
+        if (G_gpg_vstate.io_length > MAX_OUT) {
+            xx = MAX_OUT - 2;
+        } else {
+            xx = G_gpg_vstate.io_length - 2;
+        }
+        G_io_apdu_buffer[tx + 1] = xx;
+        if (io_flags & IO_RETURN_AFTER_TX) {
+            // The pending asynchronous exchange receives the next command
+            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, tx + 2);
+            gpg_io_out_pending = true;
+            return 0;
+        }
+        rx = io_exchange(CHANNEL_APDU, tx + 2);
+        // Any command other than GET RESPONSE drops the pending response
+        if (!gpg_io_is_get_response(rx)) {
+            gpg_io_discard(1);
+            return rx;
+        }
+    }
+    memmove(G_io_apdu_buffer,
+            G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+            G_gpg_vstate.io_length);
+    if (io_flags & IO_RETURN_AFTER_TX) {
+        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
+        return 0;
+    }
+    return io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
+}
+
+/**
  * APDU Receive/transmit
  *
  * @param[in]  flag io buffer flag
@@ -522,48 +587,21 @@ unsigned int gpg_io_do(unsigned int io_flags) {
     unsigned int rx = 0;
 
     if (io_flags & IO_ASYNCH_REPLY) {
-        // if IO_ASYNCH_REPLY has been set,
-        //  io_exchange will return when IO_RETURN_AFTER_TX will set in ui
+        // io_exchange returns on the command following the reply sent from the UI
         rx = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
+        if (gpg_io_out_pending) {
+            gpg_io_out_pending = false;
+            if (gpg_io_is_get_response(rx)) {
+                rx = gpg_io_send(0);
+            } else {
+                gpg_io_discard(1);
+            }
+        }
     } else {
         // --- full out chaining ---
         G_gpg_vstate.io_offset = 0;
-        while (G_gpg_vstate.io_length > MAX_OUT) {
-            unsigned int tx, xx;
-            // send chunk
-            tx = MAX_OUT - 2;
-            memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, tx);
-            G_gpg_vstate.io_length -= tx;
-            G_gpg_vstate.io_offset += tx;
-            G_io_apdu_buffer[tx] = (SWO_RESPONSE_BYTES_AVAILABLE >> 8) & 0xFF;
-            if (G_gpg_vstate.io_length > MAX_OUT) {
-                xx = MAX_OUT - 2;
-            } else {
-                xx = G_gpg_vstate.io_length - 2;
-            }
-            G_io_apdu_buffer[tx + 1] = xx;
-            rx = io_exchange(CHANNEL_APDU, tx + 2);
-            // Any command other than GET RESPONSE drops the pending response
-            if ((rx < 4) || (G_io_apdu_buffer[OFFSET_CLA] != CLA_APP_DEF) ||
-                (G_io_apdu_buffer[OFFSET_INS] != INS_GET_RESPONSE) ||
-                (G_io_apdu_buffer[OFFSET_P1] != GET_RESPONSE) ||
-                (G_io_apdu_buffer[OFFSET_P2] != GET_RESPONSE)) {
-                gpg_io_discard(1);
-                break;
-            }
-            rx = 0;
-        }
-        if (rx == 0) {
-            memmove(G_io_apdu_buffer,
-                    G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                    G_gpg_vstate.io_length);
-
-            if (io_flags & IO_RETURN_AFTER_TX) {
-                io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
-                return SWO_SUCCESS;
-            }
-            rx = io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
-        } else if (io_flags & IO_RETURN_AFTER_TX) {
+        rx = gpg_io_send(io_flags);
+        if (io_flags & IO_RETURN_AFTER_TX) {
             return SWO_SUCCESS;
         }
     }

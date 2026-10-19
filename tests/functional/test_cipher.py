@@ -285,6 +285,33 @@ def test_uif_command_during_prompt(device: Device, backend: BackendInterface, na
     verifier.verify(shown, rapdu.data)
 
 
+# In this test we send a new command instead of GET RESPONSE during a long response to a UIF operation
+def test_uif_long_response_aborted(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
+    client = CommandSender(backend)
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+    assert client.set_uif(DataObject.DO_UIF_SIG, True).status == Errors.SW_OK
+    login = b"John.Doe"
+    assert client.put_data(DataObject.DO_LOGIN, login).status == Errors.SW_OK
+    check_pincode(client, PassWord.PW1)
+
+    pso_cds_p1, pso_cds_p2 = 0x9E, 0x9A
+    frame = SHA256_DIGEST_INFO + SHA256.new(get_random_bytes(16)).digest()
+    header = struct.pack(">BBBBB", ClaType.CLA_APP, InsType.INS_PSO, pso_cds_p1, pso_cds_p2, len(frame))
+    # The 256-byte signature ends with a 61xx status word
+    with pytest.raises(ExceptionRAPDU) as err:
+        with backend.exchange_async_raw(header + frame):
+            util_navigate(device, navigator, test_name, "Confirm_Yes")
+    assert (err.value.status & 0xFF00) == Errors.SW_CORRECT_LONG_RESPONSE
+
+    rapdu = client.get_data(DataObject.DO_LOGIN)
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == login
+
+
 def test_cv25519(backend: BackendInterface) -> None:
     # Use the app interface instead of raw interface
     client = CommandSender(backend)

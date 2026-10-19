@@ -614,7 +614,7 @@ static void test_io_transmit_chained_announce(void) {
         fake_io_reset();
         load_response(first_len + remaining);
         fake_io_push_rx(get_response, sizeof(get_response));
-        gpg_io_do(IO_RETURN_AFTER_TX);
+        gpg_io_do(0);
 
         TEST_ASSERT_EQUAL_UINT(2, fake_io_tx_count);
         TEST_ASSERT_EQUAL_UINT_MESSAGE(remaining + 2, fake_io_tx[1].len, "last part length");
@@ -642,6 +642,56 @@ static void test_io_return_after_tx(void) {
     TEST_ASSERT_EQUAL_UINT(1, fake_io_tx_count);
     TEST_ASSERT_EQUAL_HEX8(CHANNEL_APDU | IO_RETURN_AFTER_TX, fake_io_tx[0].flags);
     TEST_ASSERT_EQUAL_UINT(2, fake_io_tx[0].len);
+}
+
+static void test_io_return_after_tx_chained(void) {
+    // From the UI, the first part only is sent: the GET RESPONSE ends the asynchronous exchange
+    const uint8_t get_response[] = {0x00, 0xC0, 0x00, 0x00, 0x00};
+    const uint8_t next[] = {0x00, 0xCA, 0x00, 0x6E, 0x00};
+    const size_t first_len = GPG_APDU_LENGTH - 2;
+    const size_t data_len = 300;
+
+    load_response(data_len);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_RETURN_AFTER_TX));
+    TEST_ASSERT_EQUAL_UINT(1, fake_io_tx_count);
+    TEST_ASSERT_EQUAL_HEX8(CHANNEL_APDU | IO_RETURN_AFTER_TX, fake_io_tx[0].flags);
+    TEST_ASSERT_EQUAL_UINT(first_len + 2, fake_io_tx[0].len);
+    TEST_ASSERT_EQUAL_HEX8(0x61, fake_io_tx[0].data[first_len]);
+    TEST_ASSERT_EQUAL_UINT(data_len - first_len, fake_io_tx[0].data[first_len + 1]);
+
+    fake_io_push_rx(get_response, sizeof(get_response));
+    fake_io_push_rx(next, sizeof(next));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_ASYNCH_REPLY));
+    TEST_ASSERT_EQUAL_UINT(3, fake_io_tx_count);
+
+    // Remaining data, then 9000
+    TEST_ASSERT_EQUAL_UINT(data_len - first_len + 2, fake_io_tx[2].len);
+    TEST_ASSERT_EQUAL_HEX8(first_len & 0xFF, fake_io_tx[2].data[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x90, fake_io_tx[2].data[data_len - first_len]);
+
+    // The command received after the response is ready to be dispatched
+    TEST_ASSERT_EQUAL_HEX8(0xCA, G_gpg_vstate.io_ins);
+}
+
+static void test_io_return_after_tx_chain_dropped(void) {
+    // From the UI, another command than GET RESPONSE drops the remaining data, and is dispatched
+    const uint8_t other[] = {0x00, 0xCA, 0x00, 0x6E, 0x00};
+
+    load_response(300);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_RETURN_AFTER_TX));
+
+    fake_io_push_rx(other, sizeof(other));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_ASYNCH_REPLY));
+    TEST_ASSERT_EQUAL_UINT(2, fake_io_tx_count);
+    TEST_ASSERT_EQUAL_HEX8(0xCA, G_gpg_vstate.io_ins);
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_length);
+
+    // Nothing is left to send on a later GET RESPONSE
+    fake_io_reset();
+    fake_io_push_rx((const uint8_t[]) {0x00, 0xC0, 0x00, 0x00, 0x00}, 5);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_ASYNCH_REPLY));
+    TEST_ASSERT_EQUAL_UINT(1, fake_io_tx_count);
+    TEST_ASSERT_EQUAL_HEX8(INS_GET_RESPONSE, G_gpg_vstate.io_ins);
 }
 
 static void test_io_asynch_reply(void) {
@@ -701,6 +751,8 @@ int main(void) {
     RUN_TEST(test_io_transmit_chained_announce);
     RUN_TEST(test_io_transmit_chain_dropped);
     RUN_TEST(test_io_return_after_tx);
+    RUN_TEST(test_io_return_after_tx_chained);
+    RUN_TEST(test_io_return_after_tx_chain_dropped);
     RUN_TEST(test_io_asynch_reply);
     return UNITY_END();
 }
