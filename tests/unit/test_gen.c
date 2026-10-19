@@ -92,7 +92,7 @@ static size_t check_template(void) {
     unsigned int l = 0;
 
     gpg_io_set_offset(0);
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x7F49, t);
     TEST_ASSERT_EQUAL_UINT(G_gpg_vstate.io_length - G_gpg_vstate.io_offset, l);
     return G_gpg_vstate.io_offset;
@@ -102,7 +102,7 @@ static void fetch_do(unsigned int tag, size_t len) {
     unsigned int t = 0;
     unsigned int l = 0;
 
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(tag, t);
     TEST_ASSERT_EQUAL_UINT(len, l);
 }

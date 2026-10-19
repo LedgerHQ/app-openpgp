@@ -101,3 +101,24 @@ def test_import_truncated_key_data(backend: BackendInterface) -> None:
     with pytest.raises(ExceptionRAPDU) as err:
         client.put_data(DataObject.DO_EXTENDED_HEADER_LIST, data)
     assert err.value.status == Errors.SW_WRONG_DATA
+
+
+# In this test we import an Extended Header list cut inside its headers
+def test_import_truncated_headers(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+    client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["rsa2048"])
+
+    template = _rsa_template(RSA_2048_FACTOR_LEN, RSA_2048_FACTOR_LEN)
+    data = _extended_header(template, len(RSA_E), RSA_E)
+    # Cut in the 4D, CRT and 7F48 headers, then in the 5F48 header
+    template_start = len(_tl(TAG_EXTENDED_HEADER, 0)) + len(_tl(DataObject.DO_SIG_KEY, 0))
+    key_data_start = template_start + len(_tl(TAG_TEMPLATE, len(template))) + len(template)
+    cuts = [*range(1, template_start + 3), key_data_start + 1, key_data_start + 2]
+    for cut in cuts:
+        with pytest.raises(ExceptionRAPDU) as err:
+            client.put_data(DataObject.DO_EXTENDED_HEADER_LIST, data[:cut])
+        assert err.value.status == Errors.SW_WRONG_LENGTH
+
+    # The application is still running
+    check_pincode(client, PassWord.PW3)

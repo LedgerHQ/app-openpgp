@@ -361,11 +361,10 @@ int gpg_apdu_pso() {
             break;
 
         case PSO_DEC:
-            if (gpg_pso_remaining() < 1) {
+            if (!gpg_io_fetch_u8(&pad_byte)) {
                 error = SWO_WRONG_LENGTH;
                 break;
             }
-            pad_byte = gpg_io_fetch_u8();
 
             switch (pad_byte) {
                 case PAD_RSA:
@@ -447,28 +446,21 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    // Check APDU content tags, each TL taking at most 5 bytes
-                    if (gpg_pso_remaining() < 3) {
+                    // Check APDU content tags
+                    if (!gpg_io_fetch_l(&l) || !gpg_io_fetch_tl(&t, &l)) {
                         error = SWO_WRONG_LENGTH;
                         break;
                     }
-                    gpg_io_fetch_l(&l);
-                    if (gpg_pso_remaining() < 5) {
-                        error = SWO_WRONG_LENGTH;
-                        break;
-                    }
-                    gpg_io_fetch_tl(&t, &l);
                     // TAG 0x7f49 announces a Public Key DO
                     if (t != 0x7f49) {
                         PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x7f49);
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
-                    if (gpg_pso_remaining() < 5) {
+                    if (!gpg_io_fetch_tl(&t, &l)) {
                         error = SWO_WRONG_LENGTH;
                         break;
                     }
-                    gpg_io_fetch_tl(&t, &l);
                     // TAG 0x86 announces an External Public Key (with its length)
                     if (t != 0x86) {
                         PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x86);

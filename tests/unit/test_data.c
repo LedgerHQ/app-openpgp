@@ -463,21 +463,21 @@ static void test_application_related_data(void) {
 
     // AID, extended length information, then the discretionary data objects up to the end
     gpg_io_set_offset(0);
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x4F, t);
     TEST_ASSERT_EQUAL_UINT(AID_LENGTH, l);
-    G_gpg_vstate.io_offset += l;
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_skip(l));
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x7F66, t);
-    G_gpg_vstate.io_offset += l;
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_skip(l));
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x73, t);
     TEST_ASSERT_EQUAL_UINT(G_gpg_vstate.io_length - G_gpg_vstate.io_offset, l);
 
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0xC0, t);
-    G_gpg_vstate.io_offset += l;
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_skip(l));
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0xC1, t);
     TEST_ASSERT_EQUAL_UINT(sizeof(ATTR_RSA2048), l);
     TEST_ASSERT_EQUAL_HEX8_ARRAY(ATTR_RSA2048,
@@ -587,6 +587,39 @@ static void test_import_ecc_wrong_length(void) {
     TEST_ASSERT_EACH_EQUAL_HEX8(0xA5,
                                 (const uint8_t *) &G_gpg_vstate.kslot->aut.priv_key,
                                 sizeof(G_gpg_vstate.kslot->aut.priv_key));
+}
+
+static void test_import_truncated(void) {
+    uint8_t buf[64];
+    size_t len = ecc_key_import(buf, KEY_AUT, 32);
+    int sw;
+
+    set_ed25519_attributes(&G_gpg_vstate.kslot->aut);
+    memset((void *) &G_gpg_vstate.kslot->aut.priv_key,
+           0xA5,
+           sizeof(G_gpg_vstate.kslot->aut.priv_key));
+
+    // Cut inside the 4D, CRT or 7F48 headers
+    for (size_t n = 0; n < 7; n++) {
+        TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, put_data(0x3FFF, buf, n));
+    }
+    // Cut anywhere else
+    for (size_t n = 7; n < len; n++) {
+        sw = put_data(0x3FFF, buf, n);
+        TEST_ASSERT_TRUE((sw == SWO_WRONG_LENGTH) || (sw == SWO_INCORRECT_DATA));
+    }
+
+    // The previous key is kept
+    TEST_ASSERT_EACH_EQUAL_HEX8(0xA5,
+                                (const uint8_t *) &G_gpg_vstate.kslot->aut.priv_key,
+                                sizeof(G_gpg_vstate.kslot->aut.priv_key));
+}
+
+static void test_import_unsupported_length(void) {
+    // 3-byte long form length
+    const uint8_t buf[] = {0x4D, 0x83, 0x00, 0x00, 0x10};
+
+    TEST_ASSERT_EQUAL_HEX16(SWO_WRONG_LENGTH, put_data(0x3FFF, buf, sizeof(buf)));
 }
 
 static void test_import_no_attributes(void) {
@@ -794,6 +827,8 @@ int main(void) {
     RUN_TEST(test_import_ecc);
     RUN_TEST(test_import_ecc_short_key);
     RUN_TEST(test_import_ecc_wrong_length);
+    RUN_TEST(test_import_truncated);
+    RUN_TEST(test_import_unsupported_length);
     RUN_TEST(test_import_no_attributes);
     RUN_TEST(test_import_bad_headers);
     RUN_TEST(test_import_rsa_bad_parts);

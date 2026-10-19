@@ -48,14 +48,6 @@ void gpg_apdu_select_data(unsigned int ref, int record) {
 }
 
 /**
- * Number of received bytes not yet fetched
- *
- */
-static unsigned int gpg_key_data_left() {
-    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
-}
-
-/**
  * Store the received data length as the length of a DO
  *
  * @param[out] length DO length in NVRAM
@@ -80,21 +72,21 @@ static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
     cx_rsa_private_key_t *key = NULL;
     unsigned char pub_e[sizeof(keygpg->pub_key.rsa)];
 
-    if (gpg_key_data_left() < 4) {
+    if (!gpg_io_fetch_u32(&len)) {
         return SWO_WRONG_LENGTH;
     }
-    len = gpg_io_fetch_u32();
     if (len != sizeof(pub_e)) {
         return SWO_INCORRECT_DATA;
     }
     // public key, then encrypted key length
-    if (gpg_key_data_left() < len + 4) {
+    if (!gpg_io_fetch(pub_e, len)) {
         return SWO_WRONG_LENGTH;
     }
-    gpg_io_fetch(pub_e, len);
     aad_len = G_gpg_vstate.io_offset;
 
-    enc_len = gpg_io_fetch_u32();
+    if (!gpg_io_fetch_u32(&enc_len)) {
+        return SWO_WRONG_LENGTH;
+    }
     if (enc_len <= GPG_BACKUP_TAG_LEN ||
         enc_len > G_gpg_vstate.io_length - G_gpg_vstate.io_offset) {
         return SWO_INCORRECT_DATA;
@@ -163,23 +155,22 @@ static int gpg_put_key_data_v1_ec(gpg_key_t *keygpg,
     unsigned int len = 0;
     unsigned char *priv = NULL;
 
-    if (gpg_key_data_left() < 4) {
+    if (!gpg_io_fetch_u32(&len)) {
         return SWO_WRONG_LENGTH;
     }
-    len = gpg_io_fetch_u32();
     if (len != sizeof(cx_ecfp_640_public_key_t)) {
         return SWO_INCORRECT_DATA;
     }
     // public key, then encrypted key length
-    if (gpg_key_data_left() < len + 4) {
+    pub_offset = G_gpg_vstate.io_offset;
+    if (!gpg_io_skip(len)) {
         return SWO_WRONG_LENGTH;
     }
-    pub_offset = G_gpg_vstate.io_offset;
-    gpg_io_fetch(NULL, len);
-    G_gpg_vstate.io_offset += len;
     aad_len = G_gpg_vstate.io_offset;
 
-    enc_len = gpg_io_fetch_u32();
+    if (!gpg_io_fetch_u32(&enc_len)) {
+        return SWO_WRONG_LENGTH;
+    }
     if (enc_len <= GPG_BACKUP_TAG_LEN ||
         enc_len > G_gpg_vstate.io_length - G_gpg_vstate.io_offset) {
         return SWO_INCORRECT_DATA;
@@ -548,7 +539,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 break;
             }
             // stored in native byte order, then read back big-endian by key generation
-            e = gpg_io_fetch_u32();
+            if (!gpg_io_fetch_u32(&e)) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             if (!gpg_rsa_exponent_is_valid((const unsigned char *) &e)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
@@ -576,13 +570,19 @@ int gpg_apdu_put_data(unsigned int ref) {
             unsigned int endof, reset_cnt;
             gpg_key_t *keygpg = NULL;
             // fecth 4D
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_io_fetch_tl(&t, &l)) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             if (t != 0x4D) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
             // fecth B8/B6/A4
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_io_fetch_tl(&t, &l)) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             reset_cnt = 0;
             switch (t) {
                 case KEY_SIG:
@@ -603,7 +603,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 break;
             }
             // fecth 7f78
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_io_fetch_tl(&t, &l)) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             if ((t != 0x7f48) || (l > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset))) {
                 sw = SWO_INCORRECT_DATA;
                 break;
@@ -613,7 +616,9 @@ int gpg_apdu_put_data(unsigned int ref) {
             len_q = 0;
             endof = G_gpg_vstate.io_offset + l;
             while (G_gpg_vstate.io_offset < endof) {
-                gpg_io_fetch_tl(&t, &l);
+                if (!gpg_io_fetch_tl(&t, &l)) {
+                    return SWO_WRONG_LENGTH;
+                }
                 if (G_gpg_vstate.io_offset > endof) {
                     return SWO_INCORRECT_DATA;
                 }
@@ -638,7 +643,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 }
             }
             // fecth 5f78
-            gpg_io_fetch_tl(&t, &l);
+            if (!gpg_io_fetch_tl(&t, &l)) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             if (t != 0x5f48) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
@@ -650,6 +658,7 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             if (keygpg->attributes.value[0] == KEY_ID_RSA) {
                 unsigned int e = 0;
+                bool fetched;
                 unsigned char *p, *q, *pq;
                 cx_rsa_public_key_t *rsa_pub;
                 cx_rsa_private_key_t *rsa_priv;
@@ -682,19 +691,24 @@ int gpg_apdu_put_data(unsigned int ref) {
                 // fetch e
                 switch (len_e) {
                     case 4:
-                        e = gpg_io_fetch_u32();
+                        fetched = gpg_io_fetch_u32(&e);
                         break;
                     case 3:
-                        e = gpg_io_fetch_u24();
+                        fetched = gpg_io_fetch_u24(&e);
                         break;
                     case 2:
-                        e = gpg_io_fetch_u16();
+                        fetched = gpg_io_fetch_u16(&e);
                         break;
                     case 1:
-                        e = gpg_io_fetch_u8();
+                        fetched = gpg_io_fetch_u8(&e);
                         break;
                     default:
+                        fetched = true;
                         break;
+                }
+                if (!fetched) {
+                    sw = SWO_WRONG_LENGTH;
+                    break;
                 }
                 if (e == 0) {
                     sw = SWO_INCORRECT_DATA;
@@ -927,7 +941,10 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
-            gpg_io_fetch_nv((unsigned char *) N_gpg_pstate->PW_status, 1);
+            if (!gpg_io_fetch_nv((unsigned char *) N_gpg_pstate->PW_status, 1)) {
+                sw = SWO_WRONG_LENGTH;
+                break;
+            }
             sw = SWO_SUCCESS;
             break;
 
@@ -1322,20 +1339,16 @@ static int gpg_put_key_data_legacy_rsa(gpg_key_t *keygpg, cx_aes_key_t *keyenc) 
     cx_rsa_private_key_t *key = NULL;
     int sw = SWO_INCORRECT_DATA;
 
-    if (gpg_key_data_left() < 4) {
+    if (!gpg_io_fetch_u32(&len)) {
         return SWO_WRONG_LENGTH;
     }
-    len = gpg_io_fetch_u32();
     if (len != sizeof(pub_e)) {
         return SWO_INCORRECT_DATA;
     }
     // public key, then encrypted key length
-    if (gpg_key_data_left() < len + 4) {
+    if (!gpg_io_fetch(pub_e, sizeof(pub_e)) || !gpg_io_fetch_u32(&enc_len)) {
         return SWO_WRONG_LENGTH;
     }
-    gpg_io_fetch(pub_e, sizeof(pub_e));
-
-    enc_len = gpg_io_fetch_u32();
     if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
         return SWO_INCORRECT_DATA;
     }
@@ -1385,21 +1398,17 @@ static int gpg_put_key_data_legacy_ec(gpg_key_t *keygpg, cx_aes_key_t *keyenc) {
     unsigned char *priv = NULL;
     int sw = SWO_INCORRECT_DATA;
 
-    if (gpg_key_data_left() < 4) {
+    if (!gpg_io_fetch_u32(&len)) {
         return SWO_WRONG_LENGTH;
     }
-    len = gpg_io_fetch_u32();
     if (len != sizeof(cx_ecfp_640_public_key_t)) {
         return SWO_INCORRECT_DATA;
     }
     // public key, then encrypted key length
-    if (gpg_key_data_left() < len + 4) {
+    pub_offset = G_gpg_vstate.io_offset;
+    if (!gpg_io_skip(len) || !gpg_io_fetch_u32(&enc_len)) {
         return SWO_WRONG_LENGTH;
     }
-    pub_offset = G_gpg_vstate.io_offset;
-    G_gpg_vstate.io_offset += len;
-
-    enc_len = gpg_io_fetch_u32();
     if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
         return SWO_INCORRECT_DATA;
     }
@@ -1443,15 +1452,10 @@ static int gpg_check_key_role(unsigned int ref, const gpg_key_t *keygpg) {
     unsigned int blob_ref;
     unsigned int len;
 
-    if (gpg_key_data_left() < 2 + 1) {
+    if (!gpg_io_fetch_u16(&blob_ref) || !gpg_io_fetch_u8(&len) || (len > sizeof(attributes)) ||
+        !gpg_io_fetch(attributes, len)) {
         return SWO_WRONG_LENGTH;
     }
-    blob_ref = gpg_io_fetch_u16();
-    len = gpg_io_fetch_u8();
-    if ((len > sizeof(attributes)) || (gpg_key_data_left() < len)) {
-        return SWO_WRONG_LENGTH;
-    }
-    gpg_io_fetch(attributes, len);
     if ((blob_ref != ref) || (len != keygpg->attributes.length) ||
         (memcmp(attributes, keygpg->attributes.value, len) != 0)) {
         return SWO_INCORRECT_DATA;
@@ -1462,7 +1466,8 @@ static int gpg_check_key_role(unsigned int ref, const gpg_key_t *keygpg) {
 int gpg_apdu_put_key_data(unsigned int ref) {
     gpg_key_t *keygpg = NULL;
     int sw = SWO_UNKNOWN;
-    unsigned char version;
+    unsigned int version;
+    unsigned int unused;
 
     switch (ref) {
         case KEY_SIG:
@@ -1478,30 +1483,24 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             return SWO_INCORRECT_DATA;
     }
 
-    if (gpg_key_data_left() < 1) {
+    if (!gpg_io_fetch_u8(&version)) {
         return SWO_WRONG_LENGTH;
     }
-    version = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
     if ((version == BACKUP_FORMAT_V1) || (version == BACKUP_FORMAT_V2) ||
         (version == BACKUP_FORMAT_V3)) {
         // AES-GCM authenticated blob, with the nonce stored in the header from v2
         cx_aes_gcm_context_t gcm_ctx;
         unsigned char nonce[GPG_BACKUP_NONCE_LEN];
 
-        // version, TARGET_ID and api_level (not checked) up to v2, then the nonce from v2
-        if (gpg_key_data_left() < 1 + ((version == BACKUP_FORMAT_V3) ? 0 : 4 + 4) +
-                                      ((version == BACKUP_FORMAT_V1) ? 0 : GPG_BACKUP_NONCE_LEN)) {
+        // TARGET_ID and api_level (not checked) up to v2, then the nonce from v2
+        if ((version != BACKUP_FORMAT_V3) &&
+            (!gpg_io_fetch_u32(&unused) || !gpg_io_fetch_u32(&unused))) {
             return SWO_WRONG_LENGTH;
-        }
-        gpg_io_fetch_u8();  // version
-        if (version != BACKUP_FORMAT_V3) {
-            gpg_io_fetch_u32();  // TARGET_ID
-            gpg_io_fetch_u32();  // api_level
         }
         if (version == BACKUP_FORMAT_V1) {
             gpg_backup_nonce(ref, nonce);
-        } else {
-            gpg_io_fetch(nonce, sizeof(nonce));
+        } else if (!gpg_io_fetch(nonce, sizeof(nonce))) {
+            return SWO_WRONG_LENGTH;
         }
         if (version == BACKUP_FORMAT_V3) {
             sw = gpg_check_key_role(ref, keygpg);
@@ -1535,8 +1534,8 @@ int gpg_apdu_put_key_data(unsigned int ref) {
         // legacy: AES-CBC blob (first byte is high byte of TARGET_ID, never a version number)
         cx_aes_key_t keyenc = {0};
 
-        // TARGET_ID and api_level
-        if (gpg_key_data_left() < 4 + 4) {
+        // rest of TARGET_ID, and api_level
+        if (!gpg_io_skip(3 + 4)) {
             return SWO_WRONG_LENGTH;
         }
         sw = gpg_init_keyenc(&keyenc);
@@ -1544,9 +1543,6 @@ int gpg_apdu_put_key_data(unsigned int ref) {
             explicit_bzero(&keyenc, sizeof(keyenc));
             return sw;
         }
-
-        gpg_io_fetch_u32();  // TARGET_ID
-        gpg_io_fetch_u32();  // api_level
 
         switch (keygpg->attributes.value[0]) {
             case KEY_ID_RSA:
