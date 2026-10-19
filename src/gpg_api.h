@@ -133,6 +133,7 @@ void gpg_io_insert_t(unsigned int T);
 void gpg_io_insert_tl(unsigned int T, unsigned int L);
 void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V);
 
+unsigned int gpg_io_remaining(void);
 WARN_UNUSED_RESULT bool gpg_io_fetch_u32(unsigned int *v32);
 WARN_UNUSED_RESULT bool gpg_io_fetch_u24(unsigned int *v24);
 WARN_UNUSED_RESULT bool gpg_io_fetch_u16(unsigned int *v16);

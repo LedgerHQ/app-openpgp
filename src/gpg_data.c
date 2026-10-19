@@ -98,8 +98,7 @@ static int gpg_put_key_data_v1_rsa(gpg_key_t *keygpg,
     if (!gpg_io_fetch_u32(&enc_len)) {
         return SWO_WRONG_LENGTH;
     }
-    if (enc_len <= GPG_BACKUP_TAG_LEN ||
-        enc_len > G_gpg_vstate.io_length - G_gpg_vstate.io_offset) {
+    if (enc_len <= GPG_BACKUP_TAG_LEN || enc_len > gpg_io_remaining()) {
         return SWO_INCORRECT_DATA;
     }
     ct_len = enc_len - GPG_BACKUP_TAG_LEN;
@@ -182,8 +181,7 @@ static int gpg_put_key_data_v1_ec(gpg_key_t *keygpg,
     if (!gpg_io_fetch_u32(&enc_len)) {
         return SWO_WRONG_LENGTH;
     }
-    if (enc_len <= GPG_BACKUP_TAG_LEN ||
-        enc_len > G_gpg_vstate.io_length - G_gpg_vstate.io_offset) {
+    if (enc_len <= GPG_BACKUP_TAG_LEN || enc_len > gpg_io_remaining()) {
         return SWO_INCORRECT_DATA;
     }
     ct_len = enc_len - GPG_BACKUP_TAG_LEN;
@@ -503,40 +501,46 @@ int gpg_apdu_put_data(unsigned int ref) {
             sw = SWO_SUCCESS;
             break;
             /*  ----------------- Config key slot ----------------- */
-        case 0x01F1:
-            if (G_gpg_vstate.io_length != 3) {
+        case 0x01F1: {
+            unsigned int nb_slots, def_slot, slot_select;
+            unsigned char config[3];
+            // number of slots, default slot, slot selection
+            if ((gpg_io_remaining() != sizeof(config)) || !gpg_io_fetch_u8(&nb_slots) ||
+                !gpg_io_fetch_u8(&def_slot) || !gpg_io_fetch_u8(&slot_select)) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
-            if ((G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 0] != GPG_KEYS_SLOTS) ||
-                (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 1] >= GPG_KEYS_SLOTS) ||
-                (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 2] > 3)) {
+            if ((nb_slots != GPG_KEYS_SLOTS) || (def_slot >= GPG_KEYS_SLOTS) || (slot_select > 3)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
-            nvm_write((void *) N_gpg_pstate->config_slot,
-                      G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                      3);
+            config[0] = nb_slots;
+            config[1] = def_slot;
+            config[2] = slot_select;
+            nvm_write((void *) N_gpg_pstate->config_slot, config, sizeof(config));
             sw = SWO_SUCCESS;
             // show or hide the slot selection of the home screen
             ui_init();
             break;
+        }
 
-        case 0x01F2:
+        case 0x01F2: {
+            unsigned int slot;
             if ((N_gpg_pstate->config_slot[2] & SLOT_SELECT_APDU) == 0) {
                 sw = SWO_CONDITIONS_NOT_SATISFIED;
                 break;
             }
-            if (G_gpg_vstate.io_length != 1) {
+            if ((gpg_io_remaining() != 1) || !gpg_io_fetch_u8(&slot)) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
-            sw = gpg_select_slot(G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset]);
+            sw = gpg_select_slot(slot);
             if (sw == SWO_SUCCESS) {
                 // leave any settings page bound to the previous slot, and show the new one
                 ui_init();
             }
             break;
+        }
 
         /* ----------------- Config RSA exponent ----------------- */
         case 0x01F8: {
@@ -561,13 +565,11 @@ int gpg_apdu_put_data(unsigned int ref) {
 
             /* ----------------- Serial -----------------*/
         case 0x4f:
-            if (G_gpg_vstate.io_length != 4) {
+            if ((gpg_io_remaining() != AID_SERIAL_LENGTH) ||
+                !gpg_io_fetch_nv(G_gpg_vstate.kslot->serial, AID_SERIAL_LENGTH)) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
-            nvm_write(G_gpg_vstate.kslot->serial,
-                      &G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset],
-                      4);
             sw = SWO_SUCCESS;
             break;
 
@@ -614,7 +616,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_WRONG_LENGTH;
                 break;
             }
-            if ((t != 0x7f48) || (l > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset))) {
+            if ((t != 0x7f48) || (l > gpg_io_remaining())) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
@@ -658,7 +660,7 @@ int gpg_apdu_put_data(unsigned int ref) {
                 sw = SWO_REFERENCED_DATA_NOT_FOUND;
                 break;
             }
-            if (l > (unsigned int) (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+            if (l > gpg_io_remaining()) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
@@ -1356,7 +1358,7 @@ static int gpg_put_key_data_legacy_rsa(gpg_key_t *keygpg, cx_aes_key_t *keyenc) 
     if (!gpg_io_fetch(pub_e, sizeof(pub_e)) || !gpg_io_fetch_u32(&enc_len)) {
         return SWO_WRONG_LENGTH;
     }
-    if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+    if (enc_len > gpg_io_remaining()) {
         return SWO_INCORRECT_DATA;
     }
     offset = G_gpg_vstate.io_offset;
@@ -1416,7 +1418,7 @@ static int gpg_put_key_data_legacy_ec(gpg_key_t *keygpg, cx_aes_key_t *keyenc) {
     if (!gpg_io_skip(len) || !gpg_io_fetch_u32(&enc_len)) {
         return SWO_WRONG_LENGTH;
     }
-    if (enc_len > (G_gpg_vstate.io_length - G_gpg_vstate.io_offset)) {
+    if (enc_len > gpg_io_remaining()) {
         return SWO_INCORRECT_DATA;
     }
     offset = G_gpg_vstate.io_offset;

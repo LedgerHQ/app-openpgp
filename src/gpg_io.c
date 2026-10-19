@@ -243,6 +243,15 @@ static buffer_t gpg_io_reader(void) {
 }
 
 /**
+ * Number of received bytes not yet fetched
+ *
+ */
+unsigned int gpg_io_remaining(void) {
+    LEDGER_ASSERT(G_gpg_vstate.io_offset <= G_gpg_vstate.io_length, "Bad offset!");
+    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+}
+
+/**
  * Read a u32 value from the APDU buffer
  *
  * @param[out]  v32 value retrieved

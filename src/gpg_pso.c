@@ -59,14 +59,6 @@ const unsigned char gpg_oid_sha512[] = {0x30,
                                         0x40};
 
 /**
- * Number of input bytes not yet fetched
- *
- */
-static unsigned int gpg_pso_remaining() {
-    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
-}
-
-/**
  * Uncompress a Curve25519 public key
  *
  * @param[in,out]  raw_public_key x coordinate as input, 04 || x || y as output
@@ -338,7 +330,7 @@ int gpg_apdu_pso() {
             if (!gpg_pso_aes_key_is_valid(aes_key)) {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
-            msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+            msg_len = gpg_io_remaining();
             if (msg_len > GPG_IO_BUFFER_LENGTH - 1) {
                 return SWO_WRONG_LENGTH;
             }
@@ -396,7 +388,7 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+                    msg_len = gpg_io_remaining();
                     CX_CHECK(cx_rsa_decrypt_no_throw(
                         rsa_key,
                         CX_PAD_PKCS1_1o5,
@@ -418,7 +410,7 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+                    msg_len = gpg_io_remaining();
                     ksz = GPG_IO_BUFFER_LENGTH;
                     CX_CHECK(cx_aes_no_throw(aes_key,
                                              CX_DECRYPT | CX_CHAIN_CBC | CX_LAST,
@@ -467,7 +459,7 @@ int gpg_apdu_pso() {
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
-                    if (l > gpg_pso_remaining()) {
+                    if (l > gpg_io_remaining()) {
                         error = SWO_WRONG_LENGTH;
                         break;
                     }

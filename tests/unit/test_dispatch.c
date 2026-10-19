@@ -26,6 +26,31 @@ static void fake_set_verified(int pinID, int value, int num_calls) {
     verified[pinID] = value;
 }
 
+// Readers of the received data, with the same contract as gpg_io.c
+static unsigned int fake_remaining(int num_calls) {
+    (void) num_calls;
+    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+}
+
+static bool fake_fetch_u8(unsigned int *v8, int num_calls) {
+    (void) num_calls;
+    if (fake_remaining(0) < 1) {
+        return false;
+    }
+    *v8 = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset++];
+    return true;
+}
+
+static bool fake_fetch_u16(unsigned int *v16, int num_calls) {
+    (void) num_calls;
+    if (fake_remaining(0) < 2) {
+        return false;
+    }
+    *v16 = U2BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
+    G_gpg_vstate.io_offset += 2;
+    return true;
+}
+
 void setUp(void) {
     memset(&G_gpg_vstate, 0, sizeof(G_gpg_vstate));
     memset((void *) N_gpg_pstate, 0, sizeof(gpg_nv_state_t));
@@ -38,6 +63,9 @@ void setUp(void) {
     gpg_pin_is_verified_StubWithCallback(fake_is_verified);
     gpg_pin_set_verified_StubWithCallback(fake_set_verified);
     gpg_io_discard_Ignore();
+    gpg_io_remaining_StubWithCallback(fake_remaining);
+    gpg_io_fetch_u8_StubWithCallback(fake_fetch_u8);
+    gpg_io_fetch_u16_StubWithCallback(fake_fetch_u16);
 }
 
 void tearDown(void) {
@@ -433,6 +461,7 @@ static int select_data(unsigned char p1, const unsigned char *data, unsigned int
     command(INS_SELECT_DATA, p1, SELECT_SKIP);
     memcpy(G_gpg_vstate.work.io_buffer, data, len);
     G_gpg_vstate.io_length = len;
+    G_gpg_vstate.io_offset = 0;
     return gpg_dispatch_under_test();
 }
 
