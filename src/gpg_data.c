@@ -48,6 +48,17 @@ void gpg_apdu_select_data(unsigned int ref, int record) {
 }
 
 /**
+ * Insert the AID, carrying the serial number of the current slot
+ *
+ */
+static void gpg_io_insert_aid(void) {
+    gpg_io_insert((const unsigned char *) N_gpg_pstate->AID, AID_SERIAL_OFFSET);
+    gpg_io_insert(G_gpg_vstate.kslot->serial, AID_SERIAL_LENGTH);
+    gpg_io_insert_u16(0x0000);  // RFU
+}
+_Static_assert(AID_SERIAL_OFFSET + AID_SERIAL_LENGTH + 2 == AID_LENGTH, "Bad AID layout");
+
+/**
  * Store the received data length as the length of a DO
  *
  * @param[out] length DO length in NVRAM
@@ -265,9 +276,7 @@ int gpg_apdu_get_data(unsigned int ref) {
             /* ----------------- Application ----------------- */
         case 0x004F:
             /*  Full Application identifier */
-            gpg_io_insert((const unsigned char *) N_gpg_pstate->AID, 10);
-            gpg_io_insert(G_gpg_vstate.kslot->serial, 4);
-            gpg_io_insert_u16(0x0000);
+            gpg_io_insert_aid();
             break;
         case 0x5F52:
             /* Historical bytes */
@@ -302,10 +311,8 @@ int gpg_apdu_get_data(unsigned int ref) {
 
             /* ----------------- aid, histo, ext_length, ... ----------------- */
         case 0x6E:
-            gpg_io_insert_tlv(0x4F, AID_LENGTH, (const unsigned char *) N_gpg_pstate->AID);
-            memmove(G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset - 6,
-                    G_gpg_vstate.kslot->serial,
-                    4);
+            gpg_io_insert_tl(0x4F, AID_LENGTH);
+            gpg_io_insert_aid();
 #ifdef WITH_HISTO_BYTES_IN_ARD
             gpg_io_insert_tlv(0x5F52, HISTO_LENGTH, (const unsigned char *) N_gpg_pstate->histo);
 #endif

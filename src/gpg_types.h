@@ -41,6 +41,8 @@
 
 #define MAGIC_LENGTH       8
 #define AID_LENGTH         16
+#define AID_SERIAL_OFFSET  10
+#define AID_SERIAL_LENGTH  4
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
 #define GPG_KEYS_SLOTS     3

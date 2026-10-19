@@ -455,17 +455,25 @@ static void test_get_next_data_other_do(void) {
 /* ----------------------------------------------------------------------- */
 
 static void test_application_related_data(void) {
+    const uint8_t serial[] = {0x12, 0x34, 0x56, 0x78};
+    uint8_t aid[AID_LENGTH];
     unsigned int t = 0;
     unsigned int l = 0;
 
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(0x4F, serial, sizeof(serial)));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_apdu_get_data(0x004F));
+    memcpy(aid, G_gpg_vstate.work.io_buffer, sizeof(aid));
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(0xC1, ATTR_RSA2048, sizeof(ATTR_RSA2048)));
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_apdu_get_data(0x6E));
 
-    // AID, extended length information, then the discretionary data objects up to the end
+    // AID, the same as DO 4F, extended length information, then the discretionary data objects
     gpg_io_set_offset(0);
     TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x4F, t);
     TEST_ASSERT_EQUAL_UINT(AID_LENGTH, l);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(aid,
+                                 G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+                                 AID_LENGTH);
     TEST_ASSERT_TRUE(gpg_io_skip(l));
     TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x7F66, t);
