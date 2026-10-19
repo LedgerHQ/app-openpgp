@@ -4,6 +4,7 @@
 This module provides Ragger tests for Cipher feature
 """
 
+import socket
 import struct
 from pathlib import Path
 
@@ -11,13 +12,13 @@ import pytest
 from application_client.app_def import ClaType, DataObject, Errors, InsType, PassWord, PubkeyAlgo
 from application_client.command_sender import CommandSender
 from Crypto.Cipher import AES, PKCS1_v1_5
-from Crypto.Hash import SHA256
+from Crypto.Hash import SHA256, SHA512
 from Crypto.Protocol.DH import key_agreement
 from Crypto.PublicKey import ECC
 from Crypto.Random import get_random_bytes
-from Crypto.Signature import pkcs1_15
+from Crypto.Signature import eddsa, pkcs1_15
 from ledgered.devices import Device
-from ragger.backend import BackendInterface
+from ragger.backend import BackendInterface, SpeculosBackend
 from ragger.backend.interface import RAPDU
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import Navigator
@@ -27,6 +28,7 @@ from utils import (
     check_pincode,
     generate_key,
     get_ECDH_pub_key,
+    get_EDDSA_pub_key,
     get_RSA_pub_key,
     util_navigate,
 )
@@ -224,6 +226,63 @@ def test_uif_authenticate_with_dec_key(device: Device, backend: BackendInterface
     rapdu = client.get_long_response(RAPDU(err.value.status, err.value.data))
     assert rapdu.status == Errors.SW_OK
     pkcs1_15.new(get_RSA_pub_key(client, DataObject.DO_DEC_KEY)).verify(hash_obj, rapdu.data)
+
+
+def _recv_exact(sock: socket.socket, size: int) -> bytes:
+    data = b""
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        assert chunk, "connection closed by Speculos"
+        data += chunk
+    return data
+
+
+def _raw_send(sock: socket.socket, apdu: bytes) -> None:
+    sock.sendall(struct.pack(">I", len(apdu)) + apdu)
+
+
+def _raw_recv(sock: socket.socket) -> RAPDU:
+    # Speculos announces the response length without its status word
+    (size,) = struct.unpack(">I", _recv_exact(sock, 4))
+    response = _recv_exact(sock, size + 2)
+    return RAPDU(int.from_bytes(response[-2:], "big"), response[:-2])
+
+
+# In this test we check that a command sent while the UIF confirmation is pending
+# is rejected, and does not replace the operation shown to the user
+def test_uif_command_during_prompt(device: Device, backend: BackendInterface, navigator: Navigator, test_name: Path) -> None:
+    if not isinstance(backend, SpeculosBackend):
+        pytest.skip("Needs the Speculos raw APDU port")
+    client = CommandSender(backend)
+
+    check_pincode(client, PassWord.PW3)
+    rapdu = client.set_template(DataObject.DO_SIG_ATTR, KEY_TEMPLATES["ed25519"])
+    assert rapdu.status == Errors.SW_OK
+    generate_key(client, DataObject.DO_SIG_KEY)
+    assert client.set_uif(DataObject.DO_UIF_SIG, True).status == Errors.SW_OK
+    verifier = eddsa.new(get_EDDSA_pub_key(client, DataObject.DO_SIG_KEY), "rfc8032")
+    check_pincode(client, PassWord.PW1)
+
+    pso_cds_p1, pso_cds_p2 = 0x9E, 0x9A
+    shown = SHA512.new(get_random_bytes(16)).digest()
+    substituted = SHA512.new(get_random_bytes(16)).digest()
+
+    # Unlike the HTTP API, the Speculos raw APDU port forwards a command while another awaits its reply
+    with socket.create_connection(("127.0.0.1", backend._apdu_port)) as sock:
+        header = struct.pack(">BBBBB", ClaType.CLA_APP, InsType.INS_PSO, pso_cds_p1, pso_cds_p2, len(shown))
+        _raw_send(sock, header + shown)
+        backend.wait_for_text_on_screen("Confirm")
+
+        header = struct.pack(">BBBBB", ClaType.CLA_APP, InsType.INS_PSO, pso_cds_p1, pso_cds_p2, len(substituted))
+        _raw_send(sock, header + substituted)
+        rapdu = _raw_recv(sock)
+        assert rapdu.status == Errors.SW_COMMAND_NOT_ACCEPTED
+
+        # The prompt is already on screen
+        util_navigate(device, navigator, test_name, "Confirm_Yes", screen_change_before_first_instruction=False)
+        rapdu = _raw_recv(sock)
+    assert rapdu.status == Errors.SW_OK
+    verifier.verify(shown, rapdu.data)
 
 
 def test_cv25519(backend: BackendInterface) -> None:
