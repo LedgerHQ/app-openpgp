@@ -27,6 +27,15 @@ set(FAKE_SOURCES
     ${FAKES_DIR}/fake_io.c
 )
 
+# SDK sources linked as is
+list(APPEND FAKE_SOURCES
+    ${SDK_DIR}/lib_standard_app/bip32.c
+    ${SDK_DIR}/lib_standard_app/buffer.c
+    ${SDK_DIR}/lib_standard_app/read.c
+    ${SDK_DIR}/lib_standard_app/varint.c
+    ${SDK_DIR}/lib_standard_app/write.c
+)
+
 # SDK services replaced by CMock mocks
 set(CRYPTO_MOCK_HEADERS
     ${SDK_DIR}/include/os_random.h
@@ -58,7 +67,6 @@ set(UT_COMPILE_DEFS
     APPVERSION="a.b.c"
     SPEC_VERSION="3.3.1"
     HAVE_RSA
-    "CUSTOM_IO_APDU_BUFFER_SIZE=(255+5+64)"
 )
 
 #######################################################################

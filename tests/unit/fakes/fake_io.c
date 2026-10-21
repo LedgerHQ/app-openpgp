@@ -29,7 +29,8 @@ void fake_io_push_rx(const uint8_t *frame, size_t len) {
     rx_count++;
 }
 
-// Record the transmitted frame, then receive the next staged frame (0 when none is left)
+// Record the transmitted frame, then receive the next staged frame (0 when none is left,
+// or with IO_RETURN_AFTER_TX)
 unsigned short io_exchange(unsigned char channel_and_flags, unsigned short tx_len) {
     if ((tx_len > sizeof(G_io_apdu_buffer)) || (fake_io_tx_count >= FAKE_IO_MAX_FRAMES)) {
         abort();
@@ -38,7 +39,7 @@ unsigned short io_exchange(unsigned char channel_and_flags, unsigned short tx_le
     fake_io_tx[fake_io_tx_count].len = tx_len;
     fake_io_tx[fake_io_tx_count].flags = channel_and_flags;
     fake_io_tx_count++;
-    if (rx_next >= rx_count) {
+    if ((channel_and_flags & IO_RETURN_AFTER_TX) || (rx_next >= rx_count)) {
         return 0;
     }
     memcpy(G_io_apdu_buffer, rx_frames[rx_next].data, rx_frames[rx_next].len);

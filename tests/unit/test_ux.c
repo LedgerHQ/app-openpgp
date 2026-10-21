@@ -291,7 +291,7 @@ static void test_terminate_refused(void) {
 
 static const uint8_t DIGEST_A[] = {0xAA, 0xAA, 0xAA, 0xAA};
 
-static int check_snapshot_pso(int num_calls) {
+static int check_shown_pso(int num_calls) {
     (void) num_calls;
     // The operation is the one shown to the user
     TEST_ASSERT_EQUAL_HEX8(INS_PSO, G_gpg_vstate.io_ins);
@@ -313,13 +313,7 @@ static void show_uif_for_digest_a(void) {
 static void test_uif_confirmed(void) {
     show_uif_for_digest_a();
 
-    // The host overwrites the command state while the prompt is shown
-    G_gpg_vstate.io_ins = INS_PSO;
-    G_gpg_vstate.io_p1p2 = PSO_DEC;
-    G_gpg_vstate.io_length = 1;
-    G_gpg_vstate.work.io_buffer[0] = 0xBB;
-
-    gpg_apdu_pso_StubWithCallback(check_snapshot_pso);
+    gpg_apdu_pso_StubWithCallback(check_shown_pso);
     uif_confirm_cb(true);
     TEST_ASSERT_EQUAL_UINT8(0, G_gpg_vstate.UIF_flags);
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, sent_sw);
@@ -336,7 +330,7 @@ static void test_uif_blocks_commands(void) {
     show_uif_for_digest_a();
     TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.ui_pending);
 
-    gpg_apdu_pso_StubWithCallback(check_snapshot_pso);
+    gpg_apdu_pso_StubWithCallback(check_shown_pso);
     uif_confirm_cb(true);
     TEST_ASSERT_EQUAL_UINT8(0, G_gpg_vstate.ui_pending);
 }

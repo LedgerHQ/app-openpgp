@@ -43,6 +43,26 @@ def test_truncated_apdu(backend: BackendInterface) -> None:
     assert rapdu.data == login
 
 
+# In this test we send the largest short APDU: 255 bytes of data followed by Le
+def test_largest_apdu(backend: BackendInterface) -> None:
+    client = CommandSender(backend)
+    check_pincode(client, PassWord.PW3)
+
+    login = bytes(range(0xFF))
+    le = 0x00
+    p1, p2 = DataObject.DO_LOGIN >> 8, DataObject.DO_LOGIN & 0xFF
+    header = _header(ClaType.CLA_APP, InsType.INS_PUT_DATA, p1, p2, len(login))
+    rapdu = backend.exchange_raw(header + login + struct.pack(">B", le))
+    assert rapdu.status == Errors.SW_OK
+
+    # The response does not fit in one APDU
+    with pytest.raises(ExceptionRAPDU) as err:
+        client.get_data(DataObject.DO_LOGIN)
+    rapdu = client.get_long_response(RAPDU(err.value.status, err.value.data))
+    assert rapdu.status == Errors.SW_OK
+    assert rapdu.data == login
+
+
 # In this test we send an APDU made of its header only, without Lc
 def test_header_only_apdu(backend: BackendInterface) -> None:
     client = CommandSender(backend)

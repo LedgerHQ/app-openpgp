@@ -19,6 +19,7 @@
 #include "offsets.h"
 #include "ledger_assert.h"
 #include "os_utils.h"
+#include "buffer.h"
 
 /*
  * io_buffer: contains current message part
@@ -230,61 +231,105 @@ void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V) {
 /* ----------------------------------------------------------------------- */
 
 /**
- * Read a u32 value from the APDU buffer
- *
- * @return  value retrieved
+ * Reader on the received data, positioned at the current offset
  *
  */
-unsigned int gpg_io_fetch_u32() {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + 4) <= G_gpg_vstate.io_length, "Bad fetch u32!");
-    unsigned int v32;
-    v32 = U4BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
-    G_gpg_vstate.io_offset += 4;
-    return v32;
+static buffer_t gpg_io_reader(void) {
+    buffer_t in = buffer_create(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
+
+    LEDGER_ASSERT(G_gpg_vstate.io_offset <= G_gpg_vstate.io_length, "Bad offset in reader!");
+    in.offset = G_gpg_vstate.io_offset;
+    return in;
+}
+
+/**
+ * Number of received bytes not yet fetched
+ *
+ */
+unsigned int gpg_io_remaining(void) {
+    LEDGER_ASSERT(G_gpg_vstate.io_offset <= G_gpg_vstate.io_length, "Bad offset!");
+    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+}
+
+/**
+ * Read a u32 value from the APDU buffer
+ *
+ * @param[out]  v32 value retrieved
+ *
+ * @return  false if the buffer is too short, the offset being left unchanged
+ *
+ */
+bool gpg_io_fetch_u32(unsigned int *v32) {
+    buffer_t in = gpg_io_reader();
+    uint32_t v;
+
+    if (!buffer_read_u32(&in, &v, BE)) {
+        return false;
+    }
+    *v32 = v;
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
 }
 
 /**
  * Read a u24 value from the APDU buffer
  *
- * @return  value retrieved
+ * @param[out]  v24 value retrieved
+ *
+ * @return  false if the buffer is too short, the offset being left unchanged
  *
  */
-unsigned int gpg_io_fetch_u24() {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + 3) <= G_gpg_vstate.io_length, "Bad fetch u24!");
-    unsigned int v24;
-    v24 = ((G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 0] << 16) |
-           (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 1] << 8) |
-           (G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 2] << 0));
-    G_gpg_vstate.io_offset += 3;
-    return v24;
+bool gpg_io_fetch_u24(unsigned int *v24) {
+    buffer_t in = gpg_io_reader();
+    uint8_t hi;
+    uint16_t lo;
+
+    if (!buffer_can_read(&in, 3) || !buffer_read_u8(&in, &hi) || !buffer_read_u16(&in, &lo, BE)) {
+        return false;
+    }
+    *v24 = (hi << 16) | lo;
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
 }
 
 /**
  * Read a u16 value from the APDU buffer
  *
- * @return  value retrieved
+ * @param[out]  v16 value retrieved
+ *
+ * @return  false if the buffer is too short, the offset being left unchanged
  *
  */
-unsigned int gpg_io_fetch_u16() {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + 2) <= G_gpg_vstate.io_length, "Bad fetch u16!");
-    unsigned int v16;
-    v16 = U2BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset);
-    G_gpg_vstate.io_offset += 2;
-    return v16;
+bool gpg_io_fetch_u16(unsigned int *v16) {
+    buffer_t in = gpg_io_reader();
+    uint16_t v;
+
+    if (!buffer_read_u16(&in, &v, BE)) {
+        return false;
+    }
+    *v16 = v;
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
 }
 
 /**
  * Read a u8 value from the APDU buffer
  *
- * @return  value retrieved
+ * @param[out]  v8 value retrieved
+ *
+ * @return  false if the buffer is too short, the offset being left unchanged
  *
  */
-unsigned int gpg_io_fetch_u8() {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch u8!");
-    unsigned int v8;
-    v8 = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
-    G_gpg_vstate.io_offset += 1;
-    return v8;
+bool gpg_io_fetch_u8(unsigned int *v8) {
+    buffer_t in = gpg_io_reader();
+    uint8_t v;
+
+    if (!buffer_read_u8(&in, &v)) {
+        return false;
+    }
+    *v8 = v;
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
 }
 
 /**
@@ -293,45 +338,64 @@ unsigned int gpg_io_fetch_u8() {
  *
  * @param[out]  T read tag
  *
+ * @return  false if the buffer is too short, the offset being left unchanged
+ *
  */
-void gpg_io_fetch_t(unsigned int *T) {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch tag!");
-    *T = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
-    G_gpg_vstate.io_offset++;
-    if ((*T & 0x1F) == 0x1F) {
-        LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch tag!");
-        *T = (*T << 8) | G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
-        G_gpg_vstate.io_offset++;
+bool gpg_io_fetch_t(unsigned int *T) {
+    buffer_t in = gpg_io_reader();
+    uint8_t b;
+    unsigned int tag;
+
+    if (!buffer_read_u8(&in, &b)) {
+        return false;
     }
+    tag = b;
+    if ((tag & 0x1F) == 0x1F) {
+        if (!buffer_read_u8(&in, &b)) {
+            return false;
+        }
+        tag = (tag << 8) | b;
+    }
+    *T = tag;
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
 }
 
 /**
- * Read a LENGTH from the APDU buffer
+ * Read a LENGTH from the APDU buffer, in short form or on 1 or 2 bytes
  * (To handle TLV)
  *
  * @param[out]  L read length
  *
+ * @return  false if the buffer is too short or the encoding unsupported,
+ *          the offset being left unchanged
+ *
  */
-void gpg_io_fetch_l(unsigned int *L) {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + 1) <= G_gpg_vstate.io_length, "Bad fetch len!");
-    *L = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset];
+bool gpg_io_fetch_l(unsigned int *L) {
+    buffer_t in = gpg_io_reader();
+    uint8_t b;
+    uint16_t v;
 
-    if ((*L & 0x80) != 0) {
-        *L &= 0x7F;
-        if (*L == 1) {
-            LEDGER_ASSERT((G_gpg_vstate.io_offset + 2) <= G_gpg_vstate.io_length, "Bad fetch len!");
-            *L = G_gpg_vstate.work.io_buffer[G_gpg_vstate.io_offset + 1];
-            G_gpg_vstate.io_offset += 2;
-        } else if (*L == 2) {
-            LEDGER_ASSERT((G_gpg_vstate.io_offset + 3) <= G_gpg_vstate.io_length, "Bad fetch len!");
-            *L = U2BE(G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_offset + 1);
-            G_gpg_vstate.io_offset += 3;
-        } else {
-            *L = -1;
-        }
-    } else {
-        G_gpg_vstate.io_offset += 1;
+    if (!buffer_read_u8(&in, &b)) {
+        return false;
     }
+    if (b < 0x80) {
+        *L = b;
+    } else if (b == 0x81) {
+        if (!buffer_read_u8(&in, &b)) {
+            return false;
+        }
+        *L = b;
+    } else if (b == 0x82) {
+        if (!buffer_read_u16(&in, &v, BE)) {
+            return false;
+        }
+        *L = v;
+    } else {
+        return false;
+    }
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
 }
 
 /**
@@ -341,10 +405,18 @@ void gpg_io_fetch_l(unsigned int *L) {
  * @param[out]  T read tag
  * @param[out]  L read length
  *
+ * @return  false if the buffer is too short or the length encoding unsupported,
+ *          the offset being left unchanged
+ *
  */
-void gpg_io_fetch_tl(unsigned int *T, unsigned int *L) {
-    gpg_io_fetch_t(T);
-    gpg_io_fetch_l(L);
+bool gpg_io_fetch_tl(unsigned int *T, unsigned int *L) {
+    unsigned int offset = G_gpg_vstate.io_offset;
+
+    if (gpg_io_fetch_t(T) && gpg_io_fetch_l(L)) {
+        return true;
+    }
+    G_gpg_vstate.io_offset = offset;
+    return false;
 }
 
 /**
@@ -354,14 +426,18 @@ void gpg_io_fetch_tl(unsigned int *T, unsigned int *L) {
  * @param[in]  buffer NVRAM address
  * @param[in]  len buffer length
  *
+ * @return  false if the buffer is too short, nothing being written
+ *
  */
-void gpg_io_fetch_nv(unsigned char *buffer, int len) {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + len) <= (int) G_gpg_vstate.io_length, "Bad fetch!");
-    LEDGER_ASSERT(len >= 0, "Negative fetch length!");
-    if (buffer) {
-        nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
-        G_gpg_vstate.io_offset += len;
+bool gpg_io_fetch_nv(unsigned char *buffer, unsigned int len) {
+    buffer_t in = gpg_io_reader();
+
+    if (!buffer_can_read(&in, len)) {
+        return false;
     }
+    nvm_write(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
+    G_gpg_vstate.io_offset += len;
+    return true;
 }
 
 /**
@@ -371,15 +447,35 @@ void gpg_io_fetch_nv(unsigned char *buffer, int len) {
  * @param[out]  buffer data buffer
  * @param[in]  len buffer length
  *
+ * @return  false if the buffer is too short, the offset being left unchanged
+ *
  */
-int gpg_io_fetch(unsigned char *buffer, int len) {
-    LEDGER_ASSERT((G_gpg_vstate.io_offset + len) <= (int) G_gpg_vstate.io_length, "Bad fetch!");
-    LEDGER_ASSERT(len >= 0, "Negative fetch length!");
-    if (buffer) {
-        memmove(buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, len);
-        G_gpg_vstate.io_offset += len;
+bool gpg_io_fetch(unsigned char *buffer, unsigned int len) {
+    buffer_t in = gpg_io_reader();
+
+    if (!buffer_read_bytes(&in, buffer, len)) {
+        return false;
     }
-    return len;
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
+}
+
+/**
+ * Skip bytes in the APDU buffer
+ *
+ * @param[in]  len number of bytes to skip
+ *
+ * @return  false if the buffer is too short, the offset being left unchanged
+ *
+ */
+bool gpg_io_skip(unsigned int len) {
+    buffer_t in = gpg_io_reader();
+
+    if (!buffer_seek_cur(&in, len)) {
+        return false;
+    }
+    G_gpg_vstate.io_offset = in.offset;
+    return true;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -423,6 +519,71 @@ static bool gpg_io_check_lc(unsigned int rx) {
 }
 
 /**
+ * Tell whether a received frame is a GET RESPONSE
+ *
+ * @param[in]  rx received frame length
+ *
+ */
+static bool gpg_io_is_get_response(unsigned int rx) {
+    return (rx >= 4) && (G_io_apdu_buffer[OFFSET_CLA] == CLA_APP_DEF) &&
+           (G_io_apdu_buffer[OFFSET_INS] == INS_GET_RESPONSE) &&
+           (G_io_apdu_buffer[OFFSET_P1] == GET_RESPONSE) &&
+           (G_io_apdu_buffer[OFFSET_P2] == GET_RESPONSE);
+}
+
+// Response data left to send on the next GET RESPONSE, after an asynchronous reply
+static bool gpg_io_out_pending;
+
+/**
+ * Send the response from the current offset, in parts announced by 61xx
+ *
+ * @param[in]  io_flags IO_RETURN_AFTER_TX to send only the next part, then return
+ *
+ * @return  length of the command received after the response,
+ *          0 with IO_RETURN_AFTER_TX
+ *
+ */
+static unsigned int gpg_io_send(unsigned int io_flags) {
+    unsigned int rx;
+
+    while (G_gpg_vstate.io_length > MAX_OUT) {
+        unsigned int tx, xx;
+        // send chunk
+        tx = MAX_OUT - 2;
+        memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, tx);
+        G_gpg_vstate.io_length -= tx;
+        G_gpg_vstate.io_offset += tx;
+        G_io_apdu_buffer[tx] = (SWO_RESPONSE_BYTES_AVAILABLE >> 8) & 0xFF;
+        if (G_gpg_vstate.io_length > MAX_OUT) {
+            xx = MAX_OUT - 2;
+        } else {
+            xx = G_gpg_vstate.io_length - 2;
+        }
+        G_io_apdu_buffer[tx + 1] = xx;
+        if (io_flags & IO_RETURN_AFTER_TX) {
+            // The pending asynchronous exchange receives the next command
+            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, tx + 2);
+            gpg_io_out_pending = true;
+            return 0;
+        }
+        rx = io_exchange(CHANNEL_APDU, tx + 2);
+        // Any command other than GET RESPONSE drops the pending response
+        if (!gpg_io_is_get_response(rx)) {
+            gpg_io_discard(1);
+            return rx;
+        }
+    }
+    memmove(G_io_apdu_buffer,
+            G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
+            G_gpg_vstate.io_length);
+    if (io_flags & IO_RETURN_AFTER_TX) {
+        io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
+        return 0;
+    }
+    return io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
+}
+
+/**
  * APDU Receive/transmit
  *
  * @param[in]  flag io buffer flag
@@ -435,48 +596,21 @@ unsigned int gpg_io_do(unsigned int io_flags) {
     unsigned int rx = 0;
 
     if (io_flags & IO_ASYNCH_REPLY) {
-        // if IO_ASYNCH_REPLY has been set,
-        //  io_exchange will return when IO_RETURN_AFTER_TX will set in ui
+        // io_exchange returns on the command following the reply sent from the UI
         rx = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
+        if (gpg_io_out_pending) {
+            gpg_io_out_pending = false;
+            if (gpg_io_is_get_response(rx)) {
+                rx = gpg_io_send(0);
+            } else {
+                gpg_io_discard(1);
+            }
+        }
     } else {
         // --- full out chaining ---
         G_gpg_vstate.io_offset = 0;
-        while (G_gpg_vstate.io_length > MAX_OUT) {
-            unsigned int tx, xx;
-            // send chunk
-            tx = MAX_OUT - 2;
-            memmove(G_io_apdu_buffer, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, tx);
-            G_gpg_vstate.io_length -= tx;
-            G_gpg_vstate.io_offset += tx;
-            G_io_apdu_buffer[tx] = (SWO_RESPONSE_BYTES_AVAILABLE >> 8) & 0xFF;
-            if (G_gpg_vstate.io_length > MAX_OUT) {
-                xx = MAX_OUT - 2;
-            } else {
-                xx = G_gpg_vstate.io_length - 2;
-            }
-            G_io_apdu_buffer[tx + 1] = xx;
-            rx = io_exchange(CHANNEL_APDU, tx + 2);
-            // Any command other than GET RESPONSE drops the pending response
-            if ((rx < 4) || (G_io_apdu_buffer[OFFSET_CLA] != CLA_APP_DEF) ||
-                (G_io_apdu_buffer[OFFSET_INS] != INS_GET_RESPONSE) ||
-                (G_io_apdu_buffer[OFFSET_P1] != GET_RESPONSE) ||
-                (G_io_apdu_buffer[OFFSET_P2] != GET_RESPONSE)) {
-                gpg_io_discard(1);
-                break;
-            }
-            rx = 0;
-        }
-        if (rx == 0) {
-            memmove(G_io_apdu_buffer,
-                    G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
-                    G_gpg_vstate.io_length);
-
-            if (io_flags & IO_RETURN_AFTER_TX) {
-                io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_gpg_vstate.io_length);
-                return SWO_SUCCESS;
-            }
-            rx = io_exchange(CHANNEL_APDU, G_gpg_vstate.io_length);
-        } else if (io_flags & IO_RETURN_AFTER_TX) {
+        rx = gpg_io_send(io_flags);
+        if (io_flags & IO_RETURN_AFTER_TX) {
             return SWO_SUCCESS;
         }
     }

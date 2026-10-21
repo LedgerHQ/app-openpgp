@@ -59,14 +59,6 @@ const unsigned char gpg_oid_sha512[] = {0x30,
                                         0x40};
 
 /**
- * Number of input bytes not yet fetched
- *
- */
-static unsigned int gpg_pso_remaining() {
-    return G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
-}
-
-/**
  * Uncompress a Curve25519 public key
  *
  * @param[in,out]  raw_public_key x coordinate as input, 04 || x || y as output
@@ -338,7 +330,7 @@ int gpg_apdu_pso() {
             if (!gpg_pso_aes_key_is_valid(aes_key)) {
                 return SWO_CONDITIONS_NOT_SATISFIED;
             }
-            msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+            msg_len = gpg_io_remaining();
             if (msg_len > GPG_IO_BUFFER_LENGTH - 1) {
                 return SWO_WRONG_LENGTH;
             }
@@ -361,11 +353,10 @@ int gpg_apdu_pso() {
             break;
 
         case PSO_DEC:
-            if (gpg_pso_remaining() < 1) {
+            if (!gpg_io_fetch_u8(&pad_byte)) {
                 error = SWO_WRONG_LENGTH;
                 break;
             }
-            pad_byte = gpg_io_fetch_u8();
 
             switch (pad_byte) {
                 case PAD_RSA:
@@ -397,7 +388,7 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+                    msg_len = gpg_io_remaining();
                     CX_CHECK(cx_rsa_decrypt_no_throw(
                         rsa_key,
                         CX_PAD_PKCS1_1o5,
@@ -419,7 +410,7 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    msg_len = G_gpg_vstate.io_length - G_gpg_vstate.io_offset;
+                    msg_len = gpg_io_remaining();
                     ksz = GPG_IO_BUFFER_LENGTH;
                     CX_CHECK(cx_aes_no_throw(aes_key,
                                              CX_DECRYPT | CX_CHAIN_CBC | CX_LAST,
@@ -447,35 +438,28 @@ int gpg_apdu_pso() {
                         error = SWO_CONDITIONS_NOT_SATISFIED;
                         break;
                     }
-                    // Check APDU content tags, each TL taking at most 5 bytes
-                    if (gpg_pso_remaining() < 3) {
+                    // Check APDU content tags
+                    if (!gpg_io_fetch_l(&l) || !gpg_io_fetch_tl(&t, &l)) {
                         error = SWO_WRONG_LENGTH;
                         break;
                     }
-                    gpg_io_fetch_l(&l);
-                    if (gpg_pso_remaining() < 5) {
-                        error = SWO_WRONG_LENGTH;
-                        break;
-                    }
-                    gpg_io_fetch_tl(&t, &l);
                     // TAG 0x7f49 announces a Public Key DO
                     if (t != 0x7f49) {
                         PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x7f49);
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
-                    if (gpg_pso_remaining() < 5) {
+                    if (!gpg_io_fetch_tl(&t, &l)) {
                         error = SWO_WRONG_LENGTH;
                         break;
                     }
-                    gpg_io_fetch_tl(&t, &l);
                     // TAG 0x86 announces an External Public Key (with its length)
                     if (t != 0x86) {
                         PRINTF("[PSO] - Wrong tag 0x%x != 0x%x\n", t, 0x86);
                         error = SWO_INCORRECT_DATA;
                         break;
                     }
-                    if (l > gpg_pso_remaining()) {
+                    if (l > gpg_io_remaining()) {
                         error = SWO_WRONG_LENGTH;
                         break;
                     }

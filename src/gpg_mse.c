@@ -60,26 +60,19 @@ void gpg_mse_reset() {
  *
  */
 int gpg_apdu_mse() {
-    int crt, ref;
+    unsigned int crt, ref;
 
     if ((G_gpg_vstate.io_p1 != MSE_SET) ||
         ((G_gpg_vstate.io_p2 != KEY_AUT) && (G_gpg_vstate.io_p2 != KEY_DEC))) {
         return SWO_WRONG_P1_P2;
     }
 
-    // MSE data must carry at least 3 bytes: tag (2) + ref (1).  An APDU
-    // shorter than that would trigger LEDGER_ASSERT inside gpg_io_fetch_*
-    // causing an os_sched_exit on device (CWE-617).
-    if ((G_gpg_vstate.io_length - G_gpg_vstate.io_offset) < 3) {
+    if (!gpg_io_fetch_u16(&crt) || !gpg_io_fetch_u8(&ref)) {
         return SWO_WRONG_LENGTH;
     }
-
-    crt = gpg_io_fetch_u16();
     if (crt != 0x8301) {
         return SWO_INCORRECT_DATA;
     }
-
-    ref = gpg_io_fetch_u8();
     if ((ref != 0x02) && (ref != 0x03)) {
         return SWO_INCORRECT_DATA;
     }

@@ -265,7 +265,8 @@ static int gpg_check_access_write_DO() {
  *
  */
 int gpg_dispatch() {
-    unsigned int tag, l;
+    unsigned int tag, t, l;
+    bool fetched;
     int sw = SWO_UNKNOWN;
 
     if (G_gpg_vstate.ui_pending) {
@@ -341,16 +342,24 @@ int gpg_dispatch() {
                 sw = SWO_WRONG_P1_P2;
                 break;
             }
-            // 60 <len> 5C <len> <tag on 1 or 2 bytes>
-            l = G_gpg_vstate.io_length;
-            if ((l < 5) || (l > 6) || (G_gpg_vstate.work.io_buffer[0] != 0x60) ||
-                (G_gpg_vstate.work.io_buffer[1] != l - 2) ||
-                (G_gpg_vstate.work.io_buffer[2] != 0x5C) ||
-                (G_gpg_vstate.work.io_buffer[3] != l - 4)) {
+            // 60 <len> 5C <len> <tag on 1 or 2 bytes>, lengths in short form
+            if (!gpg_io_fetch_u8(&t) || (t != 0x60) || !gpg_io_fetch_u8(&l) ||
+                (l != gpg_io_remaining()) || !gpg_io_fetch_u8(&t) || (t != 0x5C) ||
+                !gpg_io_fetch_u8(&l) || (l != gpg_io_remaining())) {
                 sw = SWO_INCORRECT_DATA;
                 break;
             }
-            tag = (l == 5) ? G_gpg_vstate.work.io_buffer[4] : U2BE(G_gpg_vstate.work.io_buffer, 4);
+            if (l == 1) {
+                fetched = gpg_io_fetch_u8(&tag);
+            } else if (l == 2) {
+                fetched = gpg_io_fetch_u16(&tag);
+            } else {
+                fetched = false;
+            }
+            if (!fetched) {
+                sw = SWO_INCORRECT_DATA;
+                break;
+            }
             gpg_io_discard(1);
             gpg_apdu_select_data(tag, G_gpg_vstate.io_p1);
             sw = SWO_SUCCESS;

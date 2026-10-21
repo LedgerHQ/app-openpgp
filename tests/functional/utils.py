@@ -37,6 +37,7 @@ def util_navigate(
     navigator: Navigator,
     test_name: Path,
     text: str = "",
+    screen_change_before_first_instruction: bool = True,
 ) -> None:
     """Navigate in the menus with conditions"""
 
@@ -66,6 +67,7 @@ def util_navigate(
         text,
         ROOT_SCREENSHOT_PATH,
         test_name,
+        screen_change_before_first_instruction=screen_change_before_first_instruction,
         screen_change_after_last_instruction=False,
     )
 

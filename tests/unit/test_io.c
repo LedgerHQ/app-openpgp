@@ -42,6 +42,7 @@ static void test_io(void) {
     unsigned int v24 = 0x456789;
     unsigned int v16 = 0x3456;
     unsigned int v8 = 0x12;
+    unsigned int value = 0;
 
     gpg_io_insert_u8(v8);
     gpg_io_insert_u16(v16);
@@ -55,15 +56,20 @@ static void test_io(void) {
     // rewind offset to the beginning to the buffer
     gpg_io_set_offset(0);
 
-    TEST_ASSERT_EQUAL_UINT(v8, gpg_io_fetch_u8());
-    TEST_ASSERT_EQUAL_UINT(v16, gpg_io_fetch_u16());
-    TEST_ASSERT_EQUAL_UINT(v24, gpg_io_fetch_u24());
-    TEST_ASSERT_EQUAL_UINT(v32, gpg_io_fetch_u32());
+    TEST_ASSERT_TRUE(gpg_io_fetch_u8(&value));
+    TEST_ASSERT_EQUAL_UINT(v8, value);
+    TEST_ASSERT_TRUE(gpg_io_fetch_u16(&value));
+    TEST_ASSERT_EQUAL_UINT(v16, value);
+    TEST_ASSERT_TRUE(gpg_io_fetch_u24(&value));
+    TEST_ASSERT_EQUAL_UINT(v24, value);
+    TEST_ASSERT_TRUE(gpg_io_fetch_u32(&value));
+    TEST_ASSERT_EQUAL_UINT(v32, value);
 
     // rewind offset to the mark
     gpg_io_set_offset(IO_OFFSET_MARK);
 
-    TEST_ASSERT_EQUAL_UINT(v32, gpg_io_fetch_u32());
+    TEST_ASSERT_TRUE(gpg_io_fetch_u32(&value));
+    TEST_ASSERT_EQUAL_UINT(v32, value);
 }
 
 static void test_io_insert_in_middle(void) {
@@ -128,17 +134,22 @@ static void test_io_insert_too_long(void) {
 /* ----------------------------------------------------------------------- */
 
 static void test_io_fetch_past_end(void) {
+    unsigned int value = 0;
+
     gpg_io_insert_u16(0x1234);
     gpg_io_set_offset(0);
 
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_u32());
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_u24());
+    TEST_ASSERT_FALSE(gpg_io_fetch_u32(&value));
+    TEST_ASSERT_FALSE(gpg_io_fetch_u24(&value));
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_offset);
 
     gpg_io_set_offset(1);
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_u16());
+    TEST_ASSERT_FALSE(gpg_io_fetch_u16(&value));
+    TEST_ASSERT_EQUAL_UINT(1, G_gpg_vstate.io_offset);
 
     gpg_io_set_offset(IO_OFFSET_END);
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_u8());
+    TEST_ASSERT_FALSE(gpg_io_fetch_u8(&value));
+    TEST_ASSERT_EQUAL_UINT(2, G_gpg_vstate.io_offset);
 }
 
 static void test_io_fetch_t(void) {
@@ -147,11 +158,11 @@ static void test_io_fetch_t(void) {
 
     load_buffer(data, sizeof(data));
 
-    gpg_io_fetch_t(&t);
+    TEST_ASSERT_TRUE(gpg_io_fetch_t(&t));
     TEST_ASSERT_EQUAL_HEX(0x5E, t);
-    gpg_io_fetch_t(&t);
+    TEST_ASSERT_TRUE(gpg_io_fetch_t(&t));
     TEST_ASSERT_EQUAL_HEX(0x5F50, t);
-    gpg_io_fetch_t(&t);
+    TEST_ASSERT_TRUE(gpg_io_fetch_t(&t));
     TEST_ASSERT_EQUAL_HEX(0x7F49, t);
     TEST_ASSERT_EQUAL_UINT(sizeof(data), G_gpg_vstate.io_offset);
 }
@@ -163,7 +174,8 @@ static void test_io_fetch_t_truncated(void) {
 
     load_buffer(data, sizeof(data));
 
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_t(&t));
+    TEST_ASSERT_FALSE(gpg_io_fetch_t(&t));
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_offset);
 }
 
 static void test_io_fetch_l(void) {
@@ -172,31 +184,29 @@ static void test_io_fetch_l(void) {
 
     load_buffer(data, sizeof(data));
 
-    gpg_io_fetch_l(&l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_l(&l));
     TEST_ASSERT_EQUAL_UINT(5, l);
     TEST_ASSERT_EQUAL_UINT(1, G_gpg_vstate.io_offset);
-    gpg_io_fetch_l(&l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_l(&l));
     TEST_ASSERT_EQUAL_UINT(0x80, l);
     TEST_ASSERT_EQUAL_UINT(3, G_gpg_vstate.io_offset);
-    gpg_io_fetch_l(&l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_l(&l));
     TEST_ASSERT_EQUAL_UINT(0x100, l);
     TEST_ASSERT_EQUAL_UINT(6, G_gpg_vstate.io_offset);
 }
 
 static void test_io_fetch_l_unsupported(void) {
-    // Indefinite form and 3-byte long form, both rejected as an all-ones length
+    // Indefinite form and 3-byte long form
     const uint8_t data[] = {0x80, 0x83, 0x01, 0x00, 0x00};
     unsigned int l = 0;
 
     load_buffer(data, sizeof(data));
 
-    gpg_io_fetch_l(&l);
-    TEST_ASSERT_EQUAL_HEX(0xFFFFFFFF, l);
+    TEST_ASSERT_FALSE(gpg_io_fetch_l(&l));
     TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_offset);
 
     gpg_io_set_offset(1);
-    gpg_io_fetch_l(&l);
-    TEST_ASSERT_EQUAL_HEX(0xFFFFFFFF, l);
+    TEST_ASSERT_FALSE(gpg_io_fetch_l(&l));
     TEST_ASSERT_EQUAL_UINT(1, G_gpg_vstate.io_offset);
 }
 
@@ -206,11 +216,13 @@ static void test_io_fetch_l_truncated(void) {
     unsigned int l = 0;
 
     load_buffer(long1, sizeof(long1));
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_l(&l));
+    TEST_ASSERT_FALSE(gpg_io_fetch_l(&l));
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_offset);
 
     gpg_io_discard(1);
     load_buffer(long2, sizeof(long2));
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_l(&l));
+    TEST_ASSERT_FALSE(gpg_io_fetch_l(&l));
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_offset);
 }
 
 static void test_io_fetch_tl(void) {
@@ -220,9 +232,21 @@ static void test_io_fetch_tl(void) {
 
     load_buffer(data, sizeof(data));
 
-    gpg_io_fetch_tl(&t, &l);
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x7F49, t);
     TEST_ASSERT_EQUAL_UINT(0x90, l);
+}
+
+static void test_io_fetch_tl_truncated(void) {
+    // Complete tag, truncated length: the tag is not consumed either
+    const uint8_t data[] = {0x7F, 0x49, 0x82, 0x01};
+    unsigned int t = 0;
+    unsigned int l = 0;
+
+    load_buffer(data, sizeof(data));
+
+    TEST_ASSERT_FALSE(gpg_io_fetch_tl(&t, &l));
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_offset);
 }
 
 static void test_io_fetch(void) {
@@ -231,12 +255,21 @@ static void test_io_fetch(void) {
 
     load_buffer(data, sizeof(data));
 
-    TEST_ASSERT_EQUAL_INT(3, gpg_io_fetch(out, sizeof(out)));
+    TEST_ASSERT_TRUE(gpg_io_fetch(out, sizeof(out)));
     TEST_ASSERT_EQUAL_MEMORY("ABC", out, sizeof(out));
     TEST_ASSERT_EQUAL_UINT(3, G_gpg_vstate.io_offset);
+}
 
-    // A NULL buffer only checks the length, without moving the offset
-    TEST_ASSERT_EQUAL_INT(1, gpg_io_fetch(NULL, 1));
+static void test_io_skip(void) {
+    const uint8_t data[] = {'A', 'B', 'C'};
+
+    load_buffer(data, sizeof(data));
+
+    TEST_ASSERT_TRUE(gpg_io_skip(2));
+    TEST_ASSERT_EQUAL_UINT(2, G_gpg_vstate.io_offset);
+    TEST_ASSERT_FALSE(gpg_io_skip(2));
+    TEST_ASSERT_EQUAL_UINT(2, G_gpg_vstate.io_offset);
+    TEST_ASSERT_TRUE(gpg_io_skip(1));
     TEST_ASSERT_EQUAL_UINT(3, G_gpg_vstate.io_offset);
 }
 
@@ -246,19 +279,23 @@ static void test_io_fetch_too_long(void) {
 
     load_buffer(data, sizeof(data));
 
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch(out, sizeof(out)));
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch(NULL, 4));
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_nv(out, sizeof(out)));
+    TEST_ASSERT_FALSE(gpg_io_fetch(out, sizeof(out)));
+    TEST_ASSERT_FALSE(gpg_io_fetch_nv(out, sizeof(out)));
+    TEST_ASSERT_EACH_EQUAL_UINT8(0, out, sizeof(out));
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_offset);
 }
 
-static void test_io_fetch_negative_length(void) {
+static void test_io_fetch_huge_length(void) {
     const uint8_t data[] = {'A', 'B', 'C'};
     uint8_t out[3] = {0};
 
     load_buffer(data, sizeof(data));
+    gpg_io_set_offset(1);
 
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch(out, -1));
-    TEST_ASSERT_LEDGER_ASSERT(gpg_io_fetch_nv(out, -1));
+    TEST_ASSERT_FALSE(gpg_io_fetch(out, UINT32_MAX));
+    TEST_ASSERT_FALSE(gpg_io_fetch_nv(out, UINT32_MAX));
+    TEST_ASSERT_FALSE(gpg_io_skip(UINT32_MAX));
+    TEST_ASSERT_EQUAL_UINT(1, G_gpg_vstate.io_offset);
 }
 
 static void test_nvm_write(void) {
@@ -267,7 +304,7 @@ static void test_nvm_write(void) {
 
     gpg_io_insert((unsigned char *) secret, sizeof(secret));
     gpg_io_set_offset(0);
-    gpg_io_fetch_nv(stored, sizeof(stored));
+    TEST_ASSERT_TRUE(gpg_io_fetch_nv(stored, sizeof(stored)));
     TEST_ASSERT_EQUAL_MEMORY(secret, stored, sizeof(secret));
 
     // A NULL source erases the destination
@@ -577,7 +614,7 @@ static void test_io_transmit_chained_announce(void) {
         fake_io_reset();
         load_response(first_len + remaining);
         fake_io_push_rx(get_response, sizeof(get_response));
-        gpg_io_do(IO_RETURN_AFTER_TX);
+        gpg_io_do(0);
 
         TEST_ASSERT_EQUAL_UINT(2, fake_io_tx_count);
         TEST_ASSERT_EQUAL_UINT_MESSAGE(remaining + 2, fake_io_tx[1].len, "last part length");
@@ -607,6 +644,56 @@ static void test_io_return_after_tx(void) {
     TEST_ASSERT_EQUAL_UINT(2, fake_io_tx[0].len);
 }
 
+static void test_io_return_after_tx_chained(void) {
+    // From the UI, the first part only is sent: the GET RESPONSE ends the asynchronous exchange
+    const uint8_t get_response[] = {0x00, 0xC0, 0x00, 0x00, 0x00};
+    const uint8_t next[] = {0x00, 0xCA, 0x00, 0x6E, 0x00};
+    const size_t first_len = GPG_APDU_LENGTH - 2;
+    const size_t data_len = 300;
+
+    load_response(data_len);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_RETURN_AFTER_TX));
+    TEST_ASSERT_EQUAL_UINT(1, fake_io_tx_count);
+    TEST_ASSERT_EQUAL_HEX8(CHANNEL_APDU | IO_RETURN_AFTER_TX, fake_io_tx[0].flags);
+    TEST_ASSERT_EQUAL_UINT(first_len + 2, fake_io_tx[0].len);
+    TEST_ASSERT_EQUAL_HEX8(0x61, fake_io_tx[0].data[first_len]);
+    TEST_ASSERT_EQUAL_UINT(data_len - first_len, fake_io_tx[0].data[first_len + 1]);
+
+    fake_io_push_rx(get_response, sizeof(get_response));
+    fake_io_push_rx(next, sizeof(next));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_ASYNCH_REPLY));
+    TEST_ASSERT_EQUAL_UINT(3, fake_io_tx_count);
+
+    // Remaining data, then 9000
+    TEST_ASSERT_EQUAL_UINT(data_len - first_len + 2, fake_io_tx[2].len);
+    TEST_ASSERT_EQUAL_HEX8(first_len & 0xFF, fake_io_tx[2].data[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x90, fake_io_tx[2].data[data_len - first_len]);
+
+    // The command received after the response is ready to be dispatched
+    TEST_ASSERT_EQUAL_HEX8(0xCA, G_gpg_vstate.io_ins);
+}
+
+static void test_io_return_after_tx_chain_dropped(void) {
+    // From the UI, another command than GET RESPONSE drops the remaining data, and is dispatched
+    const uint8_t other[] = {0x00, 0xCA, 0x00, 0x6E, 0x00};
+
+    load_response(300);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_RETURN_AFTER_TX));
+
+    fake_io_push_rx(other, sizeof(other));
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_ASYNCH_REPLY));
+    TEST_ASSERT_EQUAL_UINT(2, fake_io_tx_count);
+    TEST_ASSERT_EQUAL_HEX8(0xCA, G_gpg_vstate.io_ins);
+    TEST_ASSERT_EQUAL_UINT(0, G_gpg_vstate.io_length);
+
+    // Nothing is left to send on a later GET RESPONSE
+    fake_io_reset();
+    fake_io_push_rx((const uint8_t[]) {0x00, 0xC0, 0x00, 0x00, 0x00}, 5);
+    TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_io_do(IO_ASYNCH_REPLY));
+    TEST_ASSERT_EQUAL_UINT(1, fake_io_tx_count);
+    TEST_ASSERT_EQUAL_HEX8(INS_GET_RESPONSE, G_gpg_vstate.io_ins);
+}
+
 static void test_io_asynch_reply(void) {
     const uint8_t frame[] = {0x00, 0xCA, 0x00, 0x6E, 0x00};
 
@@ -633,9 +720,11 @@ int main(void) {
     RUN_TEST(test_io_fetch_l_unsupported);
     RUN_TEST(test_io_fetch_l_truncated);
     RUN_TEST(test_io_fetch_tl);
+    RUN_TEST(test_io_fetch_tl_truncated);
     RUN_TEST(test_io_fetch);
+    RUN_TEST(test_io_skip);
     RUN_TEST(test_io_fetch_too_long);
-    RUN_TEST(test_io_fetch_negative_length);
+    RUN_TEST(test_io_fetch_huge_length);
     RUN_TEST(test_nvm_write);
     RUN_TEST(test_io_set_offset);
     RUN_TEST(test_io_inserted);
@@ -662,6 +751,8 @@ int main(void) {
     RUN_TEST(test_io_transmit_chained_announce);
     RUN_TEST(test_io_transmit_chain_dropped);
     RUN_TEST(test_io_return_after_tx);
+    RUN_TEST(test_io_return_after_tx_chained);
+    RUN_TEST(test_io_return_after_tx_chain_dropped);
     RUN_TEST(test_io_asynch_reply);
     return UNITY_END();
 }
