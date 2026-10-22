@@ -40,6 +40,10 @@ ctest --test-dir build --output-on-failure
 
 A single test executable can also be run directly, for example `build/test_io`.
 
+The test executables are built with AddressSanitizer and UndefinedBehaviorSanitizer:
+an invalid memory access or an undefined behaviour aborts the test with its call stack.
+Configure with `-DLEDGER_UT_SANITIZERS=OFF` to build without them.
+
 ## Code coverage
 
 After running the tests:
