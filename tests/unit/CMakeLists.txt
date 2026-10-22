@@ -37,6 +37,16 @@ list(APPEND FAKE_SOURCES
     ${SDK_DIR}/lib_standard_app/write.c
 )
 
+# Key, PIN and DO handling shared by the tests on the main commands
+set(CORE_SOURCES
+    ${APP_DIR}/gpg_data.c
+    ${APP_DIR}/gpg_gen.c
+    ${APP_DIR}/gpg_init.c
+    ${APP_DIR}/gpg_io.c
+    ${APP_DIR}/gpg_mse.c
+    ${APP_DIR}/gpg_pin.c
+)
+
 # SDK services replaced by CMock mocks
 set(CRYPTO_MOCK_HEADERS
     ${SDK_DIR}/include/os_random.h
@@ -99,12 +109,7 @@ ledger_unit_tests_add_test(
 
 ledger_unit_tests_add_test(
     NAME         test_data
-    SOURCES      ${APP_DIR}/gpg_data.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+    SOURCES      ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
@@ -144,11 +149,7 @@ ledger_unit_tests_add_test(
 ledger_unit_tests_add_test(
     NAME         test_pso
     SOURCES      ${APP_DIR}/gpg_pso.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+                 ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
@@ -164,12 +165,7 @@ ledger_unit_tests_add_test(
 ledger_unit_tests_add_test(
     NAME         test_backup
     SOURCES      ${FAKES_DIR}/fake_digest.c
-                 ${APP_DIR}/gpg_data.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+                 ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
@@ -182,12 +178,7 @@ ledger_unit_tests_add_test(
 ledger_unit_tests_add_test(
     NAME         test_gen
     SOURCES      ${FAKES_DIR}/fake_digest.c
-                 ${APP_DIR}/gpg_data.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+                 ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
