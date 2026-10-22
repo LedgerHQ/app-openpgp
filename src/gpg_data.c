@@ -311,9 +311,7 @@ int gpg_apdu_get_data(unsigned int ref) {
         case 0x6E:
             gpg_io_insert_tl(0x4F, AID_LENGTH);
             gpg_io_insert_aid();
-#ifdef WITH_HISTO_BYTES_IN_ARD
             gpg_io_insert_tlv(0x5F52, HISTO_LENGTH, (const unsigned char *) N_gpg_pstate->histo);
-#endif
             gpg_io_insert_tlv(0x7F66, sizeof(C_ext_length), C_ext_length);
 
             gpg_io_mark();
