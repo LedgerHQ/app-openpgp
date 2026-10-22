@@ -13,12 +13,13 @@ if(NOT DEFINED ENV{BOLOS_SDK})
 endif()
 
 set(SDK_DIR $ENV{BOLOS_SDK})
+set(LEDGER_UT_APP_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 include(${SDK_DIR}/cmake/LedgerUT.cmake)
 
 #######################################################################
 #             Setup app specific includes & compile defs              #
 #######################################################################
-set(APP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+set(APP_DIR ${LEDGER_UT_APP_SRC_DIR})
 set(FAKES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/fakes)
 
 set(FAKE_SOURCES
@@ -74,8 +75,7 @@ set(UT_COMPILE_DEFS
 #######################################################################
 ledger_unit_tests_init()
 
-# The app sources live in ../../src: ledger_unit_tests_find_sources() only looks in ../src
-file(GLOB APP_SOURCES CONFIGURE_DEPENDS ${APP_DIR}/*.c)
+ledger_unit_tests_find_sources()
 list(FILTER APP_SOURCES EXCLUDE REGEX "/gpg_main\\.c$")
 
 # Built only so that every app source has a .gcno file for the coverage baseline
@@ -83,13 +83,6 @@ ledger_unit_tests_build_app_sources_as_lib(
     SOURCES      ${APP_SOURCES}
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-)
-
-# generate_coverage filters on ../src: regenerate the report restricted to the app sources
-add_custom_command(TARGET generate_coverage POST_BUILD
-    COMMAND ${LEDGER_UT_DIR}/gen_coverage.sh ${APP_DIR}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    VERBATIM
 )
 
 #######################################################################
