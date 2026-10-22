@@ -72,6 +72,91 @@ static void fake_keypad(const char *title,
     keypad_back = backCallback;
 }
 
+// The callbacks of the last confirmation, settings page and radio page shown
+static nbgl_choiceCallback_t choice_cb;
+static const nbgl_genericContents_t *config_contents;
+static const char *config_title;
+static nbgl_layoutTouchCallback_t radio_cb;
+static nbgl_callback_t status_cb;
+
+static void fake_status(const char *message,
+                        bool isSuccess,
+                        nbgl_callback_t quitCallback,
+                        int num_calls) {
+    (void) message;
+    (void) isSuccess;
+    (void) num_calls;
+    status_cb = quitCallback;
+}
+
+static void fake_choice(const nbgl_icon_details_t *icon,
+                        const char *message,
+                        const char *subMessage,
+                        const char *confirmText,
+                        const char *rejectString,
+                        nbgl_choiceCallback_t callback,
+                        int num_calls) {
+    (void) icon;
+    (void) message;
+    (void) subMessage;
+    (void) confirmText;
+    (void) rejectString;
+    (void) num_calls;
+    choice_cb = callback;
+}
+
+static void fake_configuration(const char *title,
+                               uint8_t initPage,
+                               const nbgl_genericContents_t *contents,
+                               nbgl_callback_t quitCallback,
+                               int num_calls) {
+    (void) initPage;
+    (void) quitCallback;
+    (void) num_calls;
+    config_title = title;
+    config_contents = contents;
+}
+
+static nbgl_layout_t *fake_layout_get(const nbgl_layoutDescription_t *description, int num_calls) {
+    (void) num_calls;
+    radio_cb = description->onActionCallback;
+    return NULL;
+}
+
+static nbgl_contentActionCallback_t config_action(void) {
+    TEST_ASSERT_NOT_NULL(config_contents);
+    return config_contents->contentsList[0].contentActionCallback;
+}
+
+// OIDs returned by the curve lookup, told apart by their single byte
+static unsigned char OID_SECP256K1[] = {0x01};
+static unsigned char OID_SECP256R1[] = {0x02};
+static unsigned char OID_ED25519[] = {0x03};
+static unsigned char OID_CV25519[] = {0x04};
+
+static unsigned char *fake_curve2oid(unsigned int cv, unsigned int *len, int num_calls) {
+    (void) num_calls;
+    *len = 1;
+    switch (cv) {
+        case CX_CURVE_SECP256K1:
+            return OID_SECP256K1;
+        case CX_CURVE_SECP256R1:
+            return OID_SECP256R1;
+        case CX_CURVE_Ed25519:
+            return OID_ED25519;
+        case CX_CURVE_Curve25519:
+            return OID_CV25519;
+        default:
+            TEST_FAIL_MESSAGE("unexpected curve");
+            return NULL;
+    }
+}
+
+static void set_attributes(gpg_key_t *key, const uint8_t *attr, unsigned int len) {
+    key->attributes.length = len;
+    memcpy(key->attributes.value, attr, len);
+}
+
 void setUp(void) {
     memset(&G_gpg_vstate, 0, sizeof(G_gpg_vstate));
     memset((void *) N_gpg_pstate, 0, sizeof(gpg_nv_state_t));
@@ -82,6 +167,11 @@ void setUp(void) {
     sent_count = 0;
     keypad_validate = NULL;
     keypad_back = NULL;
+    choice_cb = NULL;
+    config_contents = NULL;
+    config_title = NULL;
+    radio_cb = NULL;
+    status_cb = NULL;
 
     Mockgpg_api_Init();
     Mocknbgl_layout_Init();
@@ -96,11 +186,14 @@ void setUp(void) {
     gpg_io_insert_u8_Ignore();
     gpg_io_insert_Ignore();
     nbgl_useCaseHomeAndSettings_Ignore();
-    nbgl_useCaseStatus_Ignore();
-    nbgl_useCaseChoice_Ignore();
-    nbgl_useCaseGenericConfiguration_Ignore();
+    nbgl_useCaseStatus_StubWithCallback(fake_status);
+    nbgl_useCaseChoice_StubWithCallback(fake_choice);
+    nbgl_useCaseGenericConfiguration_StubWithCallback(fake_configuration);
+    nbgl_useCaseGetNbChoicesInPage_IgnoreAndReturn(4);
+    gpg_curve2oid_StubWithCallback(fake_curve2oid);
+    gpg_oid2curve_IgnoreAndReturn(0);
     nbgl_useCaseKeypad_StubWithCallback(fake_keypad);
-    nbgl_layoutGet_IgnoreAndReturn(NULL);
+    nbgl_layoutGet_StubWithCallback(fake_layout_get);
     nbgl_layoutAddHeader_IgnoreAndReturn(0);
     nbgl_layoutAddSeparationLine_IgnoreAndReturn(0);
     nbgl_layoutAddRadioChoice_IgnoreAndReturn(0);
@@ -179,6 +272,12 @@ static void test_pinentry_verify_wrong(void) {
     gpg_pin_check_ExpectAnyArgsAndReturn(SWO_SECURITY_CONDITION_NOT_SATISFIED);
     keypad_validate(PIN_OLD, sizeof(PIN_OLD));
     TEST_ASSERT_EQUAL_UINT(0, sent_count);
+
+    TEST_ASSERT_NOT_NULL(status_cb);
+    keypad_validate = NULL;
+    status_cb();
+    TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.ui_pending);
+    TEST_ASSERT_NOT_NULL(keypad_validate);
 }
 
 static void test_pinentry_verify_blocked(void) {
@@ -241,6 +340,9 @@ static void test_pinentry_change_differs(void) {
     // A different confirmation sets nothing, and starts the new PIN again
     keypad_validate(other, sizeof(other));
     TEST_ASSERT_EQUAL_UINT(0, sent_count);
+    TEST_ASSERT_NOT_NULL(status_cb);
+    status_cb();
+    TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.ux_step);
     keypad_validate(PIN_NEW, sizeof(PIN_NEW) - 1);
     TEST_ASSERT_EQUAL_UINT(0, sent_count);
 }
@@ -410,6 +512,215 @@ static void test_template_change(void) {
     TEST_ASSERT_EQUAL_HEX8_ARRAY(attr, G_gpg_vstate.kslot->dec.attributes.value, sizeof(attr));
 }
 
+/* ----------------------------------------------------------------------- */
+/* Key template selection                                                  */
+/* ----------------------------------------------------------------------- */
+
+static const uint8_t ATTR_RSA2048[] = {KEY_ID_RSA, 0x08, 0x00, 0x00, 0x20, 0x01};
+static const uint8_t ATTR_RSA3072[] = {KEY_ID_RSA, 0x0C, 0x00, 0x00, 0x20, 0x01};
+
+static void test_template_select_without_key(void) {
+    set_attributes(&G_gpg_vstate.kslot->sig, ATTR_RSA2048, sizeof(ATTR_RSA2048));
+    G_gpg_vstate.ux_key = TOKEN_TEMPLATE_SIG;
+
+    // Without a key to delete, the template applies at once
+    gpg_key_is_present_ExpectAndReturn(&G_gpg_vstate.kslot->sig, false);
+    gpg_key_erase_Expect(&G_gpg_vstate.kslot->sig);
+    template_key_cb(TOKEN_TEMPLATE_SIG, TOKEN_TYPE_RSA3072 - FIRST_USER_TOKEN, 0);
+    TEST_ASSERT_NULL(choice_cb);
+    TEST_ASSERT_EQUAL_UINT(sizeof(ATTR_RSA3072), G_gpg_vstate.kslot->sig.attributes.length);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(ATTR_RSA3072,
+                                 G_gpg_vstate.kslot->sig.attributes.value,
+                                 sizeof(ATTR_RSA3072));
+}
+
+static void test_template_select_same(void) {
+    set_attributes(&G_gpg_vstate.kslot->sig, ATTR_RSA2048, sizeof(ATTR_RSA2048));
+    G_gpg_vstate.ux_key = TOKEN_TEMPLATE_SIG;
+
+    // The template in use changes nothing, and does not delete the key
+    template_key_cb(TOKEN_TEMPLATE_SIG, TOKEN_TYPE_RSA2048 - FIRST_USER_TOKEN, 0);
+    TEST_ASSERT_NULL(choice_cb);
+    TEST_ASSERT_EQUAL_UINT8(0, G_template_pending.key);
+}
+
+static void test_template_select_with_key(void) {
+    const uint8_t attr_cv25519[] = {KEY_ID_ECDH, 0x04};
+
+    set_attributes(&G_gpg_vstate.kslot->dec, ATTR_RSA2048, sizeof(ATTR_RSA2048));
+    G_gpg_vstate.ux_key = TOKEN_TEMPLATE_DEC;
+
+    // Deleting the key needs a confirmation
+    gpg_key_is_present_ExpectAndReturn(&G_gpg_vstate.kslot->dec, true);
+    template_key_cb(TOKEN_TEMPLATE_DEC, TOKEN_TYPE_Ed25519 - FIRST_USER_TOKEN, 0);
+    TEST_ASSERT_NOT_NULL(choice_cb);
+    choice_cb(false);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(ATTR_RSA2048,
+                                 G_gpg_vstate.kslot->dec.attributes.value,
+                                 sizeof(ATTR_RSA2048));
+    TEST_ASSERT_EQUAL_UINT8(0, G_template_pending.key);
+
+    // The decryption key takes Curve25519 for the Ed25519 entry
+    gpg_key_is_present_ExpectAndReturn(&G_gpg_vstate.kslot->dec, true);
+    template_key_cb(TOKEN_TEMPLATE_DEC, TOKEN_TYPE_Ed25519 - FIRST_USER_TOKEN, 0);
+    gpg_key_erase_Expect(&G_gpg_vstate.kslot->dec);
+    choice_cb(true);
+    TEST_ASSERT_EQUAL_UINT(sizeof(attr_cv25519), G_gpg_vstate.kslot->dec.attributes.length);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(attr_cv25519,
+                                 G_gpg_vstate.kslot->dec.attributes.value,
+                                 sizeof(attr_cv25519));
+}
+
+static void test_template_select_on_second_page(void) {
+    const uint8_t attr_ed25519[] = {KEY_ID_EDDSA, 0x03};
+
+    // The choice index is relative to its page
+    template_cb(TOKEN_TEMPLATE_AUT, 0, 0);
+    TEST_ASSERT_EQUAL_UINT8(TOKEN_TEMPLATE_AUT, G_gpg_vstate.ux_key);
+    TEST_ASSERT_EQUAL_STRING(LABEL_AUT, config_title);
+
+    gpg_key_is_present_ExpectAndReturn(&G_gpg_vstate.kslot->aut, false);
+    gpg_key_erase_Expect(&G_gpg_vstate.kslot->aut);
+    config_action()(TOKEN_TEMPLATE_AUT, TOKEN_TYPE_Ed25519 - FIRST_USER_TOKEN - 4, 1);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(attr_ed25519,
+                                 G_gpg_vstate.kslot->aut.attributes.value,
+                                 sizeof(attr_ed25519));
+}
+
+static void test_template_select_back(void) {
+    set_attributes(&G_gpg_vstate.kslot->sig, ATTR_RSA2048, sizeof(ATTR_RSA2048));
+    G_gpg_vstate.ux_key = TOKEN_TEMPLATE_SIG;
+
+    template_key_cb(TOKEN_TYPE_BACK, TOKEN_TYPE_RSA3072 - FIRST_USER_TOKEN, 0);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(ATTR_RSA2048,
+                                 G_gpg_vstate.kslot->sig.attributes.value,
+                                 sizeof(ATTR_RSA2048));
+}
+
+/* ----------------------------------------------------------------------- */
+/* Slot selection                                                          */
+/* ----------------------------------------------------------------------- */
+
+static void test_slot_select_disabled(void) {
+    // DO 01F1 does not allow the slot selection on the screen
+    N_gpg_pstate->config_slot[1] = 0;
+    N_gpg_pstate->config_slot[2] = 0;
+    G_gpg_vstate.slot = 1;
+
+    slot_cb(TOKEN_SLOT_SELECT, 2);
+    slot_cb(TOKEN_SLOT_DEF, 0);
+    TEST_ASSERT_EQUAL_UINT8(0, N_gpg_pstate->config_slot[1]);
+}
+
+static void test_slot_select(void) {
+    N_gpg_pstate->config_slot[2] = SLOT_SELECT_SCREEN;
+    G_gpg_vstate.slot = 0;
+
+    // The slot in use is not selected again
+    slot_cb(TOKEN_SLOT_SELECT, 0);
+
+    gpg_select_slot_ExpectAndReturn(2, SWO_SUCCESS);
+    slot_cb(TOKEN_SLOT_SELECT, 2);
+}
+
+static void test_slot_default(void) {
+    N_gpg_pstate->config_slot[1] = 0;
+    N_gpg_pstate->config_slot[2] = SLOT_SELECT_SCREEN;
+    G_gpg_vstate.slot = 2;
+
+    ui_menu_slot_action();
+    TEST_ASSERT_NOT_NULL(radio_cb);
+    radio_cb(TOKEN_SLOT_DEF, 0);
+    TEST_ASSERT_EQUAL_UINT8(2, N_gpg_pstate->config_slot[1]);
+}
+
+/* ----------------------------------------------------------------------- */
+/* Seed mode setting                                                       */
+/* ----------------------------------------------------------------------- */
+
+static void test_seed_mode_disable(void) {
+    G_gpg_vstate.seed_mode = 1;
+    ui_settings_seed();
+
+    // Disabling the seed mode needs a confirmation
+    config_action()(TOKEN_SEED, 0, 0);
+    TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.seed_mode);
+    TEST_ASSERT_NOT_NULL(choice_cb);
+    choice_cb(false);
+    TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.seed_mode);
+
+    config_action()(TOKEN_SEED, 0, 0);
+    choice_cb(true);
+    TEST_ASSERT_EQUAL_UINT8(0, G_gpg_vstate.seed_mode);
+}
+
+static void test_seed_mode_enable(void) {
+    G_gpg_vstate.seed_mode = 0;
+    ui_settings_seed();
+
+    config_action()(TOKEN_SEED, 1, 0);
+    TEST_ASSERT_NULL(choice_cb);
+    TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.seed_mode);
+}
+
+/* ----------------------------------------------------------------------- */
+/* UIF setting                                                             */
+/* ----------------------------------------------------------------------- */
+
+static void test_uif_setting(void) {
+    ui_settings_uif(0);
+
+    config_action()(TOKEN_UIF_DEC, 1, 0);
+    TEST_ASSERT_EQUAL_UINT8(0, G_gpg_vstate.kslot->sig.UIF[0]);
+    TEST_ASSERT_EQUAL_UINT8(1, G_gpg_vstate.kslot->dec.UIF[0]);
+    TEST_ASSERT_EQUAL_UINT8(0, G_gpg_vstate.kslot->aut.UIF[0]);
+
+    config_action()(TOKEN_UIF_DEC, 0, 0);
+    TEST_ASSERT_EQUAL_UINT8(0, G_gpg_vstate.kslot->dec.UIF[0]);
+}
+
+static void test_uif_setting_locked(void) {
+    // A UIF set permanently by the host cannot be changed on the device
+    N_gpg_pstate->keys[0].aut.UIF[0] = 2;
+    ui_settings_uif(0);
+
+    config_action()(TOKEN_UIF_AUT, 0, 0);
+    TEST_ASSERT_EQUAL_UINT8(2, G_gpg_vstate.kslot->aut.UIF[0]);
+}
+
+/* ----------------------------------------------------------------------- */
+/* Settings menu and factory reset                                         */
+/* ----------------------------------------------------------------------- */
+
+static void test_settings_menu(void) {
+    controlsCallback(TOKEN_SETTINGS_TEMPLATE, 0, 1);
+    TEST_ASSERT_EQUAL_UINT8(1, setting_initPage);
+    TEST_ASSERT_EQUAL_STRING("Keys Templates", config_title);
+    TEST_ASSERT_EQUAL_PTR(template_cb, config_action());
+
+    controlsCallback(TOKEN_SETTINGS_SEED, 0, 1);
+    TEST_ASSERT_EQUAL_PTR(seed_cb, config_action());
+
+    controlsCallback(TOKEN_SETTINGS_UIF, 0, 1);
+    TEST_ASSERT_EQUAL_PTR(uif_cb, config_action());
+
+    controlsCallback(TOKEN_SETTINGS_PIN, 0, 1);
+    TEST_ASSERT_EQUAL_PTR(pin_cb, radio_cb);
+}
+
+static void test_reset(void) {
+    memset((void *) N_gpg_pstate->magic, 0xAA, MAGIC_LENGTH);
+    controlsCallback(TOKEN_SETTINGS_RESET, 0, 0);
+    TEST_ASSERT_NOT_NULL(choice_cb);
+
+    choice_cb(false);
+    TEST_ASSERT_EACH_EQUAL_HEX8(0xAA, N_gpg_pstate->magic, MAGIC_LENGTH);
+
+    gpg_init_Expect();
+    choice_cb(true);
+    TEST_ASSERT_EACH_EQUAL_HEX8(0x00, N_gpg_pstate->magic, MAGIC_LENGTH);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_pin_confirm);
@@ -431,5 +742,19 @@ int main(void) {
     RUN_TEST(test_pin_mode_default);
     RUN_TEST(test_template_change_other_slot);
     RUN_TEST(test_template_change);
+    RUN_TEST(test_template_select_without_key);
+    RUN_TEST(test_template_select_same);
+    RUN_TEST(test_template_select_with_key);
+    RUN_TEST(test_template_select_on_second_page);
+    RUN_TEST(test_template_select_back);
+    RUN_TEST(test_slot_select_disabled);
+    RUN_TEST(test_slot_select);
+    RUN_TEST(test_slot_default);
+    RUN_TEST(test_seed_mode_disable);
+    RUN_TEST(test_seed_mode_enable);
+    RUN_TEST(test_uif_setting);
+    RUN_TEST(test_uif_setting_locked);
+    RUN_TEST(test_settings_menu);
+    RUN_TEST(test_reset);
     return UNITY_END();
 }
