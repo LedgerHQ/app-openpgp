@@ -18,6 +18,10 @@
 #ifndef GPG_API_H
 #define GPG_API_H
 
+#include <stdbool.h>
+
+#include "gpg_types.h"
+
 /* ----------------------------------------------------------------------- */
 /* ---                              INIT                              ---- */
 /* ----------------------------------------------------------------------- */
@@ -99,8 +103,10 @@ int gpg_apdu_reset_retry_counter(void);
 
 gpg_pin_t *gpg_pin_get_pin(int id);
 int gpg_pin_is_verified(int pinID);
+int gpg_pin_is_blocked(gpg_pin_t *pin);
 void gpg_pin_set_verified(int pinID, int verified);
 int gpg_pin_check(gpg_pin_t *pin, int pinID, const unsigned char *pin_val, unsigned int pin_len);
+int gpg_pin_check_value(gpg_pin_t *pin, const unsigned char *pin_val, unsigned int pin_len);
 int gpg_pin_set(gpg_pin_t *pin, unsigned char *pin_val, unsigned int pin_len);
 
 /* ----------------------------------------------------------------------- */
@@ -117,7 +123,6 @@ void gpg_io_discard(int clear);
 void gpg_io_clear(void);
 void gpg_io_set_offset(unsigned int offset);
 void gpg_io_mark(void);
-void gpg_io_rewind(void);
 void gpg_io_inserted(unsigned int len);
 void gpg_io_insert(unsigned char const *buffer, unsigned int len);
 void gpg_io_insert_u32(unsigned int v32);
@@ -128,16 +133,17 @@ void gpg_io_insert_t(unsigned int T);
 void gpg_io_insert_tl(unsigned int T, unsigned int L);
 void gpg_io_insert_tlv(unsigned int T, unsigned int L, unsigned char const *V);
 
-void gpg_io_fetch_buffer(unsigned char *buffer, unsigned int len);
-unsigned int gpg_io_fetch_u32(void);
-unsigned int gpg_io_fetch_u24(void);
-unsigned int gpg_io_fetch_u16(void);
-unsigned int gpg_io_fetch_u8(void);
-void gpg_io_fetch_t(unsigned int *T);
-void gpg_io_fetch_l(unsigned int *L);
-void gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
-void gpg_io_fetch_nv(unsigned char *buffer, int len);
-int gpg_io_fetch(unsigned char *buffer, int len);
+unsigned int gpg_io_remaining(void);
+WARN_UNUSED_RESULT bool gpg_io_fetch_u32(unsigned int *v32);
+WARN_UNUSED_RESULT bool gpg_io_fetch_u24(unsigned int *v24);
+WARN_UNUSED_RESULT bool gpg_io_fetch_u16(unsigned int *v16);
+WARN_UNUSED_RESULT bool gpg_io_fetch_u8(unsigned int *v8);
+WARN_UNUSED_RESULT bool gpg_io_fetch_t(unsigned int *T);
+WARN_UNUSED_RESULT bool gpg_io_fetch_l(unsigned int *L);
+WARN_UNUSED_RESULT bool gpg_io_fetch_tl(unsigned int *T, unsigned int *L);
+WARN_UNUSED_RESULT bool gpg_io_fetch_nv(unsigned char *buffer, unsigned int len);
+WARN_UNUSED_RESULT bool gpg_io_fetch(unsigned char *buffer, unsigned int len);
+WARN_UNUSED_RESULT bool gpg_io_skip(unsigned int len);
 
 unsigned int gpg_io_do(unsigned int io_flags);
 

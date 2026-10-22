@@ -19,8 +19,8 @@ jobs:
     with:
       run_type_check: true
       src_directory: .
-      setup_directory: tests/ragger
-      req_directory: tests/ragger
+      setup_directory: tests/functional
+      req_directory: tests/functional
 
   lint_pytools:
     name: Lint pytools

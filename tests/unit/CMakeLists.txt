@@ -1,65 +1,266 @@
 cmake_minimum_required(VERSION 3.10)
-
-if(${CMAKE_VERSION} VERSION_LESS 3.10)
-    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-endif()
-
-# project information
 project(unit_tests
-        VERSION 0.1
-	      DESCRIPTION "Unit tests for Ledger OpenPGP application"
-        LANGUAGES C)
-
-
-# guard against bad build-type strings
-if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release")
-endif()
-
-# guard against in-source builds
-if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
-  message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
-endif()
-
-include(CTest)
-
-# specify C standard
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED True)
-
-add_compile_options(-Wall -Wextra -g -pedantic --coverage)
-# Flag depending on the Build Type
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}-O3")
-
-set(GCC_COVERAGE_LINK_FLAGS "--coverage -lgcov")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
-
-set(APP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
-set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
-set(MOCK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mocks")
-set(SDK_DIR "$ENV{BOLOS_SDK}")
-
-add_compile_definitions(TEST)
-
-include_directories(
-  ${MOCK_DIR}
-  ${APP_DIR}
-  ${SDK_DIR}/io/include
-  ${SDK_DIR}/lib_nbgl/include
-  ${SDK_DIR}/include
+    VERSION 0.1
+    DESCRIPTION "Unit tests for Ledger OpenPGP application"
+    LANGUAGES C
 )
 
-add_executable(test_io
-    ${SRC_DIR}/test_io.c
-    ${MOCK_DIR}/mocks.c
+#######################################################################
+#                        Setup SDK & LedgerUT                         #
+#######################################################################
+if(NOT DEFINED ENV{BOLOS_SDK})
+    message(FATAL_ERROR "BOLOS_SDK environment variable is not set. Please set it to the path of the Ledger Secure SDK.")
+endif()
+
+set(SDK_DIR $ENV{BOLOS_SDK})
+set(LEDGER_UT_APP_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+include(${SDK_DIR}/cmake/LedgerUT.cmake)
+
+#######################################################################
+#             Setup app specific includes & compile defs              #
+#######################################################################
+set(APP_DIR ${LEDGER_UT_APP_SRC_DIR})
+set(FAKES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/fakes)
+
+set(FAKE_SOURCES
+    ${FAKES_DIR}/fake_assert.c
+    ${FAKES_DIR}/fake_sdk.c
+    ${FAKES_DIR}/fake_io.c
+)
+
+# SDK sources linked as is
+list(APPEND FAKE_SOURCES
+    ${SDK_DIR}/lib_standard_app/bip32.c
+    ${SDK_DIR}/lib_standard_app/buffer.c
+    ${SDK_DIR}/lib_standard_app/read.c
+    ${SDK_DIR}/lib_standard_app/varint.c
+    ${SDK_DIR}/lib_standard_app/write.c
+)
+
+# Key, PIN and DO handling shared by the tests on the main commands
+set(CORE_SOURCES
+    ${APP_DIR}/gpg_data.c
+    ${APP_DIR}/gpg_gen.c
+    ${APP_DIR}/gpg_init.c
     ${APP_DIR}/gpg_io.c
-    ${APP_DIR}/gpg_vars.c
+    ${APP_DIR}/gpg_mse.c
+    ${APP_DIR}/gpg_pin.c
 )
 
-target_link_libraries(test_io PUBLIC
-                      cmocka
-                      gcov)
+# SDK services replaced by CMock mocks
+set(CRYPTO_MOCK_HEADERS
+    ${SDK_DIR}/include/os_random.h
+    ${SDK_DIR}/include/os_utils.h
+    ${SDK_DIR}/lib_cxng/include/lcx_aes.h
+    ${SDK_DIR}/lib_cxng/include/lcx_aes_gcm.h
+    ${SDK_DIR}/lib_cxng/include/lcx_ecfp.h
+    ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+    ${SDK_DIR}/lib_cxng/include/lcx_math.h
+    ${SDK_DIR}/lib_cxng/include/lcx_rng.h
+    ${SDK_DIR}/lib_cxng/include/lcx_rsa.h
+    ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+    ${SDK_DIR}/lib_cxng/include/lcx_sha3.h
+)
 
-add_test(test_io test_io)
+# CMock checks for NULL the arguments that SDK headers declare nonnull
+set(MOCK_COMPILE_OPTIONS -Wno-nonnull-compare)
+
+set(UT_INCLUDE_DIRS
+    ${FAKES_DIR}
+    ${APP_DIR}
+    ${UT_INCLUDE_DIRS_SDK}
+    ${SDK_DIR}/lib_cxng/src
+)
+
+set(UT_COMPILE_DEFS
+    ${UT_COMPILE_DEFS_SDK}
+    APPNAME="OpenPGP"
+    APPVERSION="a.b.c"
+    SPEC_VERSION="3.3.1"
+    HAVE_RSA
+)
+
+#######################################################################
+#                           LedgerUT Setup                            #
+#######################################################################
+ledger_unit_tests_init()
+
+ledger_unit_tests_find_sources()
+list(FILTER APP_SOURCES EXCLUDE REGEX "/gpg_main\\.c$")
+
+# Built only so that every app source has a .gcno file for the coverage baseline
+ledger_unit_tests_build_app_sources_as_lib(
+    SOURCES      ${APP_SOURCES}
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+)
+
+#######################################################################
+#                        LedgerUT test suites                         #
+#######################################################################
+ledger_unit_tests_add_test(
+    NAME         test_io
+    SOURCES      ${APP_DIR}/gpg_io.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_data
+    SOURCES      ${CORE_SOURCES}
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_pin
+    SOURCES      ${APP_DIR}/gpg_pin.c
+                 ${APP_DIR}/gpg_io.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${SDK_DIR}/include/os_utils.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_dispatch
+    SOURCES      ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${APP_DIR}/gpg_api.h
+                 ${APP_DIR}/gpg_ux.h
+                 ${SDK_DIR}/lib_standard_app/main_std_app.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_pso
+    SOURCES      ${APP_DIR}/gpg_pso.c
+                 ${CORE_SOURCES}
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
+                 ${SDK_DIR}/lib_cxng/include/lcx_ecdh.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_ecdsa.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_eddsa.h
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_backup
+    SOURCES      ${FAKES_DIR}/fake_digest.c
+                 ${CORE_SOURCES}
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_gen
+    SOURCES      ${FAKES_DIR}/fake_digest.c
+                 ${CORE_SOURCES}
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_mse
+    SOURCES      ${APP_DIR}/gpg_mse.c
+                 ${APP_DIR}/gpg_io.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_select
+    SOURCES      ${APP_DIR}/gpg_select.c
+                 ${APP_DIR}/gpg_mse.c
+                 ${APP_DIR}/gpg_io.c
+                 ${APP_DIR}/gpg_pin.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${SDK_DIR}/include/os_utils.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_challenge
+    SOURCES      ${FAKES_DIR}/fake_digest.c
+                 ${APP_DIR}/gpg_challenge.c
+                 ${APP_DIR}/gpg_io.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_math.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_rng.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_sha3.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_init
+    SOURCES      ${APP_DIR}/gpg_init.c
+                 ${APP_DIR}/gpg_io.c
+                 ${APP_DIR}/gpg_mse.c
+                 ${APP_DIR}/gpg_pin.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${SDK_DIR}/include/os_utils.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_rng.h
+                 ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+                 ${APP_DIR}/gpg_ux.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)
+
+ledger_unit_tests_add_test(
+    NAME         test_ux
+    SOURCES      ${APP_DIR}/gpg_ux.c
+                 ${APP_DIR}/gpg_ux_msg.c
+                 ${FAKES_DIR}/fake_vars.c
+                 ${FAKE_SOURCES}
+    MOCK_HEADERS ${APP_DIR}/gpg_api.h
+                 ${SDK_DIR}/lib_nbgl/include/nbgl_use_case.h
+                 ${SDK_DIR}/lib_nbgl/include/nbgl_layout.h
+                 ${SDK_DIR}/lib_standard_app/main_std_app.h
+    INCLUDE_DIRS ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS ${UT_COMPILE_DEFS}
+    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
+)

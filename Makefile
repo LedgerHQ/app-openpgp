@@ -29,7 +29,7 @@ APPNAME = OpenPGP
 
 # Application version
 APPVERSION_M = 3
-APPVERSION_N = 0
+APPVERSION_N = 1
 APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
@@ -140,15 +140,7 @@ DISABLE_OS_IO_STACK_USE = 1
 
 ENABLE_LINK_TIME_OPTIMIZATION = 1
 
-DEFINES   += CUSTOM_IO_APDU_BUFFER_SIZE=\(255+5+64\)
 DEFINES   += HAVE_RSA
-# Historical Bytes is removed from Application Related Data
-# The response payload size (246 bytes) triggers a transport
-# layer freeze on the physical device (T=0 protocol).
-# While technically within the Short APDU limit (256 bytes),
-# sending a payload this close to the maximum size causes the Host/Driver to
-# fail capturing the Status Word correctly, resulting in a timeout.
-# DEFINES   += WITH_HISTO_BYTES_IN_ARD
 
 #########################
 

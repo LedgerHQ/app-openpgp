@@ -24,7 +24,6 @@
 #include "gpg_vars.h"
 #include "gpg_ux_msg.h"
 #include "gpg_ux.h"
-#include "usbd_ccid_if.h"
 #include "os_io_seph_cmd.h"
 
 /* ----------------------------------------------------------------------- */
@@ -57,6 +56,16 @@ static nbgl_content_t contents;
 static nbgl_genericContents_t settingContents;
 static nbgl_contentSwitch_t switches[5];  // 5 should be enough for all switches
 
+// Texts of the settings page on screen, read by NBGL as long as it is displayed
+#define SETTING_CHOICES_MAX 4
+static union {
+    char choices[SETTING_CHOICES_MAX][32];
+    char keys[KEY_NB][64];
+} settingTexts;
+static const char *settingNames[SETTING_CHOICES_MAX];
+_Static_assert(KEY_NB <= SETTING_CHOICES_MAX, "Too small settingNames array");
+_Static_assert(GPG_KEYS_SLOTS <= SETTING_CHOICES_MAX, "Too small settingNames array");
+
 /* ------------------------------- Helpers  UX ------------------------------- */
 
 /**
@@ -70,22 +79,63 @@ static void ui_info(const char *msg1, const char *msg2, nbgl_callback_t cb, bool
     snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "%s\n%s", msg1, msg2);
 
     nbgl_useCaseStatus((const char *) G_gpg_vstate.menu, isSuccess, cb);
-};
+}
+
+/**
+ * @brief Format a settings choice, marking the default one, and on Nano the current one
+ *
+ * @param[in] idx choice index
+ * @param[in] label choice label
+ * @param[in] current choice in use
+ * @param[in] is_default choice set as default
+ *
+ */
+static void ui_setting_choice(uint8_t idx, const char *label, bool current, bool is_default) {
+    char *text = settingTexts.choices[idx];
+
+#ifdef SCREEN_SIZE_NANO
+    snprintf(text,
+             sizeof(settingTexts.choices[idx]),
+             current ? "[%s]\n%s" : "%s\n%s",
+             label,
+             is_default ? "(default)" : " ");
+#else
+    UNUSED(current);
+    snprintf(text,
+             sizeof(settingTexts.choices[idx]),
+             "%s %s",
+             label,
+             is_default ? "[default]" : "");
+#endif
+    settingNames[idx] = text;
+}
 
 #ifdef SCREEN_SIZE_WALLET
 /**
- * @brief Display Setting page header
+ * @brief Display a Setting page with radio choices and a "Set default" button
  *
  * @param[in] title page title
  * @param[in] back_token token for back button
  * @param[in] touch_cb action callback
+ * @param[in] names choices texts
+ * @param[in] nb_choices number of choices
+ * @param[in] init_choice choice selected at display
+ * @param[in] select_token token for a choice selection
+ * @param[in] default_token token for the "Set default" button
  *
  */
-static void ui_setting_header(const char *title,
-                              uint8_t back_token,
-                              nbgl_layoutTouchCallback_t touch_cb) {
+static void ui_setting_radio_page(const char *title,
+                                  uint8_t back_token,
+                                  nbgl_layoutTouchCallback_t touch_cb,
+                                  const char *const *names,
+                                  uint8_t nb_choices,
+                                  uint8_t init_choice,
+                                  uint8_t select_token,
+                                  uint8_t default_token) {
     nbgl_layoutDescription_t layoutDescription = {0};
     nbgl_layoutHeader_t headerDesc = {0};
+    nbgl_layoutRadioChoice_t choices = {0};
+    nbgl_layoutButton_t buttonInfo = {0};
 
     layoutDescription.onActionCallback = touch_cb;
     layoutDescription.modal = false;
@@ -97,6 +147,23 @@ static void ui_setting_header(const char *title,
     headerDesc.backAndText.tuneId = TUNE_TAP_CASUAL;
     nbgl_layoutAddHeader(layoutCtx, &headerDesc);
     nbgl_layoutAddSeparationLine(layoutCtx);
+
+    choices.names = names;
+    choices.localized = false;
+    choices.nbChoices = nb_choices;
+    choices.initChoice = init_choice;
+    choices.token = select_token;
+    nbgl_layoutAddRadioChoice(layoutCtx, &choices);
+
+    buttonInfo.fittingContent = false;
+    buttonInfo.onBottom = true;
+    buttonInfo.style = BLACK_BACKGROUND;
+    buttonInfo.text = "Set default";
+    buttonInfo.token = default_token;
+    buttonInfo.tuneId = TUNE_TAP_CASUAL;
+    nbgl_layoutAddButton(layoutCtx, &buttonInfo);
+
+    nbgl_layoutDraw(layoutCtx);
 }
 #endif  // SCREEN_SIZE_WALLET
 
@@ -293,6 +360,23 @@ static void slot_cb(int token, uint8_t index) {
     }
 }
 
+/**
+ * @brief Fill the slot choices
+ *
+ */
+static void slot_names(void) {
+    char label[8];
+    uint8_t slot;
+
+    for (slot = 0; slot < GPG_KEYS_SLOTS; slot++) {
+        snprintf(label, sizeof(label), "Slot %d", (slot + 1));
+        ui_setting_choice(slot,
+                          label,
+                          G_gpg_vstate.slot == slot,
+                          N_gpg_pstate->config_slot[1] == slot);
+    }
+}
+
 #ifdef SCREEN_SIZE_NANO
 /**
  * @brief Slot Configuration callback
@@ -302,40 +386,23 @@ static void slot_cb(int token, uint8_t index) {
  *
  */
 static bool slot_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
-    static char *names[GPG_KEYS_SLOTS] = {0};
-    static char text[GPG_KEYS_SLOTS][32];
-    uint32_t slot;
-
     switch (page) {
         case 0:
-            for (slot = 0; slot < GPG_KEYS_SLOTS; slot++) {
-                if (G_gpg_vstate.slot == slot) {
-                    snprintf(text[slot],
-                             sizeof(text[slot]),
-                             "[Slot %d]\n%s",
-                             (slot + 1),
-                             (N_gpg_pstate->config_slot[1] == slot) ? "(default)" : " ");
-                } else {
-                    snprintf(text[slot],
-                             sizeof(text[slot]),
-                             "Slot %d\n%s",
-                             (slot + 1),
-                             (N_gpg_pstate->config_slot[1] == slot) ? "(default)" : " ");
-                }
-                names[slot] = text[slot];
-            }
-
+            slot_names();
             content->type = CHOICES_LIST;
-            content->choicesList.names = (const char *const *) names;
+            content->choicesList.names = settingNames;
             content->choicesList.token = TOKEN_SLOT_SELECT;
             content->choicesList.nbChoices = GPG_KEYS_SLOTS;
             content->choicesList.initChoice = G_gpg_vstate.slot;
             break;
         case 1:
-            snprintf(text[0], sizeof(text[0]), "Set Slot %d", (G_gpg_vstate.slot + 1));
+            snprintf(settingTexts.choices[0],
+                     sizeof(settingTexts.choices[0]),
+                     "Set Slot %d",
+                     (G_gpg_vstate.slot + 1));
             content->type = INFO_BUTTON;
             content->infoButton.text = "Set Default Slot";
-            content->infoButton.buttonText = text[0];
+            content->infoButton.buttonText = settingTexts.choices[0];
             content->infoButton.buttonToken = TOKEN_SLOT_DEF;
             break;
         default:
@@ -351,38 +418,15 @@ static bool slot_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
  */
 static void ui_menu_slot_action(void) {
 #ifdef SCREEN_SIZE_WALLET
-    nbgl_layoutRadioChoice_t choices = {0};
-    nbgl_layoutButton_t buttonInfo = {0};
-    static char *names[GPG_KEYS_SLOTS] = {0};
-    static char text[GPG_KEYS_SLOTS][32];
-    uint32_t slot;
-
-    ui_setting_header("Slots configuration", TOKEN_SLOT_BACK, slot_cb);
-
-    for (slot = 0; slot < GPG_KEYS_SLOTS; slot++) {
-        snprintf(text[slot],
-                 sizeof(text[slot]),
-                 "Slot %d %s",
-                 (slot + 1),
-                 (N_gpg_pstate->config_slot[1] == slot) ? "[default]" : "");
-        names[slot] = text[slot];
-    }
-    choices.names = (const char *const *) names;
-    choices.localized = false;
-    choices.nbChoices = GPG_KEYS_SLOTS;
-    choices.initChoice = G_gpg_vstate.slot;
-    choices.token = TOKEN_SLOT_SELECT;
-    nbgl_layoutAddRadioChoice(layoutCtx, &choices);
-
-    buttonInfo.fittingContent = false;
-    buttonInfo.onBottom = true;
-    buttonInfo.style = BLACK_BACKGROUND;
-    buttonInfo.text = "Set default";
-    buttonInfo.token = TOKEN_SLOT_DEF;
-    buttonInfo.tuneId = TUNE_TAP_CASUAL;
-    nbgl_layoutAddButton(layoutCtx, &buttonInfo);
-
-    nbgl_layoutDraw(layoutCtx);
+    slot_names();
+    ui_setting_radio_page("Slots configuration",
+                          TOKEN_SLOT_BACK,
+                          slot_cb,
+                          settingNames,
+                          GPG_KEYS_SLOTS,
+                          G_gpg_vstate.slot,
+                          TOKEN_SLOT_SELECT,
+                          TOKEN_SLOT_DEF);
 #else   // SCREEN_SIZE_WALLET
     nbgl_useCaseNavigableContent("Slots configuration",
                                  slot_initPage,
@@ -564,7 +608,7 @@ static void template_confirm_cb(bool confirm) {
 static void template_key_cb(int token, uint8_t index, int page) {
     LV(attributes, GPG_KEY_ATTRIBUTES_LENGTH);
     gpg_key_t *dest = NULL;
-    static uint8_t *oid = NULL;
+    uint8_t *oid = NULL;
     uint32_t oid_len = 0;
     uint32_t size = 0;
 #ifdef SCREEN_SIZE_NANO
@@ -722,8 +766,6 @@ static void template_cb(int token, uint8_t index, int page) {
  *
  */
 static void ui_settings_template(void) {
-    static char *names[3] = {0};
-    static char text[3][64];
     char *subText = NULL;
     uint32_t i;
 
@@ -731,7 +773,7 @@ static void ui_settings_template(void) {
     explicit_bzero(&settingContents, sizeof(settingContents));
     contents.type = BARS_LIST;
     contents.content.barsList.nbBars = KEY_NB;
-    contents.content.barsList.barTexts = (const char *const *) names;
+    contents.content.barsList.barTexts = settingNames;
     contents.content.barsList.tokens = tokens;
     for (i = 0; i < KEY_NB; i++) {
         switch (_getKeyType(TOKEN_TEMPLATE_SIG + i)) {
@@ -757,8 +799,12 @@ static void ui_settings_template(void) {
             default:
                 break;
         }
-        snprintf(text[i], sizeof(text[i]), "%s\n%s", (const char *) PIC(keyNameTexts[i]), subText);
-        names[i] = text[i];
+        snprintf(settingTexts.keys[i],
+                 sizeof(settingTexts.keys[i]),
+                 "%s\n%s",
+                 (const char *) PIC(keyNameTexts[i]),
+                 subText);
+        settingNames[i] = settingTexts.keys[i];
     }
 #ifdef HAVE_PIEZO_SOUND
     contents.content.barsList.tuneId = TUNE_TAP_CASUAL;
@@ -895,6 +941,8 @@ enum {
     PIN_CHOICE_NB,
 };
 
+_Static_assert(PIN_CHOICE_NB <= SETTING_CHOICES_MAX, "Too small settingNames array");
+
 static const char *const PinNameTexts[PIN_CHOICE_NB] = {
     "Random keypad",
     "Fixed keypad",
@@ -1018,6 +1066,21 @@ static void pin_cb(int token, uint8_t index) {
     }
 }
 
+/**
+ * @brief Fill the PIN mode choices
+ *
+ * @param[in] current PIN mode choice in use
+ *
+ */
+static void pin_names(uint8_t current) {
+    uint8_t def = pin_choice(N_gpg_pstate->config_pin, N_gpg_pstate->keypad_shuffle);
+    uint8_t pin;
+
+    for (pin = 0; pin < PIN_CHOICE_NB; pin++) {
+        ui_setting_choice(pin, (const char *) PIC(PinNameTexts[pin]), current == pin, def == pin);
+    }
+}
+
 #ifdef SCREEN_SIZE_NANO
 /**
  * @brief Pin Configuration callback
@@ -1027,45 +1090,28 @@ static void pin_cb(int token, uint8_t index) {
  *
  */
 static bool pin_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
-    static char *names[PIN_CHOICE_NB] = {0};
-    static char text[PIN_CHOICE_NB][32];
     uint8_t current = pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle);
-    uint8_t def = pin_choice(N_gpg_pstate->config_pin, N_gpg_pstate->keypad_shuffle);
-    uint32_t pin;
 
     if (current >= PIN_CHOICE_NB) {
         return false;
     }
     switch (page) {
         case 0:
-            for (pin = 0; pin < PIN_CHOICE_NB; pin++) {
-                if (current == pin) {
-                    snprintf(text[pin],
-                             sizeof(text[pin]),
-                             "[%s]\n%s",
-                             (const char *) PIC(PinNameTexts[pin]),
-                             (def == pin) ? "(default)" : " ");
-                } else {
-                    snprintf(text[pin],
-                             sizeof(text[pin]),
-                             "%s\n%s",
-                             (const char *) PIC(PinNameTexts[pin]),
-                             (def == pin) ? "(default)" : " ");
-                }
-                names[pin] = text[pin];
-            }
-
+            pin_names(current);
             content->type = CHOICES_LIST;
-            content->choicesList.names = (const char *const *) names;
+            content->choicesList.names = settingNames;
             content->choicesList.token = TOKEN_PIN_SET;
             content->choicesList.nbChoices = PIN_CHOICE_NB;
             content->choicesList.initChoice = current;
             break;
         case 1:
-            snprintf(text[0], sizeof(text[0]), "Set %s", (const char *) PIC(PinNameTexts[current]));
+            snprintf(settingTexts.choices[0],
+                     sizeof(settingTexts.choices[0]),
+                     "Set %s",
+                     (const char *) PIC(PinNameTexts[current]));
             content->type = INFO_BUTTON;
             content->infoButton.text = "Set Default Mode";
-            content->infoButton.buttonText = text[0];
+            content->infoButton.buttonText = settingTexts.choices[0];
             content->infoButton.buttonToken = TOKEN_PIN_DEF;
             break;
         default:
@@ -1081,39 +1127,17 @@ static bool pin_cfg_cb(uint8_t page, nbgl_pageContent_t *content) {
  */
 static void ui_settings_pin(void) {
 #ifdef SCREEN_SIZE_WALLET
-    static nbgl_layoutRadioChoice_t choices = {0};
-    nbgl_layoutButton_t buttonInfo = {0};
-    static char *names[PIN_CHOICE_NB] = {0};
-    static char text[PIN_CHOICE_NB][32];
-    uint8_t def = pin_choice(N_gpg_pstate->config_pin, N_gpg_pstate->keypad_shuffle);
-    uint32_t pin;
+    uint8_t current = pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle);
 
-    ui_setting_header("PIN mode", TOKEN_PIN_BACK, pin_cb);
-
-    for (pin = 0; pin < PIN_CHOICE_NB; pin++) {
-        snprintf(text[pin],
-                 sizeof(text[pin]),
-                 "%s %s",
-                 (const char *) PIC(PinNameTexts[pin]),
-                 (def == pin) ? "[default]" : "");
-        names[pin] = text[pin];
-    }
-    choices.names = (const char *const *) names;
-    choices.localized = false;
-    choices.nbChoices = PIN_CHOICE_NB;
-    choices.initChoice = pin_choice(G_gpg_vstate.pinmode, G_gpg_vstate.keypad_shuffle);
-    choices.token = TOKEN_PIN_SET;
-    nbgl_layoutAddRadioChoice(layoutCtx, &choices);
-
-    buttonInfo.fittingContent = false;
-    buttonInfo.onBottom = true;
-    buttonInfo.style = BLACK_BACKGROUND;
-    buttonInfo.text = "Set default";
-    buttonInfo.token = TOKEN_PIN_DEF;
-    buttonInfo.tuneId = TUNE_TAP_CASUAL;
-    nbgl_layoutAddButton(layoutCtx, &buttonInfo);
-
-    nbgl_layoutDraw(layoutCtx);
+    pin_names(current);
+    ui_setting_radio_page("PIN mode",
+                          TOKEN_PIN_BACK,
+                          pin_cb,
+                          settingNames,
+                          PIN_CHOICE_NB,
+                          current,
+                          TOKEN_PIN_SET,
+                          TOKEN_PIN_DEF);
 #else   // SCREEN_SIZE_WALLET
     nbgl_useCaseNavigableContent("PIN mode", pin_initPage, 2, ui_home_init, pin_cfg_cb, pin_cb);
 #endif  // SCREEN_SIZE_WALLET
@@ -1259,6 +1283,42 @@ static void ui_reset(void) {
                        reset_cb);
 }
 
+/* ---------------------------- TERMINATE DF UX ----------------------------- */
+
+/**
+ * @brief TERMINATE DF confirmation callback
+ *
+ * @param[in] confirm indicate if the user press 'Yes, reset' or 'Cancel'
+ *
+ */
+static void terminate_confirm_cb(bool confirm) {
+    G_gpg_vstate.ui_pending = 0;
+    gpg_io_discard(1);
+    if (confirm) {
+        gpg_install(STATE_TERMINATE);
+        gpg_init_session();
+    }
+    gpg_io_insert_u16(confirm ? SWO_SUCCESS : SWO_SECURITY_CONDITION_NOT_SATISFIED);
+    gpg_io_do(IO_RETURN_AFTER_TX);
+    ui_init();
+}
+
+/**
+ * TERMINATE DF confirmation page, when PW3 is blocked
+ *
+ */
+void ui_menu_terminate_display(void) {
+    G_gpg_vstate.ui_pending = 1;
+    nbgl_useCaseChoice(NULL,
+                       "Factory Reset",
+                       "Admin PIN is blocked.\n"
+                       "The computer requests to delete ALL keys and reset the app.\n"
+                       "Are you sure?",
+                       "Yes, reset",
+                       "Cancel",
+                       terminate_confirm_cb);
+}
+
 /* ------------------------------ PIN CONFIRM UX ----------------------------- */
 
 /**
@@ -1340,9 +1400,9 @@ static void pinentry_validate_cb(const uint8_t *pinentry, uint8_t length) {
         case INS_CHANGE_REFERENCE_DATA:
             switch (G_gpg_vstate.ux_step) {
                 case 0:
-                    // Check Current pin code
+                    // Check Current pin code, without opening a session
                     pin = gpg_pin_get_pin(G_gpg_vstate.ux_pinconfirm_p2);
-                    sw = gpg_pin_check(pin, G_gpg_vstate.ux_pinconfirm_p2, pinentry, length);
+                    sw = gpg_pin_check_value(pin, pinentry, length);
                     gpg_io_discard(1);
                     if (sw == SWO_AUTH_METHOD_BLOCKED) {
                         gpg_io_insert_u16(sw);
@@ -1424,35 +1484,31 @@ static void pinback_cb(void) {
  */
 void ui_menu_pinentry_display(unsigned int step) {
     uint8_t minLen;
-    char line[10];
+    const char *action = "Enter";
     bool shuffled = G_gpg_vstate.keypad_shuffle;
 
     G_gpg_vstate.ui_pending = 1;
     // Init the page title
-    explicit_bzero(G_gpg_vstate.line, sizeof(G_gpg_vstate.line));
     if (G_gpg_vstate.io_ins == INS_CHANGE_REFERENCE_DATA) {
         switch (step) {
             case 0:
-                // Default or initial case
-                snprintf(line, sizeof(line), "Current");
+                action = "Current";
                 break;
             case 1:
-                snprintf(line, sizeof(line), "New");
+                action = "New";
                 break;
             case 2:
-                snprintf(line, sizeof(line), "Confirm");
+                action = "Confirm";
                 break;
             default:
                 break;
         }
         G_gpg_vstate.ux_step = step;
-    } else {
-        snprintf(line, sizeof(line), "Enter");
     }
     snprintf(G_gpg_vstate.menu,
              sizeof(G_gpg_vstate.menu),
              "%s %s PIN",
-             line,
+             action,
              (G_gpg_vstate.ux_pinconfirm_p2 == PIN_ID_PW3) ? "Admin" : "User");
 
     minLen =
@@ -1486,22 +1542,6 @@ static void ui_menu_pinentry_cb(void) {
 
 /* ------------------------------ UIF CONFIRM UX ----------------------------- */
 
-/* Snapshot of the APDU presented to the user before the UIF prompt is shown.
- * While the prompt is pending (IO_ASYNCH_REPLY), the host can overwrite the
- * global APDU state with a different command.  Restoring from this snapshot
- * in the callback ensures the operation executed is exactly what the user
- * reviewed, not an attacker-substituted payload. */
-typedef struct {
-    unsigned char ins;
-    unsigned char p1;
-    unsigned char p2;
-    unsigned short p1p2;
-    unsigned short length;
-    unsigned char data[GPG_IO_BUFFER_LENGTH];
-} uif_snapshot_t;
-
-static uif_snapshot_t G_uif_snapshot;
-
 /**
  * @brief UIF Confirmation callback
  *
@@ -1511,16 +1551,10 @@ static uif_snapshot_t G_uif_snapshot;
 void uif_confirm_cb(bool confirm) {
     unsigned int sw = SWO_SECURITY_ISSUE;
 
+    G_gpg_vstate.ui_pending = 0;
     if (confirm) {
-        /* Restore the exact APDU state that was shown to the user, discarding
-         * any APDU the host may have sent while the prompt was pending. */
-        G_gpg_vstate.io_ins = G_uif_snapshot.ins;
-        G_gpg_vstate.io_p1 = G_uif_snapshot.p1;
-        G_gpg_vstate.io_p2 = G_uif_snapshot.p2;
-        G_gpg_vstate.io_p1p2 = G_uif_snapshot.p1p2;
-        G_gpg_vstate.io_length = G_uif_snapshot.length;
+        // The SDK rejects any command received while this one awaits its reply
         G_gpg_vstate.io_offset = 0;
-        memmove(G_gpg_vstate.work.io_buffer, G_uif_snapshot.data, G_uif_snapshot.length);
         G_gpg_vstate.UIF_flags = 1;
         if (G_gpg_vstate.io_ins == INS_PSO) {
             sw = gpg_apdu_pso();
@@ -1536,7 +1570,6 @@ void uif_confirm_cb(bool confirm) {
     } else {
         gpg_io_discard(1);
     }
-    explicit_bzero(&G_uif_snapshot, sizeof(G_uif_snapshot));
     gpg_io_insert_u16(sw);
     gpg_io_do(IO_RETURN_AFTER_TX);
     ui_init();
@@ -1549,33 +1582,31 @@ void uif_confirm_cb(bool confirm) {
  *
  */
 void ui_menu_uifconfirm_display(unsigned int value) {
-    UNUSED(value);
+    const char *operation = "Please Cancel";
 
+    UNUSED(value);
+    G_gpg_vstate.ui_pending = 1;
     switch (G_gpg_vstate.io_ins) {
         case INS_INTERNAL_AUTHENTICATE:
             if (G_gpg_vstate.mse_aut == &G_gpg_vstate.kslot->aut) {
-                snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Authentication");
+                operation = "Authentication";
             } else {
-                snprintf(G_gpg_vstate.menu,
-                         sizeof(G_gpg_vstate.menu),
-                         "Authentication with Decryption key");
+                operation = "Authentication with Decryption key";
             }
             break;
         case INS_PSO:
             switch (G_gpg_vstate.io_p1p2) {
                 case PSO_CDS:
-                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Signature");
+                    operation = "Signature";
                     break;
                 case PSO_ENC:
-                    snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Encryption");
+                    operation = "Encryption";
                     break;
                 case PSO_DEC:
                     if (G_gpg_vstate.mse_dec == &G_gpg_vstate.kslot->dec) {
-                        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Decryption");
+                        operation = "Decryption";
                     } else {
-                        snprintf(G_gpg_vstate.menu,
-                                 sizeof(G_gpg_vstate.menu),
-                                 "Decryption with Authentication key");
+                        operation = "Decryption with Authentication key";
                     }
                     break;
                 default:
@@ -1585,18 +1616,6 @@ void ui_menu_uifconfirm_display(unsigned int value) {
         default:
             break;
     }
-    if (G_gpg_vstate.menu[0] == 0) {
-        snprintf(G_gpg_vstate.menu, sizeof(G_gpg_vstate.menu), "Please Cancel");
-    }
 
-    /* Capture APDU state before entering async mode so the callback can
-     * restore it even if the host sends a new APDU while the prompt is up. */
-    G_uif_snapshot.ins = G_gpg_vstate.io_ins;
-    G_uif_snapshot.p1 = G_gpg_vstate.io_p1;
-    G_uif_snapshot.p2 = G_gpg_vstate.io_p2;
-    G_uif_snapshot.p1p2 = G_gpg_vstate.io_p1p2;
-    G_uif_snapshot.length = G_gpg_vstate.io_length;
-    memmove(G_uif_snapshot.data, G_gpg_vstate.work.io_buffer, G_gpg_vstate.io_length);
-
-    nbgl_useCaseChoice(NULL, "Confirm operation", G_gpg_vstate.menu, "Yes", "No", uif_confirm_cb);
+    nbgl_useCaseChoice(NULL, "Confirm operation", operation, "Yes", "No", uif_confirm_cb);
 }

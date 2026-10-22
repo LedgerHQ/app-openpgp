@@ -1,0 +1,362 @@
+# SPDX-FileCopyrightText: 2023 Ledger SAS
+# SPDX-License-Identifier: LicenseRef-LEDGER
+"""
+This module provides Ragger tests utility functions
+"""
+
+import re
+from pathlib import Path
+
+from application_client.app_def import DataObject, Errors, KeyGenMode, PassWord, PubkeyAlgo
+from application_client.command_sender import CommandSender
+from Crypto.Protocol import DH as ecdh
+from Crypto.PublicKey import ECC, RSA
+from Crypto.Signature import eddsa
+from Crypto.Util.number import bytes_to_long
+from ledgered.devices import Device
+from ragger.navigator import Navigator, NavIns, NavInsID
+
+ROOT_SCREENSHOT_PATH = Path(__file__).parent.resolve()
+
+KEY_TEMPLATES = {
+    "rsa2048": "010800002001",
+    "rsa3072": "010C00002001",
+    "rsa4096": "011000002001",
+    "nistp256": "132A8648CE3D030107",
+    "secp256k1": "132B8104000A",
+    "ed25519": "162B06010401DA470F01",
+    "cv25519": "122B060104019755010501",
+}
+
+# digestInfo header: https://www.rfc-editor.org/rfc/rfc8017#section-9.2
+SHA256_DIGEST_INFO = b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01\x05\x00\x04\x20"
+
+
+def util_navigate(
+    device: Device,
+    navigator: Navigator,
+    test_name: Path,
+    text: str = "",
+    screen_change_before_first_instruction: bool = True,
+) -> None:
+    """Navigate in the menus with conditions"""
+
+    assert text
+    valid_instr: list[NavIns | NavInsID] = []
+
+    if device.is_nano:
+        text = text.split("_")[1]
+        nav_inst = NavInsID.RIGHT_CLICK
+        valid_instr.append(NavInsID.BOTH_CLICK)
+
+    else:
+        text, txt_cfg = text.split("_")
+        if txt_cfg == "Yes":
+            nav_inst = NavInsID.USE_CASE_CHOICE_CONFIRM
+            valid_instr.append(NavInsID.USE_CASE_CHOICE_CONFIRM)
+        elif txt_cfg == "No":
+            nav_inst = NavInsID.USE_CASE_REVIEW_REJECT
+            valid_instr.append(NavInsID.USE_CASE_CHOICE_REJECT)
+        else:
+            raise ValueError(f'Wrong text "{text}"')
+
+    # Do not wait last screen change because home screen contain a "random" ID
+    navigator.navigate_until_text_and_compare(
+        nav_inst,
+        valid_instr,
+        text,
+        ROOT_SCREENSHOT_PATH,
+        test_name,
+        screen_change_before_first_instruction=screen_change_before_first_instruction,
+        screen_change_after_last_instruction=False,
+    )
+
+
+def generate_key(client: CommandSender, key_tag: DataObject, mode: KeyGenMode = KeyGenMode.DEFAULT) -> None:
+    """Generate a Asymmetric key
+
+    Args:
+        client (CommandSender): Application object
+        key_tag (DataObject):   Tag identifying the key
+        mode (KeyGenMode):      Random or seeded generation
+    """
+
+    # Verify PW3 (Admin)
+    check_pincode(client, PassWord.PW3)
+
+    # Generate the SIG Key Pair
+    rapdu = client.generate_key(key_tag, mode)
+    assert rapdu.status == Errors.SW_OK
+
+
+def get_key_attributes(client: CommandSender, key_attr: int) -> tuple[PubkeyAlgo, int]:
+    """Send and check the pincode
+
+    Args:
+        client (CommandSender): Application object
+        key_attr (int):         Key related attribute to be parsed
+
+    Returns:
+        Public-Key Algorithm ID and Key size
+    """
+
+    rapdu = client.get_data(DataObject.DO_APP_DATA)
+    assert rapdu.status == Errors.SW_OK
+
+    tags = decode_tlv(rapdu.data)
+    data1 = tags.get(DataObject.DO_DISCRET_DATA, b"")
+    if not data1:
+        return PubkeyAlgo.INVALID, 0
+    data2 = decode_tlv(data1)
+    attr = data2.get(key_attr, b"")
+    if not attr:
+        return PubkeyAlgo.INVALID, 0
+    key_algo = attr[0]
+    print(f" Key ID:       {key_algo}")
+    if key_algo == PubkeyAlgo.RSA:
+        key_size = (attr[1] << 8) | attr[2]
+        print(f" Key size:     {key_size}")
+    else:
+        key_size = 0
+    return key_algo, key_size
+
+
+def get_EDDSA_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
+    """Read the Public Key and generate a EccKey object
+
+    Args:
+        client (CommandSender): Application object
+        key_tag (DataObject):   Tag identifying the key to read
+
+    Returns:
+        EccKey
+    """
+
+    # Extract Pub key parameters
+    data = _get_pub_key(client, key_tag)
+
+    oid = data[0x86]
+    print(f" OID[{len(oid)}]: {oid.hex()}")
+    assert len(oid) == 32
+    return eddsa.import_public_key(oid)
+
+
+def get_ECDH_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
+    """Read the Public Key and generate a EccKey object
+
+    Args:
+        client (CommandSender): Application object
+        key_tag (DataObject):   Tag identifying the key to read
+
+    Returns:
+        EccKey
+    """
+
+    # Extract Pub key parameters
+    data = _get_pub_key(client, key_tag)
+
+    oid = data[0x86]
+    print(f" OID[{len(oid)}]: {oid.hex()}")
+    assert len(oid) == 32
+    return ecdh.import_x25519_public_key(oid)
+
+
+def get_ECDSA_pub_key(client: CommandSender, key_tag: DataObject) -> ECC.EccKey:
+    """Read the Public Key and generate a EccKey object
+
+    Args:
+        client (CommandSender): Application object
+        key_tag (DataObject):   Tag identifying the key to read
+
+    Returns:
+        EccKey
+    """
+
+    # Extract Pub key parameters
+    data = _get_pub_key(client, key_tag)
+
+    oid = data[0x86][1:]
+    pt_len = int(len(oid) / 2)
+    x = oid[:pt_len]
+    y = oid[pt_len:]
+    print(f" X[{len(x)}]: {x.hex()}")
+    print(f" Y[{len(y)}]: {y.hex()}")
+    assert len(x) == len(y)
+    return ECC.construct(curve="P-256", point_x=bytes_to_long(x), point_y=bytes_to_long(y))
+
+
+P256_ORDER = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+
+
+def verify_ecdsa_p256(pubkey: ECC.EccKey, digest: bytes, signature: bytes) -> bool:
+    """Verify a r || s P-256 signature of a digest, left-padded or truncated to 32 bytes
+
+    Args:
+        pubkey (EccKey):   P-256 public key
+        digest (bytes):    Digest given to the card
+        signature (bytes): r || s, 32 bytes each
+
+    Returns:
+        True if the signature is valid
+    """
+
+    assert len(signature) == 64
+    r = int.from_bytes(signature[:32], "big")
+    s = int.from_bytes(signature[32:], "big")
+    if not (0 < r < P256_ORDER and 0 < s < P256_ORDER):
+        return False
+    z = int.from_bytes(digest[:32].rjust(32, b"\x00"), "big")
+    w = pow(s, -1, P256_ORDER)
+    generator = ECC.construct(curve="P-256", d=1).pointQ
+    point = generator * (z * w % P256_ORDER) + pubkey.pointQ * (r * w % P256_ORDER)
+    return int(point.x) % P256_ORDER == r
+
+
+def get_RSA_pub_key(client: CommandSender, key_tag: DataObject) -> RSA.RsaKey:
+    """Read the Public Key and generate a RsaKey object
+
+    Args:
+        client (CommandSender): Application object
+        key_tag (DataObject):   Tag identifying the key to read
+
+    Returns:
+        RsaKey
+    """
+
+    # Extract Pub key parameters
+    data = _get_pub_key(client, key_tag)
+
+    exponent = data[0x82]
+    modulus = data[0x81]
+    print(f" Key Exponent: 0x{exponent.hex()}")
+    print(f" Key Modulus[{len(modulus)}]: {modulus.hex()}")
+
+    return RSA.construct((int.from_bytes(modulus, "big"), int.from_bytes(exponent, "big")))
+
+
+def check_pincode(client: CommandSender, pwd: PassWord) -> None:
+    """Send and check the pincode
+
+    Args:
+        client (CommandSender): Application object
+        pwd (PassWord):         Password to be verified
+    """
+
+    if pwd in (PassWord.PW1, PassWord.PW2):
+        pincode = "123456"
+    elif pwd == PassWord.PW3:
+        pincode = "12345678"
+    else:
+        raise ValueError(f"Invalid pwd: {pwd}")
+
+    # Verify PW
+    rapdu = client.send_verify_pw(pwd, pincode)
+    assert rapdu.status == Errors.SW_OK
+
+
+def verify_version(version: str) -> None:
+    """Verify the app version, based on defines in Makefile
+
+    Args:
+        Version (str): Version to be checked
+    """
+
+    vers_dict = {}
+    vers_str = ""
+    lines = _read_makefile()
+    version_re = re.compile(r"^APPVERSION_(?P<part>\w)\s?=\s?(?P<val>\d)", re.I)
+    for line in lines:
+        info = version_re.match(line)
+        if info:
+            dinfo = info.groupdict()
+            vers_dict[dinfo["part"]] = dinfo["val"]
+    try:
+        vers_str = f"{vers_dict['M']}.{vers_dict['N']}.{vers_dict['P']}"
+    except KeyError:
+        pass
+    assert version == vers_str
+
+
+def verify_name(name: str) -> None:
+    """Verify the app name, based on defines in Makefile
+
+    Args:
+        name (str): Name to be checked
+    """
+
+    name_str = ""
+    lines = _read_makefile()
+    name_re = re.compile(r"^APPNAME\s?=\s?(?P<val>\w+)", re.I)
+    for line in lines:
+        info = name_re.match(line)
+        if info:
+            dinfo = info.groupdict()
+            name_str = dinfo["val"]
+    assert name == name_str
+
+
+def decode_tlv(tlv: bytes) -> dict:
+    """Decode TLV fields
+
+    Args:
+        tlv (bytes): Input data bytes to parse
+
+    Returns:
+        dict {t: v, t:v, ...}
+    """
+
+    tags = {}
+    offset = 0
+    while offset < len(tlv):
+        # One or two byte tag, then a one byte length or 81/82 followed by the length
+        tag_len = 2 if (tlv[offset] & 0x1F) == 0x1F else 1
+        if offset + tag_len + 1 > len(tlv):
+            raise ValueError("Truncated TLV data")
+        tag = int.from_bytes(tlv[offset : offset + tag_len], "big")
+        offset += tag_len
+        length = tlv[offset]
+        offset += 1
+        if length & 0x80:
+            num_bytes = length & 0x7F
+            if num_bytes not in (1, 2) or offset + num_bytes > len(tlv):
+                raise ValueError(f"Invalid TLV length for tag {tag:x}")
+            length = int.from_bytes(tlv[offset : offset + num_bytes], "big")
+            offset += num_bytes
+        if offset + length > len(tlv):
+            raise ValueError(f"Truncated TLV value for tag {tag:x}")
+        if tag in tags:
+            raise ValueError(f"Duplicate TLV tag {tag:x}")
+        tags[tag] = tlv[offset : offset + length]
+        offset += length
+    return tags
+
+
+def _read_makefile() -> list[str]:
+    """Read lines from the parent Makefile"""
+
+    parent = Path(ROOT_SCREENSHOT_PATH).parent.parent.resolve()
+    makefile = f"{parent}/Makefile"
+    print(f"Analyzing {makefile}...")
+    with open(makefile, encoding="utf-8") as f_p:
+        lines = f_p.readlines()
+
+    return lines
+
+
+def _get_pub_key(client: CommandSender, key_tag: DataObject) -> dict:
+    """Read the Public Key parameters
+
+    Args:
+        client (CommandSender): Application object
+        key_tag (DataObject):   Tag identifying the key to read
+
+    Returns:
+        Dictionary with key parameters
+    """
+
+    rapdu = client.read_key(key_tag)
+    assert rapdu.status == Errors.SW_OK
+
+    # Extract Pub key parameters
+    tags = decode_tlv(rapdu.data)
+    return decode_tlv(tags[DataObject.DO_PUB_KEY])

@@ -18,14 +18,14 @@
 #ifndef GPG_TYPES_H
 #define GPG_TYPES_H
 
+#include "os.h"
+#include "cx.h"
 #include "lcx_sha3.h"
 #include "usbd_ccid_if.h"
 #include "status_words.h"
 #include "nbgl_layout.h"
 
-/* cannot send more that F0 bytes in CCID, why? do not know for now
- *  So set up length to F0 minus 2 bytes for SW
- */
+// Largest APDU response, status word included, announced in the extended length information
 #define GPG_APDU_LENGTH 0xFE
 
 /* big private DO */
@@ -41,6 +41,8 @@
 
 #define MAGIC_LENGTH       8
 #define AID_LENGTH         16
+#define AID_SERIAL_OFFSET  10
+#define AID_SERIAL_LENGTH  4
 #define HISTO_LENGTH       15
 #define HISTO_OFFSET_STATE 12  // 3rd byte from last (buffer size is 15)
 #define GPG_KEYS_SLOTS     3
@@ -68,7 +70,6 @@
 #define KEY_ID_EDDSA 22  // Edwards-curve Digital Signature Algorithm
 
 struct gpg_pin_s {
-    unsigned int ref;
     // initial pin length, 0 means not set
     unsigned int length;
     unsigned int counter;

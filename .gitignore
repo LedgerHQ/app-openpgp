@@ -9,7 +9,7 @@ debug/
 glyphs/home_gpg_14px.gif
 
 # Temporary directory with snapshots taken during test runs
-tests/ragger/snapshots-tmp/
+tests/functional/snapshots-tmp/
 
 # manual tests
 tests/manual/foo*
@@ -18,8 +18,6 @@ tests/manual/work
 
 # Unit tests and code coverage
 tests/unit/build/
-tests/unit/coverage/
-tests/unit/coverage.info
 
 # Fuzzing
 fuzzing/build/

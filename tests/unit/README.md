@@ -1,48 +1,55 @@
 # Unit tests
 
-## Prerequisite
+The unit tests use the SDK unit-test framework (`LedgerUT`), based on
+[Unity](https://github.com/ThrowTheSwitch/Unity) and [CMock](https://github.com/ThrowTheSwitch/CMock).
+It is documented in the SDK, in `cmake/USAGE.md`.
 
-Be sure to have installed:
+## Prerequisites
 
 - CMake >= 3.10
-- CMocka >= 1.1.5
+- Ruby, used by CMock to generate the mocks
+- Network access on the first configuration, to fetch Unity and CMock
+- lcov >= 1.14, for the code coverage
 
-and for code coverage generation:
+All of them are available in the `ledger-app-builder` Docker images.
+`BOLOS_SDK` must point to the SDK, as it does in these images.
 
-- lcov >= 1.14
+## Layout
 
-## Overview
+| Path | Content |
+| --- | --- |
+| `CMakeLists.txt` | Test declarations, one `ledger_unit_tests_add_test()` per test executable |
+| `test_<name>.c` | Test executable `test_<name>` |
+| `fakes/` | Hand-written replacements of SDK functions (`io_exchange`, `nvm_write`, `assert_exit`) and of the generated `glyphs.h` |
 
-In `tests/unit` folder, compile with:
+Prefer the real SDK headers and CMock mocks (`MOCK_HEADERS`) to new fakes.
+A fake is worth it when the test needs a stateful behaviour, like the APDU exchange in `fakes/fake_io.c`.
 
-```shell
-cmake -Bbuild -H. && make -C build
-```
+`LEDGER_ASSERT` failures make the test fail, as they reset the device.
+Use `TEST_ASSERT_LEDGER_ASSERT(statement)` from `fakes/fake_assert.h` to check that a statement does trigger one.
 
-and run tests with:
+## Build and run
 
-```shell
-CTEST_OUTPUT_ON_FAILURE=1 make -C build test
-```
-
-To get more verbose output, use:
-
-```shell
-CTEST_OUTPUT_ON_FAILURE=1 make -C build test ARGS="-V"
-```
-
-Or also directly with:
+In `tests/unit` folder:
 
 ```shell
-CTEST_OUTPUT_ON_FAILURE=1 build/test_io
+cmake -B build -S .
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-## Generate code coverage
+A single test executable can also be run directly, for example `build/test_io`.
 
-Just execute in `tests/unit` folder:
+The test executables are built with AddressSanitizer and UndefinedBehaviorSanitizer:
+an invalid memory access or an undefined behaviour aborts the test with its call stack.
+Configure with `-DLEDGER_UT_SANITIZERS=OFF` to build without them.
+
+## Code coverage
+
+After running the tests:
 
 ```shell
-./gen_coverage.sh
+cmake --build build --target generate_coverage
 ```
 
-it will output `coverage.total` and `coverage/` folder with HTML details (in `coverage/index.html`).
+It outputs `build/coverage.info`, `build/coverage.xml`, and an HTML report in `build/coverage/index.html`.
