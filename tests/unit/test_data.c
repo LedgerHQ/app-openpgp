@@ -464,9 +464,11 @@ static void test_application_related_data(void) {
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_apdu_get_data(0x004F));
     memcpy(aid, G_gpg_vstate.work.io_buffer, sizeof(aid));
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, put_data(0xC1, ATTR_RSA2048, sizeof(ATTR_RSA2048)));
+    memset((void *) N_gpg_pstate->histo, 0xA5, HISTO_LENGTH);
     TEST_ASSERT_EQUAL_HEX16(SWO_SUCCESS, gpg_apdu_get_data(0x6E));
 
-    // AID, the same as DO 4F, extended length information, then the discretionary data objects
+    // AID, the same as DO 4F, historical bytes, extended length information,
+    // then the discretionary data objects
     gpg_io_set_offset(0);
     TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x4F, t);
@@ -474,6 +476,11 @@ static void test_application_related_data(void) {
     TEST_ASSERT_EQUAL_HEX8_ARRAY(aid,
                                  G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset,
                                  AID_LENGTH);
+    TEST_ASSERT_TRUE(gpg_io_skip(l));
+    TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
+    TEST_ASSERT_EQUAL_HEX(0x5F52, t);
+    TEST_ASSERT_EQUAL_UINT(HISTO_LENGTH, l);
+    TEST_ASSERT_EACH_EQUAL_HEX8(0xA5, G_gpg_vstate.work.io_buffer + G_gpg_vstate.io_offset, l);
     TEST_ASSERT_TRUE(gpg_io_skip(l));
     TEST_ASSERT_TRUE(gpg_io_fetch_tl(&t, &l));
     TEST_ASSERT_EQUAL_HEX(0x7F66, t);
