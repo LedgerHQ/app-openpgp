@@ -13,12 +13,13 @@ if(NOT DEFINED ENV{BOLOS_SDK})
 endif()
 
 set(SDK_DIR $ENV{BOLOS_SDK})
+set(LEDGER_UT_APP_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 include(${SDK_DIR}/cmake/LedgerUT.cmake)
 
 #######################################################################
 #             Setup app specific includes & compile defs              #
 #######################################################################
-set(APP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+set(APP_DIR ${LEDGER_UT_APP_SRC_DIR})
 set(FAKES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/fakes)
 
 set(FAKE_SOURCES
@@ -34,6 +35,16 @@ list(APPEND FAKE_SOURCES
     ${SDK_DIR}/lib_standard_app/read.c
     ${SDK_DIR}/lib_standard_app/varint.c
     ${SDK_DIR}/lib_standard_app/write.c
+)
+
+# Key, PIN and DO handling shared by the tests on the main commands
+set(CORE_SOURCES
+    ${APP_DIR}/gpg_data.c
+    ${APP_DIR}/gpg_gen.c
+    ${APP_DIR}/gpg_init.c
+    ${APP_DIR}/gpg_io.c
+    ${APP_DIR}/gpg_mse.c
+    ${APP_DIR}/gpg_pin.c
 )
 
 # SDK services replaced by CMock mocks
@@ -74,8 +85,7 @@ set(UT_COMPILE_DEFS
 #######################################################################
 ledger_unit_tests_init()
 
-# The app sources live in ../../src: ledger_unit_tests_find_sources() only looks in ../src
-file(GLOB APP_SOURCES CONFIGURE_DEPENDS ${APP_DIR}/*.c)
+ledger_unit_tests_find_sources()
 list(FILTER APP_SOURCES EXCLUDE REGEX "/gpg_main\\.c$")
 
 # Built only so that every app source has a .gcno file for the coverage baseline
@@ -83,13 +93,6 @@ ledger_unit_tests_build_app_sources_as_lib(
     SOURCES      ${APP_SOURCES}
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-)
-
-# generate_coverage filters on ../src: regenerate the report restricted to the app sources
-add_custom_command(TARGET generate_coverage POST_BUILD
-    COMMAND ${LEDGER_UT_DIR}/gen_coverage.sh ${APP_DIR}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    VERBATIM
 )
 
 #######################################################################
@@ -106,12 +109,7 @@ ledger_unit_tests_add_test(
 
 ledger_unit_tests_add_test(
     NAME         test_data
-    SOURCES      ${APP_DIR}/gpg_data.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+    SOURCES      ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
@@ -151,11 +149,7 @@ ledger_unit_tests_add_test(
 ledger_unit_tests_add_test(
     NAME         test_pso
     SOURCES      ${APP_DIR}/gpg_pso.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+                 ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
@@ -171,12 +165,7 @@ ledger_unit_tests_add_test(
 ledger_unit_tests_add_test(
     NAME         test_backup
     SOURCES      ${FAKES_DIR}/fake_digest.c
-                 ${APP_DIR}/gpg_data.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+                 ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
@@ -189,12 +178,7 @@ ledger_unit_tests_add_test(
 ledger_unit_tests_add_test(
     NAME         test_gen
     SOURCES      ${FAKES_DIR}/fake_digest.c
-                 ${APP_DIR}/gpg_data.c
-                 ${APP_DIR}/gpg_gen.c
-                 ${APP_DIR}/gpg_init.c
-                 ${APP_DIR}/gpg_io.c
-                 ${APP_DIR}/gpg_mse.c
-                 ${APP_DIR}/gpg_pin.c
+                 ${CORE_SOURCES}
                  ${FAKES_DIR}/fake_vars.c
                  ${FAKE_SOURCES}
     MOCK_HEADERS ${CRYPTO_MOCK_HEADERS}
