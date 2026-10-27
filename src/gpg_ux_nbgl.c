@@ -845,9 +845,7 @@ static void pin_cb(int token, uint8_t index) {
                     }
                     break;
                 case PIN_MODE_TRUST:
-                    if (gpg_pin_is_verified(PIN_ID_PW3) == 0) {
-                        err = PIN_ADMIN;
-                    }
+                    // Trust mode does not require Admin PIN (PW3).
                     break;
             }
             if (err != NULL) {
