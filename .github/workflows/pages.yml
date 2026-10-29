@@ -15,14 +15,24 @@ on:
       - 'clients/wui/**'
       - '.github/workflows/pages.yml'
 
+permissions:
+  contents: read
+
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  # One lock per pull request, and a separate one for the deployments.
+  group: >-
+    ${{ github.event_name == 'pull_request'
+        && format('pages-pr-{0}', github.event.pull_request.number)
+        || format('pages-deploy-{0}', github.ref) }}
+  # Superseding a pull request's own run is fine; a deployment in flight is not interrupted.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     name: Build documentation
     runs-on: ubuntu-latest
+    # The install and build steps run scripts from the checked-out branch.
+    timeout-minutes: 15
     permissions:
       contents: read
       pages: read
