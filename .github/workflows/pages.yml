@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - develop
+      - master
     paths:
       - 'doc/**'
       - 'clients/wui/**'
@@ -85,7 +86,10 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+    # Deploy from the repository's default branch only (develop here, master on the public mirror).
+    if: >-
+      github.event_name != 'pull_request'
+      && github.ref_name == github.event.repository.default_branch
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
