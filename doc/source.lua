@@ -4,6 +4,11 @@
 
 -- Canonical path of an existing file, or nil
 local function realpath(path)
+  local f = io.open(path, "r")
+  if not f then
+    return nil
+  end
+  f:close()
   local ok, out = pcall(pandoc.pipe, "realpath", { "-e", "-q", "--", path }, "")
   if ok then
     return (out:gsub("\n$", ""))
