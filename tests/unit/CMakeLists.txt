@@ -62,9 +62,6 @@ set(CRYPTO_MOCK_HEADERS
     ${SDK_DIR}/lib_cxng/include/lcx_sha3.h
 )
 
-# CMock checks for NULL the arguments that SDK headers declare nonnull
-set(MOCK_COMPILE_OPTIONS -Wno-nonnull-compare)
-
 set(UT_INCLUDE_DIRS
     ${FAKES_DIR}
     ${APP_DIR}
@@ -116,7 +113,6 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -131,7 +127,6 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -143,7 +138,6 @@ ledger_unit_tests_add_test(
                  ${SDK_DIR}/lib_standard_app/main_std_app.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -159,7 +153,6 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -172,7 +165,6 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -185,7 +177,6 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -212,7 +203,6 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -229,7 +219,6 @@ ledger_unit_tests_add_test(
                  ${SDK_DIR}/lib_cxng/include/lcx_sha3.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -247,7 +236,6 @@ ledger_unit_tests_add_test(
                  ${APP_DIR}/gpg_ux.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
 
 ledger_unit_tests_add_test(
@@ -262,5 +250,4 @@ ledger_unit_tests_add_test(
                  ${SDK_DIR}/lib_standard_app/main_std_app.h
     INCLUDE_DIRS ${UT_INCLUDE_DIRS}
     COMPILE_DEFS ${UT_COMPILE_DEFS}
-    COMPILE_OPTIONS ${MOCK_COMPILE_OPTIONS}
 )
