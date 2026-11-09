@@ -246,12 +246,12 @@ FIXED_KEYPAD_CHOICE = {DeviceType.FLEX: (430, 234), DeviceType.STAX: (350, 233),
 PIN_MODE_SETTING = {DeviceType.FLEX: (430, 325), DeviceType.STAX: (350, 320), DeviceType.APEX_P: (270, 235)}
 
 
-# In this test we check that a pinpad VERIFY is answered in TRUST mode
-def test_verify_trust_mode(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
-    client = CommandSender(backend)
-    check_pincode(client, PassWord.PW3)
+CONFIRM_CHOICE = {DeviceType.FLEX: (430, 326), DeviceType.STAX: (350, 326), DeviceType.APEX_P: (270, 230)}
 
-    # Settings / PIN mode / Trust / confirm
+
+def _select_trust_mode(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
+    """Settings / PIN mode / Trust / confirm"""
+
     if device.is_nano:
         navigator.navigate(
             [NavInsID.RIGHT_CLICK, NavInsID.RIGHT_CLICK, NavInsID.BOTH_CLICK],
@@ -278,10 +278,42 @@ def test_verify_trust_mode(device: Device, backend: BackendInterface, navigator:
         )
     backend.wait_for_text_on_screen("TRUST MODE")
 
+
+# In this test we check that TRUST mode is selected with no PIN verified, then answers a pinpad VERIFY
+def test_verify_trust_mode(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
+    client = CommandSender(backend)
+    _select_trust_mode(device, backend, navigator)
+
     rapdu = backend.exchange(cla=ClaType.CLA_APP_VERIFY, ins=InsType.INS_VERIFY, p2=PassWord.PW1)
     assert rapdu.status == Errors.SW_OK
     rapdu = client.send_verify_pw(PassWord.PW1)
     assert rapdu.status == Errors.SW_OK
+
+
+# In this test we check that Confirm Only is selected back from TRUST mode with no PIN verified
+def test_trust_mode_back_to_confirm(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
+    _select_trust_mode(device, backend, navigator)
+
+    # Back to the PIN mode setting, once the TRUST MODE status is dismissed
+    backend.wait_for_text_not_on_screen("TRUST MODE")
+    if device.is_nano:
+        navigator.navigate_until_text(
+            NavInsID.LEFT_CLICK, [NavInsID.BOTH_CLICK], "Confirm", screen_change_before_first_instruction=False
+        )
+    else:
+        navigator.navigate([NavIns(NavInsID.TOUCH, CONFIRM_CHOICE[device.type])], screen_change_before_first_instruction=False)
+
+    header = struct.pack(">BBBB", ClaType.CLA_APP_VERIFY, InsType.INS_VERIFY, 0, PassWord.PW1)
+    with pytest.raises(ExceptionRAPDU) as err:
+        with backend.exchange_async_raw(header):
+            backend.wait_for_text_on_screen("Confirm PIN")
+            if device.is_nano:
+                navigator.navigate_until_text(
+                    NavInsID.RIGHT_CLICK, [NavInsID.BOTH_CLICK], "No", screen_change_before_first_instruction=False
+                )
+            else:
+                navigator.navigate([NavInsID.USE_CASE_CHOICE_REJECT], screen_change_before_first_instruction=False)
+    assert err.value.status == Errors.SW_CONDITIONS_NOT_SATISFIED
 
 
 # Centers of the keypad columns and rows (digits 1 to 9, then back, 0 and validate) on touch devices
@@ -311,10 +343,9 @@ def _enter_pin(device: Device, navigator: Navigator, pin: str) -> None:
 
 
 def _use_fixed_keypad(device: Device, backend: BackendInterface, navigator: Navigator) -> None:
-    """Select the fixed keypad in the PIN mode setting, which requires the User PIN"""
+    """Select the fixed keypad in the PIN mode setting"""
 
     client = CommandSender(backend)
-    check_pincode(client, PassWord.PW2)
 
     # Settings / PIN mode / Fixed keypad
     if device.is_nano:

@@ -441,14 +441,10 @@ static void test_uif_blocks_commands(void) {
 /* PIN mode settings                                                       */
 /* ----------------------------------------------------------------------- */
 
-static void test_pin_mode_trust_requires_pw3(void) {
+static void test_pin_mode_trust(void) {
+    // The Trust mode needs no verified PIN, only a confirmation
     G_gpg_vstate.pinmode = PIN_MODE_CONFIRM;
 
-    pin_cb(TOKEN_PIN_SET, PIN_CHOICE_TRUST);
-    TEST_ASSERT_EQUAL_HEX8(PIN_MODE_CONFIRM, G_gpg_vstate.pinmode);
-
-    // With PW3, the Trust mode is only selected after a confirmation
-    verified[PIN_ID_PW3] = 1;
     pin_cb(TOKEN_PIN_SET, PIN_CHOICE_TRUST);
     TEST_ASSERT_EQUAL_HEX8(PIN_MODE_CONFIRM, G_gpg_vstate.pinmode);
     TEST_ASSERT_EQUAL_HEX8(PIN_MODE_TRUST, G_gpg_vstate.pinmode_req);
@@ -456,17 +452,28 @@ static void test_pin_mode_trust_requires_pw3(void) {
     TEST_ASSERT_EQUAL_HEX8(PIN_MODE_TRUST, G_gpg_vstate.pinmode);
 }
 
-static void test_pin_mode_screen_requires_pw1(void) {
+static void test_pin_mode_trust_refused(void) {
     G_gpg_vstate.pinmode = PIN_MODE_CONFIRM;
 
-    pin_cb(TOKEN_PIN_SET, PIN_CHOICE_SCREEN);
+    pin_cb(TOKEN_PIN_SET, PIN_CHOICE_TRUST);
+    trust_cb(false);
     TEST_ASSERT_EQUAL_HEX8(PIN_MODE_CONFIRM, G_gpg_vstate.pinmode);
+}
 
-    verified[PIN_ID_PW2] = 1;
+static void test_pin_mode_screen(void) {
+    G_gpg_vstate.pinmode = PIN_MODE_CONFIRM;
     G_gpg_vstate.keypad_shuffle = true;
+
     pin_cb(TOKEN_PIN_SET, PIN_CHOICE_SCREEN);
     TEST_ASSERT_EQUAL_HEX8(PIN_MODE_SCREEN, G_gpg_vstate.pinmode);
     TEST_ASSERT_FALSE(G_gpg_vstate.keypad_shuffle);
+}
+
+static void test_pin_mode_confirm_from_trust(void) {
+    G_gpg_vstate.pinmode = PIN_MODE_TRUST;
+
+    pin_cb(TOKEN_PIN_SET, PIN_CHOICE_CONFIRM);
+    TEST_ASSERT_EQUAL_HEX8(PIN_MODE_CONFIRM, G_gpg_vstate.pinmode);
 }
 
 static void test_pin_mode_default(void) {
@@ -737,8 +744,10 @@ int main(void) {
     RUN_TEST(test_uif_confirmed);
     RUN_TEST(test_uif_refused);
     RUN_TEST(test_uif_blocks_commands);
-    RUN_TEST(test_pin_mode_trust_requires_pw3);
-    RUN_TEST(test_pin_mode_screen_requires_pw1);
+    RUN_TEST(test_pin_mode_trust);
+    RUN_TEST(test_pin_mode_trust_refused);
+    RUN_TEST(test_pin_mode_screen);
+    RUN_TEST(test_pin_mode_confirm_from_trust);
     RUN_TEST(test_pin_mode_default);
     RUN_TEST(test_template_change_other_slot);
     RUN_TEST(test_template_change);

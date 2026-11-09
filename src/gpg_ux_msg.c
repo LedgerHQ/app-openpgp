@@ -27,11 +27,8 @@ const char *const C_RIGHT_PIN = "PIN Correct";
 const char *const C_PIN_CHANGED = "PIN changed";
 const char *const C_PIN_LOCKED = "PIN locked";
 const char *const C_PIN_DIFFERS = "2 PINs differs";
-const char *const C_PIN_USER = "User PIN";
-const char *const C_PIN_ADMIN = "Admin PIN";
 
 const char *const C_VERIFIED = "Verified";
-const char *const C_NOT_VERIFIED = "Not Verified";
 const char *const C_ALLOWED = "Allowed";
 const char *const C_NOT_ALLOWED = "Not Allowed ";
 
