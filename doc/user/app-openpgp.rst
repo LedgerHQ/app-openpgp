@@ -405,11 +405,6 @@ selecting the *Set default* menu.
 
 Note: *Trust* can not be set as default mode.
 
-Before you can change the PIN mode, you need to verify the PIN on the client. To do this,
-run ``gpg --card-edit``, then ``admin`` and finally ``verify`` on you PC. You will then
-be asked to enter the current PIN. After doing so, you can change the PIN mode on your
-device.
-
 
 **On Screen**
 

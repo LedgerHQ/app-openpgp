@@ -194,11 +194,6 @@ def test_menu_settings(device: Device, backend: BackendInterface, navigator: Nav
                 NavInsID.USE_CASE_CHOICE_CONFIRM,  # Press 'Reset'
             ]
 
-    # Use the app interface instead of raw interface
-    client = CommandSender(backend)
-    # Verify PW2 (User)
-    check_pincode(client, PassWord.PW2)
-
     # Navigate to settings menu to avoid 1st screen with random serial no
     navigator.navigate(
         initial_instructions,
