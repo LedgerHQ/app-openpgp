@@ -979,7 +979,6 @@ static uint8_t pin_choice(uint8_t mode, bool shuffle) {
  *
  */
 static void pin_cb(int token, uint8_t index) {
-    const char *err = NULL;
     uint8_t mode = PIN_MODE_MAX;
 
     G_gpg_vstate.pinmode_req = 0xFF;
@@ -1004,24 +1003,6 @@ static void pin_cb(int token, uint8_t index) {
                     break;
                 default:
                     return;
-            }
-            switch (mode) {
-                case PIN_MODE_SCREEN:
-                case PIN_MODE_CONFIRM:
-                    if ((gpg_pin_is_verified(PIN_ID_PW1) == 0) &&
-                        (gpg_pin_is_verified(PIN_ID_PW2) == 0)) {
-                        err = PIN_USER;
-                    }
-                    break;
-                case PIN_MODE_TRUST:
-                    if (gpg_pin_is_verified(PIN_ID_PW3) == 0) {
-                        err = PIN_ADMIN;
-                    }
-                    break;
-            }
-            if (err != NULL) {
-                ui_info(err, NOT_VERIFIED, ui_settings_pin, false);
-                break;
             }
 #ifdef SCREEN_SIZE_NANO
             pin_initPage = index;
