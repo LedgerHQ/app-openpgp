@@ -197,7 +197,7 @@ Thus, you must ensure (or add):
 Notes:
 
 - The 3 entry nodes must be added for each device. It can be easier to add new ones at the end of each list.
-- A file `0001-plist.patch` is provided in this directory.
+- The files `0001-plist-ubuntu22.patch` and `0001-plist-ubuntu24.patch` are provided in this directory.
 - With Ubuntu 22.04, gpg default version is 2.2.27, which is announced End-of-Life by 2024-12-31. You may update to a newer version
 - gpg version 2.2.27 has some conflict with other smartcards like Yubikey. If needed, update to v2.4.0 using [this link](https://www.procustodibus.com/blog/2023/02/gpg-2-4-on-ubuntu-22-04/)
 
