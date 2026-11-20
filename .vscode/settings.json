@@ -64,6 +64,7 @@
             "test_password.py::test_change_revokes_pw2_session",
             "test_password.py::test_reset_with_resetting_code",
             "test_password.py::test_verify_trust_mode",
+            "test_password.py::test_trust_mode_back_to_confirm",
             "test_password.py::test_change_pin_cancelled",
             "test_password.py::test_access_without_pin",
             "test_password.py::test_terminate_pw3_not_verified",
